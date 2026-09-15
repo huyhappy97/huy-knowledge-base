@@ -1,0 +1,169 @@
+% ============================================================================
+%  Chương 18 — Pretraining, transfer và mô hình nền tảng
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: B/06, B/07, B/09, C/13, C/14 | Mức độ: cốt lõi
+% ============================================================================
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Pretraining, transfer và mô hình nền tảng (Pretraining, Transfer and Foundation Models)}
+\ptrtarget{C/18}\ptrtarget{C/18-pretraining-va-foundation}
+\dependency{\ptr{B/06-chat-luong-du-lieu} và \ptr{B/07-chia-du-lieu-va-danh-gia} (chi phí nhãn và cách đánh giá không tự lừa mình); \ptr{B/09-thiet-ke-ham-mat-mat} (\en{contrastive loss}, cross-entropy); \ptr{C/13-kien-truc-backbone} (ViT và \en{inductive bias} --- chương này giải thích vì sao ViT chỉ toả sáng khi có tiền huấn luyện quy mô lớn).}
+
+\begin{tomtat}
+Chương này trả lời một câu hỏi: nhãn thì đắt, dữ liệu không nhãn thì vô hạn --- vậy tín hiệu giám sát miễn phí lấy từ đâu, và mua bao nhiêu thì đủ. Mục 18.1 đi qua bốn nguồn giám sát rẻ dần và nói mỗi nguồn hỏng ở đâu; mục 18.2 đưa ra mặt định lượng: scaling laws, bài học Chinchilla, nhiễm bẩn tập kiểm tra, và LoRA. Đọc xong bạn chọn được \en{backbone}, chọn được chế độ thích nghi, và ước lượng được hoá đơn compute --- thay vì hỏi người khác hoặc thử mù. Nếu chỉ nhớ một điều: mô hình nền tảng đã biến bạn từ người huấn luyện thành người tích hợp, nên câu hỏi trung tâm đổi từ ``mô hình này có đúng không'' sang ``tôi có biết nó giả định gì và hỏng ở đâu không''.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mô hình (model)}{một hàm có tham số, ánh xạ đầu vào (ảnh) sang đầu ra (nhãn, hộp, vector đặc trưng). ``Huấn luyện'' nghĩa là tìm bộ tham số làm hàm mất mát nhỏ nhất trên dữ liệu.}
+\kn{tiền huấn luyện (pretraining)}{huấn luyện một mô hình trên một tập dữ liệu lớn, tổng quát, \emph{trước} khi biết bài toán cuối là gì. Mục đích là để mô hình học sẵn những đặc trưng chung của ảnh, thứ mà dữ liệu ít ỏi của bài toán cuối không đủ để học lại.}
+\kn{học chuyển giao (transfer learning)}{lấy mô hình đã tiền huấn luyện rồi dùng lại cho bài toán khác, hoặc bằng cách đóng băng nó, hoặc bằng cách huấn luyện tiếp trên dữ liệu của mình.}
+\kn{backbone}{phần thân của mạng chịu trách nhiệm biến ảnh thành vector đặc trưng; phần ``đầu'' (head) gắn sau nó mới sinh ra đầu ra cụ thể của từng bài toán. Tách hai phần ra là điều kiện để tái sử dụng.}
+\kn{học tự giám sát (self-supervised learning)}{huấn luyện mà không dùng nhãn người: đáp án của bài toán phụ được suy ra từ chính dữ liệu, chẳng hạn ``hai lát cắt của cùng bức ảnh phải cho vector giống nhau''.}
+\kn{mô hình nền tảng (foundation model)}{một mô hình lớn được tiền huấn luyện trên dữ liệu quy mô rất lớn, đủ tổng quát để dùng lại cho nhiều bài toán khác nhau mà không huấn luyện lại từ đầu.}
+\kn{VLM (vision-language model)}{mô hình nhận cả ảnh lẫn văn bản làm đầu vào và sinh ra văn bản, thường bằng cách nối một bộ mã hoá ảnh vào một mô hình ngôn ngữ lớn.}
+\kn{ngân sách compute}{tổng số phép tính (FLOPs) bạn mua được cho một lần huấn luyện. Vì nó cố định, mọi quyết định về kích thước mô hình và lượng dữ liệu đều là quyết định phân bổ trong cùng một ngân sách.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Với 500 ảnh nội soi, \en{linear probe} trên một \en{backbone} khổng lồ hay tinh chỉnh toàn bộ một ResNet nhỏ sẽ thắng? Và vì sao câu trả lời đảo chiều ở 50\,000 ảnh?}
+\h{Nếu chỉ cần dạy mô hình rằng hai lát cắt của cùng một bức ảnh phải cho vector giống nhau, vì sao nó không học ngay nghiệm rẻ nhất là xuất một hằng số cho mọi ảnh?}
+\h{Vì sao một dòng chú thích cẩu thả trên internet lại là tín hiệu giám sát ngữ nghĩa mạnh hơn một nhãn ImageNet do người gán cẩn thận?}
+\h{Gopher lớn gấp bốn lần Chinchilla và tốn cùng số FLOPs để huấn luyện, nhưng thua --- cả ngành đã tối ưu nhầm đại lượng nào suốt mấy năm?}
+\h{Vì sao một mô hình chưa bao giờ nhìn thấy ảnh vệ tinh lại cho đặc trưng ảnh vệ tinh tốt hơn một mạng huấn luyện riêng trên ảnh vệ tinh?}
+\end{khoigoi}
+
+Câu hỏi dẫn dắt của cả chương chỉ có một dòng: \emph{nhãn thì đắt, dữ liệu không nhãn thì vô hạn --- tín hiệu giám sát miễn phí có thể lấy từ đâu?} Mọi kỹ thuật trong chương, từ học chuyển giao những năm 2014 tới VLM ngày nay, là một câu trả lời cho đúng câu hỏi đó, và các câu trả lời xếp thành một chuỗi ngày càng táo bạo: dùng nhãn của người khác, rồi dùng chính bức ảnh, rồi dùng dòng chữ đi kèm bức ảnh, rồi mượn luôn khả năng suy luận của một mô hình ngôn ngữ.
+
+Chuỗi ấy là một mạch \emph{định tính}: nó nói cho bạn biết có những nguồn giám sát nào và mỗi nguồn giả định gì. Nhưng nó không trả lời được câu hỏi mà bạn thực sự phải quyết định khi ngồi trước một cụm GPU có hạn: \emph{tiêu ngân sách vào đâu, và bao nhiêu thì đủ?} Đó là một mạch khác, mang tính \emph{định lượng} và kinh tế, với từ vựng riêng --- \en{scaling laws}, tỉ lệ dữ liệu trên tham số, chi phí thích nghi. Hai mạch dùng chung đối tượng nhưng khác hẳn nhau về loại lập luận, và trộn chúng vào một mạch duy nhất là cách nhanh nhất để cả hai đều mờ đi. Vì vậy chương chia làm hai mục:
+
+\begin{itemize}
+\item \textbf{18.1 --- Nguồn giám sát ngày càng rẻ.} Chuỗi bốn nguồn, dừng ở từng nguồn để hỏi nó chống lại nghiệm tầm thường bằng cách nào, nó ép vào biểu diễn những bất biến gì, và nó hỏng ở đâu.
+\item \textbf{18.2 --- Kinh tế học của pretraining.} Lấy kết quả của mục trước làm cho sẵn rồi hỏi tiếp: với chừng này compute thì mô hình nên lớn cỡ nào, dữ liệu nên nhiều cỡ nào, và khi nào tinh chỉnh đáng giá hơn đóng băng.
+\end{itemize}
+
+Thứ tự đọc là bắt buộc theo chiều này: mục 18.2 nhắc tới \en{linear probe}, \en{fine-tune} và mô hình nền tảng như những khái niệm đã biết. Có một điểm nối giữa hai mục đáng nói trước: cả hai kết thúc ở cùng một kết luận về phương pháp luận. Mục 18.1 kết luận rằng bạn không thể biết một biểu diễn tự giám sát đã học gì nếu chỉ nhìn \en{benchmark} chung; mục 18.2 kết luận rằng bạn không thể biết chế độ thích nghi nào đúng nếu chỉ nghe lời khuyên chung. Cả hai đẩy bạn về cùng một hành động: đo trên chính dữ liệu của mình, với một tập đánh giá mà mô hình nền tảng chắc chắn chưa từng thấy.
+
+
+Hình~\ref{fig:bando-ch18} vẽ chỗ nối giữa hai mục: mục 18.1 sản xuất ra một mô hình nền tảng, còn mục 18.2 hỏi cái mô hình ấy tốn bao nhiêu và thích nghi thế nào cho rẻ.
+
+\begin{figure}[H]\centering
+\resizebox{0.97\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  lane/.style={draw=rulecol, fill=bluebg!40, rounded corners=4pt, inner sep=8pt},
+  b/.style={draw=steel, fill=bluebg, rounded corners=2pt, align=center, inner sep=4pt, text width=2.6cm, font=\footnotesize},
+  hot/.style={draw=violetdark, fill=violetbg, rounded corners=2pt, align=center, inner sep=4pt, text width=2.6cm, font=\footnotesize\bfseries},
+  ar/.style={-{Latex[length=2.2mm]}, draw=inkblue, thick}]
+\node[b] (n1) at (0,0)    {nhãn của người khác};
+\node[b] (n2) at (3.3,0)  {chính bức ảnh};
+\node[b] (n3) at (6.6,0)  {chữ đi kèm ảnh};
+\node[b] (n4) at (9.9,0)  {mượn một LLM};
+\node[hot] (fm) at (13.4,0) {mô hình nền tảng};
+\foreach \a/\b in {n1/n2, n2/n3, n3/n4, n4/fm} \draw[ar] (\a) -- (\b);
+\node[font=\footnotesize\itshape, color=steel, anchor=west] at (-1.9,0) {\rotatebox{90}{\textbf{18.1}}};
+\node[b] (m1) at (0,-2.6)   {ngân sách \(C\approx 6ND\)};
+\node[b] (m2) at (3.3,-2.6) {Chinchilla: thiếu dữ liệu};
+\node[b] (m3) at (6.6,-2.6) {chất lượng hơn số lượng};
+\node[b] (m4) at (9.9,-2.6) {LoRA: thích nghi rẻ};
+\node[hot] (dg) at (13.4,-2.6) {thí nghiệm điểm giao};
+\foreach \a/\b in {m1/m2, m2/m3, m3/m4, m4/dg} \draw[ar] (\a) -- (\b);
+\node[font=\footnotesize\itshape, color=steel, anchor=west] at (-1.9,-2.6) {\rotatebox{90}{\textbf{18.2}}};
+\draw[ar, draw=violetdark] (fm) to[bend left=32] node[right=2pt, font=\scriptsize\itshape, color=violetdark, align=left]{dựng nó tốn bao nhiêu?\\ thích nghi thế nào cho rẻ?} (dg);
+\node[font=\footnotesize\itshape, color=tiercol, anchor=west, align=left] at (-1.4,-4.4)
+  {Hàng trên: giám sát rẻ dần, tín hiệu gián tiếp dần. Hàng dưới: cùng một ngân sách nhìn từ phía chi phí.};
+\end{tikzpicture}}
+\caption{Bản đồ chương 18. Hai mục không nối tiếp nhau về thời gian mà nối nhau ở \emph{đối tượng}: mục 18.1 kết thúc ở mô hình nền tảng, và mục 18.2 bắt đầu bằng câu hỏi mô hình đó tốn bao nhiêu. Mọi con số chung ở hàng dưới đều kết thúc ở cùng một chỗ --- một thí nghiệm bạn phải tự chạy trên dữ liệu của mình.}
+\label{fig:bando-ch18}
+\end{figure}
+
+\subfile{00-map}
+\subfile{01-nguon-giam-sat/nguon-giam-sat}
+\subfile{02-kinh-te-hoc-pretraining/kinh-te-hoc-pretraining}
+
+\section{Thực hành}
+Phần thực hành của chương này có một đặc điểm khác các chương trước: bạn gần như không huấn luyện gì từ đầu. Công việc chủ yếu là chọn đúng thành phần dựng sẵn, đo xem nó hợp với dữ liệu của mình tới đâu, và biết dừng lại ở chế độ thích nghi rẻ nhất còn đủ tốt.
+
+\begin{description}
+\item[Repo và tài nguyên.] \emph{Backbone tự giám sát:} \repo{facebookresearch/dinov3} (có cả bản cho ảnh vệ tinh; giấy phép riêng --- dùng DINOv2 nếu bắt buộc Apache 2.0), \repo{facebookresearch/mae}, \repo{lightly-ai/lightly} và \repo{lightly-train} khi muốn tự tiền huấn luyện trên dữ liệu của chính mình. \emph{Thị giác--ngôn ngữ:} \code{mlfoundations/open\_clip}, SigLIP. \emph{VLM mở đáng thử tại thời điểm viết:} Qwen3-VL (mạnh toàn diện, OCR và video tốt), InternVL3 (giấy phép MIT, thoáng nhất nhóm dẫn đầu), Molmo2 của AI2 (mở cả dữ liệu huấn luyện --- lựa chọn đúng khi cần tái lập), Pixtral (Apache 2.0). \emph{Thích nghi:} \repo{huggingface/peft}. Danh sách tên mô hình này chốt tại tháng 9/2026 và sẽ cũ trong 6--12 tháng, trong khi các repo hạ tầng như \repo{peft} hay \repo{timm} bền hơn nhiều --- hãy nhớ tên hạ tầng, tra lại tên mô hình.
+
+\item[Câu hỏi kiểm tra hiểu.] Với 500 ảnh trong một lĩnh vực rất hẹp, chẳng hạn ảnh nội soi, thì \en{linear probe} trên DINOv3 hay tinh chỉnh toàn bộ một ResNet ImageNet sẽ thắng --- và lập luận của bạn dựa trên đại lượng nào? Vì sao ``mở trọng số'' không đồng nghĩa với ``mở'', và điều đó ràng buộc thế nào tới việc đưa mô hình vào sản phẩm? Nếu phải giải thích cho một đồng nghiệp trong ba câu vì sao BYOL không sụp dù không có \en{negative}, ba câu đó là gì?
+
+\item[Mini project (vài giờ đến hai ngày).] Chạy thí nghiệm điểm giao trên một bài toán phân loại nhỏ của riêng bạn: ba chế độ train từ đầu, đóng băng và tinh chỉnh toàn bộ, ở bốn mức 100, 500, 2000 và 10\,000 mẫu, mỗi ô ba \en{seed}. Vẽ ba đường cong trên một hình kèm dải phương sai giữa các \en{seed}. Sản phẩm cuối không phải cái hình, mà là hai con số: hai hoành độ điểm giao --- ngưỡng quyết định cho chính bài toán của bạn.
+
+\end{description}
+
+
+\begin{onbai}
+\ar[3]{Học chuyển giao}{Lấy trọng số đã học trên một tập lớn làm điểm khởi đầu thay vì khởi tạo ngẫu nhiên. Đáng thử đầu tiên; hỏng khi vật lý tạo ảnh của miền đích khác nguồn, ví dụ ảnh nhiệt hay radar.}
+\ar[3]{Linear probe}{Đóng băng backbone, chỉ huấn luyện một tầng tuyến tính trên đặc trưng. Phép thử rẻ nhất xem đặc trưng có chứa thông tin cần thiết; che giấu việc mô hình định vị kém.}
+\ar[2]{Vì sao mở nhiều tham số lại hại khi ít dữ liệu?}{Số tham số được phép thay đổi phải tương xứng với lượng thông tin mới. Vài trăm mẫu không trả nổi cho cả mạng, nên bạn nhận overfitting và quên thảm khốc.}
+\ar[3]{Học tự giám sát}{Tạo bài toán phụ mà đáp án suy ra từ chính bức ảnh, nên không cần nhãn người. Cái giá là bài toán phụ có nghiệm tầm thường phải chống.}
+\ar[3]{Sụp biểu diễn}{Mô hình xuất ra cùng một vector cho mọi ảnh, thoả mọi ràng buộc ``giống nhau'' mà không học gì. Chống nó là toàn bộ nội dung kỹ thuật của tự giám sát.}
+\ar[2]{Vì sao contrastive cần rất nhiều negative?}{Lực đẩy từ negative chính là cơ chế chống sụp duy nhất của nó. Batch nhỏ thì tín hiệu đẩy yếu; dữ liệu ít lớp thì negative hoá ra là positive.}
+\ar[2]{Masked modeling}{Che một phần ảnh rồi bắt mô hình khôi phục. Không cần chống sụp, nhưng đặc trưng thô nên linear probe kém --- phải fine-tune mới mạnh.}
+\ar[2]{Hạ nhiệt độ trong InfoNCE dồn gradient đi đâu?}{Về những cặp âm có độ tương đồng gần với cặp dương. Vặn quá thấp thì chỉ học từ vài cặp khó nhất và rất nhạy với ảnh gần trùng nhau.}
+\ar[3]{CLIP}{Tương phản giữa ảnh và chú thích của chính nó, trên ma trận \(N\times N\) trong một batch. Cho tập nhãn mở và zero-shot; yếu ở quan hệ không gian, đếm và phủ định.}
+\ar[2]{Vì sao VLM mô tả ảnh trôi chảy nhưng sai vị trí?}{Vì khối kết nối nén nhiều token thị giác xuống ít token truy vấn. Bước nén đó rẻ nhưng vứt mất thông tin định vị.}
+\ar[3]{Mô hình nền tảng}{Mô hình lớn tiền huấn luyện trên dữ liệu quy mô rất lớn, dùng lại được cho nhiều bài toán. Thường thắng cả mạng train từ đầu ngay trong lĩnh vực hẹp.}
+\ar[2]{Vì sao chi phí huấn luyện xấp xỉ \(6ND\)?}{Hai FLOPs cho mỗi phép nhân--cộng, nhân ba lượt: một lượt xuôi và hai lượt ngược. Hệ số 6 chỉ đúng cho transformer huấn luyện chuẩn.}
+\ar[3]{Scaling law}{Quan hệ luỹ thừa khớp từ thực nghiệm giữa loss, tham số, dữ liệu và compute. Cho phép ngoại suy từ thí nghiệm rẻ; trượt ngay khi bạn đổi kiến trúc hoặc lịch learning rate.}
+\ar[3]{Chinchilla}{Kết quả cho thấy phần lớn mô hình lớn thiếu dữ liệu chứ không thiếu tham số; quy tắc ngón tay cái là 20 token cho mỗi tham số. Chỉ tối ưu cho chi phí huấn luyện.}
+\ar[3]{Contamination}{Dữ liệu test lọt vào corpus tiền huấn luyện, nên điểm số đo trí nhớ chứ không đo tổng quát hoá. Không kiểm chứng được, vì corpus thường không công bố.}
+\ar[3]{LoRA}{Học cập nhật hạng thấp \(\Delta W = BA\), gốc đóng băng; hạng 8 trên ma trận \(1024\times1024\) chỉ tốn 1,56\% tham số. Cộng thẳng vào \(W\) sau huấn luyện nên suy luận không đắt thêm.}
+\ar[2]{Loss huấn luyện chững cao hơn hẳn full fine-tune dù học rất lâu?}{Giả định hạng thấp của LoRA đã bị vi phạm: bạn đang đòi một năng lực mới chứ không phải thích nghi. Tăng \(r\) hoặc mở thêm module, đừng tăng learning rate.}
+\ar[2]{Zero-shot đẹp trên benchmark nhưng tệ trên dữ liệu của bạn?}{Nghi contamination trước tiên, rồi nghi khoảng cách miền. Cách duy nhất kết luận được là một tập đánh giá bạn tự thu sau ngày mô hình ra đời.}
+\end{onbai}
+
+
+\begin{ungdung}
+\ud{DINOv2 / DINOv3}{Tự chưng cất không cần negative, dùng đúng cơ chế bất đối xứng teacher--student ở mục 18.1; đặc trưng đóng băng cho linear probe}{Hạ tầng đặc trưng phổ biến nhất cho thị giác 2024--2026; DINOv3 có bản riêng cho ảnh vệ tinh}
+\ud{OpenCLIP / SigLIP}{Tương phản chéo phương thức ảnh--văn bản, đúng ý tưởng ``ngôn ngữ là giám sát ngữ nghĩa rẻ nhất''}{Bộ mã hoá được dùng lại trong gần như mọi VLM mở hiện nay}
+\ud{LLaVA, Qwen-VL, InternVL}{Khối kết nối nối bộ mã hoá thị giác vào LLM --- chính cuộc đánh đổi số token và thông tin định vị ở mục 18.1}{Kiến trúc ba khối này ổn định từ 2023 tới nay dù tên mô hình đổi liên tục}
+\ud{\repo{huggingface/peft}}{LoRA và adapter, tức giả định cập nhật thích nghi có hạng thấp}{Hạ tầng; là cách mặc định để tinh chỉnh mô hình lớn từ 2023}
+\ud{Mô hình mở gần đây}{Tỉ lệ dữ liệu trên tham số vượt xa 20, đúng như lập luận tối ưu \emph{tổng chi phí vòng đời} chứ không chỉ chi phí huấn luyện}{Được cho là động cơ chính; tôi không kiểm chứng được con số cụ thể của từng mô hình}
+\end{ungdung}
+
+\begin{duan}{Điểm giao trên mảnh ảnh quanh đặc trưng EuRoC}{1--2 ngày}
+\dmt trả lời bằng số, trên chính dữ liệu của bạn, câu hỏi ``bao nhiêu mẫu thì tinh chỉnh vượt đặc trưng đóng băng''. Bảng bốn ô chỉ thu hẹp không gian; con số này mới quyết định.
+\ddl EuRoC \code{MH\_01} và \code{V1\_02} để dựng tập, \code{V2\_03} giữ riêng để đánh giá. Cắt mảnh $32\times32$ quanh các đặc trưng ORB do chính frontend của bạn phát hiện; nhãn ``cùng điểm bản đồ / khác điểm'' lấy miễn phí từ liên kết dữ liệu trong bản đồ sau khi chạy hệ đầy đủ, không cần ai gán tay.
+\dbc dựng tập ở bốn mức 100, 500, 2000 và 10\,000 cặp. Chạy ba chế độ trên cùng bốn mức: một CNN nhỏ huấn luyện từ đầu; \en{linear probe} trên DINOv2 đóng băng; tinh chỉnh toàn bộ chính \en{backbone} đó. Ba \en{seed} mỗi ô, tổng 36 lần chạy ngắn. Đo độ chính xác ghép cặp trên chuỗi giữ riêng.
+\dxk bạn vẽ được ba đường trên một hình kèm dải phương sai giữa các \en{seed}, và ghi ra được \emph{hai con số}: hai hoành độ nơi thứ hạng đảo chiều. Nếu dải phương sai chồng lên nhau tại điểm giao, kết luận đúng là ``chưa phân giải được'' và bạn nói được cần bao nhiêu \en{seed} nữa.
+\dnv \ptr{C/18} cho bảng bốn ô và hình điểm giao; \ptr{B/07} cho lý do phải giữ riêng cả một chuỗi chứ không chỉ giữ riêng vài khung hình. Tập mảnh ảnh dựng ở đây được dùng lại nguyên vẹn ở mini project chương 19 và 20.
+\end{duan}
+
+\begin{traloi}
+\tl{Với 500 ảnh, \en{linear probe} trên đặc trưng nền tảng thường thắng, vì mở toàn bộ tham số của một ResNet với vài trăm mẫu là mời gọi \en{overfitting} và quên thảm khốc. Ở 50\,000 mẫu chiều đảo lại: lúc đó dữ liệu đủ để \emph{trả tiền} cho số tham số được mở, nên tinh chỉnh toàn bộ vượt lên --- đó chính là điểm giao thứ nhất ở Hình~\ref{fig:diem-giao}.}
+\tl{Vì nghiệm hằng số bị chặn bằng \emph{cấu trúc}, không bằng hàm mất mát: tương phản thêm lực đẩy từ negative, tự chưng cất dựng bất đối xứng teacher EMA cộng stop-gradient, còn masked modeling đặt mục tiêu khôi phục pixel vốn không có nghiệm hằng. Bỏ đúng thành phần chống sụp của mỗi họ là mô hình sụp thật.}
+\tl{Vì nhãn ImageNet là hàm vào một tập 1000 phần tử cố định, còn chú thích là hàm vào một không gian ngữ nghĩa mở. Chú thích nhiễu hơn theo từng mẫu, nhưng nó phủ được vô hạn khái niệm và đi kèm quan hệ giữa các khái niệm --- thứ mà một tập nhãn đóng không bao giờ có.}
+\tl{Số tham số. Đó là đại lượng dễ công bố và dễ gây ấn tượng, nên nó bị tối ưu thay cho đại lượng đúng; lượng token thì không ai khoe. Với cùng $C \approx 6ND$, Chinchilla chọn $D/N = 20$ thay vì $1{,}07$ và thắng rõ rệt.}
+\tl{Vì vài trăm tới vài nghìn ảnh chuyên ngành không đủ để học lại những thống kê ảnh cơ bản mà 140 triệu ảnh đã học hộ. Đặc trưng nền tảng cung cấp phần chung, còn phần chuyên ngành chỉ cần một đầu tuyến tính --- trừ khi vật lý tạo ảnh khác hẳn, lúc đó lập luận này sụp.}
+\end{traloi}
+
+\begin{dongian}
+Bạn mở một xưởng và cần một người phân loại ốc vít. Cách cũ là thuê một người chưa biết gì rồi ngồi cạnh, cầm từng con ốc lên và nói tên nó, hàng nghìn lần. Rất tốn công, và bạn phải trả tiền cho từng lần nói tên.
+
+Mẹo của mười năm qua là: đừng tuyển người chưa biết gì. Hãy nhận một người đã nhìn hàng trăm triệu bức ảnh đủ loại trong đời --- xe cộ, cây cối, mặt người, nhà cửa --- dù chưa từng thấy con ốc nào của bạn. Người đó đã có sẵn con mắt: biết thế nào là một cạnh, một vết xước, hai vật giống nhau. Bạn chỉ còn phải dạy tên gọi, và việc đó xong trong nửa buổi thay vì ba tháng.
+
+Cái giá không nằm ở công sức của bạn mà nằm ở chỗ khác. Con mắt ấy được rèn bằng hàng trăm triệu bức ảnh và một hoá đơn tiền điện khổng lồ; chỉ là người khác đã trả hộ, và bạn không biết họ đã cho nó xem những gì. Nên khi ảnh của bạn chụp bằng máy hồng ngoại chứ không phải máy ảnh thường, kinh nghiệm kia bỗng vô dụng và không ai báo trước cho bạn.
+
+Nửa sau của chương là một bài học về tiền: cả ngành từng tin máy càng to càng giỏi, rồi phát hiện phần lớn máy to bị bỏ đói --- cùng số tiền điện, một cái máy nhỏ hơn nhưng được xem nhiều ảnh hơn thì giỏi hơn hẳn.
+
+\chuadongian{vì sao con mắt rèn trên ảnh đời thường lại dùng tốt cho ảnh nội soi hay ảnh vệ tinh thì tới nay chưa ai giải thích gọn mà không sai; mọi cách nói đơn giản đều bỏ quên phản ví dụ là ảnh radar, nơi nó gần như không chuyển được.}
+\motcau{Đừng dạy máy nhìn từ đầu --- hãy mượn một con mắt đã được rèn bằng dữ liệu và tiền điện của người khác, rồi chỉ dạy nó tên gọi trong nghề của bạn.}
+\end{dongian}
+
+\subsection*{Tổng kết chương}
+Chương này kể một chuyển động lịch sử. Giám sát từng là thứ đắt nhất trong hệ thống; ngành đã tìm ra bốn cách lấy nó gần như miễn phí. Cái giá mỗi lần là tín hiệu gián tiếp hơn và khó kiểm chứng hơn. Kết quả tích luỹ là mô hình nền tảng. Nó đổi vai trò của bạn từ người huấn luyện sang người tích hợp. Câu hỏi trung tâm đổi theo: không còn là ``mô hình này có đúng không'', mà là ``tôi có biết nó giả định gì và hỏng ở đâu không''.
+
+Mặt định lượng gọn hơn nhưng tốn kém hơn nếu làm sai: compute, tham số và dữ liệu là ba mặt của một ngân sách; bài học Chinchilla là ví dụ đắt tiền nhất trong lịch sử ngành về việc tối ưu một mặt mà quên hai mặt kia; và mọi con số chung, kể cả tỉ lệ 20 \en{token} trên tham số, chỉ là điểm khởi đầu cho phép đo của riêng bạn.
+
+Hai chỗ chương này để ngỏ và được nhận tiếp ở nơi khác. Thứ nhất, làm sao \emph{đánh giá} một mô hình nền tảng cho tử tế khi bạn không biết nó đã thấy gì --- đó là \ptr{E/24-thi-nghiem-va-ablation} và \ptr{E/25-do-tin-cay-va-van-hanh}. Thứ hai, một khi đã chọn được mô hình thì làm sao ép nó vào ngân sách phần cứng thật. Đó là toàn bộ Phần D, bắt đầu ở \ptr{D/20-toi-uu-va-nen-mo-hinh}. Ở đó cùng một logic ngân sách xuất hiện lại, chỉ khác là cột chi đổi từ compute huấn luyện sang compute \vn{suy luận}{inference}.
+\begin{tukiem}
+\item Mục 1 xếp các nguồn giám sát theo độ rẻ, mục 2 xếp chi phí theo compute và dữ liệu. Ghép hai trục lại: nguồn giám sát rẻ nhất có phải nguồn có tổng chi phí thấp nhất không, và khoản chi bị bỏ sót nằm ở đâu?
+\item Augmentation của học đối lập ép một tập bất biến vào biểu diễn, còn định luật scaling nói cứ thêm dữ liệu là loss giảm. Với một tác vụ mà bất biến bị ép sai, thêm dữ liệu pretraining có cứu được không, và số hạng nào trong công thức scaling mô tả đúng chỗ không cứu được?
+\item Bạn nhận một backbone mở trọng số và định dùng cho ảnh y tế. Ba câu hỏi phải trả lời trước --- một về nguồn giám sát, một về nhiễm bẩn dữ liệu, một về giấy phép --- là gì, và câu nào bạn thật sự kiểm chứng được bằng thí nghiệm?
+\item Vì sao thí nghiệm tìm điểm giao giữa linear probe và fine-tune lại dễ ra kết quả sai, và trong các cách làm sai thường gặp, cách nào không lộ ra nếu chỉ nhìn bảng kết quả cuối?
+\item LoRA giả định ma trận cập nhật có hạng thấp, còn mục 1 lập luận theo lượng thông tin mới so với số tham số được phép thay đổi. Hai lập luận đó gặp nhau ở đâu, và triệu chứng nào cho biết hạng bạn chọn quá nhỏ so với lượng thông tin mới?
+\item Chương nói bạn đã đổi vai từ người huấn luyện thành người tích hợp. Việc đổi vai đó làm loại lỗi nào khó phát hiện hơn hẳn so với thời tự huấn luyện, và bạn bù lại bằng phép đo nào?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

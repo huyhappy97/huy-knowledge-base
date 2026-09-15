@@ -1,0 +1,112 @@
+% ============================================================================
+%  97-doc-them.tex — tài liệu tham khảo có chú giải và hướng đọc tiếp
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-07
+% ============================================================================
+\documentclass[algorithm.tex]{subfiles}
+\begin{document}
+\chapter*{Tài liệu tham khảo có chú giải}
+\addcontentsline{toc}{chapter}{Tài liệu tham khảo có chú giải}
+\markboth{Tài liệu tham khảo có chú giải}{}
+
+\begin{tomtat}
+Danh sách \emph{Nguồn} ở cuối sách liệt kê đầy đủ mọi tài liệu được trích dẫn, xếp theo thứ tự xuất hiện. Phụ lục này làm việc khác: nó nhóm các tài liệu theo \emph{mục đích sử dụng}, nói rõ mỗi quyển dùng để làm gì, đọc vào lúc nào, và đọc bao nhiêu là đủ. Nếu chỉ nhớ một điều: chọn \emph{một} quyển làm trục chính theo mục tiêu của bạn và dùng những quyển còn lại để tra --- đọc song song ba giáo trình là cách chắc chắn nhất để không đọc xong quyển nào.
+\end{tomtat}
+
+\section*{A. Bốn quyển làm trục chính --- chọn một theo mục tiêu}
+
+\emph{Tự học tổng quát, muốn nhận diện được bài toán:} Skiena, \emph{The Algorithm Design Manual}\cite{skiena2020}. Nửa đầu dạy kỹ thuật, nửa sau là danh mục tra ngược ``bài của tôi trông thế này thì nó tên là gì''. Đây là quyển hợp nhất với người đi làm. Đọc nửa đầu tuần tự, nửa sau chỉ tra.
+
+\emph{Muốn học cách \emph{nghĩ ra} thuật toán:} Kleinberg và Tardos, \emph{Algorithm Design}\cite{kleinberg2006}. Điểm mạnh riêng: mỗi kỹ thuật được dẫn ra từ một bài toán thật, và phần tham lam cùng phần luồng là phần trình bày tốt nhất mà tôi biết. Đọc chương 4, 6, 7 trước.
+
+\emph{Thi đấu:} Laaksonen, \emph{Guide to Competitive Programming}\cite{laaksonen2017} làm trục chính; Halim và cộng sự, \emph{Competitive Programming 4}\cite{halim2020} làm danh mục kỹ thuật kèm bài luyện. Đọc kèm bộ bài CSES\cite{cses} theo đúng thứ tự chủ đề.
+
+\emph{Muốn nền chứng minh vững, đặc biệt về đệ quy:} Erickson, \emph{Algorithms}\cite{erickson2019}, bản điện tử miễn phí. Phần quay lui và quy hoạch động dạy cách viết chứng minh song song với thuật toán --- đúng tinh thần chương \ptr{A/04}.
+
+\section*{B. Tra cứu, không đọc tuần tự}
+
+\emph{Cormen và cộng sự, \emph{Introduction to Algorithms}}\cite{clrs2022}: tham chiếu chuẩn của ngành. Dùng để tra định nghĩa chính xác và chứng minh đầy đủ. Đọc tuần tự gần như luôn thất bại; đây không phải lỗi của bạn mà là do sách được thiết kế cho vai trò khác.
+
+\emph{Knuth, \emph{The Art of Computer Programming}}\cite{knuth1997v1,knuth1998v3}: phân tích tới hằng số, độ sâu không sách nào bằng. Dùng khi cần hiểu tường tận \emph{một} chủ đề cụ thể. Bài tập có xếp hạng độ khó 0--50; hãy chọn theo mức thay vì làm hết.
+
+\emph{Sedgewick và Wayne, \emph{Algorithms}}\cite{sedgewick2011}: mạnh về cài đặt chạy được và về thực nghiệm. Hợp khi bạn muốn thấy code thật kèm số đo thật.
+
+\emph{Graham, Knuth, Patashnik, \emph{Concrete Mathematics}}\cite{graham1994}: tra khi phân tích độ phức tạp đụng tổng hoặc truy hồi khó (\ptr{A/05}).
+
+\emph{cp-algorithms}\cite{cpalgorithms} và \emph{KACTL}\cite{kactl}: cài đặt ngắn gọn đã được kiểm chứng. Dùng để \emph{đối chiếu} sau khi tự viết, không phải để chép.
+
+\section*{C. Tư duy giải bài và cách luyện}
+
+\emph{Pólya, \emph{How to Solve It}}\cite{polya1945}: mỏng, đọc trong một buổi, và nên đọc trước mọi thứ khác. Nền của chương \ptr{A/01}.
+
+\emph{Zeitz, \emph{The Art and Craft of Problem Solving}}\cite{zeitz2007} và Engel, \emph{Problem-Solving Strategies}\cite{engel1998}: luyện tư duy bằng bài toán olympiad. Đọc khi muốn nâng khả năng nghĩ chứ không phải học thêm thuật toán.
+
+\emph{Schoenfeld, \emph{Mathematical Problem Solving}}\cite{schoenfeld1985}: nghiên cứu thực nghiệm về quá trình giải bài; nguồn của khái niệm tự giám sát ở \ptr{A/01}.
+
+\emph{Ericsson và Pool, \emph{Peak}}\cite{ericsson2016} cùng bài báo gốc năm 1993\cite{ericsson1993}: cơ sở của toàn bộ chương \ptr{E/28}. Đọc bài báo nếu muốn phần lõi; đọc sách nếu muốn ví dụ.
+
+\emph{Lehman, Leighton, Meyer, \emph{Mathematics for Computer Science}}\cite{mcs2018}: nền toán rời rạc viết cho người làm tin học, bản điện tử miễn phí. Chương ``State Machines'' là nguồn của khung bất biến bảo toàn ở \ptr{A/04}; các chương về quy nạp và tổ hợp thay thế được phần lớn nội dung của \ptr{A/05}.
+
+\emph{Bentley, \emph{Programming Pearls}}\cite{bentley2000}: đọc rải rác, mỗi lần một chương ngắn. Là quyển gần nhất với công việc thật trong danh sách này.
+
+\emph{Norvig, ``Teach Yourself Programming in Ten Years''}\cite{norvig2001}: một bài viết ngắn, đọc mười phút, chỉnh lại kỳ vọng về tốc độ tiến bộ.
+
+\section*{D. Chuyên sâu theo miền}
+
+\emph{Độ khó và NP:} Garey và Johnson\cite{garey1979} vẫn là danh mục bài toán NP-đầy đủ đầy đủ nhất. Dùng khi cần tra ``bài này đã biết là khó chưa''.
+
+\emph{Ngẫu nhiên hoá:} Motwani và Raghavan\cite{motwani1995} cho chiều sâu; Mitzenmacher và Upfal\cite{mitzenmacher2005} dễ vào hơn và dạy luôn phần xác suất cần thiết.
+
+\emph{Xấp xỉ:} Williamson và Shmoys\cite{williamson2011} cho lý thuyết hiện đại; Vazirani\cite{vazirani2001} ngắn gọn hơn.
+
+\emph{Tham số hoá:} Cygan và cộng sự\cite{cygan2015} --- tài liệu chuẩn cho hướng ``khó theo \(n\) nhưng dễ theo \(k\)'' ở \ptr{D/23}.
+
+\emph{Hình học tính toán:} de Berg và cộng sự\cite{deberg2008}; đọc kèm cảnh báo về số thực ở \ptr{D/22}.
+
+\emph{Cấu trúc dữ liệu nâng cao:} khoá học công khai của Demaine\cite{demaine6851} cho cây bền vững, cấu trúc thời gian, và các kết quả gần biên.
+
+\emph{Luồng và mạng:} Ahuja, Magnanti, Orlin\cite{ahuja1993} cho chiều sâu vận trù học.
+
+\emph{Cấu trúc bất biến:} Okasaki\cite{okasaki1998} nếu bạn làm việc với ngôn ngữ hàm hoặc cần cấu trúc bền vững.
+
+\section*{E. Bài báo gốc đáng đọc trực tiếp}
+
+Nhiều kết quả trong sách này dễ hiểu hơn khi đọc bản gốc, vì tác giả nói rõ \emph{vì sao} họ cần nó.
+
+Hoare về Quicksort\cite{hoare1962} và về cơ sở tiên đề cho chương trình\cite{hoare1969}; Dijkstra về đường đi ngắn nhất\cite{dijkstra1959} --- hai trang, đọc trong mười phút. Tarjan về duyệt sâu\cite{tarjan1972} và về hợp nhất tập hợp\cite{tarjan1975}; Knuth về ``tối ưu hoá sớm''\cite{knuth1974goto} --- đọc để thấy câu đó bị trích cụt thế nào. Cook\cite{cook1971} và Karp\cite{karp1972} cho khởi đầu của lý thuyết NP. Bentley và McIlroy về kỹ thuật hoá một hàm sắp xếp\cite{bentley1993sort} --- tài liệu tốt nhất về khoảng cách giữa thuật toán trong sách và hàm dùng được. Frigo và cộng sự về cache-oblivious\cite{frigo1999}. McSherry và cộng sự về chi phí của khả năng mở rộng\cite{mcsherry2015} --- ngắn, và thay đổi cách bạn đọc mọi báo cáo hiệu năng.
+
+Từ đợt bổ sung 2026-09-07, mỗi chương có mục chuyên sâu đều kèm khối \textbf{Đọc thêm} riêng với đầy đủ nơi công bố và năm; danh sách dưới đây chỉ gom lại những công trình mới thêm, để tiện tra theo chủ đề.
+
+\emph{Cấu trúc dữ liệu.} Fredman và Tarjan về Fibonacci heap (\emph{Journal of the ACM}, 1987) đọc kèm ngay với Larkin, Sen, Tarjan (\emph{ALENEX}, 2014) --- một bên là cận, một bên là số đo, và đọc cùng lúc thì thấy rõ khoảng cách giữa hai thứ\cite{fredman1987,larkin2014}. Sleator và Tarjan về splay tree (\emph{Journal of the ACM}, 1985) đọc kèm Demaine và cộng sự về Tango tree (\emph{SIAM Journal on Computing}, 2007) cho câu hỏi tối ưu động\cite{sleator1985,demaine2007}. Pagh và Rodler về băm cuckoo (\emph{Journal of Algorithms}, 2004) và Pătraşcu cùng Thorup về băm bảng tra (\emph{Journal of the ACM}, 2012) cho phía bảo đảm của bảng băm\cite{pagh2004,patrascu2012}. Bentley và Saxe (\emph{Journal of Algorithms}, 1980) cho cách động hoá một cấu trúc tĩnh, và Fenwick (\emph{Software: Practice and Experience}, 1994) cho bài gốc của cây chỉ số nhị phân\cite{bentley1980,fenwick1994}.
+
+\emph{Giới hạn và cận dưới.} Tarjan (\emph{Journal of Computer and System Sciences}, 1979) cùng Fredman và Saks (\emph{STOC}, 1989) cho biết ``\(\alpha\) là tối ưu'' nghĩa là gì trong từng mô hình\cite{tarjan1979,fredman1989}. Backurs và Indyk (\emph{SIAM Journal on Computing}, 2018; bản hội nghị \emph{STOC} 2015) và Gajentaan cùng Overmars (\emph{Computational Geometry}, 1995) là hai cửa vào tốt nhất cho độ phức tạp tinh\cite{backurs2018,gajentaan1995}.
+
+\emph{Biên giới hiện nay.} Harvey và van der Hoeven về phép nhân \Ob{n\log n} (\emph{Annals of Mathematics}, 2021); Agrawal, Kayal, Saxena về ``PRIMES is in P'' (\emph{Annals of Mathematics}, 2004); Duan và cộng sự về việc phá rào cản sắp xếp cho đường đi ngắn nhất (\emph{STOC}, 2025); Chen và cộng sự về luồng cực đại trong thời gian gần tuyến tính (\emph{FOCS}, 2022)\cite{harvey2021,aks2004,duan2025,chen2022}. Bốn bài này chỉ nên đọc phần mở đầu --- ở đó các tác giả kể lại lịch sử cận trên của bài toán, và đó mới là phần có giá trị lâu dài cho người học.
+
+\emph{Quy hoạch động và hình học.} Yao (\emph{SIAM Journal on Algebraic and Discrete Methods}, 1982) cho bất đẳng thức tứ giác, Hirschberg (\emph{Communications of the ACM}, 1975) cho truy vết trong bộ nhớ tuyến tính, Aggarwal và cộng sự (\emph{Algorithmica}, 1987) cho SMAWK, Shewchuk (\emph{Discrete \& Computational Geometry}, 1997) cho vị từ hình học tin cậy\cite{yao1982,hirschberg1975,aggarwal1987,shewchuk1997}.
+
+\section*{F. Nguồn bài tập}
+
+\emph{CSES Problem Set}\cite{cses}: có thứ tự, phủ đúng các chủ đề của phần B và C, và là nơi tôi lấy phần lớn bài trong ngân hàng ở \ptr{E/28}. Nếu chỉ chọn một nguồn, chọn nguồn này.
+
+\emph{Chuỗi bài quy hoạch động của AtCoder}: 26 bài phủ gần hết các họ trạng thái ở \ptr{C/16}.
+
+\emph{Codeforces}: bài phân loại theo mức và có thi ảo --- nguồn tốt nhất để luyện dưới sức ép (\ptr{E/27}).
+
+\emph{LeetCode}: hợp cho chuẩn bị phỏng vấn hơn là cho thi đấu; dùng kèm McDowell\cite{mcdowell2015} trong 4--6 tuần trước buổi phỏng vấn, không sớm hơn.
+
+\emph{Skiena và Revilla, \emph{Programming Challenges}}\cite{skiena2003}: bài cũ nhưng phân loại tốt và có phần bình luận cách nghĩ.
+
+\section*{G. Chọn nguồn thế nào cho khỏi hỏng cây kiến thức}
+
+Một nguồn sai đưa vào cây tri thức sẽ âm thầm làm hỏng mọi thứ dựng lên trên nó, và vài năm sau bạn sẽ không nhớ nổi ý sai đến từ đâu. Vì vậy quyển này giữ một quy tắc chọn nguồn cố định.
+
+Nguồn được tin: bài đã qua phản biện ở hội nghị hoặc tạp chí đầu ngành --- với thuật toán là \emph{Journal of the ACM}, \emph{SIAM Journal on Computing}, \emph{Algorithmica}, \emph{Journal of Algorithms}, và các kỷ yếu STOC, FOCS, SODA, ALENEX; với phần toán là các tạp chí toán chuẩn --- cùng các sách giáo trình đã qua nhiều lần tái bản. Ưu tiên thêm cho bài có mã nguồn công khai hoặc đã được người ngoài chạy lại.
+
+Nguồn bị loại: hội nghị và tạp chí săn phí, bản tiền ấn chưa ai kiểm chứng và không kèm mã nguồn, bài chỉ khoe số đo mà giấu điều kiện thí nghiệm, và nội dung do mô hình ngôn ngữ sinh ra rồi đăng lại. Khi buộc phải dẫn một nguồn chưa qua phản biện --- trong quyển này chỉ có đúng một chỗ, là con số mới nhất của số mũ nhân ma trận ở \ptr{C/14} --- thì nó được ghi rõ là tiền ấn ngay tại chỗ.
+
+Một lưu ý riêng cho tài liệu lập trình thi đấu. cp-algorithms, KACTL và các blog kỹ thuật\cite{cpalgorithms,kactl} rất hữu ích và tôi dùng chúng thường xuyên, nhưng chúng là tài liệu cộng đồng, không qua phản biện. Cách dùng đúng: lấy chúng làm bản đối chiếu \emph{cài đặt}, và lấy bài báo gốc làm nguồn cho \emph{phát biểu và điều kiện áp dụng}. Rất nhiều lỗi ``thuật toán này chạy trong \Ob{\cdot}'' lan truyền trong cộng đồng chỉ vì một điều kiện trong bài gốc bị bỏ quên khi viết lại.
+
+\begin{cannho}
+Thứ tự đọc gợi ý nếu bạn bắt đầu từ đầu: Pólya (một buổi) \(\rightarrow\) quyển trục chính theo mục tiêu \(\rightarrow\) giải bài song song ngay từ tuần đầu \(\rightarrow\) tra CLRS hoặc cp-algorithms khi vướng \(\rightarrow\) đọc các bài báo gốc ở mục E khi đã quen với chủ đề tương ứng. Đừng đọc quá hai quyển cùng lúc.
+\end{cannho}
+\end{document}

@@ -1,0 +1,223 @@
+% ---------------------------------------------------------------------------
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: A/02-vat-ly-tao-anh/03, B/04-nen-tang-hoc-tu-du-lieu
+%  Mức độ: cốt lõi (mạch chính của chương 16)
+% ---------------------------------------------------------------------------
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Bốn thế hệ, cùng một bài toán (Four Generations of 3D Reconstruction)}
+\ptrtarget{C/16-thi-giac-3d/01}\ptrtarget{C/16-thi-giac-3d/01-bon-the-he-3d}\ptrtarget{C/16/01}\ptrtarget{C/16/01-bon-the-he-3d}
+\dependency{\ptr{A/02-vat-ly-tao-anh/03-camera-va-hinh-hoc-nhieu-view} (mô hình chiếu, ràng buộc epipolar); \ptr{B/04-nen-tang-hoc-tu-du-lieu} (trục ``giả định mạnh + ít dữ liệu'' \(\leftrightarrow\) ``giả định yếu + nhiều dữ liệu''); \ptr{B/03-giai-phau-he-thong} (tách bài toán \ra nguyên lý \ra cài đặt).}
+
+\begin{tomtat}
+Bài toán khôi phục hình học 3D từ ảnh đã được giải lại từ đầu bốn lần. Bốn thế hệ đó không thay thế nhau: mỗi thế hệ thay một \emph{đoạn khác nhau} của cùng một pipeline. Vì vậy chúng chồng lớp được, và câu hỏi ``VGGT có thay được COLMAP không'' là câu hỏi sai. Đọc xong bạn làm được ba việc. Chọn thế hệ đúng cho dữ liệu đang có: bao nhiêu ảnh, có pose hay không, cảnh loại gì. Ghép hai thế hệ thành một pipeline, một bên khởi tạo một bên tinh chỉnh. Và kiểm tra được lúc một mô hình tiến thẳng đang nói dối. Nếu chỉ nhớ một điều: đi từ thế hệ một tới thế hệ bốn, thứ mất đi không chỉ là độ chính xác metric mà là \emph{khả năng tự chẩn đoán}. Hiệu chỉnh chùm tia trả về phần dư và hiệp phương sai; mạng tiến thẳng không trả về gì cả. Vì vậy đưa nó vào hệ thống thật là phải tự dựng lại cơ chế phát hiện sai từ bên ngoài.
+\end{tomtat}
+
+\begin{nentang}
+\kn{SfM (structure from motion)}{quy trình cổ điển suy đồng thời hình dạng 3D của cảnh và vị trí camera từ một tập ảnh chụp cùng cảnh ở nhiều góc.}
+\kn{MVS (multi-view stereo)}{bước sau SfM: khi đã biết pose camera, dựng bề mặt dày đặc bằng cách khớp từng vùng ảnh giữa nhiều view.}
+\kn{pose camera (camera pose)}{vị trí và hướng của camera trong không gian, sáu bậc tự do; ``biết pose'' là biết ảnh được chụp từ đâu, nhìn về đâu.}
+\kn{tam giác hoá (triangulation)}{tìm điểm 3D bằng giao của hai hay nhiều tia nhìn xuất phát từ các camera đã biết pose; đây là chỗ chiều bị mất khi chiếu được lấy lại.}
+\kn{hiệu chỉnh chùm tia (bundle adjustment)}{bài toán bình phương tối thiểu phi tuyến. Nó tinh chỉnh đồng thời mọi pose và mọi điểm 3D sao cho sai số chiếu lại nhỏ nhất. Bạn đã quen nó; điều cần nhớ ở đây là nó trả về \emph{phần dư} và \emph{hiệp phương sai}.}
+\kn{RANSAC}{thủ tục lọc điểm sai bằng cách thử ngẫu nhiên nhiều giả thuyết nhỏ rồi giữ giả thuyết được nhiều dữ liệu ủng hộ nhất. Nó giả định điểm sai là \emph{ngẫu nhiên}, không phải sai đồng loạt theo một kiểu.}
+\kn{point map}{ảnh mà mỗi pixel chứa một toạ độ 3D thay vì một màu; đây là dạng đầu ra của các mô hình tiến thẳng hiện đại, thay cho ``point cloud rời rạc''.}
+\kn{disparity}{độ lệch ngang của cùng một điểm giữa ảnh trái và ảnh phải trong hệ stereo; nó tỉ lệ nghịch với độ sâu.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Bài toán gốc của thị giác 3D không đổi trong bốn mươi năm: cho một tập ảnh 2D của cùng một cảnh, hãy khôi phục hình dạng ba chiều của cảnh và vị trí camera lúc chụp. Nó khó vì phép chiếu phối cảnh làm mất một chiều --- mỗi pixel chỉ nói ``có gì đó nằm đâu đó trên tia này'', chứ không nói nó xa bao nhiêu. Chỉ khi nhiều tia từ nhiều vị trí camera khác nhau cắt nhau thì độ sâu mới được xác định, và cả ngành 3D là các cách khác nhau để lấy lại thông tin đã mất đó.
+
+Điều đáng học ở lĩnh vực này không phải thuật toán cụ thể mà là mạch lịch sử của nó: đây là chỗ duy nhất trong computer vision mà ta thấy một bài toán được giải lại từ đầu bốn lần, mỗi lần đổi một loại giả định lấy một loại độ bền. Thế hệ đầu viết thẳng mô hình vật lý vào bài toán tối ưu, nên chỉ cần vài chục ảnh nhưng đòi cảnh phải cư xử đúng như mô hình. Thế hệ cuối vứt gần hết mô hình đó đi. Nó thay bằng một \en{prior} học từ hàng triệu cảnh, nên chạy được ở chỗ mô hình vật lý bó tay. Cái giá là không còn cách nào kiểm chứng kết quả từ bên trong. Đây chính xác là trục ``giả định mạnh + ít dữ liệu \(\leftrightarrow\) giả định yếu + nhiều dữ liệu'' của chương 4, và không chỗ nào trong CV nó hiện ra sạch sẽ như ở đây.
+\lk{B/04}{trường hợp riêng của}{bốn thế hệ 3D là hiện thân cụ thể nhất của trục ``giả định mạnh + ít dữ liệu \(\leftrightarrow\) giả định yếu + nhiều dữ liệu''; ở đây ta đo được cái giá bằng centimét.}
+
+\textbf{Học mục này thì làm được gì mà trước đó không làm được?} Trả lời được ba câu hỏi thực dụng: (i) với dữ liệu bạn đang có --- bao nhiêu ảnh, có pose hay không, cảnh loại gì --- thế hệ nào là lựa chọn đúng; (ii) khi ghép hai thế hệ vào một pipeline thì ai làm khởi tạo, ai làm tinh chỉnh; (iii) làm thế nào phát hiện lúc một mô hình \vn{tiến thẳng}{feed-forward} đang nói dối, việc mà \vn{hiệu chỉnh chùm tia}{bundle adjustment} làm hộ bạn miễn phí còn mạng học thì không.
+
+Với người đọc đang làm \en{visual-inertial SLAM}, ba thế hệ đầu phần lớn là sân nhà. Phần lạ nằm ở hai thế hệ sau --- \en{neural rendering} và \en{feed-forward geometry} --- nên chương này viết kỹ đúng hai chỗ đó.
+
+\begin{trucgiac}
+Bốn thế hệ là bốn cách trả lời câu hỏi ``căn phòng này rộng bao nhiêu''. Thế hệ hình học mang thước ra đo từng cạnh rồi cộng sai số theo quy tắc rõ ràng: đúng tới milimét, và nếu các số đo mâu thuẫn nhau thì phần dư của phép bình phương tối thiểu tự nó tố cáo. Thế hệ lai vẫn dùng thước, nhưng nhờ mắt chỉ chỗ đặt thước cho nhanh. \en{Neural rendering} không đo phòng: nó dựng một mô hình phòng bằng sương mù có màu rồi chỉnh đám sương cho tới khi ảnh chụp mô hình trùng khít mọi ảnh thật --- đúng về mặt \emph{nhìn}, chưa chắc đúng về mặt \emph{chạm}. Thế hệ tiến thẳng liếc một cái rồi nói ``khoảng bốn nhân năm mét'', vì đã ở trong hàng vạn căn phòng: nhanh, thường đúng, và khi sai thì sai rất tự tin vì không có phép đo nào để mâu thuẫn với nó.
+\end{trucgiac}
+
+\subsection{B. Bốn thế hệ đặt cạnh nhau}
+Bảng~\ref{tab:bon-the-he-3d} đặt bốn thế hệ trên cùng bốn tiêu chí. Cột đáng đọc kỹ nhất là cột cuối: mỗi thế hệ ra đời vì thế hệ trước hỏng ở một chỗ cụ thể, rồi lại hỏng ở một chỗ khác.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Bốn thế hệ giải bài toán khôi phục hình học 3D từ ảnh. Không thế hệ nào thay thế hoàn toàn thế hệ trước; trên thực tế chúng chồng lên nhau.}
+\label{tab:bon-the-he-3d}
+\begin{tabularx}{\linewidth}{@{}L{1.95cm}YYYY@{}}
+\toprule
+\textbf{Thế hệ} & \textbf{Cơ chế} & \textbf{Giả định} & \textbf{Mạnh khi} & \textbf{Hỏng khi}\\
+\midrule
+Hình học cổ điển (SfM/MVS, COLMAP) & Tìm tương ứng, ước lượng pose, tam giác hoá, hiệu chỉnh chùm tia & Cảnh tĩnh, đủ texture, đủ chồng lấn giữa các view & Cần độ chính xác metric và cần kiểm chứng được & Ít texture, ít ảnh, bề mặt phản chiếu hoặc trong suốt\\
+Lai học \(+\) hình học & Học phần tương ứng hoặc phần độ sâu, giữ nguyên phần tối ưu hình học & Hình học vẫn đúng; chỉ khâu nhận dạng cần học & Có prior mạnh nhưng vẫn cần ràng buộc cứng & Khi khâu học sai một cách \emph{có hệ thống}: RANSAC không lọc nổi\\
+Neural rendering (NeRF, 3DGS) & Tối ưu một biểu diễn riêng cho từng cảnh bằng loss render khả vi & Đã biết pose; cảnh tĩnh; phơi sáng nhất quán & Cần chất lượng ảnh ở góc nhìn mới & Không có pose sẵn; phải tối ưu lại từ đầu cho mỗi cảnh\\
+Feed-forward geometry (DUSt3R, VGGT) & Một \en{transformer} suy ra pose \(+\) độ sâu \(+\) point map trong một lượt xuôi & Prior học từ dữ liệu lớn khái quát được sang cảnh mới & Ít ảnh, không có pose, cần kết quả nhanh & Cảnh dễ mà cần độ chính xác metric: thua hiệu chỉnh chùm tia\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng cho biết \emph{cái gì}, hai hình sau cho biết \emph{tại sao}. Hình~\ref{fig:truc-gia-dinh-3d} đặt bốn thế hệ lên một trục duy nhất và cho thấy ba đại lượng cùng biến thiên theo trục đó; Hình~\ref{fig:the-he-thay-khoi} cho thấy mỗi thế hệ thay một \emph{đoạn} khác nhau của cùng một pipeline. Hình thứ hai giải thích vì sao câu hỏi ``VGGT có thay được COLMAP không'' là câu hỏi sai --- câu hỏi đúng là ``thay được đoạn nào''.
+
+\begin{figure}[H]\centering
+\resizebox{0.96\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize]
+\draw[-{Stealth[length=5pt]},very thick,steel] (0,0) -- (13.2,0);
+\node[align=center,font=\scriptsize,inkblue,anchor=north] at (0.9,-0.15){giả định \textbf{mạnh}\\ dữ liệu \textbf{ít}};
+\node[align=center,font=\scriptsize,inkblue,anchor=north] at (12.3,-0.15){giả định \textbf{yếu}\\ dữ liệu \textbf{nhiều}};
+\foreach \x/\t in {1.6/{SfM \(+\) MVS\\ (COLMAP)}, 5.0/{Lai\\ (đặc trưng học được)}, 8.4/{Neural rendering\\ (NeRF, 3DGS)}, 11.8/{Feed-forward\\ (DUSt3R, VGGT)}}{
+  \draw[steel,thick] (\x,-0.16) -- (\x,0.16);
+  \node[draw=steel,fill=bluebg,rounded corners=1.5pt,inner sep=3pt,align=center,
+        anchor=south,font=\scriptsize] at (\x,0.3) {\t};}
+\draw[-{Stealth[length=4pt]},reddark,thick] (1.4,-1.5) -- (12.0,-1.5)
+  node[midway,above=1pt,font=\scriptsize,reddark]{dữ liệu huấn luyện cần thiết \emph{tăng}};
+\draw[-{Stealth[length=4pt]},violetdark,thick] (12.0,-2.15) -- (1.4,-2.15)
+  node[midway,below=1pt,font=\scriptsize,violetdark]{khả năng tự chẩn đoán (phần dư, hiệp phương sai) \emph{tăng}};
+\draw[-{Stealth[length=4pt]},inkblue,thick] (12.0,-2.8) -- (1.4,-2.8)
+  node[midway,below=1pt,font=\scriptsize,inkblue]{độ chính xác metric trên cảnh \emph{dễ} \emph{tăng}};
+\end{tikzpicture}}
+\caption{Một trục duy nhất giải thích cả bốn thế hệ. Đi sang phải, ta bỏ bớt giả định về thế giới và bù bằng dữ liệu; đổi lại, hai thứ cùng giảm --- độ chính xác metric ở cảnh dễ, và quan trọng hơn, khả năng hệ thống tự biết mình đang sai.}
+\label{fig:truc-gia-dinh-3d}
+\end{figure}
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  bx/.style={draw=steel,fill=bluebg,rounded corners=1.5pt,inner sep=4pt,
+             minimum height=8mm,minimum width=1.9cm,align=center,font=\footnotesize},
+  ar/.style={-{Stealth[length=4pt]},steel,thick}]
+\node[bx] (a) {Ảnh vào};
+\node[bx,right=0.45cm of a] (b) {Tương ứng\\ giữa ảnh};
+\node[bx,right=0.45cm of b] (c) {Pose\\ camera};
+\node[bx,right=0.45cm of c] (d) {Tam giác\\ hoá};
+\node[bx,right=0.45cm of d] (e) {Hiệu chỉnh\\ chùm tia};
+\node[bx,right=0.45cm of e] (f) {Hình học\\ 3D};
+\foreach \x/\y in {a/b,b/c,c/d,d/e,e/f} \draw[ar] (\x) -- (\y);
+\draw[decorate,decoration={brace,mirror,amplitude=4pt},violetdark]
+  ([yshift=-3pt]b.south west) -- ([yshift=-3pt]b.south east)
+  node[midway,below=5pt,font=\scriptsize,violetdark,align=center]{Thế hệ lai\\ thay khối này};
+\draw[decorate,decoration={brace,mirror,amplitude=4pt},reddark]
+  ([yshift=-20pt]d.south west) -- ([yshift=-20pt]f.south east)
+  node[midway,below=5pt,font=\scriptsize,reddark,align=center]{Neural rendering thay đoạn này\\ (nhưng \emph{cần} pose ở trên làm đầu vào)};
+\draw[decorate,decoration={brace,mirror,amplitude=4pt},inkblue]
+  ([yshift=-52pt]b.south west) -- ([yshift=-52pt]f.south east)
+  node[midway,below=5pt,font=\scriptsize,inkblue,align=center]{Feed-forward geometry nuốt cả đoạn này trong một lượt xuôi};
+\end{tikzpicture}}
+\caption{Cùng một pipeline, ba cách thay thế khác nhau. Thế hệ lai thay đúng khối dễ hỏng nhất mà giữ nguyên phần tối ưu; neural rendering nằm \emph{sau} khâu pose nên nó là khách hàng của SfM chứ không phải đối thủ; chỉ thế hệ tiến thẳng mới thực sự cạnh tranh trực tiếp với COLMAP.}
+\label{fig:the-he-thay-khoi}
+\end{figure}
+
+\subsection{C. Vì sao thế hệ sau ra đời}
+
+\begin{mach}[Mạch 1 --- bốn thế hệ, cùng một bài toán]
+\item \vd{ảnh mất một chiều, và không có cách nào lấy lại nó từ một ảnh đơn lẻ.} \gp viết thẳng mô hình chiếu vào một bài toán bình phương tối thiểu: tìm tương ứng giữa các ảnh, ước lượng pose tương đối, tam giác hoá điểm, rồi tinh chỉnh toàn bộ bằng hiệu chỉnh chùm tia \cite{hartley2004,schoenberger2016colmap}. \gd cảnh tĩnh, bề mặt \en{Lambertian} đủ texture, nhiễu đo là Gauss độc lập. \hq mô hình sinh ảnh đã được cài cứng, nên phương pháp cần rất ít dữ liệu: vài chục ảnh là ra kết quả metric. Quan trọng hơn, nó trả về \emph{phần dư} cùng \emph{ma trận hiệp phương sai}, tức là tự nói cho ta biết nó tin kết quả tới đâu.
+\item \vd{khâu yếu nhất của thế hệ một là tìm tương ứng: nó dựa vào \en{descriptor} thủ công, và descriptor thủ công chết ở thay đổi ánh sáng lớn, góc nhìn lệch nhiều, vùng hoa văn lặp lại.} \gp thay đúng khối đó bằng một mạng học --- detector/descriptor học được, matcher học được, hoặc \vn{khớp dày đặc}{dense matching} --- và giữ nguyên phần tối ưu hình học phía sau. \gd hình học vẫn đúng; chỉ phần ``nhận dạng'' mới cần học. \gia mất tính tái lập bit-for-bit và mất khả năng suy luận giải tích về sai số của khâu đầu. \vdm mạng học sai theo kiểu \emph{tương quan}. Ở một mặt tường lặp hoa văn, nó không cho ra \en{outlier} ngẫu nhiên mà cho ra một tập tương ứng sai \emph{nhất quán}. RANSAC không lọc được loại lỗi đó, vì nó giả định outlier là ngẫu nhiên.
+\lk{B/08}{hệ quả của}{sai đồng loạt của khâu học là lệch phân phối biểu hiện ở tầng hình học; đó là lý do một bộ lọc thống kê không cứu được nó.}
+\item \vd{ngay cả khi hình học đúng, đầu ra của SfM/MVS là point cloud hoặc mesh --- render lại thì thủng lỗ, không có hiệu ứng phụ thuộc góc nhìn.} \gp bỏ luôn ý định khôi phục bề mặt; tham số hoá cảnh bằng một trường liên tục và tối ưu trường đó sao cho ảnh render khớp mọi ảnh quan sát \cite{mildenhall2020nerf}. \gd pose đã biết trước, cảnh tĩnh, phơi sáng và cân bằng trắng nhất quán. \hq chất lượng ảnh ở góc nhìn mới nhảy vọt. \gia hàm mất mát chỉ ràng buộc \emph{ảnh render}, không ràng buộc \emph{hình học}. \vdm mỗi cảnh phải tối ưu lại từ đầu, và pose vẫn phải xin từ thế hệ một.
+\item \vd{cả ba thế hệ trên đều gãy ở cùng một điều kiện: quá ít ảnh, hoặc chồng lấn không đủ để tam giác hoá.} Ba tấm ảnh chụp ba góc một căn phòng, mỗi cặp chồng lấn 20\,\%, thì COLMAP thường không khởi tạo nổi. \gp huấn luyện một transformer trên rất nhiều cảnh có chân trị 3D, cho nó nhận thẳng một tập ảnh không pose và xuất ra \en{point map} trong một hệ toạ độ chung \cite{wang2024dust3r}; dòng kế tiếp (DUSt3R \ra MASt3R \ra VGGT) mở rộng từ hai ảnh lên hàng chục ảnh trong một lượt xuôi. \gd cảnh mới nằm trong phân phối mà prior đã học. \hq bài toán đổi bản chất: từ ước lượng có ràng buộc cứng thành hồi quy. \gia độ chính xác metric ở cảnh dễ thua hiệu chỉnh chùm tia, và --- điểm quan trọng nhất --- không còn phần dư hình học để phát hiện lúc nó sai.
+\end{mach}
+
+Đọc theo mạch này thì thấy cả bốn bước là cùng một phép đánh đổi lặp lại: mỗi lần bỏ bớt một giả định về thế giới, ta phải bù bằng dữ liệu, và mất đi một phần khả năng tự kiểm tra --- đúng ba mũi tên của Hình~\ref{fig:truc-gia-dinh-3d}.
+
+\subsection{D. Một phép tính nhỏ: vì sao ``chính xác metric'' là đặc sản của thế hệ một}
+Nói gọn thì: sai số độ sâu của phương pháp hình học có một \emph{công thức}, còn sai số của mạng học thì không. Với một cặp \en{stereo} đã hiệu chỉnh, độ sâu suy ra từ \vn{độ lệch ngang}{disparity} theo \(Z = fb/d\), nên
+\[
+\Delta Z \;=\; \frac{Z^{2}}{fb}\,\Delta d .
+\]
+Câu này nói: sai khớp điểm \emph{một chút} ở gần thì hầu như không sao, nhưng cùng sai số đó ở xa thì bị khuếch đại theo bình phương khoảng cách. Lấy con số của một bộ EuRoC quen thuộc, \(f \approx 400\) pixel và \(b \approx 0{,}11\) m: ở \(Z = 10\) m thì \(d = 4{,}4\) pixel, và \(\Delta d = 0{,}2\) pixel cho \(\Delta Z \approx 0{,}45\) m (4,5\,\%); ở \(Z = 2\) m thì cùng \(\Delta d\) đó chỉ cho \(\Delta Z \approx 1{,}8\) cm.
+
+Hình~\ref{fig:sai-so-do-sau} vẽ hai đường sai số đó cạnh nhau và cho thấy chúng cắt nhau ở đâu.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.8\linewidth,height=5.8cm,
+  xlabel={Khoảng cách tới vật \(Z\) (m)}, ylabel={Sai số độ sâu \(\Delta Z\) (m)},
+  xlabel style={font=\footnotesize}, ylabel style={font=\footnotesize},
+  tick label style={font=\scriptsize},
+  xmin=1,xmax=20,ymin=0,ymax=2.0, axis lines=left,
+  legend style={font=\scriptsize,draw=none,fill=none,at={(0.03,0.97)},anchor=north west},
+  every axis plot/.append style={thick}]
+\addplot[domain=1:20,samples=90,steel,very thick]{x*x/220};
+\addlegendentry{stereo: \(\Delta Z = Z^{2}\Delta d/(fb)\)}
+\addplot[domain=1:20,samples=2,violetdark,very thick,dashed]{0.05*x};
+\addlegendentry{độ sâu học được: sai số tương đối gần như hằng}
+\addplot[only marks,mark=*,mark size=2pt,reddark] coordinates {(11,0.55)};
+\node[font=\scriptsize,reddark,anchor=south east,align=right] at (axis cs:10.6,0.62)
+  {điểm giao \(\approx 11\) m:\\ quá đây thì đường cơ sở\\ không còn là lợi thế};
+\end{axis}
+\end{tikzpicture}
+\caption{Hai loại sai số độ sâu có \emph{hình dạng} khác nhau, và đó mới là điều đáng nhớ. Sai số stereo tăng theo \(Z^{2}\) nên rất tốt ở gần và vô dụng ở xa; sai số của một mạng học được tăng gần như tuyến tính vì nó là sai số \emph{tương đối} do prior quyết định, không do hình học. Vì vậy tồn tại một khoảng cách mà quá nó, phép đo hình học thua phép đoán có học. \emph{Con số minh hoạ} (\(f=400\) px, \(b=0{,}11\) m, \(\Delta d=0{,}2\) px, sai số tương đối 5\,\%), không phải số đo trên một hệ cụ thể.}
+\label{fig:sai-so-do-sau}
+\end{figure}
+
+Ba hệ quả rút ra:
+\begin{itemize}
+\item \textbf{Có một ``chân trời'' độ sâu.} Vượt qua nó, độ sâu stereo vô dụng --- không phải vì thuật toán kém mà vì hình học.
+\item \textbf{Cách duy nhất đẩy chân trời ra xa là tăng \(fb\).} Bundle adjustment trên một chuỗi ảnh chính là cách tăng \vn{đường cơ sở}{baseline} hiệu dụng bằng thời gian; đây là lý do SLAM đơn mắt vẫn có độ sâu tốt khi robot đi đủ xa.
+\item \textbf{Mạng suy độ sâu từ một ảnh không có phương trình này.} Sai số của nó do prior quyết định, nên không tuân theo \(Z^{2}\) và cũng không hưởng lợi khi ta đi thêm một quãng để mở rộng đường cơ sở. Trộn hai loại sai số này vào cùng một bộ lọc mà không mô hình hoá đúng thì hiệp phương sai sẽ sai.
+\end{itemize}
+
+\subsection{E. Giới hạn và trường hợp hỏng}
+Giới hạn lớn nhất của cách kể ``bốn thế hệ'' là nó gợi ý một sự thay thế tuần tự, trong khi thực tế là chồng lớp. Pipeline mạnh nhất hiện nay thường lai, gồm ba chặng. Thứ nhất, dùng feed-forward geometry để có khởi tạo pose và point map thô, không cần khởi tạo thủ công. Thứ hai, ném khởi tạo đó vào hiệu chỉnh chùm tia cổ điển để lấy lại độ chính xác metric. Thứ ba, dựng biểu diễn render lên trên. Thế hệ bốn giải bài toán \emph{khởi tạo} (vốn là chỗ SfM hay chết), thế hệ một giải bài toán \emph{tinh chỉnh}.
+
+Các chế độ hỏng riêng:
+\begin{itemize}
+\item \textbf{Thế hệ một} hỏng khi giả định vật lý bị vi phạm --- mặt kính, mặt nước, tường trắng, cảnh động --- và nó hỏng \emph{ồn ào}: số \en{inlier} tụt, phần dư tăng, hệ thống biết mình đang hỏng.
+\item \textbf{Thế hệ hai} kế thừa toàn bộ chỗ hỏng đó và thêm \vn{lệch phân phối}{domain shift} của khâu học.
+\item \textbf{Thế hệ ba} hỏng ở ba chỗ: pose đầu vào sai, phơi sáng tự động thay đổi giữa các ảnh, hoặc cảnh có vật chuyển động. Riêng pose thì chỉ cần sai vài phần mười độ: ảnh render mờ đi, và tối ưu bù lại bằng vật chất giả lơ lửng.
+\item \textbf{Thế hệ bốn} hỏng khi cảnh ra khỏi phân phối huấn luyện --- và đây là chế độ nguy hiểm nhất vì nó \emph{im lặng}.
+\end{itemize}
+
+Gộp lại, bốn chế độ hỏng đó cho một quy tắc chọn dùng được ngay: Hình~\ref{fig:cay-chon-the-he} hỏi theo đúng thứ tự các ràng buộc, từ ràng buộc cứng nhất trở đi.
+
+\begin{figure}[H]\centering
+\resizebox{0.95\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  q/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\scriptsize},
+  a/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=4pt,align=center,font=\scriptsize},
+  e/.style={-{Stealth[length=4pt]},steel}]
+\node[q] (q1) {Đã có \textbf{pose camera} chưa?};
+\node[q,below left=1.0cm and 2.3cm of q1] (q2) {Có hơn khoảng 30 ảnh,\\ chồng lấn tốt?};
+\node[q,below right=1.0cm and 1.4cm of q1] (q3) {Bài toán hạ nguồn có cần\\ \textbf{render} ảnh mới?};
+\node[a,below left=1.0cm and 0.4cm of q2] (a1) {\textbf{Thế hệ 1--2}\\ SfM/COLMAP\\ \emph{metric, kiểm chứng được}};
+\node[a,below right=1.0cm and -0.2cm of q2] (a2) {\textbf{Thế hệ 4}\\ mô hình tiến thẳng\\ \emph{rồi tinh chỉnh nếu cần mét}};
+\node[a,below left=1.0cm and 0.0cm of q3] (a3) {\textbf{Thế hệ 3}\\ NeRF / 3DGS};
+\node[a,below right=1.0cm and -0.4cm of q3] (a4) {\textbf{Dừng lại}\\ bản đồ thưa đã đủ};
+\draw[e] (q1) -- node[above left,font=\scriptsize]{chưa} (q2);
+\draw[e] (q1) -- node[above right,font=\scriptsize]{rồi} (q3);
+\draw[e] (q2) -- node[above left,font=\scriptsize]{có} (a1);
+\draw[e] (q2) -- node[above right,font=\scriptsize]{không} (a2);
+\draw[e] (q3) -- node[above left,font=\scriptsize]{có} (a3);
+\draw[e] (q3) -- node[above right,font=\scriptsize]{không} (a4);
+\end{tikzpicture}}
+\caption{Chọn thế hệ nào, hỏi theo đúng thứ tự. Câu hỏi đầu tiên không phải ``phương pháp nào mới nhất'' mà ``tôi đã có pose chưa'' --- vì neural rendering nằm sau khâu pose nên nó không bao giờ là câu trả lời khi chưa có pose. Nhánh phải dưới cùng là nhánh hay bị bỏ quên nhất: rất nhiều bài toán robot chỉ cần định vị, và ở đó bản đồ thưa cổ điển vẫn là lựa chọn đúng.}
+\label{fig:cay-chon-the-he}
+\end{figure}
+
+\begin{cambay}
+Cạm bẫy phổ biến nhất khi so sánh thế hệ bốn với COLMAP là so trên chính loại cảnh mà thế hệ bốn được huấn luyện. Nhiều bộ \en{benchmark} 3D lớn đã được dùng làm dữ liệu huấn luyện cho các mô hình tiến thẳng gần đây, nên con số ``tốt hơn COLMAP'' trên các bộ đó không nói được gì về cảnh của bạn. Phép thử trung thực duy nhất là chạy trên dữ liệu bạn tự quay. Và cách phát hiện lỗi duy nhất là kiểm tra chéo bằng một ràng buộc bên ngoài. Ba ràng buộc rẻ nhất: chiều dài một vật đã biết, một đoạn quỹ đạo có chân trị, hoặc phần dư sau khi ép kết quả tiến thẳng qua một vòng hiệu chỉnh chùm tia.
+\lk{C/17/04}{cùng nguyên lý với}{khôi phục ảnh cũng đổi ràng buộc cứng lấy prior học được, và cũng mất khả năng tự phát hiện sai theo đúng cách này.}
+\lk{A/02}{tiền đề}{mọi phép tam giác hoá đứng trên mô hình chiếu và giả định hiệu chỉnh; sai ở tầng đó thì không thế hệ nào cứu được.}
+\end{cambay}
+
+\begin{cannho}
+Đi từ thế hệ một tới thế hệ bốn, thứ mất đi không chỉ là độ chính xác metric mà là \emph{khả năng tự chẩn đoán}. Hiệu chỉnh chùm tia trả về phần dư và hiệp phương sai, nên hệ thống biết lúc nào nó không tin được; một mạng tiến thẳng trả về point map với cùng vẻ tự tin dù cảnh nằm trong hay ngoài phân phối. Khi đưa thế hệ bốn vào hệ thống thật, việc đầu tiên phải làm là dựng lại một cơ chế phát hiện sai từ bên ngoài. \T{3}
+\end{cannho}
+
+\subsection{F. Kết nối}
+Mục này là khung để đọc hai mục còn lại của chương. Mục kế tiếp,
+\ptr{C/16-thi-giac-3d/02-bieu-dien-3d-va-depth}, đi vào các quyết định con bên trong mỗi thế hệ; mục cuối,
+\ptr{C/16-thi-giac-3d/03-nerf-3dgs-va-hop-nhat}, đào sâu đúng hai thứ lạ nhất với người làm SLAM.
+
+Trục đánh đổi ở đây là trường hợp riêng, cụ thể nhất, của \ptr{B/04-nen-tang-hoc-tu-du-lieu}. Cơ chế ``prior thay ràng buộc cứng'' sẽ trở lại nguyên vẹn dưới tên bài toán \en{ill-posed} ở
+\ptr{C/17-mo-hinh-sinh/04-low-level-vision}. Mô hình chiếu và các giả định hiệu chỉnh nằm ở
+\ptr{A/02-vat-ly-tao-anh/03-camera-va-hinh-hoc-nhieu-view}; còn nếu khâu tương ứng hỏng vì domain shift thì \ptr{B/08-dich-chuyen-phan-phoi} là chỗ đọc tiếp.
+
+\begin{tukiem}
+\item Vì sao thế hệ lai ``chỉ học khâu tương ứng'' lại nguy hiểm hơn thế hệ cổ điển ở đúng một loại cảnh, dù RANSAC vẫn được giữ nguyên?
+\item Neural rendering đứng \emph{sau} khâu pose trong pipeline. Điều đó nói gì về câu ``NeRF thay thế SfM''?
+\item Một mạng tiến thẳng cho ra point map đẹp trên video bạn quay. Bạn có ba mươi phút để kiểm tra xem nó đúng hay chỉ trông đúng --- bạn làm gì?
+\item Sai số độ sâu stereo tăng theo \(Z^{2}\). Vì sao sai số của độ sâu đơn ảnh học được lại \emph{không} tuân theo quy luật đó, và điều này ảnh hưởng thế nào tới việc gán trọng số cho nó trong một bộ lọc?
+\item Nếu phải chọn đúng một thế hệ để đưa vào robot chạy 24/7 ngoài trời, bạn chọn thế hệ nào và dựng thêm cơ chế an toàn nào?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

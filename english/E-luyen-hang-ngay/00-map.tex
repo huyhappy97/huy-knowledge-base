@@ -1,0 +1,54 @@
+% ============================================================================
+%  E/00-map.tex — bản đồ phần E
+%  Ngày tạo: 2026-09-07 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../english.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ phần E --- Luyện hằng ngày}
+
+\begin{tomtat}
+Ba chương, đọc theo thứ tự. Chương 19 cho khung để bạn biết mình đang thiếu gì; chương 20 cho công cụ để lấp; chương 21 gộp thành lịch cụ thể. Nếu bạn chỉ đọc một chương, hãy đọc 19 --- vì chẩn đoán sai chỗ thiếu thì mọi công cụ và lộ trình đều lệch theo.
+\end{tomtat}
+
+\subsection*{A. Bảng tra ngược: bạn đang gặp gì \(\rightarrow\) đọc chương nào}
+\begin{center}\footnotesize
+\begin{tabularx}{\linewidth}{@{}L{5.6cm}L{2.0cm}Y@{}}
+\toprule
+\textbf{Tình huống} & \textbf{Chương} & \textbf{Công cụ chính}\\
+\midrule
+Học nhiều mà không thấy tiến bộ & 19 & Bốn nhánh, chẩn đoán mất cân bằng\\
+Không biết chọn từ điển, phần mềm, nguồn đọc & 20 & Bộ công cụ tối thiểu, cách dùng mô hình ngôn ngữ\\
+Biết phải làm gì nhưng không duy trì được & 21 & Lộ trình 12 tuần, ngân hàng tài nguyên\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection*{B. Vì sao chia như vậy}
+Cách chia thông thường của các sách ``học tiếng Anh hiệu quả'' là theo kỹ năng: một chương cho đọc, một cho viết, một cho nghe, một cho nói. Cách đó lặp lại nội dung của các phần trước và không giải quyết vấn đề thật của người tự học, vốn không phải là thiếu kỹ thuật mà là \emph{phân bổ sai thời gian} và \emph{không duy trì được}.
+
+Ba chương ở đây vì thế chia theo ba câu hỏi thiết kế: tôi nên chia thời gian thế nào (19), tôi nên dùng cái gì (20), và tôi nên làm gì vào thứ Hai tuần này (21).
+
+\subsection*{C. Phụ thuộc và thứ tự đọc}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.58cm and 1.0cm,
+  m/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=3.0cm},
+  o/.style={draw=accent,fill=amberbg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=3.0cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  ard/.style={-{Latex[length=2.2mm]},draw=tiercol,thick,dashed},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.3cm}]
+\node[o] (c19) {\textbf{19.} Bốn nhánh luyện};
+\node[m,right=of c19] (c20) {\textbf{20.} Công cụ};
+\node[m,right=of c20] (c21) {\textbf{21.} Lộ trình 12 tuần};
+\node[m,below=1.0cm of c20] (abcd) {Phần \ptr{A/01}--\ptr{D/18}\\ nội dung để luyện};
+\draw[ar] (c19) -- node[lb,above=0pt] {chẩn đoán \(\rightarrow\) chọn công cụ} (c20);
+\draw[ar] (c20) -- node[lb,above=0pt] {công cụ \(\rightarrow\) lịch} (c21);
+\draw[ard] (abcd) -- (c21);
+\draw[ard] (abcd) -- (c19);
+\end{tikzpicture}
+\caption{Ba chương theo thứ tự thiết kế: chia thời gian, chọn công cụ, lên lịch. Chương 19 tô hổ phách vì chẩn đoán sai ở bước này làm lệch cả hai bước sau.}
+\label{fig:map-E-en}
+\end{figure}
+
+\subsection*{D. Cốt lõi hay tham khảo}
+\textbf{Cốt lõi:} bốn nhánh và bài tự chẩn đoán ở chương 19; nguyên tắc dùng mô hình ngôn ngữ ở chương 20; và lịch tuần cùng bảng chỉ số ở chương 21. \textbf{Tham khảo:} danh mục tài nguyên chi tiết ở chương 21 --- đọc lướt một lần để biết có gì, rồi quay lại khi cần đúng loại tài liệu.
+\end{document}

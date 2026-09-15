@@ -1,0 +1,412 @@
+% ---------------------------------------------------------------------------
+% Chương 1 — Hình học đa thị
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-13  |  Ôn gần nhất: —
+% Phụ thuộc: không (chương mở đầu cây). Cần đại số tuyến tính cơ bản (SVD, hạng, null space).
+% Mức độ: QUAN TRỌNG — đọc hiểu cơ chế và điều kiện áp dụng. Hai mục PHẢI đọc kỹ:
+%         mục 6 (cấu hình suy biến) và mục 4 (vì sao các phương pháp triangulation khác nhau).
+% Kiểm chứng công thức lõi:
+%   (1) Ràng buộc epipolar x'^T E x = 0 — cửa (a) tự dẫn từ tính đồng phẳng của ba véctơ;
+%       cửa (c) đối chiếu hartley2004 (§9.6) và ma2004invitation.
+%   (2) E = [t]_x R và hai giá trị kỳ dị bằng nhau — cửa (a) dẫn trực tiếp; cửa (b) ví dụ số
+%       ở mục 3C với t=(1,0,0), R=I, tính tay ra E và kiểm hạng 2.
+%   (3) Bốn nghiệm của phân rã E, lọc bằng cheirality — cửa (a); cửa (c) hartley2004 §9.6.2.
+%   (4) Bất định độ sâu từ triangulation tỉ lệ với z^2/(b·f) — cửa (a) vi phân quan hệ
+%       z = b·f/d; cửa (b) ví dụ số ở mục 4C (b=12cm, f=400px, z=5m -> ~0.13 m/px).
+%   (5) Xoay thuần làm parallax bằng 0 nên không triangulate được — cửa (a) thay t=0 vào
+%       phương trình chiếu; cửa (b) hai tia trùng nhau, hệ DLT suy biến.
+% Ghi chú trung thực: chương này KHÔNG chứa con số thực nghiệm nào của hệ thống nào.
+%   Mọi số là ký hiệu toán, số đếm nghiệm, hoặc ví dụ số tự đặt có dẫn "giả sử".
+% ---------------------------------------------------------------------------
+\documentclass[../../vslam.tex]{subfiles}
+\begin{document}
+\chapter{Hình học đa thị (Multi-View Geometry)}
+\ptrtarget{A/01}\ptrtarget{A/01-hinh-hoc-da-thi}
+\dependency{Không có chương trước. Cần sẵn: đại số tuyến tính ở mức SVD, hạng ma trận, không gian rỗng. Chương này là nền cho \ptr{A/02-mo-hinh-camera} (chỗ tia thành pixel), \ptr{B/10-khoi-tao} (khởi tạo hai khung) và \ptr{B/07-dac-trung-va-data-association} (kiểm định hình học sau khớp điểm).}
+
+\begin{tomtat}
+Chương này trả lời một câu hỏi duy nhất: hai ảnh của cùng một cảnh tĩnh ràng buộc nhau như thế nào, và khi nào ràng buộc ấy sụp đổ? Câu trả lời có ba tầng. Tầng đại số: một điểm ở ảnh này bắt buộc nằm trên một đường thẳng ở ảnh kia --- đường epipolar --- và toàn bộ quan hệ đó gói trong một ma trận \(3\times 3\) hạng hai. Tầng hình học: từ ràng buộc đó ta lấy ra được tư thế tương đối tới một hệ số tỉ lệ, rồi lấy ra được cấu trúc ba chiều bằng triangulation. Tầng suy biến, tầng quan trọng nhất trong thực hành: có những cấu hình --- cảnh phẳng, xoay thuần, chuyển động dọc trục quang --- mà quy trình trên trả về một kết quả trông bình thường nhưng vô nghĩa. Đọc xong bạn tự dựng lại được toàn bộ chuỗi từ hai tập điểm khớp tới một đám mây điểm ba chiều, và quan trọng hơn, bạn biết trước những chuỗi ảnh nào sẽ làm chuỗi đó vỡ. Nếu chỉ nhớ một điều: \emph{camera đo hướng chứ không đo khoảng cách, nên mọi thông tin về độ sâu đều đến từ sự khác biệt giữa hai tia, tức từ parallax, và parallax chỉ sinh ra khi camera dịch chuyển} --- xoay đầu không cho biết gì về độ sâu, dù xoay bao nhiêu độ.
+\end{tomtat}
+
+\begin{nentang}
+\kn{toạ độ thuần nhất (homogeneous coordinates)}{biểu diễn một điểm \(2\)D bằng một véctơ \(3\) thành phần \((x,y,w)\), trong đó \((x,y,w)\) và \(\lambda(x,y,w)\) với \(\lambda \neq 0\) là \emph{cùng} một điểm. Toạ độ Euclid lấy lại bằng \((x/w,\, y/w)\). Lợi ích: phép chiếu phối cảnh --- vốn phi tuyến trong toạ độ Euclid --- trở thành một phép nhân ma trận, và các điểm ``ở vô hạn'' (\(w = 0\)) có chỗ đứng hợp lệ thay vì là trường hợp ngoại lệ.}
+\kn{mặt phẳng chuẩn hoá (normalized plane)}{mặt phẳng \(z = 1\) trong hệ toạ độ camera. Một điểm \(3\)D \((X,Y,Z)\) chiếu về \((X/Z,\, Y/Z,\, 1)\). Đây là ảnh của cảnh khi đã gỡ bỏ hoàn toàn ảnh hưởng của tham số nội, nên mọi công thức hình học ở chương này viết trên mặt phẳng chuẩn hoá cho gọn.}
+\kn{parallax}{độ lệch hướng nhìn tới cùng một điểm \(3\)D khi camera dịch chuyển. Đo bằng góc giữa hai tia. Parallax lớn thì độ sâu xác định tốt; parallax bằng không thì độ sâu hoàn toàn không xác định.}
+\kn{epipole}{ảnh của tâm camera này trên mặt phẳng ảnh của camera kia. Mọi đường epipolar trong một ảnh đều đi qua epipole của ảnh đó.}
+\kn{cheirality}{ràng buộc rằng điểm \(3\)D phải nằm \emph{trước} camera, tức có độ sâu dương trong cả hai khung. Về mặt hình học thuần tuý, một điểm sau lưng camera vẫn chiếu ra một pixel hợp lệ; cheirality là ràng buộc vật lý loại bỏ các nghiệm như vậy.}
+\kn{cấu hình suy biến (degenerate configuration)}{một bố trí cảnh hoặc chuyển động làm cho bài toán mất nghiệm duy nhất: cảnh phẳng, xoay thuần, mọi điểm ở vô hạn, hoặc camera và các điểm cùng nằm trên một mặt bậc hai đặc biệt.}
+\kn{DLT (direct linear transform)}{kỹ thuật chung: biến một ràng buộc hình học thành một hệ phương trình tuyến tính thuần nhất \(A\theta = 0\), rồi lấy nghiệm là véctơ kỳ dị phải ứng với giá trị kỳ dị nhỏ nhất của \(A\). Nhanh và không cần khởi tạo, nhưng cực tiểu hoá một sai số \emph{đại số} không có ý nghĩa vật lý.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Một camera đơn mắt quay tại chỗ \(360^\circ\) và chụp một nghìn ảnh của một căn phòng đầy vân. Mọi cặp ảnh liền kề khớp điểm hoàn hảo. Vì sao không thể dựng lại được bất kỳ điểm \(3\)D nào, và vì sao ``chụp thêm ảnh'' không cứu được?}
+\h{Ma trận essential \(E\) có chín phần tử nhưng chỉ mã hoá năm bậc tự do. Hai bậc bị mất đi đâu, và vì sao thuật toán tám điểm vẫn chạy được dù nó bỏ qua điều này?}
+\h{Phân rã \(E\) cho ra đúng bốn nghiệm, ba trong số đó vô lý về mặt vật lý. Bốn nghiệm đó khác nhau ở chỗ nào, và vì sao phép thử loại chúng lại là một ràng buộc \emph{vật lý} chứ không phải một ràng buộc hình học?}
+\h{Với cùng một cặp điểm khớp và cùng một cặp tư thế, ba phương pháp triangulation --- DLT, midpoint, optimal --- cho ba kết quả khác nhau. Sự khác nhau đó lớn nhất ở đâu, và vì sao điều đó giải thích được bằng một câu về parallax?}
+\h{Hệ của bạn khởi tạo tốt trong hành lang nhưng thất bại khi quay mặt vào tường. Tường có vân rõ, khớp điểm tốt, RANSAC cho nhiều inlier. Cơ chế nào đang hỏng, và vì sao ORB-SLAM phải chạy \emph{hai} mô hình song song thay vì chọn sẵn một?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{A/01/01}
+
+Bài toán gốc của cả lĩnh vực có thể phát biểu trong một câu: \emph{cho một chuỗi ảnh hai chiều của một cảnh ba chiều, khôi phục lại cảnh đó và đường đi của camera}. Câu hỏi này cũ hơn nhiều so với robot học --- nó là bài toán của trắc địa ảnh (photogrammetry) từ đầu thế kỷ hai mươi, khi người ta dựng bản đồ địa hình từ ảnh chụp trên khinh khí cầu --- nhưng nó vẫn là bài toán trung tâm, vì một lý do đơn giản: ảnh là loại dữ liệu giàu thông tin nhất trên mỗi đồng chi phí và mỗi watt điện.
+
+Cái khó nằm ở chỗ phép chiếu \emph{mất thông tin một cách không phục hồi được}. Một camera lấy một điểm ba chiều và trả về hai con số. Một chiều đã biến mất, và nó biến mất theo một kiểu đặc biệt khó chịu: toàn bộ tia sáng đi qua tâm quang học chiếu về đúng một pixel. Nói cách khác, \emph{camera đo hướng, không đo khoảng cách}. Từ một ảnh duy nhất của một quả bóng, không có cách nào phân biệt một quả bóng nhỏ ở gần với một quả bóng to ở xa. Đây không phải giới hạn của thuật toán mà là giới hạn của phép đo, và mọi thứ trong chương này là cách đối phó với nó.
+
+Cách đối phó duy nhất là \emph{nhìn từ chỗ khác}. Khi camera dịch chuyển, tia nhìn tới cùng một điểm đổi hướng, và độ đổi hướng ấy --- parallax --- chứa thông tin về độ sâu. Đó là lý do một người nhắm một mắt vẫn ước lượng được khoảng cách khi lắc đầu, và cũng là lý do người đó không ước lượng được gì khi ngồi im. Toàn bộ hình học đa thị là việc hình thức hoá quan sát đơn giản ấy, và điều đáng ngạc nhiên là nó dẫn tới một cấu trúc đại số gọn gàng bất ngờ.
+
+Trước khi có cấu trúc đó, cách tiếp cận hiển nhiên là thử trực tiếp: đặt ẩn là tư thế tương đối và toạ độ các điểm, viết sai số chiếu, rồi tối ưu. Cách này \emph{đúng} --- nó chính là bundle adjustment ở \ptr{A/04} --- nhưng nó hỏng ở một chỗ chí mạng: tối ưu phi tuyến cần một điểm khởi đầu đủ gần, và ta chưa có gì cả. Thiếu khởi tạo thì bộ giải rơi vào cực tiểu địa phương, và với bài toán này cực tiểu địa phương không hiếm mà là quy luật. Vậy câu hỏi thực sự của chương là: \emph{làm sao có được một nghiệm xấp xỉ mà không cần nghiệm xấp xỉ nào trước đó?}
+
+Câu trả lời là khai thác một cấu trúc đại số ẩn trong hình học: ràng buộc epipolar. Nó cho phép ước lượng tư thế tương đối bằng cách giải một hệ tuyến tính --- không cần khởi tạo, không có cực tiểu địa phương --- rồi từ đó triangulate ra cấu trúc. Cái giá phải trả là hai thứ, và cả hai đều đáng nói ngay vì chúng theo ta suốt cây. Thứ nhất, nghiệm tuyến tính cực tiểu hoá một \emph{sai số đại số} không phải sai số vật lý, nên nó chỉ dùng làm khởi tạo chứ không dùng làm kết quả. Thứ hai, và nghiêm trọng hơn, phương pháp này có những \emph{cấu hình suy biến} mà ở đó nó không chỉ kém chính xác mà hoàn toàn vô nghĩa --- trong khi vẫn trả về một ma trận trông bình thường. Mục~6 dành riêng cho chuyện đó, và nếu chỉ có thời gian cho một mục của chương thì đó là mục nên đọc.
+
+\begin{trucgiac}
+Đứng ở hai chỗ khác nhau nhìn cùng một vật. Nối tâm mắt trái, tâm mắt phải và điểm vật --- ba điểm ấy xác định một mặt phẳng. Toàn bộ hình học epipolar là hệ quả của sự kiện tầm thường này.
+
+Vì điểm vật nằm trên mặt phẳng đó, nên ảnh của nó trên võng mạc phải cũng nằm trên giao tuyến của mặt phẳng đó với võng mạc phải --- một \emph{đường thẳng}. Nghĩa là: biết một điểm trong ảnh trái, bạn không biết nó ở đâu trong ảnh phải, nhưng bạn biết nó nằm trên đúng một đường thẳng. Bài toán tìm kiếm hai chiều rút xuống một chiều, miễn phí.
+
+Đường thẳng ấy là đường epipolar, và ma trận biến điểm trái thành đường phải là ma trận essential. Nó không chứa gì hơn ngoài thông tin ``hai mắt đặt ở đâu so với nhau'' --- chính vì thế mà từ nó lấy ngược ra được tư thế tương đối.
+
+Chỗ mọi thứ sụp đổ cũng nhìn ra từ đây. Nếu hai tâm mắt \emph{trùng nhau} --- tức camera chỉ xoay chứ không dịch --- thì ba điểm không xác định mặt phẳng nào nữa, đường epipolar không tồn tại, và cả cấu trúc biến mất. Đó là lý do xoay thuần là kẻ thù số một của SLAM đơn mắt.
+\end{trucgiac}
+
+\section{Toạ độ thuần nhất và phép chiếu}
+\ptrtarget{A/01/02}
+
+Trước khi vào ràng buộc chính, cần thống nhất ký hiệu, và lựa chọn ký hiệu ở đây không phải chuyện hình thức: dùng toạ độ thuần nhất biến một loạt trường hợp đặc biệt thành trường hợp thường.
+
+Một điểm \(3\)D trong hệ thế giới viết là \(\mathbf{P} = (X, Y, Z)^{\top}\), và dạng thuần nhất của nó là \(\tilde{\mathbf{P}} = (X,Y,Z,1)^{\top}\). Một camera ở tư thế \((R, \mathbf{t})\) --- với quy ước \(R\) và \(\mathbf{t}\) biến toạ độ thế giới sang toạ độ camera --- nhìn thấy điểm đó ở
+
+\[
+\mathbf{P}_c \;=\; R\,\mathbf{P} + \mathbf{t},
+\qquad
+\mathbf{x} \;=\; \pi(\mathbf{P}_c) \;=\; \frac{1}{Z_c}\begin{pmatrix} X_c \\ Y_c \end{pmatrix},
+\]
+
+với \(\mathbf{x}\) là toạ độ trên mặt phẳng chuẩn hoá. Việc biến \(\mathbf{x}\) thành pixel là việc của \ptr{A/02}; chương này làm việc hoàn toàn trên mặt phẳng chuẩn hoá, tức giả định camera đã hiệu chuẩn nội. Giả định đó đáng nhắc lại ở đây vì nó sẽ bị bỏ ở \ptr{C/14}: khi tham số nội trở thành ẩn, mọi thứ trong chương này vẫn đúng nhưng không còn dùng trực tiếp được, và đó chính là ranh giới giữa ma trận essential và ma trận fundamental ở mục~3D.
+
+Sức mạnh của toạ độ thuần nhất nằm ở chỗ nó gộp hai thứ vốn tách rời. Trong toạ độ Euclid, phép chiếu là một phép chia --- phi tuyến, và có kỳ dị ở \(Z_c = 0\). Trong toạ độ thuần nhất, cùng phép chiếu ấy viết là \(\tilde{\mathbf{x}} \sim [R \mid \mathbf{t}]\, \tilde{\mathbf{P}}\), trong đó \(\sim\) nghĩa là ``bằng nhau tới một hệ số tỉ lệ khác không''. Phép chia biến mất vào trong quan hệ \(\sim\), và toàn bộ biểu thức trở thành tuyến tính. Đây không phải mẹo ký hiệu: chính nhờ tính tuyến tính này mà các phương pháp DLT ở mục~3 và mục~4 tồn tại.
+
+Một lợi ích thứ hai, ít rõ hơn nhưng quan trọng trong SLAM. Toạ độ thuần nhất cho phép biểu diễn \emph{điểm ở vô hạn}: \(\tilde{\mathbf{P}} = (X,Y,Z,0)^{\top}\) là một hướng chứ không phải một vị trí. Điều này không phải trò chơi toán học, vì trong thực tế các điểm rất xa --- toà nhà ở cuối phố, đám mây --- hành xử \emph{gần như} điểm ở vô hạn: chúng không cho thông tin gì về tịnh tiến nhưng cho thông tin rất tốt về xoay. Nhận ra điều này giải thích một hiện tượng thực tế quan trọng: một hệ SLAM ngoài trời thường ước lượng hướng rất tốt mà vị trí rất tệ, và lý do là phần lớn đặc trưng nó nhìn thấy đều ở xa. Cách xử lý đúng là tham số hoá bằng nghịch đảo độ sâu, chuyện của \ptr{B/08}, nơi điểm ở vô hạn tương ứng với nghịch đảo độ sâu bằng không --- một giá trị hoàn toàn hợp lệ chứ không phải kỳ dị.
+
+\section{Ràng buộc epipolar: \(E\), \(F\) và \(H\)}
+\ptrtarget{A/01/03}
+
+\subsection{A. Suy dẫn ràng buộc từ tính đồng phẳng}
+
+Xét hai camera. Đặt khung thứ nhất làm gốc, và khung thứ hai ở tư thế tương đối \((R, \mathbf{t})\). Một điểm \(3\)D nhìn từ khung một có toạ độ \(\mathbf{P}_1\), nhìn từ khung hai có toạ độ \(\mathbf{P}_2 = R\,\mathbf{P}_1 + \mathbf{t}\).
+
+Ba véctơ sau cùng nằm trên một mặt phẳng, khi biểu diễn trong hệ của khung hai: véctơ \(\mathbf{P}_2\) (từ tâm camera hai tới điểm), véctơ \(\mathbf{t}\) (từ tâm camera hai tới tâm camera một, sai khác dấu), và véctơ \(R\,\mathbf{P}_1\) (tia của camera một, đã xoay về hệ hai). Đây chính là mặt phẳng epipolar trong khối \emph{Trực giác} ở trên. Điều kiện đồng phẳng của ba véctơ viết bằng tích hỗn tạp bằng không:
+
+\[
+\mathbf{P}_2^{\top}\,\bigl(\mathbf{t} \times (R\,\mathbf{P}_1)\bigr) \;=\; 0 .
+\]
+
+Vì sao bước này hợp lệ? Vì tích có hướng \(\mathbf{t} \times (R\mathbf{P}_1)\) là một véctơ vuông góc với mặt phẳng chứa \(\mathbf{t}\) và \(R\mathbf{P}_1\); tích vô hướng của nó với \(\mathbf{P}_2\) bằng không đúng khi \(\mathbf{P}_2\) cũng nằm trong mặt phẳng ấy. Viết tích có hướng thành phép nhân ma trận phản đối xứng \([\mathbf{t}]_\times\), ta có
+
+\[
+\mathbf{P}_2^{\top}\,[\mathbf{t}]_\times R\,\mathbf{P}_1 \;=\; 0 .
+\]
+
+Bước cuối là chỗ toạ độ thuần nhất trả công. Điểm chiếu chuẩn hoá \(\mathbf{x}_i\) chỉ khác \(\mathbf{P}_i\) một hệ số tỉ lệ (chính là độ sâu), và phương trình trên thuần nhất bậc một theo cả \(\mathbf{P}_1\) lẫn \(\mathbf{P}_2\), nên hệ số tỉ lệ triệt tiêu hoàn toàn:
+
+\begin{equation}
+\boxed{\;\mathbf{x}_2^{\top}\, E\, \mathbf{x}_1 \;=\; 0, \qquad E \;=\; [\mathbf{t}]_\times R \;}
+\label{eq:a01-epipolar}
+\end{equation}
+
+Đây là \term{ràng buộc epipolar}, và \(E\) là \vn{ma trận essential}{essential matrix}. Kết quả thuộc về Longuet-Higgins \cite{longuethiggins1981}; trình bày hiện đại đầy đủ nhất nằm ở \cite[§9.6]{hartley2004}. Tôi đã tự dẫn lại toàn bộ bước trên (cửa kiểm chứng a) và đối chiếu kết luận với hai nguồn độc lập là \cite{hartley2004} và \cite{ma2004invitation} (cửa c).
+
+Điều đáng dừng lại một câu: phương trình~\eqref{eq:a01-epipolar} \emph{không} chứa \(\mathbf{P}\). Toạ độ \(3\)D đã biến mất hoàn toàn. Nghĩa là ràng buộc này đúng cho \emph{mọi} điểm khớp, bất kể cấu trúc cảnh --- và đó là lý do nó dùng được để ước lượng tư thế tương đối \emph{trước khi} biết gì về cấu trúc. Đây là bước tách bài toán ``ước lượng đồng thời tư thế và cấu trúc'' thành hai bài toán tuần tự, và sự tách đó là điều làm cho khởi tạo khả thi.
+
+\subsection{B. Năm bậc tự do trong chín con số}
+
+\(E\) có chín phần tử nhưng chỉ mã hoá năm bậc tự do, và hiểu vì sao là hiểu bản chất của nó.
+
+Đếm bậc tự do vật lý trước: tư thế tương đối \((R, \mathbf{t})\) có sáu bậc, ba xoay và ba tịnh tiến. Nhưng phương trình~\eqref{eq:a01-epipolar} thuần nhất theo \(E\): nếu \(E\) thoả thì \(\lambda E\) cũng thoả với mọi \(\lambda \neq 0\). Vì \(E\) tuyến tính theo \(\mathbf{t}\), điều này nghĩa là \emph{độ lớn của \(\mathbf{t}\) không quan sát được} --- chỉ hướng của nó là. Mất một bậc, còn năm.
+
+Đây là lần đầu tiên trong cây ta gặp \term{tỉ lệ không quan sát được} (\emph{scale unobservability}), và nó sẽ trở lại ở \ptr{A/05} dưới dạng tổng quát hơn. Cơ chế thì đã nói ở phần đặt vấn đề: camera đo hướng. Nhân đôi toàn bộ thế giới --- mọi điểm, mọi đường cơ sở --- thì mọi tia nhìn giữ nguyên, nên mọi ảnh giữ nguyên. Không có phép đo thị giác nào phân biệt được hai thế giới ấy. Muốn có tỉ lệ tuyệt đối phải \emph{thêm thông tin}: đường cơ sở stereo đã biết (\ptr{A/02}), gia tốc kế (\code{../IMU\_Fusion/}), một vật có kích thước đã biết như marker (\code{../marker/}), hoặc một tiên nghiệm học được về kích thước vật thể (\ptr{C/17}).
+
+Hệ quả đại số của cấu trúc \(E = [\mathbf{t}]_\times R\) là một ràng buộc đặc trưng: \emph{\(E\) có hạng hai, và hai giá trị kỳ dị khác không của nó bằng nhau}. Lý do ngắn gọn: \([\mathbf{t}]_\times\) có hạng hai (không gian rỗng của nó là chính \(\mathbf{t}\)) và các giá trị kỳ dị khác không của nó đều bằng \(\|\mathbf{t}\|\); nhân thêm ma trận trực giao \(R\) không đổi phổ giá trị kỳ dị. Ràng buộc này quan trọng trong thực hành vì thuật toán tám điểm \emph{bỏ qua} nó: nó giải hệ tuyến tính tám phương trình và thu được một ma trận bất kỳ, nói chung không có dạng \([\mathbf{t}]_\times R\). Cách chữa chuẩn là chiếu về tập hợp hợp lệ bằng SVD: lấy \(E = U\,\mathrm{diag}(\sigma_1,\sigma_2,\sigma_3)\,V^{\top}\) rồi thay bằng \(U\,\mathrm{diag}(1,1,0)\,V^{\top}\).
+
+\begin{cambay}
+Thuật toán \textbf{tám điểm} dùng tám ràng buộc cho một ma trận chín phần tử (trừ đi tỉ lệ chung là tám ẩn), nên nó là hệ tuyến tính đúng cỡ --- nhưng nó cần tám điểm trong khi bài toán chỉ có năm bậc tự do. Ba ràng buộc thừa ấy là cái giá của việc tuyến tính hoá, và cái giá thật sự không phải số điểm mà là \textbf{độ nhạy với nhiễu}.
+
+Thuật toán \textbf{năm điểm} \cite{nister2004fivepoint} khai thác đúng năm bậc tự do và ràng buộc phổ giá trị kỳ dị, nên nó cần ít điểm hơn trong mỗi mẫu RANSAC. Điều này không phải chuyện tiết kiệm: số lần lặp RANSAC cần thiết tăng theo \emph{hàm mũ} của cỡ mẫu tối thiểu, nên đi từ tám xuống năm là một khác biệt lớn khi tỉ lệ outlier cao. Chi tiết ở \ptr{B/07}.
+
+Quan trọng hơn cả: thuật toán năm điểm \textbf{không suy biến với cảnh phẳng}, trong khi tám điểm thì có --- xem mục 6. Đây là lý do thực dụng chính để dùng nó, và nó bị nhắc tới ít hơn nhiều so với chuyện số điểm.
+\end{cambay}
+
+\subsection{C. Ví dụ nhỏ tính tay: stereo chuẩn}
+
+Lấy trường hợp đơn giản nhất để có số cụ thể. Giả sử hai camera song song, camera hai dịch sang phải một đoạn \(b\) so với camera một, không xoay. Trong quy ước ``\(R, \mathbf{t}\) biến toạ độ thế giới sang toạ độ camera'', với khung một làm gốc thế giới, ta có \(R = I\) và \(\mathbf{t} = (-b, 0, 0)^{\top}\) --- dấu âm vì camera dịch sang phải thì cảnh dịch sang trái trong hệ của nó.
+
+Tính \(E\) trực tiếp:
+\[
+E \;=\; [\mathbf{t}]_\times R \;=\;
+\begin{pmatrix} 0 & 0 & 0 \\ 0 & 0 & b \\ 0 & -b & 0 \end{pmatrix} .
+\]
+Kiểm hạng: hàng đầu bằng không, hai hàng còn lại độc lập tuyến tính, vậy hạng đúng bằng hai. Kiểm phổ giá trị kỳ dị: khối \(2\times 2\) ở góc dưới phải là \(b\) lần một ma trận trực giao, nên hai giá trị kỳ dị khác không đều bằng \(b\), bằng nhau đúng như mục~B dự đoán. Cả hai tính chất được xác nhận bằng số (cửa kiểm chứng b).
+
+Bây giờ thay vào ràng buộc epipolar với \(\mathbf{x}_1 = (u_1, v_1, 1)^{\top}\) và \(\mathbf{x}_2 = (u_2, v_2, 1)^{\top}\):
+\[
+\mathbf{x}_2^{\top} E\, \mathbf{x}_1 \;=\; b\,(v_1 - v_2) \;=\; 0
+\quad\Longrightarrow\quad v_1 = v_2 .
+\]
+Ràng buộc epipolar rút gọn thành \emph{hai điểm khớp phải có cùng toạ độ dọc}. Đây đúng là tính chất mà stereo rectification tạo ra một cách nhân tạo cho cấu hình bất kỳ, và là lý do tìm kiếm khớp điểm trong stereo đã hiệu chỉnh chỉ cần quét dọc một hàng. Ví dụ nhỏ này vừa kiểm chứng công thức, vừa cho thấy stereo rectification không phải một thủ thuật riêng mà là một trường hợp đặc biệt của hình học epipolar.
+
+\subsection{D. Fundamental và homography: hai họ hàng cần phân biệt}
+
+Ma trận \(E\) giả định camera đã hiệu chuẩn nội, tức ta làm việc trên mặt phẳng chuẩn hoá. Khi không có hiệu chuẩn, ta chỉ có pixel, và quan hệ tương ứng là \vn{ma trận fundamental}{fundamental matrix}:
+\[
+\mathbf{p}_2^{\top} F\, \mathbf{p}_1 = 0,
+\qquad
+F \;=\; K_2^{-\top} E\, K_1^{-1},
+\]
+với \(\mathbf{p}_i\) là toạ độ pixel thuần nhất và \(K_i\) là ma trận nội. \(F\) có bảy bậc tự do (chín phần tử, trừ tỉ lệ chung, trừ ràng buộc \(\det F = 0\)), nhiều hơn \(E\) đúng hai bậc --- hai bậc ấy chính là phần thông tin nội mà ta không biết. Trong Visual SLAM, \(F\) ít được dùng trực tiếp vì ta gần như luôn đã hiệu chuẩn; chỗ nó có giá trị là SfM từ ảnh internet, nơi tham số nội là ẩn (\ptr{C/14}).
+
+\vn{Homography}{homography} \(H\) là chuyện khác hẳn và dễ nhầm. Nó là một ma trận \(3\times 3\) khả nghịch biến \emph{điểm thành điểm}, không phải điểm thành đường:
+\[
+\mathbf{x}_2 \;\sim\; H\,\mathbf{x}_1 .
+\]
+Quan hệ này đúng trong đúng hai trường hợp, và biết rõ hai trường hợp ấy là điều quan trọng nhất cần nhớ về \(H\). Thứ nhất, khi mọi điểm nằm trên \emph{một mặt phẳng} trong không gian --- lúc đó \(H = R + \frac{1}{d}\mathbf{t}\,\mathbf{n}^{\top}\) với \(\mathbf{n}\) là pháp tuyến mặt phẳng và \(d\) là khoảng cách từ camera một tới mặt phẳng đó \cite[§13]{hartley2004}. Thứ hai, khi camera \emph{chỉ xoay} --- lúc đó \(\mathbf{t} = 0\) và \(H = R\), đúng cho mọi điểm bất kể cấu trúc.
+
+Sự trùng hợp này không phải ngẫu nhiên mà là dấu hiệu của một điều sâu hơn: \emph{cả hai trường hợp đều là trường hợp mà \(E\) mất nghĩa}. Với cảnh phẳng, ràng buộc epipolar vẫn đúng nhưng không còn xác định \(E\) duy nhất; với xoay thuần, \(\mathbf{t} = 0\) nên \(E = 0\). Nói cách khác, homography không phải một mô hình cạnh tranh với \(E\) mà là mô hình \emph{thay thế cho đúng những cấu hình mà \(E\) chết}. Đó là toàn bộ lý do ORB-SLAM chạy song song hai mô hình rồi chọn theo điểm số \cite{murartal2015orbslam}, chuyện sẽ nói kỹ ở \ptr{B/10}.
+
+\begin{table}[H]\centering\small
+\caption{Ba ma trận, ba phạm vi áp dụng. Cột cuối là chỗ dễ sai nhất trong thực hành.}
+\label{tab:a01-efh}
+\begin{tabularx}{\linewidth}{@{}L{1.5cm}L{1.4cm}L{3.4cm}YL{2.6cm}@{}}
+\toprule
+\textbf{Ma trận} & \textbf{Bậc tự do} & \textbf{Giả thiết} & \textbf{Cho ra cái gì} & \textbf{Suy biến khi}\\
+\midrule
+\(E\) & 5 & Nội đã biết; cảnh không phẳng; có tịnh tiến & \((R, \hat{\mathbf{t}})\) --- hướng tịnh tiến, không có độ lớn & Cảnh phẳng; xoay thuần; mọi điểm ở vô hạn\\
+\(F\) & 7 & Nội chưa biết & Hình học epipolar trong pixel; cần thêm giả định để ra tư thế & Như \(E\), cộng thêm mọi cấu hình mà tự hiệu chuẩn suy biến\\
+\(H\) & 8 & Cảnh phẳng \emph{hoặc} xoay thuần & Ánh xạ điểm-điểm; phân rã cho \((R,\mathbf{t}/d,\mathbf{n})\) & Cảnh \emph{không} phẳng và \emph{có} tịnh tiến --- tức trường hợp thông thường\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng~\ref{tab:a01-efh} nên đọc theo cột cuối. Điều đáng chú ý là \(E\) và \(H\) suy biến ở \emph{những chỗ bù nhau}: nơi này chết thì nơi kia sống. Hệ quả thiết kế trực tiếp là không nên chọn sẵn một mô hình mà phải chạy cả hai và để dữ liệu quyết định --- một nguyên tắc sẽ lặp lại ở nhiều chỗ trong cây, dưới cái tên \emph{model selection}.
+
+\subsection{E. Phân rã \(E\): bốn nghiệm và ràng buộc vật lý loại ba}
+
+Có \(E\) rồi, lấy \((R, \hat{\mathbf{t}})\) ra bằng SVD. Viết \(E = U\,\mathrm{diag}(1,1,0)\,V^{\top}\) và đặt
+\[
+W = \begin{pmatrix} 0 & -1 & 0 \\ 1 & 0 & 0 \\ 0 & 0 & 1\end{pmatrix},
+\]
+thì bốn tổ hợp sau đều thoả \(E = [\mathbf{t}]_\times R\):
+\[
+(R_a, +\mathbf{u}_3),\quad (R_a, -\mathbf{u}_3),\quad (R_b, +\mathbf{u}_3),\quad (R_b, -\mathbf{u}_3),
+\]
+với \(R_a = U W V^{\top}\), \(R_b = U W^{\top} V^{\top}\), và \(\mathbf{u}_3\) là cột thứ ba của \(U\) \cite[§9.6.2]{hartley2004}.
+
+Bốn nghiệm này không phải một khiếm khuyết của thuật toán mà là một tính chất thật của ràng buộc epipolar: phương trình~\eqref{eq:a01-epipolar} không biết phân biệt ``điểm ở trước camera'' với ``điểm ở sau camera''. Hai nghiệm khác nhau ở dấu của \(\mathbf{t}\) tương ứng với việc đổi chiều đường cơ sở; hai nghiệm khác nhau ở \(R_a\) so với \(R_b\) tương ứng với phép xoay \(180^\circ\) quanh đường cơ sở --- cấu hình gọi là ``twisted pair''.
+
+Cách loại là \term{cheirality}: triangulate một điểm khớp bằng mỗi nghiệm, rồi giữ nghiệm cho độ sâu dương ở \emph{cả hai} camera. Về mặt hình học thuần tuý cả bốn đều hợp lệ; thứ phân biệt chúng là một sự kiện vật lý --- ánh sáng đi vào camera từ phía trước. Đây là một ví dụ đẹp và đáng nhớ của một khuôn mẫu lặp lại khắp cây: \emph{ràng buộc hình học để lại nhiều nghiệm, và ràng buộc vật lý là thứ chọn ra nghiệm đúng}. Ta sẽ gặp lại đúng khuôn mẫu này ở lưỡng nghĩa tư thế của target phẳng trong \code{../marker/}, và ở chỗ trọng lực ghim roll với pitch trong \code{../IMU\_Fusion/}.
+
+\begin{cannho}
+Bốn nghiệm của phân rã \(E\), và cheirality loại ba. Trong cài đặt thật, đừng chỉ triangulate \emph{một} điểm để quyết định: với nhiễu và với điểm ở gần vô hạn, dấu của độ sâu không đáng tin. Hãy triangulate \emph{tất cả} inlier cho từng nghiệm rồi đếm số điểm có độ sâu dương ở cả hai khung, và chọn nghiệm thắng áp đảo.
+
+Nếu không nghiệm nào thắng áp đảo --- chẳng hạn hai nghiệm cho số lượng xấp xỉ nhau --- thì đó \textbf{không} phải lúc chọn đại. Đó là dấu hiệu parallax quá nhỏ hoặc cảnh phẳng, tức là dấu hiệu bạn đang ở một cấu hình suy biến của mục 6. Câu trả lời đúng lúc đó là \emph{từ chối khởi tạo} và chờ thêm dữ liệu, không phải trả về nghiệm nhiều phiếu hơn một chút.
+\end{cannho}
+
+\section{Triangulation: từ hai tia ra một điểm}
+\ptrtarget{A/01/04}
+
+Có tư thế tương đối rồi, bước tiếp theo là khôi phục cấu trúc. Bài toán phát biểu đơn giản: cho hai tia xuất phát từ hai tâm camera đã biết theo hai hướng đã biết, tìm giao điểm. Cái bẫy nằm ở chỗ với dữ liệu thật, \emph{hai tia không cắt nhau} --- nhiễu pixel làm chúng chéo nhau trong không gian. Vậy ``giao điểm'' nghĩa là gì? Ba câu trả lời khác nhau cho ba phương pháp, và chúng khác nhau nhiều nhất đúng ở chỗ quan trọng nhất.
+
+\subsection{A. Ba phương pháp, ba định nghĩa về ``gần nhất''}
+
+\term{DLT} biến bài toán thành đại số tuyến tính. Điều kiện \(\mathbf{x} \sim P\tilde{\mathbf{P}}\) tương đương với \(\mathbf{x} \times P\tilde{\mathbf{P}} = 0\); mỗi khung cho hai phương trình độc lập, hai khung cho bốn, và nghiệm là véctơ kỳ dị phải nhỏ nhất của ma trận \(4\times 4\) tương ứng. Ưu điểm: một lần SVD, không lặp, không khởi tạo. Nhược điểm: nó cực tiểu hoá một \emph{sai số đại số} --- một đại lượng không có đơn vị vật lý, và tệ hơn, một đại lượng có trọng số ngầm phụ thuộc vào độ sâu. Điểm càng xa thì trọng số ngầm càng lệch, nên DLT thiên vị một cách khó đoán.
+
+\term{Midpoint} lấy trung điểm của đoạn vuông góc chung giữa hai tia. Trực giác hình học rất rõ, và nó là phương pháp hay được viết ra đầu tiên. Nhưng nó cực tiểu hoá khoảng cách trong không gian \(3\)D, trong khi nhiễu thật nằm ở \emph{mặt phẳng ảnh}. Với parallax lớn hai tiêu chí gần trùng nhau; với parallax nhỏ, chúng phân kỳ mạnh, và midpoint cho kết quả tệ nhất trong ba phương pháp đúng ở chế độ khó nhất.
+
+\term{Optimal} (Hartley--Sturm) đặt đúng câu hỏi thống kê: tìm điểm \(3\)D cực tiểu hoá \emph{tổng bình phương sai số chiếu lại} trên hai ảnh, tức ước lượng hợp lý cực đại dưới giả định nhiễu Gauss đẳng hướng trên pixel. Hartley và Sturm \cite{hartley1997triangulation} chỉ ra bài toán này rút về việc tìm nghiệm của một đa thức bậc sáu, nên giải được chính xác chứ không cần lặp. Đây là phương pháp đúng về mặt nguyên tắc, và nó cũng đắt nhất.
+
+\subsection{B. Vì sao chúng khác nhau ở điểm xa}
+
+Đây là điểm cần hiểu cơ chế chứ không phải thuộc kết luận, vì cùng cơ chế ấy chi phối lựa chọn tham số hoá landmark ở \ptr{B/08} và ngân sách sai số ở \ptr{A/06}.
+
+Xét hình dạng của \emph{vùng bất định} quanh điểm triangulate. Với parallax lớn --- hai tia gần vuông góc --- giao của hai chùm tia là một vùng gần tròn, và mọi tiêu chí ``gần nhất'' đều trỏ về gần cùng một chỗ. Với parallax nhỏ --- hai tia gần song song --- vùng ấy là một \emph{điếu xì gà} rất dài dọc theo hướng nhìn: ngắn theo phương ngang, dài theo phương sâu. Bất định theo hai hướng lệch nhau nhiều bậc độ lớn.
+
+Trong vùng dẹt như vậy, ba tiêu chí trỏ về ba chỗ khác nhau dọc theo trục dài, và khoảng cách giữa chúng có thể lớn hơn nhiều so với sai số pixel đã sinh ra chúng. Tệ hơn, phân bố của sai số độ sâu \emph{không còn đối xứng}: nhiễu pixel đối xứng ánh xạ thành sai số độ sâu lệch phải, vì quan hệ độ sâu--disparity là nghịch đảo. Trung bình của một đại lượng lệch không bằng ảnh của trung bình, nên mọi ước lượng điểm đều thiên vị theo một hướng nào đó. Đây chính là lý do sâu xa vì sao \term{nghịch đảo độ sâu} là tham số hoá tốt hơn: trong biến nghịch đảo, quan hệ trở lại gần tuyến tính và phân bố trở lại gần Gauss \cite{civera2008inversedepth}. Chi tiết ở \ptr{B/08}.
+
+\subsection{C. Ví dụ nhỏ tính tay: bất định độ sâu của stereo}
+
+Lấy cấu hình stereo chuẩn ở mục~3C để có một quan hệ định lượng đáng thuộc lòng. Với đường cơ sở \(b\), tiêu cự \(f\) (đơn vị pixel) và disparity \(d = u_1 - u_2\) (pixel), độ sâu là
+
+\begin{equation}
+z \;=\; \frac{b\,f}{d} .
+\label{eq:a01-depth}
+\end{equation}
+
+Vi phân theo \(d\):
+\[
+\frac{\partial z}{\partial d} \;=\; -\frac{b f}{d^2} \;=\; -\frac{z^2}{b f}
+\quad\Longrightarrow\quad
+\boxed{\;\sigma_z \;\approx\; \frac{z^2}{b f}\,\sigma_d\;}
+\]
+
+Đây là một trong vài quan hệ trong cả cây đáng thuộc lòng, vì nó chi phối mọi quyết định về chọn cảm biến ở \ptr{D/21}. Nó nói: \emph{sai số độ sâu tăng theo bình phương độ sâu}. Gấp đôi khoảng cách thì sai số gấp bốn.
+
+Số cụ thể. Giả sử \(b = 12\) cm, \(f = 400\) px, và tinh chỉnh subpixel cho \(\sigma_d = 0{,}2\) px. Ở \(z = 2\) m:
+\[
+\sigma_z \;=\; \frac{2^2}{0{,}12 \times 400}\times 0{,}2 \;=\; \frac{4}{48}\times 0{,}2 \;\approx\; 0{,}017\ \text{m} .
+\]
+Ở \(z = 5\) m:
+\[
+\sigma_z \;=\; \frac{25}{48}\times 0{,}2 \;\approx\; 0{,}104\ \text{m} .
+\]
+Ở \(z = 10\) m: \(\sigma_z \approx 0{,}417\) m. Khoảng cách tăng năm lần thì sai số tăng hai mươi lăm lần --- từ mức centimet lên mức gần nửa mét. (Ví dụ tự đặt; các con số là kết quả tính tay từ công thức trên, cửa kiểm chứng b.)
+
+Bài học thiết kế rút ra ngay, và nó là bài học thật cho sản phẩm: với stereo đường cơ sở ngắn, dữ liệu độ sâu ở xa gần như vô dụng cho việc đo đạc --- nhưng vẫn rất hữu ích cho việc ước lượng \emph{hướng}, vì sai số ngang không tăng theo bình phương. Hệ quả là điểm xa nên được đưa vào bài toán với trọng số đúng theo hướng, chứ không nên bị vứt bỏ. Cách làm đúng là tham số hoá nghịch đảo độ sâu và để hiệp phương sai phản ánh hình dạng điếu xì gà, thay vì gán một \(\sigma\) đẳng hướng rồi hy vọng. Đây là một trong những chỗ mà chương~6 và chương~8 nối trực tiếp vào chương này.
+
+\section{Từ hai khung sang nhiều khung}
+\ptrtarget{A/01/05}
+
+Hai khung cho ta khởi tạo. Nhưng SLAM là chuyện hàng nghìn khung, và có ba câu hỏi mà hình học hai khung không trả lời được.
+
+Thứ nhất, \emph{tư thế tuyệt đối}. Khi đã có một bản đồ và một khung mới, không cần quay lại hình học epipolar: ta có các tương ứng \(3\)D--\(2\)D và bài toán trở thành \vn{PnP}{perspective-n-point}. Với ba điểm (P3P) bài toán có tối đa bốn nghiệm, giải được ở dạng đóng \cite{kneip2011p3p}; với nhiều điểm, EPnP \cite{lepetit2009epnp} cho nghiệm tuyến tính thời gian \(O(n)\). PnP là xương sống của luồng tracking trong mọi hệ thống có bản đồ --- ORB-SLAM gọi nó mỗi khung --- và cũng là bước cuối của mọi pipeline relocalization ở \ptr{B/12}.
+
+Thứ hai, \emph{ba khung trở lên ràng buộc nhau thế nào}. Câu trả lời đầy đủ là tensor ba tiêu (trifocal tensor), một đối tượng \(3\times3\times3\) đóng vai trò của \(F\) cho bộ ba ảnh, và nó có một khả năng mà hình học hai khung không có: chuyển \emph{đường thẳng} giữa các ảnh. Trong Visual SLAM hiện đại tensor này ít được dùng trực tiếp --- lý do thực dụng là khi đã có bản đồ thì PnP rẻ hơn và ổn định hơn --- nên cây này xếp nó mức \muc{1}: biết là có, đọc \cite[§15]{hartley2004} khi gặp bài toán thuần thị giác không có bản đồ.
+
+Thứ ba, và đây là câu quan trọng nhất: \emph{làm sao ghép mọi thứ lại một cách nhất quán}. Ghép từng cặp rồi nối chuỗi là cách hiển nhiên, và nó hỏng theo một kiểu không thể sửa được: sai số tích luỹ đơn điệu, và không có cơ chế nào để một phép đo muộn chỉnh lại một ước lượng sớm. Cách đúng là đặt \emph{mọi} tư thế và \emph{mọi} điểm vào cùng một bài toán tối ưu, tức bundle adjustment --- nội dung của \ptr{A/04}. Nói cách khác, chương này cho \emph{khởi tạo}, còn chương~4 cho \emph{nghiệm}. Nhầm hai vai trò ấy là một lỗi phổ biến: dùng nghiệm tuyến tính từ chương này làm kết quả cuối là bỏ lại rất nhiều độ chính xác trên bàn.
+
+\section{Cấu hình suy biến: mục quan trọng nhất của chương}
+\ptrtarget{A/01/06}
+
+Nếu chỉ đọc một mục của chương thì đọc mục này. Lý do không phải vì nó khó mà vì nó là mục quyết định hệ thống của bạn có sống sót ngoài phòng thí nghiệm hay không --- và vì phần lớn tài liệu nói về nó bằng một dòng ở cuối phần liên quan, nếu có nói.
+
+\subsection{A. Xoay thuần}
+
+Khi \(\mathbf{t} = 0\), phương trình~\eqref{eq:a01-epipolar} cho \(E = [\mathbf{0}]_\times R = 0\). Ràng buộc epipolar trở thành \(0 = 0\), đúng với mọi cặp điểm, nên nó không ràng buộc gì cả. Hình học hơn: hai tâm camera trùng nhau nên không có mặt phẳng epipolar, không có đường epipolar, không có parallax. Mỗi điểm \(3\)D có thể ở bất kỳ độ sâu nào dọc theo tia của nó mà không ảnh hưởng tới ảnh nào.
+
+Đây là chế độ hỏng phổ biến nhất và tốn kém nhất của SLAM đơn mắt trong thực tế, vì nó không hiếm chút nào: robot quay tại chỗ để đổi hướng, người cầm điện thoại xoay để quét phòng, drone yaw để đổi tầm nhìn. Trong mọi tình huống đó, camera thu được ảnh chất lượng cao, khớp điểm hoàn hảo, RANSAC báo nhiều inlier --- và không một điểm \(3\)D mới nào được sinh ra một cách đáng tin.
+
+Cách xử lý đúng gồm ba phần, và phần thứ ba hay bị bỏ. Một: \emph{phát hiện} bằng cách đo parallax trung vị của các điểm khớp, không phải bằng số inlier. Hai: khi phát hiện, \emph{không tạo landmark mới} và không tạo keyframe mới, chỉ theo dõi bằng mô hình homography thuần xoay. Ba, phần hay bị bỏ: \emph{ghi lại} rằng đoạn đó là đoạn xoay thuần, vì khi robot dịch chuyển trở lại, các điểm nhìn thấy trong lúc xoay vẫn chưa có độ sâu và phải được triangulate lúc đó chứ không phải bị vứt đi. Chi tiết ở \ptr{B/10} và \ptr{C/13}.
+
+\subsection{B. Cảnh phẳng}
+
+Khi mọi điểm nằm trên một mặt phẳng, hệ phương trình của thuật toán tám điểm mất hạng: có nhiều hơn một ma trận \(E\) khớp với dữ liệu. Nghiệm trả về khi đó là một tổ hợp tuỳ tiện quyết định bởi nhiễu, và nó có thể sai bất kỳ mức nào.
+
+Điều làm cấu hình này nguy hiểm hơn xoay thuần là nó \emph{im lặng hơn}: parallax vẫn có, số inlier vẫn cao, và không có đại lượng đơn giản nào như ``parallax trung vị'' báo động. Tình huống này rất thường gặp trong nhà: camera quay mặt vào tường, nhìn xuống sàn, nhìn lên trần, nhìn vào cửa. Với robot lau nhà hay AGV kho hàng, nó là chế độ mặc định chứ không phải ngoại lệ.
+
+Có hai cách xử lý và chúng bổ sung nhau. Cách thứ nhất là dùng thuật toán năm điểm, vốn không suy biến với cảnh phẳng vì nó khai thác ràng buộc phổ giá trị kỳ dị \cite{nister2004fivepoint}. Cách thứ hai, mạnh hơn, là \emph{model selection}: chạy song song cả \(E\) và \(H\), tính một điểm số cho mỗi mô hình dựa trên phần dư của inlier, rồi chọn. ORB-SLAM chọn cách này \cite{murartal2015orbslam}, và lý do không chỉ là độ chính xác mà là \emph{thông tin chẩn đoán}: khi \(H\) thắng, hệ thống biết nó đang nhìn một mặt phẳng, và nó có thể dùng thông tin đó để đổi hành vi thay vì chỉ đổi công thức.
+
+\subsection{C. Chuyển động dọc trục quang, và điểm ở vô hạn}
+
+Khi camera tiến thẳng về phía trước, epipole nằm \emph{trong} ảnh --- tại điểm mà mọi thứ dường như toả ra. Về nguyên tắc hình học vẫn không suy biến, và \(E\) vẫn xác định được. Trên thực tế nó là chế độ khó: các điểm gần epipole có parallax rất nhỏ dù camera đã đi một quãng dài, nên độ sâu của chúng rất kém xác định. Với xe tự lái đi thẳng trên đường cao tốc, đây là chế độ hoạt động chính, và nó là một phần lý do vì sao KITTI khó hơn EuRoC về mặt hình học dù cảnh sạch hơn.
+
+Trường hợp cuối: \emph{mọi điểm ở rất xa}. Lúc đó tất cả hành xử như điểm ở vô hạn, ma trận \(E\) chỉ ràng buộc được thành phần xoay, còn hướng tịnh tiến thì không xác định. Đây là chuyện của SLAM ngoài trời nhìn ra xa, và của drone bay cao. Một dấu hiệu nhận biết rẻ: nếu ước lượng hướng ổn định nhưng hướng tịnh tiến nhảy lung tung giữa các khung, nhiều khả năng bạn đang ở đây, không phải đang có lỗi cài đặt.
+
+\begin{table}[H]\centering\small
+\caption{Bốn cấu hình suy biến, dấu hiệu nhận biết, và cách xử lý. Cột ``dấu hiệu'' là cột đáng nhớ nhất, vì nó là thứ bạn cần cài vào hệ thống để nó tự chẩn đoán.}
+\label{tab:a01-degen}
+\begin{tabularx}{\linewidth}{@{}L{2.6cm}L{3.2cm}YL{3.2cm}@{}}
+\toprule
+\textbf{Cấu hình} & \textbf{Cái gì mất} & \textbf{Dấu hiệu đo được} & \textbf{Xử lý}\\
+\midrule
+Xoay thuần & Toàn bộ cấu trúc; \(E = 0\) & Parallax trung vị nhỏ dù số inlier cao; \(H\) khớp tốt hơn hẳn \(E\) & Không tạo landmark mới; theo dõi bằng \(H\); ghi lại để triangulate sau\\
+Cảnh phẳng & Nghiệm \(E\) duy nhất & Điểm số \(H\) cao hơn \(E\) rõ rệt; pháp tuyến ổn định qua nhiều khung & Thuật toán 5 điểm; hoặc model selection rồi phân rã \(H\)\\
+Đi dọc trục quang & Độ sâu của điểm gần epipole & Epipole nằm trong ảnh; parallax phân bố rất lệch theo bán kính & Ưu tiên điểm ở rìa ảnh; dùng cửa sổ thời gian dài hơn\\
+Mọi điểm ở vô hạn & Hướng tịnh tiến & Hướng \(\hat{\mathbf{t}}\) nhảy giữa các khung trong khi \(R\) ổn định & Tham số hoá nghịch đảo độ sâu; thêm nguồn tỉ lệ (IMU, stereo)\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{cambay}
+Đừng dùng \textbf{số inlier} của RANSAC làm thước đo chất lượng khởi tạo. Đây là lỗi phổ biến nhất liên quan tới chương này, và nó phổ biến vì số inlier là con số dễ lấy nhất.
+
+Lý do nó sai: trong cả bốn cấu hình ở Bảng~\ref{tab:a01-degen}, số inlier vẫn \emph{cao}. Với xoay thuần, mọi điểm khớp hoàn hảo với một homography, nên nếu bạn đang chạy mô hình \(E\) thì nhiều điểm vẫn nằm trong ngưỡng phần dư; với cảnh phẳng, mọi điểm khớp hoàn hảo với một \(E\) \emph{nào đó} trong họ nghiệm. Số inlier đo \emph{mức độ nhất quán của dữ liệu với mô hình}, không đo \emph{mức độ xác định của mô hình}. Hai thứ đó khác nhau, và chính sự nhầm lẫn giữa chúng là nguồn của kiểu hỏng im lặng mà \ptr{A/05} mô tả tổng quát.
+
+Thước đo đúng gồm ba con số và nên tính cả ba: \textbf{parallax trung vị} của các điểm inlier (không phải trung bình --- trung vị bền hơn với vài điểm ở rất gần); \textbf{tỉ số điểm số} giữa hai mô hình \(H\) và \(E\); và \textbf{số điều kiện} của ma trận thông tin nếu bạn đã dựng nó. Hệ thống nên \emph{từ chối khởi tạo} khi ba con số này không đạt, chứ không nên khởi tạo rồi hy vọng bundle adjustment sẽ sửa. BA không sửa được thứ mà dữ liệu không chứa.
+\end{cambay}
+
+\section{Giới hạn của chương và chỗ nó nối sang}
+\ptrtarget{A/01/07}
+
+Toàn bộ chương này đứng trên bốn giả thiết, và hai trong số đó là giả thiết ngầm mà ít tài liệu nói ra. Nêu rõ chúng ở đây vì mỗi giả thiết bị vi phạm là một chương ở phần sau.
+
+\emph{Giả thiết một: cảnh tĩnh.} Mọi phương trình giả định điểm \(3\)D không di chuyển giữa hai lần chụp. Khi có vật động, ràng buộc epipolar đơn giản là sai với các điểm trên vật đó. RANSAC cứu được khi vật động chiếm thiểu số; khi nó chiếm đa số khung hình --- một chiếc xe tải đi ngang trước camera --- thì RANSAC sẽ trung thành chọn \emph{vật động} làm inlier và cảnh tĩnh làm outlier, rồi trả về tư thế tương đối so với chiếc xe tải. Kết quả sai nhưng nhất quán, tức im lặng. Xử lý ở \ptr{D/19}.
+
+\emph{Giả thiết hai: camera đã hiệu chuẩn nội đúng.} Chương làm việc trên mặt phẳng chuẩn hoá, tức giả định đã gỡ được \(K\) và distortion. Nếu hiệu chuẩn sai, sai số ấy không biến mất mà \emph{chảy sang} tư thế và cấu trúc, thường theo một hoa văn có hệ thống. Chương~2 dạy cách nhận ra hoa văn ấy; chương~14 dạy cách ước lượng lại tham số ngay trong bài toán.
+
+\emph{Giả thiết ba (ngầm): mọi pixel được chụp cùng một lúc.} Với cảm biến global shutter thì đúng; với rolling shutter thì sai, và một ảnh chụp lúc đang xoay nhanh không tương ứng với \emph{một} tư thế nào cả. Chương~2 mô tả mô hình đúng.
+
+\emph{Giả thiết bốn (ngầm): điểm khớp là khớp đúng.} Cả chương giả định bài toán data association đã giải xong. Trong thực tế đó là phần khó nhất và là nguồn của phần lớn lỗi thảm hoạ --- một cặp khớp sai có phần dư khổng lồ sẽ kéo nghiệm bình phương tối thiểu đi rất xa. Chương~7 nói về việc tìm khớp, chương~4 nói về việc chịu đựng khớp sai bằng hàm mất mát bền.
+
+\begin{ungdung}
+\ud{ORB-SLAM3 \cite{campos2021orbslam3}}{Chạy song song mô hình \(H\) và \(E\), tính điểm số, chọn mô hình; từ chối khởi tạo khi parallax không đủ}{Chỗ luận điểm mục 6 xuất hiện nguyên vẹn trong mã nguồn thật}
+\ud{COLMAP \cite{schonberger2016colmap}}{Kiểm định hình học hai khung với nhiều mô hình; phân loại cặp ảnh theo mô hình thắng}{Bước \emph{geometric verification} chính là Bảng~\ref{tab:a01-efh} được cài đặt}
+\ud{OpenCV \code{findEssentialMat}}{Thuật toán 5 điểm \cite{nister2004fivepoint} trong vòng lặp RANSAC; \code{recoverPose} làm cheirality}{Mục 3E là đúng cái hàm \code{recoverPose} làm bên trong}
+\ud{HLoc \cite{sarlin2019hloc}}{PnP + RANSAC ở bước cuối sau khi retrieval và matching}{Mục 5 --- khi đã có bản đồ thì PnP thay thế hình học epipolar}
+\ud{VINS-Mono \cite{qin2018vinsmono}}{Khởi tạo bằng SfM hai khung rồi căn với IMU để lấy tỉ lệ}{Minh hoạ trực tiếp mục 3B: tỉ lệ phải đến từ ngoài thị giác}
+\end{ungdung}
+
+\begin{duan}{Dựng lại pipeline hai khung từ đầu, rồi phá nó bằng ba cấu hình suy biến}{3 ngày}
+\dmt tự viết toàn chuỗi từ hai tập điểm khớp tới đám mây điểm \(3\)D, rồi \emph{cố tình} đưa nó vào ba cấu hình suy biến để thấy tận mắt kiểu hỏng im lặng.
+\ddl một cặp ảnh bất kỳ từ EuRoC hoặc TUM-RGBD kèm hiệu chuẩn đã biết; thêm dữ liệu tổng hợp tự sinh, vì với dữ liệu tổng hợp bạn kiểm soát được chính xác chuyển động.
+\dbc cài thuật toán tám điểm có chuẩn hoá Hartley; chiếu \(E\) về tập hợp lệ bằng SVD và kiểm hai giá trị kỳ dị bằng nhau; phân rã ra bốn nghiệm và lọc bằng cheirality trên toàn bộ inlier; cài cả ba phương pháp triangulation; đo sai số chiếu lại của từng phương pháp theo parallax, vẽ đồ thị sai số theo góc parallax.
+\dxk bạn có một đồ thị cho thấy ba phương pháp trùng nhau ở parallax lớn và phân kỳ ở parallax nhỏ --- xác nhận mục 4B bằng số của chính bạn. Và bạn có ba lần chạy trên ba cấu hình suy biến (xoay thuần, cảnh phẳng, đi dọc trục quang), mỗi lần kèm một bảng ba con số chẩn đoán ở khối \emph{Cạm bẫy} mục 6, cho thấy \emph{số inlier không phát hiện được suy biến còn ba con số kia thì có}.
+\dnv \ptr{B/10-khoi-tao} dùng trực tiếp kết quả này làm tiêu chí chấp nhận khởi tạo; \ptr{A/06-bat-dinh-va-lan-truyen-sai-so} lấy đồ thị parallax làm đầu vào cho ngân sách sai số.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì xoay tại chỗ không sinh parallax: hai tâm camera trùng nhau nên không có mặt phẳng epipolar, \(\mathbf{t} = 0\) nên \(E = [\mathbf{0}]_\times R = 0\), và ràng buộc epipolar trở thành \(0=0\) --- đúng với mọi cặp điểm, nên không ràng buộc gì. Mỗi điểm có thể ở bất kỳ độ sâu nào dọc tia của nó mà không đổi ảnh nào. Chụp thêm ảnh không cứu được vì \emph{mọi} ảnh mới cũng chụp từ đúng tâm đó; thông tin không tồn tại trong dữ liệu, và số lượng không tạo ra thông tin từ chỗ không có. Đây là cùng một cơ chế mà \ptr{A/05} phát biểu tổng quát.}
+\tl{Một bậc mất vì tính thuần nhất: \(E\) và \(\lambda E\) cho cùng ràng buộc, nên độ lớn của \(\mathbf{t}\) không quan sát được --- chỉ hướng là. Bậc thứ hai mất vì ràng buộc cấu trúc \(E = [\mathbf{t}]_\times R\), thể hiện thành việc hai giá trị kỳ dị khác không phải bằng nhau. Thuật toán tám điểm vẫn chạy vì nó \emph{cố tình} bỏ qua ràng buộc thứ hai để giữ bài toán tuyến tính, rồi chữa sau bằng phép chiếu SVD về \(\mathrm{diag}(1,1,0)\). Cái giá là độ nhạy nhiễu cao hơn và --- quan trọng hơn --- suy biến với cảnh phẳng, chỗ mà thuật toán năm điểm không bị.}
+\tl{Bốn nghiệm chia thành hai cặp: dấu của \(\mathbf{t}\) (đổi chiều đường cơ sở) và \(R_a\) so với \(R_b\) (xoay \(180^\circ\) quanh đường cơ sở, gọi là twisted pair). Phép thử loại chúng là cheirality --- yêu cầu độ sâu dương ở cả hai khung --- và nó là ràng buộc \emph{vật lý} chứ không phải hình học vì phương trình epipolar hoàn toàn không biết phân biệt trước với sau camera: một điểm sau lưng vẫn chiếu ra một pixel hợp lệ về mặt đại số. Thứ loại nó là sự kiện ánh sáng đi vào camera từ phía trước. Cùng khuôn mẫu ``hình học để lại nhiều nghiệm, vật lý chọn một'' xuất hiện ở lưỡng nghĩa target phẳng trong \code{../marker/} và ở chỗ trọng lực ghim roll--pitch trong \code{../IMU\_Fusion/}.}
+\tl{Khác nhau lớn nhất ở \emph{parallax nhỏ}, tức điểm xa. Cơ chế: vùng bất định quanh điểm triangulate là một điếu xì gà rất dài dọc hướng nhìn khi hai tia gần song song; ba tiêu chí ``gần nhất'' khác nhau (đại số, khoảng cách \(3\)D, sai số chiếu lại) trỏ về ba chỗ khác nhau dọc trục dài đó. Với parallax lớn vùng bất định gần tròn nên ba tiêu chí hội tụ. Thêm một lớp nữa: quan hệ độ sâu--disparity là nghịch đảo nên nhiễu pixel đối xứng thành sai số độ sâu \emph{lệch}, làm mọi ước lượng điểm thiên vị --- đây chính là lý do nghịch đảo độ sâu là tham số hoá tốt hơn \cite{civera2008inversedepth}.}
+\tl{Tường là cảnh \emph{phẳng}, nên hệ phương trình của thuật toán tám điểm mất hạng và \(E\) không còn duy nhất; nghiệm trả về là một tổ hợp tuỳ tiện do nhiễu quyết định. Khớp điểm tốt và nhiều inlier không mâu thuẫn gì với điều này, vì số inlier đo mức nhất quán của dữ liệu với mô hình chứ không đo mức xác định của mô hình. ORB-SLAM chạy hai mô hình song song vì \(E\) và \(H\) suy biến ở \emph{những chỗ bù nhau}: chọn sẵn một mô hình là tự nguyện chết ở một nửa số cấu hình. Lợi ích thứ hai, ít được nhắc: khi \(H\) thắng, hệ thống \emph{biết} nó đang nhìn mặt phẳng và có thể đổi hành vi, chứ không chỉ đổi công thức.}
+\end{traloi}
+
+\begin{dongian}
+Nhắm một mắt lại rồi thử với tay lấy một cái cốc. Bạn vẫn làm được, nhưng chậm hơn và hay hụt. Bây giờ vẫn nhắm một mắt nhưng lắc nhẹ đầu sang hai bên --- đột nhiên bạn lại biết cái cốc ở đâu.
+
+Đó là toàn bộ chương này. Một con mắt đứng yên chỉ biết \emph{hướng} của vật, không biết vật xa hay gần. Muốn biết xa gần thì phải nhìn từ hai chỗ khác nhau và so sánh: vật ở gần thì dịch nhiều trong tầm nhìn khi ta dịch đầu, vật ở xa thì gần như đứng im. Chỉ vậy thôi.
+
+Từ đó suy ra mọi thứ còn lại. Nếu bạn chỉ \emph{quay} đầu chứ không dịch đầu, thì không có hai chỗ khác nhau nào cả --- mắt vẫn ở nguyên một chỗ, chỉ nhìn hướng khác. Nên quay đầu không bao giờ cho biết vật xa hay gần, dù quay cả ngày. Máy cũng vậy, và đó là kiểu hỏng hay gặp nhất.
+
+Nếu bạn nhìn vào một bức tường phẳng, mọi thứ trên tường ở cùng một khoảng cách, nên chúng dịch chuyển giống hệt nhau khi bạn lắc đầu. Bạn không đọc được gì từ sự khác biệt, vì không có khác biệt. Máy cũng vậy.
+
+Và nếu vật ở rất xa --- một ngọn núi --- thì lắc đầu bao nhiêu nó cũng không nhúc nhích. Bạn biết nó ở \emph{hướng} nào rất chính xác, nhưng nó cách bao xa thì hoàn toàn không biết.
+
+Điều nguy hiểm là cái máy trong cả ba trường hợp trên vẫn đọc ra một con số. Nó được lập trình để đọc ra một con số, nên nó đọc. Việc của chương này là dạy bạn nhận ra khi nào con số đó là kết quả của một phép đo, và khi nào nó chỉ là chỗ mà thuật toán tình cờ dừng lại.
+
+\chuadongian{chỗ thật sự không đơn giản hoá được là \emph{ngưỡng}: parallax bao nhiêu thì đủ? Không có câu trả lời tuyệt đối, vì nó phụ thuộc vào mức nhiễu pixel, vào độ sâu cảnh, và vào việc bạn định dùng kết quả để làm gì. Đây là một trong những chỗ mà kinh nghiệm thật sự có giá trị, và cũng là chỗ mà \ptr{A/06} cố gắng thay kinh nghiệm bằng một phép tính.}
+\motcau{Muốn biết vật xa hay gần thì phải nhìn nó từ hai chỗ khác nhau --- và ``khác nhau'' nghĩa là dịch đi, không phải quay đi.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{A/01/08}
+
+Theo quy tắc của kho, một chương phải nói rõ điều gì sẽ bác bỏ nó.
+
+Mệnh đề chính --- \emph{độ sâu chỉ khôi phục được từ parallax, và parallax chỉ sinh ra từ tịnh tiến} --- bị bác bỏ nếu ai đó khôi phục được cấu trúc metric từ một chuỗi xoay thuần tinh khiết mà không dùng tiên nghiệm nào khác. Điều kiện cuối là chỗ phải kiểm nghiêm khắc. Rất nhiều hệ trông như đang làm điều đó thực ra đang dùng thông tin thêm: một mô hình học được mang theo tiên nghiệm về kích thước vật thể trong cảnh (\ptr{C/17}), một giả định rằng mặt đất phẳng và cách camera một khoảng cố định, một cảm biến độ sâu. Mỗi thứ đó là một nguồn thông tin hợp lệ và làm độ sâu quan sát được --- nhưng chúng không bác bỏ mệnh đề, chúng xác nhận nó bằng cách chỉ ra rằng \emph{phải thêm thứ gì đó}.
+
+Mệnh đề thứ hai --- \emph{\(E\) có đúng năm bậc tự do và phân rã cho đúng bốn nghiệm} --- là một mệnh đề đại số thuần tuý, bị bác bỏ nếu ai đó chỉ ra một nghiệm thứ năm độc lập, hoặc chỉ ra rằng một trong bốn nghiệm trùng với nghiệm khác trong trường hợp tổng quát. Tôi đã kiểm bằng suy dẫn trực tiếp (cửa a) và đối chiếu \cite[§9.6.2]{hartley2004} (cửa c).
+
+Mệnh đề thứ ba --- \emph{số inlier không phải thước đo chất lượng khởi tạo} --- là mệnh đề thực dụng và dễ kiểm nhất. Nó bị bác bỏ nếu một thí nghiệm có kiểm soát cho thấy, trên một tập đủ lớn các cặp khung gồm cả cấu hình suy biến lẫn cấu hình tốt, số inlier tương quan chặt với sai số tư thế thật --- chặt ngang hoặc chặt hơn parallax trung vị. Mini project ở trên chính là phép kiểm đó, và tôi khuyên chạy nó thật chứ không tin lời tôi.
+
+Một mệnh đề mềm hơn nhưng đáng nêu: chương này khẳng định rằng \emph{cấu hình suy biến quan trọng hơn độ chính xác của bộ ước lượng trong thực hành}. Điều đó bị bác bỏ nếu trong triển khai thật, phần lớn ca hỏng hoá ra bắt nguồn từ chất lượng khớp điểm hoặc lỗi cài đặt chứ không từ suy biến hình học. Tôi không có số liệu để khẳng định tỉ lệ, và đây là chỗ tôi phát biểu dựa trên cấu trúc của vấn đề chứ không dựa trên thống kê \emph{(tôi suy ra, chưa đối chiếu nguồn)}. Chương~21 đề nghị cách thu số liệu đó từ fleet analytics.
+
+\section{Kết nối}
+\ptrtarget{A/01/09}
+
+Chương này là gốc của Phần~A và gần như mọi chương sau đều gọi ngược về đây.
+
+Nối xuống dưới trong Phần~A trước. \ptr{A/02-mo-hinh-camera} lấp vào chỗ chương này bỏ trống: làm sao từ pixel về tới mặt phẳng chuẩn hoá, và chuyện gì xảy ra khi phép biến đổi ấy sai. \ptr{A/03-lie-group-va-toi-uu-tren-da-tap} cung cấp ngôn ngữ để \((R,\mathbf{t})\) trở thành một biến tối ưu được chứ không chỉ một kết quả đại số. \ptr{A/04-uoc-luong-map-va-bundle-adjustment} thay nghiệm tuyến tính của chương này bằng nghiệm hợp lý cực đại --- nhớ rằng chương này cho \emph{khởi tạo}, chương 4 cho \emph{nghiệm}. \ptr{A/05-observability-gauge-va-suy-bien} tổng quát hoá mục~6: bốn cấu hình suy biến ở đây là bốn ví dụ của một hiện tượng duy nhất, và chương 5 cho công cụ để phát hiện chúng một cách hệ thống thay vì theo danh sách. \ptr{A/06-bat-dinh-va-lan-truyen-sai-so} biến công thức \(\sigma_z \approx z^2 \sigma_d/(bf)\) ở mục~4C thành một ngân sách sai số đầy đủ.
+
+Nối sang Phần~B. \ptr{B/07-dac-trung-va-data-association} cung cấp đầu vào cho cả chương --- các cặp điểm khớp --- và giả thiết bốn ở mục~7 là chỗ nối. \ptr{B/10-khoi-tao} là ứng dụng trực tiếp nhất: toàn bộ mục~3 và mục~6 hợp lại thành thuật toán khởi tạo hai khung, và tiêu chí từ chối ở khối \emph{Cạm bẫy} mục~6 là phần quan trọng nhất của thuật toán đó. \ptr{B/08-mo-hinh-phan-du} nhận mục~4B: lập luận về điếu xì gà bất định là lý do tồn tại của tham số hoá nghịch đảo độ sâu. \ptr{B/12-relocalization} dùng PnP ở mục~5 làm bước cuối.
+
+Nối ngang sang hai cây khác. \code{../marker/} là trường hợp đặc biệt sạch sẽ của chương này: marker phẳng nên homography là mô hình \emph{đúng} chứ không phải mô hình dự phòng, và kích thước marker đã biết nên tỉ lệ quan sát được --- hai vấn đề lớn nhất của chương này đều biến mất, đổi lại phải sống với lưỡng nghĩa tư thế phẳng. \code{../IMU\_Fusion/} giải bài toán tỉ lệ theo hướng khác, bằng cách thêm một cảm biến có đơn vị mét; đọc chương~10 ở đó để thấy vì sao việc thêm ấy không miễn phí mà đòi hỏi chuyển động phải có gia tốc thay đổi.
+
+\begin{tukiem}
+\item Vì sao ràng buộc epipolar không chứa toạ độ \(3\)D, và vì sao chính điều đó làm nó dùng được để khởi tạo?
+\item \(E\) có chín phần tử và năm bậc tự do. Hai bậc mất đi đâu, và ràng buộc đại số nào thể hiện mỗi bậc bị mất?
+\item Hai kỹ sư triangulate cùng một cặp điểm, một người dùng midpoint và một người dùng optimal. Khi nào hai kết quả gần như trùng nhau, khi nào chúng phân kỳ, và cơ chế hình học nào giải thích điều đó?
+\item Một cặp khung cho 500 inlier với ngưỡng chặt. Nêu ba tình huống hoàn toàn khác nhau mà con số đó vẫn xảy ra nhưng khởi tạo sẽ sai, và nêu phép đo phân biệt chúng.
+\item Vì sao homography là mô hình đúng cho \emph{cả} cảnh phẳng \emph{lẫn} xoay thuần --- hai tình huống nghe không liên quan gì tới nhau?
+\item Sai số độ sâu của stereo tăng theo bình phương độ sâu. Tự dẫn lại quan hệ đó từ \(z = bf/d\), rồi nói nó ảnh hưởng thế nào tới việc chọn đường cơ sở khi thiết kế sản phẩm.
+\item Bốn giả thiết của chương là cảnh tĩnh, nội đã biết, global shutter, và khớp điểm đúng. Với mỗi giả thiết, bỏ nó đi thì kết luận nào của chương thay đổi, và bạn có nhận ra được lúc nó bị vi phạm không?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,72 @@
+% ============================================================================
+%  HIỆU SUẤT NGƯỜI LÀM NGHIÊN CỨU — master gộp toàn bài học thành một PDF.
+%  Ngày tạo: 2026-09-09 | Sửa gần nhất: 2026-09-09 | Ôn gần nhất: chưa
+%  Nguồn: khảo sát ../00-cau-hoi.md, ../search-log.md, ../matrix.md, ../notes/
+%  Dependency: không. Mức độ: cốt lõi.
+%  Build: ./build.sh  |  ./build.sh all  |  ./build.sh <file.tex>
+% ============================================================================
+\documentclass[11pt,a4paper,oneside]{report}
+\usepackage{subfiles}
+\input{\subfix{preamble/common}}
+\addbibresource{\subfix{refs.bib}}
+\hypersetup{pdftitle={Hiệu suất người làm nghiên cứu khoa học máy tính},
+            pdfsubject={Khảo sát: cách người làm khoa học giỏi luyện tập, viết lại, tự phản biện và tấn công bài toán khó}}
+\begin{document}
+
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture, overlay]
+  \fill[inkblue] (current page.north west) rectangle ++(1.5cm,-\paperheight);
+  \fill[accent]  ($(current page.north west)+(1.5cm,0)$) rectangle ++(0.22cm,-\paperheight);
+\end{tikzpicture}
+
+\vspace*{4.2cm}
+\begin{flushleft}
+{\sffamily\bfseries\color{accent}\large KHẢO SÁT TỪ CÔNG TRÌNH GỐC\par}
+\vspace{0.5cm}
+{\sffamily\bfseries\color{inkblue}\fontsize{38}{43}\selectfont
+HIỆU SUẤT\\[0.12em] NGƯỜI LÀM NGHIÊN CỨU\par}
+\vspace{0.9cm}
+{\color{accent}\rule{7cm}{2.4pt}}\par
+\vspace{0.9cm}
+{\large\color{inkblue!85}
+Luyện tập, đọc, viết lại, tự phản biện,\\[0.25em]
+và tấn công bài toán khó --- trong một\\[0.25em]
+\textbf{môi trường phản hồi tồi}\par}
+\end{flushleft}
+
+\vfill
+\begin{flushleft}
+{\itshape\color{tiercol}``Nguyên tắc thứ nhất là bạn không được tự lừa mình --- và bạn là người dễ bị\\
+chính mình lừa nhất.''\par}
+{\footnotesize\sffamily\color{tiercol}Richard Feynman, \emph{Cargo Cult Science}, 1974\par}
+\vspace{1.1cm}
+{\footnotesize\sffamily\color{inkblue}\textbf{Mười chương}\quad
+nền tảng · môi trường phản hồi · đọc · viết lại · tự phản biện\\[0.25em]
+\phantom{\textbf{Mười chương}}\quad bài toán khó · học và giữ · thực nghiệm CV · chọn bài toán · đo bản thân\par}
+\vspace{0.5em}
+{\footnotesize\sffamily\color{tiercol}51 công trình, mọi ý mượn có trích dẫn tại chỗ --- \today\par}
+\end{flushleft}
+\end{titlepage}
+
+\pagenumbering{roman}
+\subfile{00-map}
+\cleardoublepage
+\tableofcontents
+\cleardoublepage
+\pagenumbering{arabic}
+
+\subfile{01-nen-tang/nen-tang}
+\subfile{02-moi-truong-phan-hoi/moi-truong-phan-hoi}
+\subfile{03-doc-va-bieu-dien/doc-va-bieu-dien}
+\subfile{04-viet-va-viet-lai/viet-va-viet-lai}
+\subfile{05-tu-phan-bien/tu-phan-bien}
+\subfile{06-bai-toan-kho/bai-toan-kho}
+\subfile{07-hoc-va-giu/hoc-va-giu}
+\subfile{08-thuc-nghiem-cv/thuc-nghiem-cv}
+\subfile{09-chon-bai-toan/chon-bai-toan}
+\subfile{10-do-hieu-suat/do-hieu-suat}
+\subfile{99-ket-luan}
+
+\printbibliography[title={Công trình tham khảo}]
+\end{document}

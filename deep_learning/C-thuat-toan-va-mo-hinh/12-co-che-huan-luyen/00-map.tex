@@ -1,0 +1,54 @@
+% ---------------------------------------------------------------------------
+% Bản đồ chương 12 — Cơ chế huấn luyện
+% Tạo: 2026-09-03  |  Sửa gần nhất: 2026-09-03
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ chương 12 --- Cơ chế huấn luyện}
+
+\begin{tomtat}
+Chương 12 gồm bốn mục và chúng \emph{không} song song: đây là bốn tầng của cùng một câu hỏi, xếp từ vi mô tới vĩ mô, mỗi tầng giả định tầng dưới đã đúng. Đọc theo đúng thứ tự \(1 \rightarrow 2 \rightarrow 3 \rightarrow 4\); đọc nhảy cóc thì mục 3 và mục 4 biến thành danh sách quy tắc phải học thuộc. Nếu chỉ nhớ một điều: câu hỏi trung tâm của cả chương là \emph{làm sao đưa gradient đi qua một mạng sâu mà không làm nó chết hoặc nổ}. Mọi kỹ thuật trong chương là một câu trả lời cho đúng câu hỏi đó.
+\end{tomtat}
+
+\begin{nentang}
+\kn{gradient}{vectơ đạo hàm riêng của hàm mất mát theo từng tham số; nó chỉ hướng làm mất mát TĂNG nhanh nhất, nên ta đi ngược lại.}
+\kn{lan truyền ngược (backpropagation)}{thuật toán tính gradient bằng cách đi ngược đồ thị phép tính một lượt duy nhất; nội dung của mục 1.}
+\kn{siêu tham số (hyperparameter)}{con số do người đặt trước khi huấn luyện chứ không học từ dữ liệu --- learning rate, batch size, cường độ weight decay; nội dung của mục 3.}
+\kn{tổng quát hoá (generalization)}{khả năng mô hình chạy tốt trên dữ liệu chưa từng thấy, chứ không chỉ trên dữ liệu đã huấn luyện; nội dung của mục 4.}
+\end{nentang}
+
+\subsection*{Có gì trong chương này}
+
+\begin{table}[H]\centering\small
+\caption{Bốn mục của chương 12: câu hỏi trung tâm, phụ thuộc, và mức độ đầu tư.}
+\label{tab:map-ch12}
+\begin{tabularx}{\linewidth}{@{}L{3.5cm}YL{2.3cm}L{2.1cm}@{}}
+\toprule
+\textbf{Mục} & \textbf{Câu hỏi trung tâm} & \textbf{Phụ thuộc} & \textbf{Mức độ}\\
+\midrule
+1. Cơ học của gradient & Gradient được tính thế nào, vì sao cách đó rẻ, và nó tốn bộ nhớ ở đâu? & \ptr{A/01} & Cốt lõi \T{1}\\
+2. Làm cho training chạy được & Gradient đúng rồi thì làm sao nó sống sót qua năm mươi tầng? & Mục 1 & Cốt lõi \T{1}\\
+3. Tối ưu hoá và siêu tham số & Đi bước dài bao nhiêu, theo hướng nào, ở độ chính xác số nào? & Mục 2 & Cốt lõi \T{2}\\
+4. Tổng quát hoá và chẩn đoán & Mô hình khớp được dữ liệu rồi, còn ngoài đời thì sao --- và hỏng thì tìm ở đâu? & Mục 3, \ptr{B/07} & Cốt lõi \T{2}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection*{Vì sao lại chia như vậy}
+Cách chia này theo \emph{độ trừu tượng của đối tượng được nói tới}, chứ không theo thứ tự lịch sử hay theo mức độ phổ biến. Mục 1 nói về một phép toán và một đồ thị; mục 2 nói về một mạng; mục 3 nói về một quá trình huấn luyện; mục 4 nói về quan hệ giữa quá trình đó và thế giới bên ngoài. Lợi ích của cách chia này là mỗi mục có một đại lượng trung tâm rõ ràng. Lần lượt: tích vector-Jacobian, hệ số nhân của tích các Jacobian, độ dài bước đi, và khoảng cách train--val. Gặp một kỹ thuật lạ, bạn biết ngay nó thuộc tầng nào.
+
+Cách chia này cũng làm lộ ra một quan hệ mà cách chia theo chủ đề che mất: \emph{triệu chứng luôn xuất hiện ở tầng trên, nguyên nhân thường nằm ở tầng dưới}. Một lỗi ở lượt ngược (tầng 1) biểu hiện thành một đường cong học xấu (tầng 4). Đây là lý do mục 4 dành phần lớn dung lượng cho một cây chẩn đoán đi từ trên xuống. Thấy một đường cong lạ thì phản xạ đúng là đi xuống, không đi ngang.
+
+\subsection*{Đọc theo thứ tự nào}
+\begin{enumerate}
+\item Nếu bạn mới bắt đầu: đọc tuần tự \(1 \rightarrow 2 \rightarrow 3 \rightarrow 4\), và làm mini project của chương \emph{ngay sau mục 4} chứ không để dành --- nó là chỗ kiến thức chuyển thành phản xạ.
+\item Nếu bạn đã huấn luyện mạng vài lần và muốn lấp lỗ hổng: đọc mục 3 và mục 4 trước, quay lại mục 1 khi gặp câu hỏi về bộ nhớ hoặc khi phải viết một tầng mới.
+\item Nếu bạn đang gỡ một lần chạy hỏng \emph{ngay bây giờ}: vào thẳng cây chẩn đoán và bảng triệu chứng ở mục 4, rồi đi ngược lên tầng mà cây chỉ tới.
+\end{enumerate}
+
+\subsection*{Cốt lõi và tham khảo}
+Cả bốn mục đều thuộc phần cốt lõi của cây, đây là một trong ít chương như vậy. Trong nội bộ chương, ba phần đáng quay lại nhiều lần là: ba mẫu gradient cộng quy tắc rẽ nhánh (mục 1), lập luận phương sai dẫn tới khởi tạo He (mục 2), và mạch bảy bước của optimizer (mục 3). Ba phần có thể đọc lướt lần đầu và tra lại khi cần là: chi tiết công thức lượt ngược của BatchNorm, bảng bốn biến thể normalization, và bảng bốn mức song song hoá dữ liệu.
+
+\subsection*{Nối vào phần còn lại của cây}
+Chương này tiêu thụ \ptr{A/01-toan-toi-thieu} và \ptr{B/09-thiet-ke-ham-mat-mat}; nó cấp đầu vào cho \emph{toàn bộ} Phần C, vì mọi kiến trúc ở các chương sau đều được huấn luyện bằng bộ máy này. Ba nhánh nối ngang đáng nhớ: chi phí bộ nhớ kích hoạt nối sang \ptr{B/11-gioi-han-tinh-toan}; dải động của fp16 và bf16 nối sang \ptr{D/20-toi-uu-va-nen-mo-hinh}; và nhận xét ``phần lớn cải tiến kiến trúc hoá ra là cải tiến công thức huấn luyện'' nối sang \ptr{E/24-thi-nghiem-va-ablation}.
+\end{document}

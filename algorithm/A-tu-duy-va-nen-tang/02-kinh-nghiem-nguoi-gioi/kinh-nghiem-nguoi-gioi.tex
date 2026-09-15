@@ -1,0 +1,327 @@
+% ============================================================================
+%  A/02-kinh-nghiem-nguoi-gioi — file chương
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+%  Dependency: A/01. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../algorithm.tex]{subfiles}
+\begin{document}
+\chapter{Kinh nghiệm của những người giỏi nhất (What the Masters Actually Do)}
+\ptrtarget{A/02}\ptrtarget{A/02-kinh-nghiem-nguoi-gioi}
+\dependency{\ptr{A/01} --- chương này nói cách luyện để quy trình ở chương 1 thành phản xạ. Đọc được độc lập, nhưng nhiều lời khuyên ở đây chỉ có nghĩa khi bạn đã biết bốn bước.}
+
+\begin{tomtat}
+Chương này khảo sát cách làm việc thật của những người đã định hình ngành thuật toán --- Knuth, Dijkstra, Hoare, Tarjan, Bentley, Skiena, Sedgewick --- cùng cách luyện của giới lập trình thi đấu hiện đại và của giới huấn luyện olympic toán. Mục đích không phải kể chuyện danh nhân mà là rút ra những thói quen \emph{bắt chước được}: viết chương trình cùng lúc với chứng minh, ước lượng trước khi cài, luyện ở vùng hơi quá sức, upsolving sau mỗi trận, giữ nhật ký lỗi, tự xây thư viện mẫu. Chương cũng cho một bản đồ sách: quyển nào đọc lúc nào và để làm gì. Nếu chỉ nhớ một điều: điểm chung của tất cả những người này không phải năng khiếu mà là \emph{họ có một vòng phản hồi chặt} --- làm, đo, phát hiện sai, sửa cách làm, lặp lại.
+\end{tomtat}
+
+\begin{nentang}
+\kn{luyện tập có chủ đích (deliberate practice)}{luyện có mục tiêu cụ thể, ở mức hơi quá sức hiện tại, có phản hồi ngay và có sửa sai --- khác hẳn với ``làm nhiều giờ''. Khái niệm của Ericsson\cite{ericsson1993}.}
+\kn{upsolving}{giải lại những bài bạn không giải được trong một kỳ thi, \emph{sau khi} thi xong, tự làm tới cùng. Đây là nguồn tiến bộ chính của dân thi đấu.}
+\kn{editorial}{bài phân tích lời giải chính thức của một đề thi lập trình.}
+\kn{chunk (khối tri thức)}{một cụm thông tin đã được ghép thành một đơn vị nhớ duy nhất, ví dụ ``thế cờ này'' thay vì hai mươi quân rời. Chuyên gia nhớ nhiều hơn không phải vì trí nhớ tốt hơn mà vì họ có nhiều khối lớn hơn.}
+\kn{thư viện mẫu (template library)}{tập hợp các đoạn mã đã kiểm chứng --- DSU, segment tree, Dijkstra --- được chuẩn bị sẵn để dán vào khi thi. KACTL của KTH là ví dụ nổi tiếng\cite{kactl}.}
+\kn{nhật ký lỗi}{sổ ghi lại mỗi lần sai: sai gì, vì sao, dấu hiệu nào lẽ ra đã phát hiện sớm. Công cụ đơn giản nhất và bị bỏ qua nhiều nhất.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Nếu tài năng là thứ quyết định, vì sao gần như mọi người giỏi thuật toán đều mô tả cùng một kiểu thói quen làm việc?}
+\h{Knuth ra bài tập có mức khó từ 0 đến 50 và bảo người đọc phải làm. Vì sao đọc mà không làm bài tập lại gần như vô ích?}
+\h{Dijkstra viết chương trình và chứng minh cùng lúc, không phải viết xong rồi kiểm thử. Điều đó thay đổi cái gì trong cách bạn ngồi trước bàn phím?}
+\h{Vì sao ``giải thật nhiều bài'' lại có thể khiến bạn dừng tiến bộ sau vài tháng, trong khi giải ít bài hơn nhưng chọn kỹ thì tiếp tục lên?}
+\h{Người thi đấu hàng đầu nói phần lớn tiến bộ đến từ upsolving chứ không từ chính kỳ thi. Cơ chế nào giải thích điều đó?}
+\end{khoigoi}
+
+Có một cách đọc chương này sai ngay từ đầu, và đáng nói trước: đọc như đọc tiểu sử danh nhân, thấy hay, rồi không thay đổi gì. Vì vậy mỗi mục dưới đây được viết theo một khuôn cố định --- người này làm gì cụ thể, vì sao nó hiệu quả, và bạn bắt chước được phần nào ngay tuần này. Những gì không bắt chước được, tôi sẽ nói thẳng là không bắt chước được.
+
+Cũng cần nói rõ giới hạn: những phát biểu dưới đây dựa trên sách và tài liệu công khai của chính họ, không phải suy đoán về đời tư. Khi tôi mô tả thói quen của giới thi đấu, đó là những điều lặp đi lặp lại trong lời khuyên công khai của nhiều người giỏi, chứ không phải câu trích nguyên văn của một cá nhân cụ thể.
+
+\section{Bốn trường phái, một vòng phản hồi}
+
+Nếu xếp những người có ảnh hưởng nhất lên một sơ đồ, họ rơi vào bốn trường phái với bốn niềm tin khác nhau về việc ``thế nào là làm thuật toán cho tốt''. Điều thú vị là bốn trường phái này không mâu thuẫn; chúng bổ sung nhau, và người mạnh thường lấy từ cả bốn.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.8cm and 1.5cm,
+  s/.style={draw=steel,fill=bluebg,rounded corners=3pt,inner sep=6pt,align=center,font=\small,text width=3.7cm},
+  c/.style={draw=accent,fill=amberbg,rounded corners=3pt,inner sep=6pt,align=center,font=\small,text width=3.5cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=tiercol,thick},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.6cm}]
+\node[c] (mid) {\textbf{Vòng phản hồi chặt}\\{\scriptsize làm \(\rightarrow\) đo \(\rightarrow\) thấy sai \(\rightarrow\) sửa \emph{cách làm}}};
+\node[s,above left=0.9cm and 0.7cm of mid] (a) {\textbf{Phân tích}\\Knuth, Sedgewick, Flajolet\\{\scriptsize đo bằng toán, đếm chính xác}};
+\node[s,above right=0.9cm and 0.7cm of mid] (b) {\textbf{Chứng minh}\\Dijkstra, Hoare, Gries\\{\scriptsize đo bằng logic, viết code cùng chứng minh}};
+\node[s,below left=0.9cm and 0.7cm of mid] (c) {\textbf{Kỹ thuật}\\Bentley, Sedgewick, McIlroy\\{\scriptsize đo bằng đồng hồ trên máy thật}};
+\node[s,below right=0.9cm and 0.7cm of mid] (d) {\textbf{Thi đấu}\\Skiena, Halim, giới CP\\{\scriptsize đo bằng số bài giải được có tính giờ}};
+\draw[ar] (a) -- (mid); \draw[ar] (b) -- (mid); \draw[ar] (c) -- (mid); \draw[ar] (d) -- (mid);
+\end{tikzpicture}
+\caption{Bốn trường phái khác nhau ở \emph{thứ họ dùng làm thước đo}, nhưng giống nhau ở chỗ đều có một thước đo khách quan và đều sửa cách làm dựa trên kết quả đo. Người luyện một mình mà không có thước đo nào là người duy nhất không có vòng phản hồi --- và đó là kiểu luyện phổ biến nhất.}
+\label{fig:bon-truong-phai}
+\end{figure}
+
+\subsection{Trường phái phân tích: Knuth và việc đếm cho chính xác}
+
+Donald Knuth xây cả sự nghiệp trên một niềm tin: muốn hiểu một thuật toán thì phải \emph{đếm được} nó làm bao nhiêu phép toán, chứ không chỉ nói ``cỡ \(n\log n\)''. Trong \emph{The Art of Computer Programming}\cite{knuth1997v1,knuth1998v3}, các thuật toán được phân tích tới hằng số, trên một máy ảo mà ông tự thiết kế để không phải phụ thuộc vào máy thật nào.
+
+Hai thói quen của Knuth đáng bắt chước ngay. Thứ nhất là \emph{bài tập có xếp hạng độ khó}: mỗi bài trong TAOCP có một số từ 0 đến 50, trong đó khoảng 20 là bài tập bình thường, còn 50 là bài toán mở nghiên cứu. Ý nghĩa của cách xếp hạng đó không phải để khoe độ khó mà để người đọc \emph{chọn đúng vùng luyện} --- ý tưởng mà mục sau sẽ nói kỹ. Thứ hai là thói quen coi việc phát hiện lỗi là có giá trị: Knuth nổi tiếng vì trả tiền thưởng cho mỗi lỗi được tìm thấy trong sách của ông. Thông điệp ẩn sau đó rất thực dụng: một người muốn đúng thì phải \emph{tạo động lực cho việc tìm ra mình sai}, chứ không phòng thủ với nó.
+
+Cũng của Knuth là câu bị trích sai nhiều nhất trong ngành: ``tối ưu hoá sớm là gốc rễ của mọi tội lỗi''\cite{knuth1974goto}. Nguyên văn nói rõ hơn nhiều --- ý ông là trong phần lớn thời gian ta nên bỏ qua những cải thiện nhỏ, nhưng \emph{không được} bỏ qua cơ hội ở phần mã thực sự quan trọng, và cách biết phần nào quan trọng là đo chứ không đoán. Đây chính là cầu nối sang trường phái kỹ thuật.
+
+\subsection{Trường phái chứng minh: Dijkstra, Hoare và kỷ luật viết code}
+
+Edsger Dijkstra có một quan điểm cực đoan và rất hữu ích: chương trình và chứng minh tính đúng của nó phải được phát triển \emph{cùng lúc}, chứ không phải viết code trước rồi kiểm thử sau\cite{dijkstra1976}. Ông cũng để lại câu nói chính xác về giới hạn của kiểm thử: kiểm thử cho thấy sự \emph{hiện diện} của lỗi, không bao giờ cho thấy sự \emph{vắng mặt} của lỗi.
+
+Nghe có vẻ hàn lâm, nhưng hệ quả thực hành rất cụ thể và rất rẻ: trước khi viết một vòng lặp, hãy viết ra --- bằng lời, trong một dòng chú thích --- \emph{bất biến} mà vòng lặp đó duy trì. Chỉ một dòng đó thôi đã loại được phần lớn lỗi lệch một đơn vị và lỗi khởi tạo sai, vì mọi câu hỏi kiểu ``chạy tới \code{n} hay \code{n-1}'' đều có câu trả lời suy ra từ bất biến. Tony Hoare cấp nền hình thức cho cách làm này\cite{hoare1969}, còn David Gries biến nó thành giáo trình dạy được\cite{gries1981}. Chương \ptr{A/04} lấy đúng ý này làm trung tâm.
+
+Cần nói cả mặt trái. Chứng minh hình thức đầy đủ cho mọi chương trình là không thực tế trong công việc hằng ngày, và Dijkstra bị phê phán chính ở điểm đó. Cách dùng hợp lý là dùng \emph{ý thức về bất biến} chứ không phải bộ máy hình thức: viết bất biến ra thành lời, và chỉ hình thức hoá ở những chỗ thật sự tinh vi.
+
+\subsection{Trường phái kỹ thuật: Bentley và thói quen đo}
+
+Jon Bentley viết \emph{Programming Pearls}\cite{bentley2000} như những chuyên mục ngắn, mỗi bài xoay quanh một bài toán thật gặp trong công việc. Ba thói quen của ông dùng được ngay.
+
+Thứ nhất là \emph{ước lượng phong bì} --- tính nhẩm quy mô trước khi cài: bao nhiêu phần tử, mỗi phần tử bao nhiêu byte, một giây làm được cỡ bao nhiêu phép toán. Ước lượng thô loại được những hướng sai hẳn với chi phí gần bằng không, và nó là kỹ năng dùng suốt đời chứ không chỉ trong thi đấu.
+
+Thứ hai là quan sát nổi tiếng của ông về \emph{tìm kiếm nhị phân}: ai cũng nghĩ mình viết đúng, còn thực tế thì rất nhiều lập trình viên chuyên nghiệp viết sai khi được yêu cầu viết từ đầu không tra cứu. Bài học không phải ``tìm kiếm nhị phân khó'' mà là: một thuật toán \emph{đơn giản về ý tưởng} vẫn có thể rất khó viết đúng, nên phần cài đặt xứng đáng được luyện riêng như một kỹ năng độc lập.
+
+Thứ ba là kỷ luật \emph{đo trước khi tối ưu}. Trong bài viết cùng McIlroy về việc kỹ thuật hoá hàm sắp xếp của thư viện C\cite{bentley1993sort}, hai người mô tả cách một thuật toán sách vở phải chỉnh sửa nhiều lần mới sống được trong môi trường thật --- với dữ liệu thù địch, với mảng đã sắp sẵn, với nhiều phần tử bằng nhau. Đây là ví dụ mẫu mực cho chương \ptr{E/26}.
+
+\subsection{Trường phái thi đấu: nhận diện bài toán quan trọng hơn thuộc thuật toán}
+
+Steven Skiena tổ chức \emph{The Algorithm Design Manual}\cite{skiena2020} thành hai nửa rất khác nhau: nửa đầu dạy kỹ thuật, nửa sau là một \emph{danh mục bài toán} --- bạn tra ``tôi đang có bài toán trông như thế này'' và sách chỉ cho bạn nó tên là gì, đã được giải chưa, và nên dùng thư viện nào. Cách tổ chức đó phản ánh một quan sát cốt lõi: trong thực tế, phần khó nhất thường không phải nghĩ ra thuật toán mà là \emph{nhận ra bài toán của mình chính là bài toán kinh điển nào}.
+
+Giới lập trình thi đấu đẩy quan sát này tới cùng. Bộ sách \emph{Competitive Programming}\cite{halim2020} và \emph{Guide to Competitive Programming}\cite{laaksonen2017} tổ chức kiến thức thành các mẫu nhận dạng kèm bài luyện; các nguồn cộng đồng như cp-algorithms\cite{cpalgorithms} và thư viện KACTL\cite{kactl} cấp phần cài đặt đã kiểm chứng. Điểm chung trong lời khuyên luyện tập của những người ở nhóm dẫn đầu, lặp lại rất nhất quán qua nhiều nguồn công khai, gồm bốn điểm: giải bài \emph{hơi quá sức}, upsolving sau mỗi trận, tự cài lại thay vì đọc code người khác, và luyện có tính giờ.
+
+\begin{kinhnghiem}
+\kng{Donald Knuth}{Phân tích tới hằng số, không chỉ tới bậc tiệm cận. Bài tập xếp hạng 0--50 để người đọc chọn đúng vùng luyện. Thưởng tiền cho ai tìm ra lỗi trong sách của mình.}{TAOCP\cite{knuth1997v1,knuth1998v3}}
+\kng{Edsger Dijkstra}{Phát triển chương trình và chứng minh cùng lúc; viết bất biến trước khi viết vòng lặp; coi kiểm thử là công cụ phát hiện lỗi chứ không phải bằng chứng đúng.}{\emph{A Discipline of Programming}\cite{dijkstra1976}}
+\kng{Tony Hoare}{Đặt nền logic cho lập luận về chương trình (tiền điều kiện, hậu điều kiện); Quicksort ra đời từ việc tìm cách sắp xếp trước khi tra từ điển --- ý tưởng đến từ ràng buộc thực tế.}{\cite{hoare1969,hoare1962}}
+\kng{Robert Tarjan}{Thiết kế cấu trúc dữ liệu song song với công cụ phân tích của nó: khấu hao và hàm thế năng ra đời để phân tích chính những cấu trúc ông thiết kế.}{\cite{tarjan1983,tarjan1985amortized}}
+\kng{Jon Bentley}{Ước lượng phong bì trước khi cài; đo trước khi tối ưu; coi việc viết đúng một thuật toán đơn giản là kỹ năng phải luyện riêng.}{\emph{Programming Pearls}\cite{bentley2000}}
+\kng{Robert Sedgewick}{Kết hợp phân tích toán học với thực nghiệm: cài đặt, đo, rồi đối chiếu với dự đoán lý thuyết; nếu lệch thì một trong hai phía sai.}{\cite{sedgewick2011,sedgewick2013analysis}}
+\kng{Steven Skiena}{Xây danh mục bài toán để tra ngược từ ``bài của tôi trông thế này''; nhấn mạnh nhận diện bài toán hơn là sáng tạo thuật toán mới.}{\emph{The Algorithm Design Manual}\cite{skiena2020}}
+\kng{George Pólya}{Bốn bước và một hệ thống câu hỏi để tự hỏi khi bí; dạy \emph{quá trình} chứ không chỉ kết quả.}{\emph{How to Solve It}\cite{polya1945}}
+\kng{Alan Schoenfeld}{Đo thực nghiệm quá trình giải bài; chỉ ra tầng tự giám sát là khác biệt lớn nhất giữa người giỏi và người kém.}{\cite{schoenfeld1985}}
+\kng{Anders Ericsson}{Luyện tập có chủ đích: mục tiêu hẹp, mức hơi quá sức, phản hồi ngay, sửa sai lập tức. Số giờ không tự sinh ra năng lực.}{\cite{ericsson1993,ericsson2016}}
+\kng{Richard Hamming}{Chọn bài toán quan trọng để làm; giữ thói quen suy nghĩ có hệ thống về việc mình đang làm gì và vì sao.}{\emph{The Art of Doing Science and Engineering}\cite{hamming1997}}
+\kng{Peter Norvig}{Không có đường tắt mười ngày; năng lực đến từ nhiều năm luyện có phản hồi, đọc code người khác, và làm dự án thật.}{\cite{norvig2001}}
+\kng{Giới lập trình thi đấu}{Bốn thói quen lặp lại nhất quán: giải bài hơi quá sức, upsolving sau mỗi trận, tự cài lại thay vì chép, luyện có tính giờ; kèm một thư viện mẫu tự viết và đã kiểm chứng.}{\cite{halim2020,laaksonen2017,kactl}}
+\end{kinhnghiem}
+
+\section{Luyện tập có chủ đích, dịch sang việc giải thuật}
+
+Nghiên cứu của Ericsson và cộng sự\cite{ericsson1993} đưa ra một kết luận đơn giản nhưng khó nuốt: số giờ luyện tập chỉ dự báo được năng lực khi việc luyện có bốn tính chất --- mục tiêu hẹp và cụ thể, mức khó hơi vượt khả năng hiện tại, phản hồi gần như tức thì, và có sửa sai chứ không chỉ làm lại. Thiếu bất kỳ tính chất nào thì thời gian bỏ ra vẫn trôi, nhưng năng lực đứng yên.
+
+Dịch sang việc luyện thuật toán, bốn tính chất trở thành bốn quy tắc rất cụ thể.
+
+\emph{Mục tiêu hẹp.} Không luyện kiểu ``hôm nay học quy hoạch động''. Luyện kiểu ``hôm nay làm năm bài quy hoạch động mà trạng thái là hai chiều, và với mỗi bài tôi phải viết ra định nghĩa trạng thái trước khi gõ code''. Mục tiêu hẹp cho phép biết mình có đạt hay không.
+
+\emph{Vùng khó hơi vượt.} Đây là quy tắc bị vi phạm nhiều nhất. Giải bài dễ cho cảm giác tốt --- giải nhanh, đúng ngay, tự tin. Nhưng nếu bạn giải đúng ngay trong mười phút thì bài đó không dạy bạn gì. Vùng luyện đúng là vùng mà bạn giải được khoảng một nửa số bài, và nửa còn lại phải vật lộn rồi mới ra hoặc phải upsolve. Hình~\ref{fig:vung-luyen} vẽ ba vùng.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[yscale=0.95]
+\fill[greenbg,draw=greendark,thick,rounded corners=3pt] (0,0) rectangle (4.0,2.3);
+\node[align=center,font=\small,color=greendark] at (2.0,1.55) {\textbf{Vùng thoải mái}};
+\node[align=center,font=\scriptsize,color=greendark,text width=3.5cm] at (2.0,0.85)
+  {giải đúng ngay, dưới 10 phút\\ \emph{cảm giác tốt, không tiến bộ}};
+\fill[amberbg,draw=accent,thick,rounded corners=3pt] (4.35,0) rectangle (8.35,2.3);
+\node[align=center,font=\small,color=accent] at (6.35,1.55) {\textbf{Vùng luyện}};
+\node[align=center,font=\scriptsize,color=accent,text width=3.5cm] at (6.35,0.85)
+  {bí 20--60 phút rồi ra,\\hoặc phải upsolve\\ \emph{khó chịu, tiến bộ nhanh}};
+\fill[redbg,draw=reddark,thick,rounded corners=3pt] (8.7,0) rectangle (12.2,2.3);
+\node[align=center,font=\small,color=reddark] at (10.45,1.55) {\textbf{Vùng quá tải}};
+\node[align=center,font=\scriptsize,color=reddark,text width=3.2cm] at (10.45,0.85)
+  {đọc lời giải vẫn không hiểu\\ \emph{nản, không đọng lại gì}};
+\draw[-{Latex[length=2.5mm]},thick,color=tiercol] (0,-0.45) -- (12.2,-0.45)
+  node[midway,below,font=\scriptsize,color=tiercol] {độ khó của bài so với trình độ hiện tại};
+\end{tikzpicture}
+\caption{Ba vùng độ khó. Sai lầm phổ biến nhất khi tự luyện là ở lì trong vùng thoải mái vì nó cho cảm giác thành công; sai lầm ngược lại là nhảy thẳng vào vùng quá tải vì nghĩ rằng làm bài khó thì tiến bộ nhanh. Vùng luyện nằm giữa: bạn giải được khoảng một nửa, và luôn hơi khó chịu.}
+\label{fig:vung-luyen}
+\end{figure}
+
+\emph{Phản hồi ngay.} Đây là lý do các trang chấm bài tự động có giá trị lớn hơn vẻ ngoài của chúng: bạn biết đúng hay sai trong vài giây. Nhưng phản hồi ``sai ở test 12'' vẫn còn nghèo; phản hồi tốt hơn là stress test tự viết (chương \ptr{E/25}), vì nó chỉ thẳng ra \emph{ca dữ liệu nào} làm hỏng.
+
+\emph{Sửa sai, không chỉ làm lại.} Đây là chỗ nhật ký lỗi vào cuộc. Sau mỗi lần sai, ghi ba dòng: tôi đã hiểu sai điều gì, dấu hiệu nào trên đề lẽ ra đã gợi ý đúng, lần sau tôi sẽ kiểm tra gì. Sau vài tháng, nhật ký này sẽ cho bạn thấy một sự thật khó chịu và hữu ích: bạn sai đi sai lại đúng vài kiểu.
+
+\begin{trucgiac}
+Vì sao vùng thoải mái không tạo tiến bộ? Vì học xảy ra khi \emph{dự đoán của bạn bị sai}. Giải một bài mà bạn biết chắc cách làm thì không có dự đoán nào bị vi phạm, nên không có gì để cập nhật. Cảm giác khó chịu khi bí chính là dấu hiệu của việc mô hình trong đầu bạn đang được sửa. Đó là lý do luyện đúng cách gần như luôn thấy không thoải mái, và vì sao cảm giác ``buổi luyện hôm nay trôi chảy quá'' thường là tin xấu.
+\end{trucgiac}
+
+\section{Vòng upsolving --- cỗ máy tiến bộ của dân thi đấu}
+
+Người mới thường nghĩ tiến bộ đến từ việc dự thi. Thực tế thì kỳ thi chỉ là phép đo; phần tạo ra tiến bộ nằm ở việc bạn làm gì trong vài ngày sau đó. Vòng lặp mà giới thi đấu dùng gần như thống nhất được vẽ ở hình~\ref{fig:upsolve}.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.7cm and 1.15cm,
+  n/.style={draw=steel,fill=bluebg,rounded corners=3pt,inner sep=5.5pt,align=center,font=\small,text width=3.0cm},
+  hi/.style={draw=accent,fill=amberbg,rounded corners=3pt,inner sep=5.5pt,align=center,font=\small,text width=3.0cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.5cm}]
+\node[n] (t1) {\textbf{1.} Thi có tính giờ\\{\scriptsize hoặc thi ảo}};
+\node[n,right=of t1] (t2) {\textbf{2.} Ghi lại: bài nào\\bí, bí ở đâu};
+\node[hi,right=of t2] (t3) {\textbf{3.} Upsolve\\{\scriptsize tự làm tiếp, chưa xem lời giải}};
+\node[hi,below=0.95cm of t3] (t4) {\textbf{4.} Bí quá 60 phút:\\đọc \emph{một gợi ý}};
+\node[n,left=of t4] (t5) {\textbf{5.} Tự cài lại từ đầu,\\không nhìn code mẫu};
+\node[n,left=of t5] (t6) {\textbf{6.} Ghi nhật ký lỗi\\{\scriptsize + một câu mẫu dùng lại được}};
+\draw[ar] (t1) -- (t2); \draw[ar] (t2) -- (t3); \draw[ar] (t3) -- (t4);
+\draw[ar] (t4) -- (t5); \draw[ar] (t5) -- (t6);
+\draw[ar] (t6) -- node[lb,left=1pt] {sau 1--2 tuần gặp lại bài cùng mẫu} (t1);
+\end{tikzpicture}
+\caption{Vòng upsolving. Hai ô tô hổ phách là phần tạo ra phần lớn tiến bộ, và cũng là phần hay bị cắt nhất vì nó không vui. Bước 5 --- tự cài lại thay vì chép --- là bước phân biệt ``hiểu lời giải'' với ``làm được''; rất nhiều người tưởng mình đã học xong sau bước 4.}
+\label{fig:upsolve}
+\end{figure}
+
+Cơ chế đằng sau vòng này khá rõ. Trong lúc thi, bạn ở trạng thái sức ép và đã tự mình đào rất sâu vào bài --- tức là đã nạp đủ ngữ cảnh. Ngay sau đó, mỗi mẩu thông tin mới (một gợi ý, một ý tưởng) sẽ dính vào đúng chỗ trong đầu bạn, vì bạn biết chính xác nó lấp vào lỗ hổng nào. Đọc lời giải khi \emph{chưa} vật lộn thì không có lỗ hổng nào để lấp, và thông tin trôi qua.
+
+Một biến thể đáng dùng khi không có kỳ thi nào: \emph{thi ảo}. Lấy một đề cũ, đặt đồng hồ đúng thời lượng thật, và làm nghiêm túc. Điểm quan trọng là tính giờ --- vì kỹ năng phân bổ thời gian và kỹ năng chịu sức ép chỉ luyện được khi có sức ép.
+
+\begin{cambay}
+Cạm bẫy phổ biến nhất trong upsolving: đọc lời giải, gật gù ``à hoá ra thế, dễ mà'', rồi chuyển bài. Cảm giác hiểu khi đọc là \emph{cảm giác quen thuộc}, không phải năng lực tái tạo. Bài kiểm tra duy nhất đáng tin: đóng lời giải lại và tự cài từ trang trắng. Rất nhiều người phát hiện ra mình không làm được ở đúng bước này --- và đó là thông tin quý, không phải điều đáng xấu hổ.
+\end{cambay}
+
+\section{Đọc sách thế nào cho có tác dụng}
+
+Sách thuật toán bị đọc sai cách nhiều hơn bất kỳ loại sách kỹ thuật nào. Có ba cách đọc, và chỉ một cách tạo ra năng lực.
+
+\emph{Đọc như tiểu thuyết} --- đọc từ đầu tới cuối, thấy hiểu. Cách này gần như không đọng lại gì sau ba tuần, vì không có lần nào bạn phải tự truy xuất kiến thức từ trí nhớ.
+
+\emph{Đọc như từ điển} --- chỉ mở khi cần tra. Cách này hợp với nửa sau sách của Skiena hoặc với cp-algorithms, nhưng không xây được nền.
+
+\emph{Đọc như phòng tập} --- đọc một mục, gấp sách, tự viết lại ý chính, rồi làm bài tập của mục đó \emph{trước khi} đọc mục sau. Đây là cách duy nhất tạo ra năng lực, và nó chậm hơn hẳn: một chương có thể mất cả tuần. Knuth thiết kế TAOCP theo đúng giả định này --- bài tập là một phần của nội dung, không phải phụ lục.
+
+Bảng dưới đây là bản đồ sách: quyển nào cho vai trò nào. Đừng đọc song song quá hai quyển; chọn một quyển làm trục chính và dùng phần còn lại để tra.
+
+\begin{center}\footnotesize
+\begin{tabularx}{\linewidth}{@{}L{4.6cm}L{2.6cm}Y@{}}
+\toprule
+\textbf{Sách} & \textbf{Vai trò} & \textbf{Dùng khi nào}\\
+\midrule
+Pólya, \emph{How to Solve It}\cite{polya1945} & Quy trình nghĩ & Đọc trước tất cả; mỏng, đọc trong một buổi\\
+Zeitz\cite{zeitz2007}, Engel\cite{engel1998} & Heuristic giải toán & Khi muốn luyện tư duy chứ không luyện thuật toán\\
+Skiena\cite{skiena2020} & Nhận diện bài toán & Trục chính tốt nhất cho người tự học; nửa sau là danh mục tra\\
+CLRS\cite{clrs2022} & Tham chiếu chuẩn & Tra định nghĩa, chứng minh chuẩn; \emph{không} nên đọc tuần tự\\
+Kleinberg--Tardos\cite{kleinberg2006} & Dạy cách thiết kế & Khi muốn học cách \emph{nghĩ ra} thuật toán, đặc biệt tham lam và luồng\\
+Erickson\cite{erickson2019} & Đệ quy và chứng minh & Miễn phí; phần quay lui và quy hoạch động rất tốt\\
+Sedgewick--Wayne\cite{sedgewick2011} & Cài đặt và đo & Khi muốn code chạy được, có thực nghiệm\\
+Bentley\cite{bentley2000} & Kỹ thuật thực dụng & Đọc rải rác, mỗi lần một chương ngắn\\
+Laaksonen\cite{laaksonen2017}, Halim\cite{halim2020} & Thi đấu & Trục chính nếu mục tiêu là contest\\
+Dijkstra\cite{dijkstra1976}, Gries\cite{gries1981} & Tính đúng & Khi bạn liên tục viết code gần đúng\\
+Knuth\cite{knuth1997v1} & Phân tích sâu & Tra một chủ đề cụ thể; không đọc tuần tự trừ khi có nhiều năm\\
+Graham--Knuth--Patashnik\cite{graham1994} & Toán rời rạc & Khi phân tích độ phức tạp đụng tổng và truy hồi khó\\
+Cormen \emph{et al.}, Garey--Johnson\cite{garey1979} & Độ khó & Khi nghi ngờ bài của mình là NP-khó\\
+McDowell\cite{mcdowell2015} & Phỏng vấn & Bốn tới sáu tuần trước phỏng vấn, không sớm hơn\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\section{Những gì không bắt chước được, và những gì bắt chước được ngay}
+
+Trung thực mà nói, có những thứ trong danh sách trên bạn không nên cố bắt chước. Knuth dành hàng chục năm cho một bộ sách; kiểu đầu tư đó chỉ hợp lý với một người có đúng mục tiêu của ông. Dijkstra làm việc phần lớn bằng bút và giấy, gần như không dùng máy tính --- cách đó phù hợp với thời của ông và với tính chất công việc của ông, không phù hợp với người cần giao sản phẩm hằng tuần. Một số kỳ thủ lập trình bắt đầu từ rất sớm và luyện với cường độ mà người đi làm không thể có; so sánh bản thân với họ theo thang thời gian là cách nhanh nhất để nản vô ích.
+
+Nhưng có sáu thứ bắt chước được ngay trong tuần này, và chúng chiếm phần lớn giá trị:
+
+\begin{enumerate}
+\item Trước mỗi vòng lặp, viết một dòng bất biến bằng lời (Dijkstra).
+\item Trước khi cài, ước lượng phong bì: \(n\) bao nhiêu, mỗi thao tác bao nhiêu, tổng cỡ bao nhiêu (Bentley).
+\item Chọn bài ở vùng bạn giải được khoảng một nửa, không dễ hơn (Ericsson).
+\item Sau mỗi trận hoặc mỗi buổi luyện, upsolve ít nhất một bài tới nơi tới chốn, tự cài lại từ trang trắng.
+\item Giữ nhật ký lỗi ba dòng cho mỗi lần sai; đọc lại mỗi tháng.
+\item Sau mỗi bài giải xong, viết một câu về ý tưởng cốt lõi không nhắc tới đề bài (Pólya, bước 4).
+\end{enumerate}
+
+Sáu việc này cộng lại tốn chừng mười phút mỗi buổi luyện. Điểm chung của chúng: cả sáu đều là cách \emph{đóng vòng phản hồi} --- đúng thứ mà hình~\ref{fig:bon-truong-phai} nói là mẫu số chung của cả bốn trường phái.
+
+\section{Gốc rễ: vì sao ta biết những điều này về luyện tập}
+
+Những lời khuyên ở trên nghe như kinh nghiệm dân gian, nhưng phần lớn chúng có nguồn thực nghiệm, và nguồn ấy không đến từ ngành máy tính mà từ nghiên cứu về cờ vua.
+
+Năm 1946, Adriaan de Groot --- vừa là nhà tâm lý học vừa là kỳ thủ --- đặt các kỳ thủ mạnh và yếu trước cùng một thế cờ và yêu cầu họ nói to suy nghĩ. Kết quả trái với kỳ vọng: kiện tướng \emph{không} tính sâu hơn người trung bình bao nhiêu. Cái họ hơn là ngay từ vài giây đầu, họ đã nhìn ra một nhóm nhỏ nước đi đáng xét, trong khi người yếu hơn phải rà nhiều nước vô nghĩa. Nói cách khác, ưu thế nằm ở \emph{nhận dạng}, không ở sức tính.
+
+Đến 1973, William Chase và Herbert Simon --- chính Simon của \emph{Human Problem Solving} nhắc ở chương \ptr{A/01} --- làm thí nghiệm quyết định. Họ cho kỳ thủ nhìn một thế cờ trong vài giây rồi dựng lại. Kiện tướng dựng lại gần như hoàn hảo, người mới thì không. Nhưng khi các quân được đặt \emph{ngẫu nhiên} thay vì theo thế cờ thật, ưu thế biến mất gần hết. Kết luận: chuyên gia không có trí nhớ tốt hơn; họ nhìn thấy \emph{đơn vị lớn hơn} --- những cụm quân có nghĩa, gọi là chunk. Trí nhớ của họ chỉ chứa vài chục đơn vị như mọi người, nhưng mỗi đơn vị đóng gói nhiều thông tin hơn.
+
+Hai kết quả đó giải thích trực tiếp vì sao chương \ptr{A/01} nhấn mạnh việc ``viết một câu về ý tưởng cốt lõi không nhắc tới đề bài''. Câu đó chính là một chunk đang được tạo ra. Người nói ``bài này dùng hai con trỏ'' và người nói ``khi cả hai đầu đều đơn điệu thì quét từ hai phía'' đang lưu hai thứ rất khác nhau: một cái tên, và một điều kiện kích hoạt. Chỉ cái thứ hai mới tự nhận ra chính nó khi gặp bài mới.
+
+Nhánh nghiên cứu thứ hai bắt đầu từ Benjamin Bloom, người phỏng vấn những cá nhân đạt đỉnh cao trong nhiều lĩnh vực và thấy một mẫu chung: nhiều năm luyện có hướng dẫn, tăng dần độ khó, với người dạy đóng vai trò cấp phản hồi. Ericsson và cộng sự hình thức hoá mẫu đó thành khái niệm luyện tập có chủ đích\cite{ericsson1993,ericsson2016}. Cần nói thẳng phần bị tranh cãi: con số ``10\,000 giờ'' là cách phổ biến hoá của người khác, không phải kết luận của nghiên cứu, và mức độ mà luyện tập giải thích được khác biệt năng lực vẫn còn đang tranh luận trong giới nghiên cứu. Phần lõi thì vững: luyện có mục tiêu, có phản hồi, ở mức hơi quá sức hiệu quả hơn hẳn lặp lại thụ động --- và đó là toàn bộ phần ta dùng.
+
+Còn bản thân môi trường luyện thuật toán hiện đại thì trẻ hơn nhiều. Các kỳ thi lập trình đại học bắt đầu từ thập niên 1970 và lớn dần thành ICPC; kỳ thi tin học quốc tế dành cho học sinh phổ thông (IOI) bắt đầu năm 1989; các nền tảng chấm bài trực tuyến xuất hiện từ cuối thập niên 1990 và bùng nổ trong thập niên 2010. Điều mà những nền tảng này thay đổi không phải nội dung kiến thức mà là \emph{độ trễ phản hồi}: từ vài tuần chờ thầy chấm xuống còn vài giây. Nếu tin vào Ericsson, thì đó chính là biến số quan trọng nhất, và nó giải thích vì sao trình độ trung bình của người luyện nghiêm túc ngày nay cao hơn hẳn hai mươi năm trước.
+
+\begin{gocre}
+\gr{1946 --- de Groot}{Muốn biết kiện tướng cờ nghĩ khác người thường ở đâu.}{Kiện tướng không tính sâu hơn; họ nhận dạng nhanh hơn. Ưu thế nằm ở nhận dạng chứ không ở sức tính.}
+\gr{1973 --- Chase \& Simon}{Kiểm chứng: đó là trí nhớ tốt hơn hay cách tổ chức tri thức khác?}{Ưu thế biến mất với thế cờ ngẫu nhiên \(\Rightarrow\) chuyên gia lưu các \emph{khối có nghĩa}. Giải thích vì sao phải phát biểu ý tưởng ở dạng tổng quát.}
+\gr{1985 --- Bloom}{Phỏng vấn người đạt đỉnh cao ở nhiều ngành để tìm mẫu chung.}{Nhiều năm luyện có hướng dẫn và tăng dần độ khó; vai trò của người cấp phản hồi.}
+\gr{1993 --- Ericsson và cộng sự}{Vì sao cùng số giờ mà kết quả khác nhau.}{Bốn điều kiện của luyện tập có chủ đích. Phần ``10\,000 giờ'' là diễn giải của người khác và còn tranh cãi.}
+\gr{1989 và sau đó --- IOI, chấm bài trực tuyến}{Muốn đánh giá được kỹ năng lập trình ở quy mô lớn.}{Độ trễ phản hồi tụt từ vài tuần xuống vài giây --- thay đổi lớn nhất với người tự học trong 30 năm qua.}
+\end{gocre}
+
+\section{Liên hệ ngang: nghề nào cũng phải giải bài toán luyện tập này}
+
+Nếu bốn điều kiện của luyện tập có chủ đích là đúng, thì mọi nghề đòi hỏi kỹ năng cao đều phải tự phát minh ra cách thoả chúng. Và quả thật là vậy --- nhìn sang các nghề khác, bạn sẽ thấy những cơ chế trùng khớp đến bất ngờ với upsolving và nhật ký lỗi, chỉ khác tên gọi. Hai chỗ đáng học nhất là y khoa và hàng không, vì họ đã \emph{thể chế hoá} việc học từ lỗi thay vì phó mặc cho ý chí cá nhân.
+
+\begin{lienhe}
+\lh{Âm nhạc}{Tập chậm từng đoạn khó, tách tay, dùng máy đếm nhịp tăng dần tốc độ}{Giống: cô lập đúng phần yếu thay vì chơi lại cả bản --- tương đương việc luyện riêng một dạng bài. Khác: nhạc công có phản hồi tức thì bằng tai, còn bạn phải tự tạo phản hồi bằng chấm bài và stress test.}
+\lh{Thể thao}{Chu kỳ hoá: xen kẽ giai đoạn tăng khối lượng, tăng cường độ và phục hồi}{Giống: cường độ cao liên tục không bền, cần xen kẽ. Gợi ý cho lộ trình ở \ptr{E/28}: xen tuần thi đấu với tuần học kiến thức mới. Khác: giải thuật không có giới hạn sinh lý, giới hạn là sự chú ý và động lực.}
+\lh{Y khoa}{Hội chẩn tử vong và biến chứng (M\&M): mỗi ca xấu được mổ xẻ công khai, không quy tội cá nhân}{Đây chính là nhật ký lỗi được thể chế hoá, và nó hiệu quả hơn nhật ký cá nhân vì bài học được chia sẻ. Bắt chước được: viết công khai bài phân tích lỗi của mình.}
+\lh{Hàng không}{Bảng kiểm (checklist), báo cáo sự cố phi trừng phạt, huấn luyện trên buồng lái mô phỏng}{Bảng kiểm ứng với danh sách trường hợp biên trước khi nộp bài (\ptr{E/25}). Buồng lái mô phỏng ứng với thi ảo: rủi ro bằng không, lặp lại được, có thể cố tình tạo tình huống xấu.}
+\lh{Quân sự}{Rà soát sau hành động (after-action review): điều dự định, điều đã xảy ra, vì sao khác, lần sau làm gì}{Bốn câu này gần như trùng khít với bước 4 của Pólya và nội dung nhật ký lỗi. Điểm mạnh: nó là quy trình bắt buộc, không phụ thuộc tâm trạng.}
+\lh{Nghiên cứu khoa học}{Sổ thí nghiệm, tái lập kết quả, bình duyệt}{Sổ thí nghiệm chính là nhật ký lỗi. Bình duyệt là phản hồi từ người ngoài --- thứ mà người tự học thiếu nhất; thay thế gần nhất là nhờ người khác đọc code hoặc viết editorial công khai.}
+\lh{Học máy}{Vòng huấn luyện: mất mát trên tập kiểm tra, dừng sớm, học theo chương trình (curriculum learning)}{Rất giống về cấu trúc: mẫu quá dễ cho gradient nhỏ, mẫu quá khó cho gradient nhiễu; vùng học hiệu quả nằm giữa --- đúng hình~\ref{fig:vung-luyen}. Khác: mô hình không tự chọn được bài, còn bạn thì có.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Vì thói quen của họ không phải sở thích cá nhân mà là cách đóng vòng phản hồi, và vòng phản hồi thì chỉ có vài cách đóng. Bốn trường phái ở hình~\ref{fig:bon-truong-phai} khác nhau ở thước đo --- toán, logic, đồng hồ, số bài giải được --- nhưng ai cũng phải có một thước đo khách quan và phải sửa cách làm theo kết quả đo. Người luyện không có thước đo nào là người duy nhất không tiến bộ.}
+\tl{Vì đọc tạo ra \emph{cảm giác quen thuộc}, còn làm bài tập tạo ra \emph{khả năng truy xuất}. Hai thứ đó khác nhau: bạn có thể thấy mọi dòng chứng minh đều hiển nhiên khi đọc mà vẫn không tái tạo được nó khi gấp sách. Bài tập ép bạn truy xuất, và chính lúc truy xuất khó khăn thì trí nhớ mới được củng cố. Cách xếp hạng 0--50 của Knuth còn giúp bạn chọn đúng vùng khó thay vì làm hết mọi bài.}
+\tl{Nó đổi thứ tự công việc. Thay vì gõ code rồi tìm ca dữ liệu làm nó sai, bạn viết ra điều kiện cần giữ đúng \emph{trước}, và code trở thành cách thực hiện điều kiện đó. Cụ thể nhất là một dòng bất biến trước mỗi vòng lặp: khi có nó, các câu hỏi ``bắt đầu từ 0 hay 1'', ``chạy tới \code{n} hay \code{n-1}'', ``khởi tạo bằng 0 hay \(-\infty\)'' đều được suy ra thay vì đoán rồi thử.}
+\tl{Vì ``nhiều bài'' thường có nghĩa là nhiều bài \emph{vừa sức}, mà vừa sức thì không tạo ra sai lệch dự đoán để học. Sau vài tháng bạn thành thạo hơn ở những gì đã biết và không mở rộng được gì mới. Điều kiện Ericsson đòi hỏi là mức hơi quá sức cộng phản hồi cộng sửa sai; giải ít bài hơn nhưng chọn ở vùng luyện, có upsolve và có nhật ký lỗi thì thoả cả ba.}
+\tl{Vì trong lúc thi bạn đã tự đào rất sâu vào bài, tức là đã tạo sẵn những ``lỗ hổng'' rất cụ thể trong hiểu biết. Ngay sau đó, một gợi ý nhỏ sẽ rơi đúng vào lỗ hổng và dính lại. Nếu đọc lời giải khi chưa vật lộn thì không có lỗ hổng nào, thông tin trôi qua và bạn chỉ thu được cảm giác đã hiểu. Đó cũng là lý do bước ``tự cài lại từ trang trắng'' không được bỏ.}
+\end{traloi}
+
+\begin{dongian}
+Hãy tưởng tượng bạn học chơi đàn. Có bốn kiểu thầy: người bắt bạn đếm nhịp thật chính xác, người bắt bạn hiểu vì sao hợp âm này đi với hợp âm kia, người bắt bạn thu âm lại rồi nghe xem chỗ nào sai, và người bắt bạn lên sân khấu đúng giờ. Bốn kiểu ấy tương ứng với bốn nhóm người trong chương này. Điều họ giống nhau là ai cũng có một cách để \emph{biết mình đang sai ở đâu} --- đếm nhịp, lý thuyết, bản thu, khán giả. Người tập đàn một mình trong phòng, không thu âm, không ai nghe, thì tập bao nhiêu năm cũng chỉ giỏi lên chút ít, vì không có gì chỉ cho họ chỗ sai.
+
+Việc luyện thuật toán y hệt. Bạn cần một cái ``bản thu'': chấm bài tự động, stress test, đồng hồ bấm giờ, hay đơn giản là quyển sổ ghi mỗi lần bạn sai. Và bạn cần chọn bài ở mức hơi khó --- dễ quá thì như tập lại bài đã thuộc, khó quá thì như ngồi trước bản nhạc không đọc nổi nốt nào. Cuối cùng, sau mỗi lần tập, hãy quay lại đúng chỗ bạn vấp và tự chơi lại từ đầu, chứ đừng nghe người khác chơi rồi tưởng mình chơi được.
+\motcau{Người giỏi không luyện nhiều hơn bạn nhiều đến thế; họ luyện ở mức khó hơn một chút và luôn biết mình vừa sai ở đâu.}
+\chuadongian{Có phần thật sự không rút gọn được: thời gian. Vòng phản hồi tốt làm mỗi giờ luyện đáng giá hơn, nhưng không có cách nào bỏ qua vài trăm giờ đầu tiên.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Bốn điều kiện của luyện tập có chủ đích}{Mục tiêu hẹp; mức hơi quá sức; phản hồi gần như tức thì; có sửa sai chứ không chỉ làm lại. Thiếu một điều thì thời gian trôi mà năng lực đứng.}
+\ar[3]{Vùng luyện đúng}{Vùng bạn giải được khoảng một nửa số bài; luôn hơi khó chịu. Dễ quá thì không có dự đoán nào bị sai để mà học.}
+\ar[3]{Vòng upsolving}{Thi tính giờ \(\rightarrow\) ghi chỗ bí \(\rightarrow\) tự làm tiếp \(\rightarrow\) chỉ đọc \emph{một} gợi ý khi bí quá 60 phút \(\rightarrow\) tự cài lại từ trang trắng \(\rightarrow\) ghi nhật ký lỗi.}
+\ar[3]{Kiểm tra ``đã học được'' đáng tin duy nhất}{Đóng lời giải, tự cài từ trang trắng. Cảm giác hiểu khi đọc chỉ là cảm giác quen thuộc.}
+\ar[3]{Câu của Dijkstra về kiểm thử}{Kiểm thử cho thấy sự hiện diện của lỗi, không bao giờ cho thấy sự vắng mặt của lỗi --- nên tính đúng phải được xây vào lúc viết, không thêm vào lúc kiểm.}
+\ar[2]{Câu Knuth bị trích sai}{``Tối ưu hoá sớm là gốc rễ mọi tội lỗi'' --- nguyên ý là bỏ qua cải thiện nhỏ trong phần lớn thời gian, nhưng phải đo để tìm ra phần thực sự quan trọng và tối ưu \emph{ở đó}.}
+\ar[2]{Đóng góp phương pháp của Tarjan}{Thiết kế cấu trúc dữ liệu cùng với công cụ phân tích của nó; khấu hao và hàm thế năng ra đời từ nhu cầu đó.}
+\ar[2]{Ba thói quen của Bentley}{Ước lượng phong bì trước khi cài; đo trước khi tối ưu; coi việc viết đúng thuật toán đơn giản là kỹ năng phải luyện riêng.}
+\ar[2]{Vì sao Skiena tổ chức sách thành danh mục}{Vì trong thực tế, phần khó nhất thường là nhận ra bài của mình chính là bài kinh điển nào, chứ không phải nghĩ ra thuật toán mới.}
+\ar[2]{Ba cách đọc sách và cách nào có tác dụng}{Đọc như tiểu thuyết (trôi), như từ điển (tra được, không xây nền), như phòng tập (gấp sách, viết lại, làm bài tập trước khi sang mục sau) --- chỉ cách thứ ba tạo năng lực.}
+\ar[2]{Nội dung ba dòng của nhật ký lỗi}{Tôi hiểu sai điều gì; dấu hiệu nào lẽ ra đã gợi ý đúng; lần sau tôi sẽ kiểm tra gì.}
+\ar[1]{Thi ảo}{Lấy đề cũ, đặt đồng hồ đúng thời lượng thật, làm nghiêm túc --- dùng khi không có kỳ thi thật, để luyện phân bổ thời gian dưới sức ép.}
+\ar[1]{Bốn trường phái và thước đo của họ}{Phân tích (toán), chứng minh (logic), kỹ thuật (đồng hồ trên máy thật), thi đấu (số bài giải được có tính giờ).}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Tôi đi làm, mỗi ngày chỉ có một giờ. Nên phân bổ thế nào cho hiệu quả nhất?}{Một cách phân bổ dùng được: 10 phút ôn lại (đọc nhật ký lỗi và bảng active recall của chương đang học), 40 phút giải một bài ở vùng luyện có bấm giờ, 10 phút cho bước 4 --- viết một câu về ý tưởng cốt lõi và ghi nhật ký nếu sai. Điều quan trọng hơn tỉ lệ là tính đều đặn: một giờ mỗi ngày trong sáu tháng hơn hẳn tám giờ mỗi cuối tuần, vì trí nhớ củng cố theo số lần truy xuất chứ không theo tổng thời gian.}
+\qa{Tôi nên đọc hết CLRS không?}{Gần như chắc chắn là không, trừ khi bạn đang học một khoá có giáo trình đó. CLRS được thiết kế làm tham chiếu chuẩn: định nghĩa chính xác, chứng minh đầy đủ, bao phủ rộng. Đọc tuần tự thì rất chậm và bạn sẽ dừng ở khoảng chương 8. Cách dùng đúng: lấy một quyển khác làm trục chính (Skiena nếu tự học, Laaksonen nếu thi đấu), và mở CLRS khi cần một chứng minh chuẩn hoặc một chi tiết mà trục chính nói lướt.}
+\qa{Đọc code của người giỏi có ích không, hay chỉ nên tự viết?}{Cả hai, nhưng đúng thứ tự. Đọc code trước khi tự vật lộn thì bạn chép được kiểu viết mà không hiểu vì sao; đọc sau khi đã tự cài xong thì rất có giá trị, vì bạn thấy ngay chỗ họ ngắn hơn, ít trường hợp riêng hơn, hoặc chọn biểu diễn dữ liệu khôn hơn. Một bài tập tốt: cài xong rồi so với thư viện tham chiếu như KACTL\cite{kactl} và tự hỏi vì sao họ chọn cách đó.}
+\qa{Xây thư viện mẫu cho riêng mình có đáng không, khi đã có thư viện công khai?}{Đáng, vì lợi ích chính không nằm ở đoạn code mà ở quá trình viết. Khi tự cài DSU hay segment tree tới mức đúng và gọn, bạn buộc phải hiểu từng chi tiết, và về sau bạn sửa được nó cho biến thể lạ --- điều không làm được với code chép về. Nguyên tắc: mỗi đoạn trong thư viện riêng của bạn phải do bạn viết và đã qua stress test.}
+\qa{Làm sao biết mình đang ở vùng luyện chứ không phải vùng thoải mái?}{Bằng tỉ lệ giải được. Nếu bạn giải đúng ngay gần như mọi bài trong dưới 15 phút, bạn đang ở vùng thoải mái --- nâng độ khó. Nếu bạn không giải được gì trong hai buổi liên tiếp và đọc lời giải vẫn thấy mù mờ, bạn đang ở vùng quá tải --- hạ xuống. Điểm cân bằng là khoảng một nửa số bài giải được sau khi vật lộn, nửa còn lại phải upsolve.}
+\qa{Nghiên cứu về luyện tập có chủ đích có bị thổi phồng không?}{Có phần. Kết luận mạnh kiểu ``chỉ cần 10\,000 giờ là thành chuyên gia'' là cách diễn giải phổ biến hoá, và bị tranh luận nhiều trong giới nghiên cứu; các yếu tố khác như điểm xuất phát và điều kiện học tập đều có vai trò. Nhưng phần lõi thì vững và cũng là phần ta dùng ở đây: luyện có mục tiêu, có phản hồi, ở mức hơi quá sức thì hiệu quả hơn hẳn luyện lặp lại thụ động. Ta không cần phần bị tranh cãi để dùng được phần lõi.}
+\qa{Chuyên gia cờ vua nhớ thế cờ giỏi hơn người thường --- điều đó liên quan gì tới thuật toán?}{Liên quan trực tiếp, và đây là một trong những kết quả kinh điển của tâm lý học nhận thức: ưu thế trí nhớ đó biến mất khi các quân được đặt ngẫu nhiên. Nghĩa là chuyên gia không nhớ tốt hơn, họ \emph{nhìn thấy đơn vị lớn hơn} --- những cụm có nghĩa. Với thuật toán cũng vậy: người có kinh nghiệm không nhớ nhiều dòng code hơn, họ nhìn một đề bài và thấy ``đây là bài ghép đôi trá hình''. Xây các khối có nghĩa đó chính là việc mà bước 4 của Pólya và câu ``phát biểu ý tưởng không nhắc đề bài'' đang làm.}
+\qa{Tôi hay bỏ dở lộ trình sau vài tuần. Có mẹo nào không?}{Ba điều chỉnh có hiệu quả rõ. Thứ nhất, hạ mục tiêu hằng ngày xuống mức bạn chắc chắn làm được kể cả ngày bận --- một bài, hoặc thậm chí 20 phút; tính liên tục quan trọng hơn khối lượng. Thứ hai, làm cho tiến bộ nhìn thấy được: một bảng đánh dấu ngày, hoặc danh sách bài đã upsolve. Thứ ba, ghép việc luyện vào một khung giờ cố định thay vì ``khi nào rảnh''. Chương \ptr{E/28} có lộ trình cụ thể theo tuần đã tính tới ba điều này.}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Tự viết lại tìm kiếm nhị phân từ trang trắng, không tra cứu}{Bài tập của Bentley\cite{bentley2000}}{Viết bất biến trước; sau đó stress test với mảng rỗng, một phần tử, nhiều phần tử trùng nhau.}
+\bt[1]{Đọc mục 1 của \emph{How to Solve It} và áp bốn bước vào một bài bạn đang bí}{\cite{polya1945}}{Mục tiêu là tập nhận ra mình đang ở bước nào, đặc biệt phát hiện lúc bạn nhảy cóc sang bước 3.}
+\bt[1]{Lập nhật ký lỗi và ghi ba dòng cho năm lần sai gần nhất}{Bài tập tự tổ chức}{Sau năm mục, tự phân loại: sai do hiểu đề, sai do ý tưởng, sai do cài đặt. Tỉ lệ này quyết định bạn nên luyện gì.}
+\bt[2]{Chọn một đề contest cũ và làm thi ảo đúng thời lượng}{Codeforces / AtCoder / CSES\cite{cses}}{Ghi lại mốc thời gian mỗi lần đổi bài; sau đó đối chiếu với \ifSubfilesClassLoaded{hình phân bổ thời gian}{hình~\ref{fig:schoenfeld}} ở chương \ptr{A/01}.}
+\bt[2]{Upsolve một bài trong đề vừa làm, tự cài lại từ trang trắng}{Cùng đề trên}{Bước 5 của vòng upsolving; đây là bài tập quan trọng nhất trong cả danh sách này.}
+\bt[2]{Cài DSU và segment tree cho thư viện riêng, có stress test}{\cite{kactl} để đối chiếu}{So sánh code của bạn với thư viện tham chiếu và giải thích từng khác biệt --- đừng chép, hãy giải thích.}
+\bt[2]{Chọn một chương của Skiena, làm hết bài tập trước khi đọc chương sau}{\cite{skiena2020}}{Luyện cách đọc ``như phòng tập''; ghi lại thời gian thật để biết tốc độ đọc bền vững của bạn.}
+\bt[3]{Viết editorial cho một bài bạn vừa giải, như thể dạy người khác}{Bài tập kiểu Feynman}{Chỗ bạn viết không trôi chính là chỗ bạn chưa hiểu; đó là mục đích duy nhất của bài tập này.}
+\bt[3]{Lấy một thuật toán bạn ``đã biết'' và tự chứng minh tính đúng bằng bất biến}{Chương \ptr{A/04}}{Chọn Dijkstra hoặc thuật toán tham lam xếp lịch; nếu không viết được chứng minh, bạn mới chỉ nhớ chứ chưa hiểu.}
+\bt[3]{Thiết kế lộ trình 12 tuần cho riêng bạn, có mục tiêu đo được mỗi tuần}{Chương \ptr{E/28} làm mẫu}{Mỗi tuần phải có một tiêu chí kiểm tra khách quan, không phải ``học xong chương X''.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Chương này rút gọn được thành một câu: những người giỏi nhất khác nhau ở thước đo họ chọn, nhưng giống nhau ở chỗ ai cũng có một thước đo và ai cũng sửa cách làm theo kết quả đo. Bạn không sao chép được hoàn cảnh của họ, nhưng sáu thói quen ở mục cuối thì sao chép được ngay, và chúng chính là phần tạo ra phần lớn giá trị.
+
+Còn bỏ ngỏ hai câu hỏi thực dụng mà chương này liên tục giả định đã có câu trả lời: thước đo ``đủ nhanh'' là gì, và thước đo ``chắc chắn đúng'' là gì. Hai chương tiếp theo cấp đúng hai thước đo đó --- \ptr{A/03} cho chi phí, \ptr{A/04} cho tính đúng. Sau đó, \ptr{E/28} sẽ biến toàn bộ chương này thành một lịch luyện cụ thể theo tuần.
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

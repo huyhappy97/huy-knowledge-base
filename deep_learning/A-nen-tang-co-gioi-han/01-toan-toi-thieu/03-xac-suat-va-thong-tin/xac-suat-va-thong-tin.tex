@@ -1,0 +1,150 @@
+% ============================================================================
+%  A/01-toan-toi-thieu/03-xac-suat-va-thong-tin
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: A/01/02-vi-phan-va-toi-uu. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Xác suất, độ hợp lý và lý thuyết thông tin (Probability, Likelihood and Information Theory)}
+\ptrtarget{A/01-toan-toi-thieu/03}\ptrtarget{A/01-toan-toi-thieu/03-xac-suat-va-thong-tin}\ptrtarget{A/01/03}\ptrtarget{A/01/03-xac-suat-va-thong-tin}
+\dependency{\ptr{A/01-toan-toi-thieu/02-vi-phan-va-toi-uu} (điều kiện dừng theo validation --- mục này cung cấp công cụ để trả lời ``validation đã thật sự cải thiện chưa'').}
+
+\begin{tomtat}
+Mục này làm hai việc: cho thấy gần như mọi \vn{hàm mất mát}{loss function} là âm log \vn{độ hợp lý}{likelihood} của một giả định phân phối được chọn ngầm, và cho bạn công cụ để biết một con số đo được đáng tin đến đâu. Đọc xong bạn không cần nhớ công thức loss nào nữa, vì suy ra được từ giả định. Bạn biết ngay loss đó hỏng ở đâu: đúng chỗ giả định vỡ. Và bạn tính được trong ba mươi giây xem chênh lệch một điểm phần trăm giữa hai mô hình có đáng bàn không. Nếu chỉ nhớ một điều: \emph{mọi loss là một giả định phân phối trá hình, và mọi con số đo được là một ước lượng có sai số} --- ai bỏ qua vế thứ hai sẽ dành hàng tháng để đuổi theo nhiễu.
+\end{tomtat}
+
+\begin{nentang}
+\kn{biến ngẫu nhiên, kỳ vọng, phương sai}{biến ngẫu nhiên là một đại lượng mà giá trị phụ thuộc kết quả của một phép thử; kỳ vọng là giá trị trung bình dài hạn của nó; phương sai đo mức dao động quanh kỳ vọng, và căn bậc hai của phương sai là độ lệch chuẩn.}
+\kn{phân phối (distribution)}{quy luật gán xác suất cho các giá trị mà biến ngẫu nhiên có thể nhận. Chọn một phân phối là đưa ra một giả định về cách dữ liệu được sinh ra.}
+\kn{độ hợp lý (likelihood)}{với một bộ tham số cho trước, xác suất mà mô hình gán cho \emph{dữ liệu đã quan sát được}. Lưu ý nó là hàm của tham số, không phải hàm của dữ liệu.}
+\kn{prior}{niềm tin về tham số \emph{trước khi} nhìn dữ liệu, viết dưới dạng một phân phối. Trong thực hành, một prior tương đương với một số hạng phạt cộng vào hàm mất mát.}
+\kn{hàm mất mát (loss function)}{một con số đo mức sai của dự đoán so với nhãn; huấn luyện là đi tìm tham số làm nó nhỏ nhất.}
+\kn{softmax}{phép biến một vector số thực bất kỳ thành một bộ số dương cộng lại bằng một, để đọc như xác suất của từng lớp. ``Đọc như'' không có nghĩa ``là''.}
+\kn{tập test và tập validation}{validation là phần dữ liệu dùng để chọn siêu tham số và quyết định khi nào dừng; test là phần chỉ được chạm vào \emph{một lần} ở cuối để báo cáo. Dùng test như validation làm mọi con số trở nên lạc quan giả.}
+\kn{độ chính xác (accuracy)}{tỉ lệ mẫu được dự đoán đúng. Nó là trung bình của các biến chỉ báo đúng hay sai, nên bản thân nó cũng là một ước lượng có sai số.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Hai câu nói kết thúc rất nhiều tranh luận kỹ thuật một cách sai: ``mô hình A đạt \(90{,}2\%\), mô hình B đạt \(89{,}1\%\), vậy A tốt hơn'' và ``loss của tôi là \vn{entropy chéo}{cross-entropy} vì mọi người dùng cross-entropy''. Câu thứ nhất là một phát biểu thống kê không kèm sai số. Câu thứ hai là một lựa chọn mô hình xác suất được nhớ như một quy ước. Mục này chữa cả hai bằng cùng một bộ công cụ.
+
+\textbf{Học xong mục này thì làm được gì mà trước đó không làm được?} Bốn việc: suy ra hàm mất mát từ giả định về nhiễu thay vì tra bảng; dự đoán trước loss sẽ hỏng ở đâu; tính khoảng tin cậy và quyết định một thí nghiệm có đủ mẫu không \emph{trước khi} chạy; và đọc đúng hướng của \vn{phân kỳ KL}{Kullback--Leibler divergence} trong một paper để biết mô hình sẽ trải mỏng hay chọn một mode. Nền lý thuyết ở \cite{murphy2022,bishop2006}; phần thông tin ở \cite{cover2006}.
+
+\begin{trucgiac}
+Cross-entropy là hoá đơn tiền điện của việc mã hoá sự thật bằng bảng mã của mô hình. Mô hình tin chắc vào điều đúng thì sự kiện thật rơi vào một ký hiệu ngắn và hoá đơn nhỏ; mô hình tin chắc vào điều sai thì sự kiện thật rơi vào một ký hiệu dài kinh khủng, đúng bằng \(-\log q\) của một xác suất gần không. \en{Entropy} là hoá đơn tối thiểu không tránh được; KL là phần phụ trội phải trả vì dùng sai bảng mã. Cách nhìn này giải thích ngay vì sao mô hình bị phạt nặng bất đối xứng khi \emph{tự tin mà sai}, chứ không phải khi chỉ đơn giản là sai.
+\end{trucgiac}
+
+\subsection{B. Sai số lấy mẫu: một tập test 500 mẫu đáng tin đến đâu}
+Độ chính xác đo trên tập test là trung bình của các biến Bernoulli, nên sai số chuẩn là \(\sqrt{p(1-p)/n}\). Nói bằng lời: \emph{đại lượng này đo mức dao động của con số nếu bạn rút một mẫu 500 phần tử khác từ cùng phân phối} --- không hơn.
+
+\textbf{Tính tay.} Với \(n=500\), \(p=0{,}90\): sai số chuẩn \(=\sqrt{0{,}9\cdot 0{,}1/500}=\sqrt{0{,}00018}\approx 0{,}0134\), tức \(1{,}34\) điểm phần trăm. Khoảng tin cậy \(95\%\) xấp xỉ \(90\% \pm 2{,}6\%\), tức từ \(87{,}4\%\) tới \(92{,}6\%\) --- rộng hơn năm điểm.
+
+Ở đây có một tinh tế quan trọng, và bỏ qua nó thì sai theo cả hai chiều. Khi hai mô hình được đánh giá trên \emph{cùng} một tập test, chúng sai ở phần lớn cùng những mẫu khó, nên phép so sánh đúng là so sánh \emph{ghép cặp}: cái cần đếm là số mẫu hai mô hình bất đồng, và độ bất định của hiệu số nhỏ hơn nhiều so với độ bất định của từng con số riêng lẻ. Nếu trong 500 mẫu chỉ có 20 mẫu bất đồng và 15 nghiêng về A thì kết luận còn yếu; nếu 60 mẫu bất đồng và 45 nghiêng về A thì hiệu số một điểm có thể có ý nghĩa. Công cụ đúng là kiểm định ghép cặp (McNemar) hoặc \en{bootstrap} trên chính tập test, không phải hai khoảng tin cậy vẽ cạnh nhau \cite{demsar2006statistical}.
+
+Còn hai nguồn bất định nữa mà công thức trên \emph{không} bắt được, và chúng thường lớn hơn:
+
+\begin{itemize}
+\item \textbf{Bất định do chọn tập test.} Công thức chỉ trả lời ``nếu rút 500 mẫu khác từ cùng phân phối''. Dòng công trình dựng lại tập test của ImageNet theo đúng quy trình gốc cho thấy độ chính xác tụt hàng điểm \cite{recht2019imagenet} --- tức bản thân quy trình thu thập cũng là một nguồn ngẫu nhiên.
+\item \textbf{Nhãn sai.} Các tập chuẩn phổ biến có tỉ lệ nhãn sai đủ để đảo thứ hạng ở phần đỉnh bảng \cite{northcutt2021pervasive}. Nó đặt một trần cứng lên mọi phép so sánh, và không phương pháp thống kê nào vượt qua được trần đó.
+\end{itemize}
+
+\subsection{C. Likelihood, MLE, MAP: nguồn gốc chung của mọi hàm mất mát}
+Giả sử ta mô hình hoá dữ liệu bằng một phân phối có tham số \(\theta\). \vn{Ước lượng độ hợp lý cực đại}{maximum likelihood estimation, MLE} chọn \(\theta\) cực đại \(\prod_i p(y_i\mid x_i;\theta)\), tương đương cực tiểu \(-\sum_i \log p(y_i\mid x_i;\theta)\). Nói bằng lời: \emph{huấn luyện chính là tìm bộ tham số làm cho dữ liệu quan sát được trở nên ít bất ngờ nhất}. Chọn dạng phân phối nào thì ra loss nấy --- và đó là toàn bộ nội dung Bảng~\ref{tab:loss-tu-likelihood}.
+
+\begin{table}[H]\centering\small
+\caption{Hàm mất mát nào cũng là một giả định phân phối. Cột cuối là cột đáng giá nhất: giả định vỡ ở đâu thì loss hỏng ở đó.}
+\label{tab:loss-tu-likelihood}
+\begin{tabularx}{\linewidth}{@{}L{2.3cm}L{3.0cm}YL{3.9cm}@{}}
+\toprule
+\textbf{Loss} & \textbf{Giả định phân phối} & \textbf{Cho ra ước lượng gì} & \textbf{Hỏng khi nào}\\
+\midrule
+MSE & Gaussian, phương sai hằng số & Trung bình có điều kiện & Có ngoại lai; nhiễu phụ thuộc tín hiệu; mục tiêu đa phương thức thì cho ra trung bình mờ\\
+L1 & Laplace & Trung vị có điều kiện & Cần ước lượng trung bình; gradient hằng số gây dao động gần nghiệm\\
+Cross-entropy & Categorical & Xác suất từng lớp & Nhãn sai hoặc mất cân bằng cực đoan; phạt rất nặng khi tự tin mà sai\\
+Phạt \(L_2\) & \vn{Cực đại hậu nghiệm}{maximum a posteriori, MAP} với prior Gaussian & Nghiệm co về 0 & Khi thang đo các tham số khác nhau nhiều\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng trên giải thích một chuyện hay gây bối rối: vì sao hồi quy độ sâu bằng MSE cho ra biên vật thể mờ. Ở biên, độ sâu thật là \emph{đa phương thức}: hoặc thuộc vật trước, hoặc thuộc nền. MLE dưới giả định Gaussian đơn phương thức buộc mô hình trả về trung bình của hai đáp án đúng. Kết quả là một giá trị sai nằm ở giữa. Không siêu tham số nào cứu được; phải đổi giả định phân phối, và đó chính là động cơ của các mô hình sinh có điều kiện ở \code{C}.
+\lk{B/09}{tiền đề}{mọi lựa chọn hàm mất mát ở chương thiết kế loss bắt đầu bằng việc chọn --- có ý thức hay không --- một giả định phân phối}
+
+
+MAP thêm một prior: cực đại \(p(\theta\mid \text{dữ liệu}) \propto p(\text{dữ liệu}\mid\theta)\,p(\theta)\), tương đương thêm một số hạng phạt vào loss. Với nền SLAM đây là chỗ nối quen thuộc: một prior trên pose \emph{chính là} một số hạng phạt trong hàm chi phí, và damping của Levenberg--Marquardt hoạt động y hệt một prior Gaussian quanh điểm hiện tại --- cùng một cơ chế, hai cái tên.
+
+Cần trung thực một chỗ: \emph{không phải mọi loss đều là âm log độ hợp lý}. \en{Focal loss} \cite{lin2017focal} là phép định lại trọng số theo độ khó; \vn{làm mượt nhãn}{label smoothing} \cite{szegedy2016rethinking} cố ý làm sai lệch mục tiêu; các loss dạng biên (triplet, contrastive) tối ưu một thứ tự chứ không một mật độ. Đó là kỹ thuật, không phải hệ quả của một mô hình sinh --- và chính vì thế xác suất mà mô hình xuất ra sau khi huấn luyện bằng chúng không còn được \vn{hiệu chuẩn}{calibrated}.
+
+\subsection{D. Entropy, cross-entropy, KL và sự bất đối xứng}
+Ba đại lượng, một quan hệ:
+\[
+H(p) = -\sum_i p_i\log p_i,\qquad
+H(p,q) = -\sum_i p_i \log q_i,\qquad
+D_{\mathrm{KL}}(p\Vert q) = H(p,q)-H(p).
+\]
+Vì \(H(p)\) không phụ thuộc tham số mô hình, \emph{cực tiểu cross-entropy chính là cực tiểu KL từ dữ liệu tới mô hình, và cũng chính là MLE} --- ba cách nói của một việc.
+
+\textbf{Một phép kiểm tra rẻ tiền rơi ra từ đây.} Với bài toán 1000 lớp, mô hình khởi tạo hợp lý phải cho loss ban đầu xấp xỉ \(\ln 1000 \approx 6{,}91\). Nếu là 20 thì khởi tạo hoặc tầng cuối sai; nếu là 2 thì có rò rỉ nhãn. Một dòng kiểm tra, bắt được cả một lớp bug.
+
+KL không đối xứng, và đây không phải khiếm khuyết toán học mà là một lựa chọn về hành vi. \textbf{Ví dụ tính tay} với hai phân phối Bernoulli \(p=(0{,}5;\,0{,}5)\) và \(q=(0{,}9;\,0{,}1)\):
+\[
+D_{\mathrm{KL}}(p\Vert q) = 0{,}5\ln\tfrac{0{,}5}{0{,}9} + 0{,}5\ln\tfrac{0{,}5}{0{,}1} \approx 0{,}511,\qquad
+D_{\mathrm{KL}}(q\Vert p) = 0{,}9\ln\tfrac{0{,}9}{0{,}5} + 0{,}1\ln\tfrac{0{,}1}{0{,}5} \approx 0{,}368 .
+\]
+Hai con số khác nhau vì hai đại lượng phạt hai kiểu sai lầm khác nhau. Hình~\ref{fig:kl-huong} cho thấy hệ quả rõ hơn mọi lời giải thích: cùng một phân phối thật hai đỉnh, hai hướng KL cho ra hai nghiệm hoàn toàn khác.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.92\linewidth,height=4.6cm,domain=-5:5,samples=200,
+  xlabel={},ylabel={},ymin=0,ymax=0.55,ytick=\empty,tick label style={font=\scriptsize},
+  axis lines=left,legend style={font=\scriptsize,at={(0.5,1.28)},anchor=north,legend columns=3,draw=rulecol}]
+\addplot[inkblue,thick] {0.5*exp(-0.5*((x+2)/0.5)^2)/(0.5*sqrt(2*pi)) + 0.5*exp(-0.5*((x-2)/0.5)^2)/(0.5*sqrt(2*pi))};
+\addlegendentry{\(p\) thật (hai mode)}
+\addplot[steel,dashed,thick] {exp(-0.5*(x/2.06)^2)/(2.06*sqrt(2*pi))};
+\addlegendentry{KL xuôi: phủ hết, trải mỏng}
+\addplot[reddark,dotted,very thick] {exp(-0.5*((x+2)/0.5)^2)/(0.5*sqrt(2*pi))};
+\addlegendentry{KL ngược: bám một mode}
+\end{axis}
+\end{tikzpicture}
+\caption{Hai hướng của KL cho hai hành vi trái ngược khi mô hình quá đơn giản để khớp phân phối thật. KL xuôi \(D_{\mathrm{KL}}(p\Vert q)\) phạt nặng chỗ \(p\) có khối lượng mà \(q\) gần bằng không, nên nghiệm bị ép phủ cả hai mode và đặt khối lượng vào vùng trống ở giữa. KL ngược \(D_{\mathrm{KL}}(q\Vert p)\) phạt chỗ \(q\) đặt khối lượng mà \(p\) không có, nên nghiệm chọn một mode và bỏ mode kia.}
+\label{fig:kl-huong}
+\end{figure}
+
+Sự khác biệt ấy giải thích ba hiện tượng sẽ gặp lại:
+\lk{C}{cùng nguyên lý với}{chiều của KL được tối ưu quyết định mô hình sinh trải mỏng qua mọi mode hay bám lấy một mode --- cùng cơ chế ở VAE, chưng cất và huấn luyện theo độ hợp lý}
+
+
+\begin{itemize}
+\item \textbf{Mô hình sinh huấn luyện theo độ hợp lý sinh ra mẫu mờ.} MLE dùng KL xuôi, nên mô hình buộc phải phủ cả những vùng trống giữa các mode. Mẫu rút từ vùng ấy không giống bất kỳ mẫu thật nào.
+\item \textbf{\en{Posterior collapse} trong VAE} \cite{kingma2014vae} --- số hạng KL ngược tới prior khiến mô hình thà bỏ hẳn vài chiều tiềm ẩn còn hơn trải mỏng.
+\item \textbf{``Dark knowledge'' trong \vn{chưng cất tri thức}{knowledge distillation}} \cite{hinton2015distilling} --- học trò khớp phân phối thầy theo chiều xuôi, nên bị buộc phải phủ cả các đuôi xác suất của những lớp \emph{không phải} đáp án; chính các đuôi đó mang thông tin về quan hệ giữa các lớp.
+\end{itemize}
+
+\subsection{E. Giới hạn và trường hợp hỏng}
+\begin{itemize}
+\item \textbf{Giả định độc lập và cùng phân phối gần như luôn sai trong thị giác.} Các khung hình liên tiếp của một video giống nhau; nhiều ảnh của cùng một bệnh nhân cũng vậy; nhiều mẫu chụp cùng buổi thì cùng ánh sáng. Một tập test 500 ảnh trích từ 20 video có kích thước mẫu \emph{hiệu dụng} gần 20 hơn gần 500. Khoảng tin cậy thật vì thế rộng gấp nhiều lần. Chia tập theo nhóm (theo video, theo người, theo thiết bị) quan trọng hơn mọi tinh chỉnh mô hình.
+\item \textbf{Xác suất mà mạng xuất ra không phải xác suất thật.} Mạng hiện đại có xu hướng quá tự tin: trong nhóm dự đoán độ tin cậy \(0{,}99\), tỉ lệ đúng thực tế thấp hơn đáng kể, và điều này được đo lặp lại nhiều lần \cite{guo2017calibration}. 
+\lk{E}{hệ quả của}{mạng quá tự tin không phải lỗi cài đặt mà là hệ quả của việc tối ưu cross-entropy chứ không tối ưu độ hiệu chuẩn}
+Đừng dùng \en{softmax} làm ngưỡng ra quyết định khi chưa hiệu chuẩn; \code{E} bàn \en{temperature scaling}, \en{ensemble} và \en{conformal prediction} \cite{angelopoulos2023conformal} như các cách vá với chi phí khác nhau.
+\item \textbf{Khung độ hợp lý có giới hạn khái niệm.} Nó tối ưu độ khớp phân phối, còn thứ ta quan tâm thường là một chỉ số nghiệp vụ bất đối xứng --- bỏ sót một người đi bộ tệ hơn nhiều so với một báo động giả. Không prior nào biến MLE thành thứ tối ưu chỉ số đó; phải đặt vào hàm chi phí một cách tường minh, và đó là nội dung của \ptr{B/09}.
+\end{itemize}
+
+\begin{cambay}
+``Cải thiện \(0{,}3\%\) trên tập test'' gần như luôn là nhiễu --- nhưng cách sửa phổ biến, chạy nhiều seed rồi báo trung bình, \emph{vẫn} chưa đủ nếu bạn đã dùng chính tập test đó để chọn siêu tham số. Khi tập test bị nhìn nhiều lần, nó biến thành tập validation và mọi khoảng tin cậy tính trên nó đều quá lạc quan. Đây là dạng rò rỉ tinh vi nhất, vì không có dòng code nào sai cả.
+\end{cambay}
+
+\begin{cannho}
+Trước khi hỏi ``mô hình nào tốt hơn'', hãy tính \(\sqrt{p(1-p)/n}\) --- ba mươi giây, và nó loại bỏ phần lớn tranh luận vô ích. Trước khi chọn loss, hãy hỏi ``tôi đang giả định nhiễu phân phối gì'' --- vì loss sẽ hỏng đúng chỗ giả định đó vỡ. \T{1}
+\end{cannho}
+
+\subsection{F. Kết nối}
+Mục này khép lại phần ``ngôn ngữ chung'' của chương, và là tiền đề của ba nhánh xa nhau. \ptr{B/09} về thiết kế hàm mất mát, nơi ta cố ý lệch khỏi độ hợp lý. \code{C} về mô hình sinh, nơi hướng của KL quyết định hành vi mẫu sinh ra. Và toàn bộ \code{E} về đánh giá và độ tin cậy. Theo chiều đối lập, nó bổ khuyết cho \ptr{A/01/02}: mục kia nói gradient descent đi tới đâu, mục này nói làm sao biết chỗ đó có thật sự tốt hơn hay không.
+
+\begin{tukiem}
+\item Vì sao KL không đối xứng, và điều đó thay đổi hành vi cụ thể nào của một mô hình sinh?
+\item Với 500 mẫu test và độ chính xác \(90\%\), khoảng tin cậy \(95\%\) rộng bao nhiêu? Vì sao con số đó \emph{không} trực tiếp bác bỏ được chênh lệch một điểm giữa hai mô hình đánh giá trên cùng tập test?
+\item Tập test gồm 500 khung hình trích từ 20 video. Kích thước mẫu hiệu dụng gần con số nào hơn, và hệ quả với cách chia dữ liệu là gì?
+\item Vì sao hồi quy độ sâu bằng MSE cho ra biên mờ, và vì sao đổi optimizer không sửa được?
+\item Loss ban đầu của bài 1000 lớp phải xấp xỉ bao nhiêu, và nếu nó bằng 2 thì bạn nghi ngờ điều gì?
+\item Focal loss và label smoothing không phải âm log độ hợp lý của mô hình nào. Điều đó gây hệ quả gì cho việc đọc đầu ra softmax?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

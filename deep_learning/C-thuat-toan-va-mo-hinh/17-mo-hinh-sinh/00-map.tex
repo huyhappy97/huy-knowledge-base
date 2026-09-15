@@ -1,0 +1,41 @@
+% ---------------------------------------------------------------------------
+%  Bản đồ chương 17 — Mô hình sinh, style transfer và low-level vision
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ chương 17 --- Mô hình sinh, style transfer và low-level vision}
+
+\begin{tomtat}
+Chương 17 gồm bốn mục, xếp theo thứ tự phụ thuộc chứ không theo mức độ phổ biến: khung bốn họ mô hình sinh, ý tưởng tối ưu trên pixel, diffusion, rồi khôi phục ảnh. Bản đồ này nói mục nào cốt lõi, mục nào tra khi cần, và trình tự đọc tuỳ mục tiêu của bạn. Nếu chỉ nhớ một điều: đọc mục 17.1 trước --- nó cho phép \emph{suy ra} kiểu thất bại của một mô hình từ hàm mất mát, và ba mục còn lại đều dùng lại khả năng đó.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mô hình sinh (generative model)}{mô hình học phân phối dữ liệu để lấy mẫu ra dữ liệu mới, khác với mô hình dự đoán nhãn.}
+\kn{diffusion}{họ mô hình sinh bằng cách học khử nhiễu dần, từ nhiễu trắng về ảnh; hiện là họ thống trị.}
+\kn{style transfer}{giữ nội dung của ảnh này, khoác ``chất'' của ảnh kia.}
+\kn{low-level vision}{nhóm bài toán ảnh sang ảnh: khử nhiễu, siêu phân giải, khử nhoè, HDR.}
+\end{nentang}
+
+\subsection*{Bốn mục và vai trò của từng mục}
+\begin{itemize}
+\item \textbf{17.1 --- Bốn họ và cuộc đánh đổi ba chiều} \emph{(cốt lõi).} Autoregressive, VAE, GAN, diffusion là bốn định nghĩa của ``giống dữ liệu thật''. Đây là khung để suy ra kiểu thất bại, và là mục đắt giá nhất của cả chương.
+\item \textbf{17.2 --- Tối ưu trên pixel thay vì trên trọng số} \emph{(cốt lõi về ý tưởng, tham khảo về chi tiết style transfer).} Một vòng lặp mười dòng cho ra năm kỹ thuật; ma trận Gram; mẫu hình dời chi phí sang lúc huấn luyện.
+\item \textbf{17.3 --- Diffusion và các bước làm cho nó khả thi} \emph{(cốt lõi).} Quá trình thuận/ngược, score function, bộ lấy mẫu, dẫn hướng, khuếch tán trong không gian ẩn, ControlNet.
+\item \textbf{17.4 --- Low-level vision và trade-off không thể tránh} \emph{(cốt lõi với người làm hệ thống thật).} Ill-posed, đánh đổi perceptual--distortion, các chỉ số và chỗ mù của từng cái, dữ liệu sinh dùng để huấn luyện.
+\end{itemize}
+
+\subsection*{Trình tự đọc}
+\begin{enumerate}
+\item \textbf{Mục tiêu là hiểu nguyên lý:} 17.1 \ra 17.3 \ra 17.4, bỏ qua 17.2 ở lần đọc đầu.
+\item \textbf{Mục tiêu là dùng được công cụ sinh ảnh:} 17.1 (chỉ phần bảng và tam giác) \ra 17.3 toàn bộ \ra 17.4 phần đánh giá.
+\item \textbf{Mục tiêu là làm hệ thống thật có khôi phục ảnh:} 17.4 trước, rồi quay lên 17.1 để hiểu vì sao ``mờ'' là nghiệm đúng.
+\item Khối \emph{Thực hành} nằm ở file chương, sau bốn mục.
+\end{enumerate}
+
+\subsection*{Chương này phụ thuộc gì và được dùng lại ở đâu}
+\begin{itemize}
+\item \textbf{Phụ thuộc lên trên:} \ptr{B/09-thiet-ke-ham-mat-mat} (hai hướng của KL --- điều kiện tiên quyết thật sự); \ptr{C/12-co-che-huan-luyen}; \ptr{C/13-kien-truc-backbone} (U-Net, transformer); \ptr{A/02-vat-ly-tao-anh} (nhiễu thật); \ptr{C/16-thi-giac-3d} (vai trò của prior trong bài toán thiếu ràng buộc).
+\item \textbf{Được dùng lại ở dưới:} \ptr{D/20-toi-uu-va-nen-mo-hinh} (dời chi phí sang lúc huấn luyện, chưng cất); \ptr{C/18-pretraining-va-foundation} (nguồn giám sát và dữ liệu sinh); \ptr{E/25-do-tin-cay-va-van-hanh} (hỏng im lặng, trực quan hoá và các phép kiểm tra tính đúng đắn).
+\end{itemize}
+\end{document}

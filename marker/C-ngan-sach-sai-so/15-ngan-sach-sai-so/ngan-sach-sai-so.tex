@@ -1,0 +1,438 @@
+% ---------------------------------------------------------------------------
+% Chương 15 — Ngân sách sai số
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-13  |  Ôn gần nhất: —
+% Phụ thuộc: A/05 (bốn quan hệ tỉ lệ + quy tắc cộng), và mọi chương Phần B
+%            (mỗi chương cấp một dòng của bảng)
+% Mức độ: XƯƠNG SỐNG — chương hội tụ của cả cây. Đây là chương nên đọc SỚM,
+%         lý tưởng nhất là ngay sau A/05.
+% Kiểm chứng công thức lõi:
+%   (1) Bốn quan hệ tỉ lệ — kế thừa A/05, đã qua cửa (a) và (b) ở đó.
+%   (2) Quy tắc cộng: ngẫu nhiên theo bình phương, hệ thống cộng thẳng
+%       — cửa (c) jcgm2008gum (chuẩn quốc tế GUM); cửa (a) tự dẫn.
+%   (3) Ví dụ số đầy đủ ở mục 4 — cửa (b) mọi phép tính làm được bằng tay,
+%       và tôi đã kiểm chéo tổng bằng hai cách (bình phương và cộng thẳng).
+%   (4) Sáu kết luận thiết kế ở mục 7 — cửa (a) suy ra từ bảng; đây là
+%       DIỄN GIẢI của tôi về bảng, không phải kết quả đo.
+% Ghi chú trung thực: TOÀN BỘ các con số trong bảng ngân sách là VÍ DỤ SỐ HỌC
+%   tự đặt có dẫn "giả sử", KHÔNG phải số đo của một hệ thống nào. Mục đích của
+%   chúng là cho thấy BẬC ĐỘ LỚN và tỉ lệ tương đối giữa các dòng, không phải
+%   để chép vào báo cáo. Cảnh báo này lặp lại trong thân bài ở mục 4 và mục 8.
+% ---------------------------------------------------------------------------
+\documentclass[../../marker.tex]{subfiles}
+\begin{document}
+\chapter{Ngân sách sai số (The Error Budget)}
+\ptrtarget{C/15}\ptrtarget{C/15-ngan-sach-sai-so}
+\dependency{\ptr{A/05-lan-truyen-sai-so-pixel-sang-pose} (bốn quan hệ tỉ lệ và quy tắc cộng ở mục~8 --- toàn bộ chương này là việc gắn số vào chúng); và mọi chương của Phần~B, vì mỗi chương ở đó cấp một dòng của bảng. Nếu chỉ đọc được hai chương trong cả cây thì hãy đọc \ptr{A/05} và chương này.}
+
+\begin{tomtat}
+Đây là chương hội tụ của cả cây: nó lấy bốn quan hệ tỉ lệ từ \ptr{A/05}, gắn số thật của một cấu hình cụ thể, cộng thêm mọi dòng mà Phần~B đã nhận diện, và cho ra một bảng nói từng khâu ăn bao nhiêu milimét. Bảng ấy trả lời câu hỏi mà không phân tích định tính nào trả lời được: \emph{cấu hình này có đạt 5\,mm / \(0{,}5^\circ\) không, và nếu không thì phải sửa cái gì?} Hai kết quả chính của phép tính. Thứ nhất, \emph{tịnh tiến dư dả còn xoay là nút thắt} --- và nút thắt ấy được chữa bằng hình học chứ không bằng thuật toán. Thứ hai, và nó bất ngờ hơn: trong chế độ đo tuyệt đối, \emph{các dòng hệ thống chiếm phần lớn ngân sách}, nên phần lớn công sức tối ưu \(\sigma\) là công sức tiêu vào chỗ đã dư. Nếu chỉ nhớ một điều: \emph{lập bảng này trước khi viết dòng code nào và trước khi đặt gia công bất cứ thứ gì} --- một buổi chiều ở đây tiết kiệm vài tuần và vài triệu tiền gia công sai.
+\end{tomtat}
+
+\begin{nentang}
+\kn{ngân sách sai số (error budget)}{bảng liệt kê mọi nguồn sai số của một hệ đo, đóng góp của từng nguồn quy về cùng đơn vị, và tổng hợp của chúng theo quy tắc cộng đúng. Đây là công cụ chuẩn của ngành đo lường và có hướng dẫn quốc tế cho nó \cite{jcgm2008gum}.}
+\kn{dòng ngẫu nhiên}{nguồn sai số đổi giữa các lần đo, trung bình không. Cộng theo bình phương; chia được cho \(\sqrt{N}\) khi lấy trung bình.}
+\kn{dòng hệ thống}{nguồn không đổi hoặc đổi chậm, có dấu xác định. Cộng thẳng trong trường hợp xấu nhất; \emph{không} chia cho \(\sqrt{N}\); triệt tiêu được bằng teach-by-showing nếu nó không phụ thuộc tư thế.}
+\kn{dòng hệ thống phụ thuộc tư thế}{loại khó chịu nhất: nó không chia cho \(\sqrt{N}\) \emph{và} nó không triệt tiêu hoàn toàn trong teach-by-showing. Bias tâm ellipse và thiên lệch do loá thuộc loại này.}
+\kn{chế độ đo tuyệt đối}{hệ điều khiển tới một toạ độ tính toán. Mọi dòng của bảng đều tính.}
+\kn{chế độ teach-by-showing}{hệ điều khiển để tái tạo một trạng thái đã ghi. Các dòng hệ thống không phụ thuộc tư thế bị loại khỏi bảng.}
+\kn{lỗi thô (gross error)}{không phải một dòng của ngân sách mà là một sự kiện phá hỏng toàn bộ ngân sách --- chọn nhầm nghiệm ambiguity, giải mã sai hướng. Phải xử lý riêng, không cộng vào.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Bạn có 5\,mm ngân sách. Nếu một dòng đóng góp 3\,mm và một dòng khác đóng góp 1\,mm, thì tổng của hai dòng ấy là bao nhiêu --- và câu trả lời phụ thuộc vào điều gì?}
+\h{Sau khi lập bảng, bạn thấy dòng lớn nhất chiếm 70\% ngân sách còn dòng nhỏ nhất chiếm 2\%. Vì sao việc cải thiện dòng nhỏ nhất bốn lần gần như không đổi gì, và con số cụ thể là bao nhiêu?}
+\h{Bảng ngân sách cho chế độ đo tuyệt đối và bảng cho chế độ teach-by-showing khác nhau ở những dòng nào? Ước lượng tỉ số giữa hai tổng.}
+\h{Pose ambiguity không xuất hiện như một dòng trong bảng dù nó là nguồn lỗi xoay lớn nhất. Vì sao, và nó được xử lý ở đâu?}
+\h{Bạn tính ra tổng là 4,2\,mm cho ngân sách 5\,mm. Nêu ba lý do vì sao con số ấy \emph{không} cho phép bạn kết luận rằng hệ sẽ đạt.}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{C/15/01}
+
+Mười bốn chương trước đã nhận diện các nguồn sai số và bàn cách giảm từng nguồn. Chương này làm một việc khác và nó là việc quyết định: \emph{đặt tất cả chúng lên cùng một thước đo}.
+
+Lý do cần làm việc ấy đã nêu ở \ptr{00-map} nhưng đáng lặp lại vì nó là toàn bộ lý do chương này tồn tại. Trong Phần~B, mỗi chương nói về một kỹ thuật và tự nhiên nghe như thể kỹ thuật ấy đáng làm --- mọi chương đều mô tả một cải thiện thật. Chỉ khi tất cả cùng quy về milimét thì mới lộ ra rằng một số kỹ thuật đóng góp hai chữ số phần trăm ngân sách còn một số khác đóng góp phần nghìn, và rằng thứ tự ấy \emph{không trùng} với thứ tự mức độ thú vị về mặt kỹ thuật.
+
+Đây là chức năng quan trọng nhất của một ngân sách sai số, và nó là một chức năng về tổ chức công việc chứ không về kỹ thuật: \emph{nó là công cụ chống lại xu hướng tự nhiên là làm việc thú vị thay vì việc có tác dụng}.
+
+Bài toán này không mới và nó có chuẩn quốc tế. Hướng dẫn GUM \cite{jcgm2008gum} hình thức hoá quy trình: liệt kê nguồn, ước lượng đóng góp của từng nguồn, phân loại chúng, và tổng hợp theo quy tắc đúng. Ngành đo lường làm việc này từ lâu trước khi có robot, và phần lớn cái khó không nằm ở toán mà nằm ở hai chỗ khác: \emph{không bỏ sót nguồn nào}, và \emph{phân loại đúng}.
+
+Có một lý do thứ hai để chương này đứng riêng thành một phần, và nó thuộc về kinh tế của dự án. Mọi chương khác mô tả những việc tốn \emph{thời gian}: đọc, cài, thử, chỉnh. Chương này mô tả những quyết định tốn \emph{tiền} và không đảo ngược được: kích thước tấm marker, khoảng cách giữa các tag, có nghiêng hay không, chọn tiêu cự nào, có làm côn dẫn hướng hay không. Một sai lầm trong nhóm thứ hai không sửa được bằng cách làm việc chăm chỉ hơn ở nhóm thứ nhất.
+
+Hệ quả về thứ tự đọc: tôi khuyên đọc chương này \emph{sớm}, lý tưởng nhất là ngay sau \ptr{A/05}, trước cả Phần~B. Bạn sẽ không hiểu hết mọi dòng --- nhiều dòng trỏ sang các chương chưa đọc --- nhưng bạn sẽ biết dòng nào lớn, và biết điều đó trước khi tiêu thời gian là khác biệt lớn nhất mà cây này có thể tạo ra.
+
+\begin{trucgiac}
+Hình dung ngân sách sai số như một bảng chi tiêu.
+
+Bạn có năm triệu để tiêu và một danh sách các khoản. Việc đầu tiên không phải là tiết kiệm từng khoản mà là \emph{xem khoản nào lớn}. Nếu tiền thuê nhà chiếm ba triệu rưỡi thì việc mặc cả từng nghìn tiền cà phê là vô nghĩa --- không phải vì cà phê không đáng tiết kiệm mà vì nó không đổi được kết quả.
+
+Có một chi tiết làm bảng này khác bảng chi tiêu thường, và nó quan trọng. Các khoản không cộng như nhau. Những khoản \emph{ngẫu nhiên} --- lúc nhiều lúc ít, trung bình thì đúng --- cộng theo một quy tắc đặc biệt: nếu có một khoản ba triệu và một khoản một triệu thì tổng không phải bốn mà là căn của chín cộng một, tức khoảng ba phẩy hai. Khoản nhỏ gần như biến mất.
+
+Những khoản \emph{cố định} thì cộng thẳng như bình thường: ba cộng một là bốn.
+
+Sự khác biệt ấy có một hệ quả thực dụng rất mạnh. Với các khoản ngẫu nhiên, chỉ khoản lớn nhất mới đáng quan tâm --- mọi khoản nhỏ hơn một phần ba nó đóng góp dưới năm phần trăm. Với các khoản cố định thì mọi khoản đều đáng quan tâm như nhau, vì chúng cộng đầy đủ.
+
+Và bây giờ là điều bất ngờ mà bảng sẽ cho thấy: trong bài toán này, các khoản \emph{cố định} thường lớn hơn các khoản ngẫu nhiên. Tức là phần lớn tiền của bạn đi vào những chỗ mà không phép trung bình nào chạm tới --- tấm marker hơi lệch so với bản vẽ, camera gắn hơi nghiêng, ống kính hơi khác mô hình.
+
+Và điều bất ngờ thứ hai: có một mẹo xoá gần hết các khoản cố định cùng một lúc, và nó không phải một khoản chi mà là một cách đặt lại câu hỏi.
+\end{trucgiac}
+
+\section{Cấu trúc của bảng}
+\ptrtarget{C/15/02}
+
+Ba việc phải làm đúng, và hai việc sau khó hơn việc đầu.
+
+\subsection{A. Liệt kê đủ nguồn}
+
+Không bỏ sót là yêu cầu khó nhất. Danh sách dưới đây là danh sách của cây này, nhóm theo chương cấp ra nó.
+
+\begin{itemize}
+\item \emph{Nhiễu định vị góc} --- \ptr{B/08}. Ngẫu nhiên.
+\item \emph{Méo còn sót sau khi khử} --- \ptr{A/01} mục~6. Hệ thống, phụ thuộc vị trí trên ảnh.
+\item \emph{Sai số intrinsic} (chủ yếu điểm chính) --- \ptr{A/01} mục~5, \ptr{B/12} mục~3. Hệ thống.
+\item \emph{Sai số constellation so với mô hình} --- \ptr{B/09} mục~5. Hệ thống.
+\item \emph{Sai số hand-eye} --- \ptr{B/12} mục~5. Hệ thống.
+\item \emph{Sai số khâu \(T^{\text{tag}}_{\text{dock}}\)} --- \ptr{B/12} mục~4. Hệ thống.
+\item \emph{Bias tâm ellipse} (nếu dùng marker tròn) --- \ptr{A/02} mục~6. Hệ thống \emph{phụ thuộc tư thế}.
+\item \emph{Rolling shutter} --- \ptr{A/06} mục~2. Hệ thống, tỉ lệ vận tốc.
+\item \emph{Motion blur} --- \ptr{A/06} mục~3. Hệ thống, tỉ lệ vận tốc.
+\item \emph{Thiên lệch do loá} --- \ptr{B/14} mục~3. Hệ thống \emph{phụ thuộc tư thế}.
+\item \emph{Sai số bám của bộ điều khiển} --- \ptr{B/13}. Ngẫu nhiên hoặc hệ thống tuỳ bộ điều khiển.
+\item \emph{Dung sai cơ khí của cơ cấu cập} --- \ptr{B/13} mục~7. Hệ thống.
+\end{itemize}
+
+Mười hai dòng. Một hệ thống thực tế có thể có thêm --- rung, trôi nhiệt, độ lún của sàn --- và việc bổ sung là việc của bạn.
+
+\subsection{B. Quy về cùng đơn vị}
+
+Mỗi nguồn phải được quy thành \emph{sai lệch tại điểm cập, tính bằng milimét và độ}. Đây là chỗ bốn quan hệ của \ptr{A/05} được dùng.
+
+Nhiễu góc \(\sigma\) quy thành \(\delta x = Z\sigma/f\) và \(\delta\theta = Z\sigma/(fB)\). Méo còn sót \(e_d\) pixel quy tương tự: \(Z e_d/f\). Sai số constellation \(e_c\) milimét quy thành sai số góc \(\approx e_c/B\) radian. Sai số hand-eye vào thẳng vì nó đã là milimét và độ.
+
+Chú ý một chi tiết dễ sai: \emph{phải quy tại đúng điểm cập}, không phải tại tâm camera. Một sai số góc \(\delta\theta\) tại camera trở thành một sai lệch vị trí \(L\,\delta\theta\) tại một điểm cách camera \(L\) --- và với \(L\) cỡ nửa mét, \(0{,}5^\circ\) trở thành 4,4\,mm. Đây là lý do ngân sách góc và ngân sách vị trí không độc lập, và mục~5 bàn kỹ.
+
+\subsection{C. Phân loại đúng}
+
+Ba loại, và phân loại sai làm tổng sai theo hướng nguy hiểm.
+
+\emph{Ngẫu nhiên:} cộng bình phương, chia \(\sqrt{N}\).
+
+\emph{Hệ thống không phụ thuộc tư thế:} cộng thẳng, không chia \(\sqrt{N}\), \emph{triệt tiêu} trong teach-by-showing.
+
+\emph{Hệ thống phụ thuộc tư thế:} cộng thẳng, không chia \(\sqrt{N}\), \emph{không triệt tiêu hoàn toàn}. Đây là loại tệ nhất và nó cần một cột riêng trong bảng.
+
+Cách kiểm phân loại: với mỗi dòng, hỏi hai câu. \emph{Lấy trung bình 100 khung thì nó giảm không?} Nếu có thì ngẫu nhiên. \emph{Nó có giống nhau ở tư thế dạy và tư thế hiện tại không?} Nếu có thì nó triệt tiêu được.
+
+\section{Bảng ngân sách: ví dụ số đầy đủ}
+\ptrtarget{C/15/03}
+
+Đây là phần cốt lõi của chương. Cấu hình giả định --- tiếp nối ví dụ chuẩn của cây từ \ptr{A/05} mục~4 và bản thiết kế mẫu ở \ptr{B/09} mục~8:
+
+\[
+f = 600\text{ px}, \quad Z = 0{,}5\text{ m}, \quad W = 75\text{ mm}, \quad B = 0{,}22\text{ m}, \quad \sigma = 0{,}2\text{ px}, \quad L = 0{,}5\text{ m},
+\]
+với \(L\) là khoảng cách từ camera tới điểm cập. Kích thước tag trên ảnh: \(w = fW/Z = 600 \times 0{,}075/0{,}5 = 90\) px.
+
+\begin{table}[H]\centering\small
+\caption{Bảng ngân sách sai số --- \textbf{ví dụ số học, không phải số đo}. Cột ``tại điểm cập'' quy mọi thứ về milimét tại điểm cập, gồm cả đóng góp của sai số góc qua cánh tay đòn \(L\).}
+\label{tab:c15-bang}
+\begin{tabularx}{\linewidth}{@{}L{3.5cm}L{1.5cm}L{1.4cm}L{1.5cm}Y@{}}
+\toprule
+\textbf{Nguồn} & \textbf{Loại} & \textbf{Giá trị gốc} & \textbf{Tại điểm cập} & \textbf{Cách tính}\\
+\midrule
+Nhiễu góc \(\rightarrow\) vị trí & Ngẫu nhiên & 0,2 px & 0,17 mm & \(Z\sigma/f\)\\
+Nhiễu góc \(\rightarrow\) chiều sâu & Ngẫu nhiên & 0,2 px & 1,11 mm & \(Z\sigma/w\)\\
+Nhiễu góc \(\rightarrow\) xoay & Ngẫu nhiên & 0,2 px & 0,38 mm & \(L\cdot Z\sigma/(fB)\)\\
+\midrule
+Méo còn sót & Hệ thống & 0,3 px & 0,25 mm & \(Z e_d/f\)\\
+Điểm chính sai & Hệ thống & 3 px & 2,50 mm & \(L\cdot e_c/f\)\\
+Constellation sai & Hệ thống & 0,3 mm & 0,68 mm & \(L\cdot e/B\)\\
+Hand-eye & Hệ thống & 1,0 mm & 1,00 mm & vào thẳng\\
+\(T^{\text{tag}}_{\text{dock}}\) & Hệ thống & 0,5 mm & 0,50 mm & vào thẳng\\
+\midrule
+Loá (phụ thuộc tư thế) & HT-tư thế & 0,4 px & 0,33 mm & \(Z e/f\)\\
+\midrule
+Bám của bộ điều khiển & Ngẫu nhiên & --- & 1,00 mm & đo được\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{A. Tổng hợp}
+
+\emph{Nhóm ngẫu nhiên}, cộng bình phương:
+\[
+\sqrt{0{,}17^2 + 1{,}11^2 + 0{,}38^2 + 1{,}00^2} = \sqrt{0{,}029 + 1{,}232 + 0{,}144 + 1{,}000} = \sqrt{2{,}405} = \mathbf{1{,}55\text{ mm}}.
+\]
+
+\emph{Nhóm hệ thống}, cộng thẳng:
+\[
+0{,}25 + 2{,}50 + 0{,}68 + 1{,}00 + 0{,}50 = \mathbf{4{,}93\text{ mm}}.
+\]
+
+\emph{Nhóm hệ thống phụ thuộc tư thế:} \(0{,}33\) mm.
+
+\emph{Tổng trong chế độ đo tuyệt đối}, cộng thẳng ba nhóm (thận trọng):
+\[
+1{,}55 + 4{,}93 + 0{,}33 = \mathbf{6{,}81\text{ mm}}.
+\]
+
+\textbf{Không đạt} ngân sách 5\,mm.
+
+\subsection{B. Đọc bảng}
+
+Ba điều lộ ra ngay, và cả ba đều quan trọng hơn con số tổng.
+
+\emph{Một, nhóm hệ thống chiếm 72\% tổng} (4,93 trên 6,81). Đây là kết quả bất ngờ nhất của chương với người đã dành thời gian tối ưu detector: \emph{phần lớn ngân sách nằm ở những dòng mà không thuật toán xử lý ảnh nào chạm tới}.
+
+\emph{Hai, dòng lớn nhất là điểm chính sai} --- 2,50\,mm, tức 37\% tổng và một nửa nhóm hệ thống. Con số 3\,px cho sai số điểm chính là hoàn toàn hợp lý với một bộ ảnh hiệu chuẩn không có tư thế nghiêng mạnh (\ptr{B/12} mục~3A). Đây là chỗ mà một buổi chụp lại ảnh hiệu chuẩn cho ra nhiều milimét hơn bất kỳ thay đổi phần mềm nào.
+
+\emph{Ba, trong nhóm ngẫu nhiên, dòng lớn nhất là chiều sâu} (1,11\,mm) và dòng nhỏ nhất là vị trí ngang (0,17\,mm). Cải thiện dòng nhỏ nhất bốn lần --- từ 0,17 xuống 0,04 --- làm tổng nhóm ngẫu nhiên đổi từ 1,55 thành 1,54. Đây là câu trả lời cho Q2 dưới dạng số cụ thể: \emph{gần như không đổi gì}.
+
+\begin{cambay}
+\textbf{Mọi con số trong bảng~\ref{tab:c15-bang} là ví dụ số học tự đặt, không phải số đo của một hệ thống nào.}
+
+Chúng được chọn để có bậc độ lớn hợp lý và để minh hoạ cấu trúc của bài toán. Chúng \emph{không} dùng được để:
+
+Báo cáo về hệ của bạn. Kết luận rằng một cấu hình cụ thể đạt hay không đạt. Hoặc so sánh với số đo của người khác.
+
+Chúng \emph{dùng được} để: thấy bậc độ lớn tương đối giữa các dòng; thấy cấu trúc của phép tính; và làm mẫu để bạn điền số của chính mình vào.
+
+Bốn con số bạn phải tự đo trước khi bảng có nghĩa: \(\sigma\) (\ptr{B/07} mini project), sai số điểm chính (\ptr{B/12} mini project), sai số constellation (\ptr{B/09} mini project), và sai số bám của bộ điều khiển. Bốn phép đo ấy tốn vài ngày, và không có chúng thì bảng chỉ là một bài tập.
+\end{cambay}
+
+\section{Cánh tay đòn: vì sao góc và vị trí không độc lập}
+\ptrtarget{C/15/04}
+
+Chi tiết quan trọng mà bảng~\ref{tab:c15-bang} đã dùng nhưng chưa giải thích.
+
+Ngân sách được phát biểu là ``5\,mm và \(0{,}5^\circ\)'' như thể hai đại lượng độc lập. Chúng không độc lập, vì một sai số góc tại camera trở thành một sai lệch vị trí tại điểm cập:
+\[
+\delta x_{\text{tại điểm cập}} = L \cdot \delta\theta,
+\]
+với \(L\) là khoảng cách từ tâm quay tới điểm cập.
+
+Với \(L = 0{,}5\) m và \(\delta\theta = 0{,}5^\circ = 8{,}73\times10^{-3}\) rad:
+\[
+\delta x = 0{,}5 \times 8{,}73\times10^{-3} = 4{,}4\text{ mm}.
+\]
+Nghĩa là \emph{toàn bộ ngân sách góc, nếu tiêu hết, đã gần bằng toàn bộ ngân sách vị trí}. Hai ngân sách không cộng độc lập được.
+
+Hai hệ quả thực hành.
+
+\emph{Một, cách phát biểu ngân sách đúng} là phát biểu nó tại điểm cập bằng một đại lượng duy nhất --- sai lệch của điểm cập, tính bằng milimét --- rồi \emph{suy ra} ngân sách góc từ đó nếu cần. Bảng~\ref{tab:c15-bang} làm đúng như vậy: cột cuối quy mọi thứ về milimét tại điểm cập.
+
+\emph{Hai, giảm \(L\) là một đòn bẩy.} Nếu camera được gắn \emph{gần} điểm cập thay vì ở phía sau robot, thì cánh tay đòn ngắn lại và sai số góc ít quan trọng hơn. Đây là một quyết định cơ khí có giá trị thật và nó thường bị bỏ qua --- camera hay được gắn ở chỗ tiện lắp chứ không ở chỗ tối ưu về ngân sách.
+
+Trường hợp đặc biệt đáng nêu: nếu cơ cấu cập có \emph{hai} điểm tiếp xúc cách nhau một khoảng \(d\), thì yêu cầu góc chặt hơn yêu cầu vị trí theo tỉ lệ \(1/d\) --- vì một sai lệch góc làm hai điểm lệch ngược chiều nhau. Khi ấy ngân sách góc mới là ngân sách chặt thật sự, và đây là tình huống phổ biến với đầu cắm sạc có hai chấu.
+
+\section{Hai chế độ, hai bảng}
+\ptrtarget{C/15/05}
+
+Mục này trả lời Q3, và nó là mục có giá trị thực dụng cao nhất sau bảng.
+
+\ptr{B/13} mục~3 chỉ ra rằng teach-by-showing triệt tiêu các dòng hệ thống \emph{không phụ thuộc tư thế}. Áp vào bảng~\ref{tab:c15-bang}:
+
+\emph{Bị loại:} méo còn sót (0,25), điểm chính (2,50), constellation (0,68), hand-eye (1,00), \(T^{\text{tag}}_{\text{dock}}\) (0,50). Tổng bị loại: 4,93\,mm.
+
+\emph{Còn lại:} toàn bộ nhóm ngẫu nhiên (1,55\,mm) và dòng phụ thuộc tư thế (0,33\,mm).
+
+\emph{Tổng trong chế độ teach-by-showing:}
+\[
+1{,}55 + 0{,}33 = \mathbf{1{,}88\text{ mm}}.
+\]
+
+\textbf{Đạt}, và đạt với biên độ lớn.
+
+Tỉ số giữa hai chế độ: \(6{,}81/1{,}88 = 3{,}6\) lần. Đây là câu trả lời định lượng cho Q3, và nó là con số biện minh cho việc \ptr{00-map} gọi teach-by-showing là ``mẹo lớn nhất'' --- một hệ số 3,6 không đạt được bằng bất kỳ cải thiện thuật toán nào trong cả cây.
+
+Thêm một bước nữa: nếu áp dụng stop-and-go với \(N = 30\) khung (\ptr{B/13} mục~4), nhóm ngẫu nhiên chia cho \(\sqrt{30} = 5{,}5\) --- \emph{trừ} dòng bám của bộ điều khiển, vốn không phải nhiễu đo. Ba dòng nhiễu góc cộng lại là \(\sqrt{0{,}17^2+1{,}11^2+0{,}38^2} = 1{,}18\) mm, chia 5,5 còn 0,21\,mm. Tổng mới:
+\[
+\sqrt{0{,}21^2 + 1{,}00^2} + 0{,}33 = 1{,}02 + 0{,}33 = \mathbf{1{,}35\text{ mm}}.
+\]
+Và bây giờ dòng lớn nhất là \emph{bám của bộ điều khiển} --- một dòng mà cả cây này gần như không bàn tới. Đó là một kết quả đáng ghi nhận: sau khi áp dụng đủ các kỹ thuật, nút thắt chuyển sang một lĩnh vực khác.
+
+\begin{cannho}
+Ba con số của cùng một cấu hình, khác nhau chỉ ở \emph{chiến lược}:
+
+\emph{Đo tuyệt đối:} 6,81\,mm --- không đạt.
+
+\emph{Teach-by-showing:} 1,88\,mm --- đạt.
+
+\emph{Teach-by-showing + stop-and-go:} 1,35\,mm --- đạt thoải mái, và nút thắt đã chuyển sang bộ điều khiển.
+
+Không có dòng code xử lý ảnh nào khác nhau giữa ba trường hợp. Khác biệt hoàn toàn nằm ở \emph{kiến trúc} --- cách đặt bài toán và cách vận hành.
+
+Đây là luận điểm trung tâm của cây, dưới dạng ba con số.
+\end{cannho}
+
+\section{Ambiguity và lỗi thô: vì sao chúng không nằm trong bảng}
+\ptrtarget{C/15/06}
+
+Mục này trả lời Q4, và nó là một điểm phương pháp luận quan trọng.
+
+Pose ambiguity (\ptr{A/04}) là nguồn lỗi xoay lớn nhất trong thực tế --- hai nghiệm cách nhau \(2\alpha\), có thể hàng chục độ. Vậy vì sao nó không có dòng trong bảng~\ref{tab:c15-bang}?
+
+Vì nó không phải một \emph{sai số} mà là một \emph{lỗi thô}. Sự khác biệt không phải về độ lớn mà về bản chất:
+
+Một sai số là một độ lệch nhỏ quanh giá trị đúng, và nó cộng được với các sai số khác theo quy tắc ở mục~2C. Một lỗi thô là việc bạn đang ở một giá trị \emph{hoàn toàn khác} --- và khi nó xảy ra, mọi con số trong bảng trở nên vô nghĩa, vì bảng giả định bạn đang ở gần nghiệm đúng.
+
+Nói bằng hình ảnh: ngân sách sai số mô tả độ chính xác của một phép đo; lỗi thô là việc đo nhầm vật.
+
+Hệ quả về cách xử lý: lỗi thô phải được đưa về \emph{xác suất bằng không (hoặc gần không)} bằng một cơ chế riêng, chứ không được cộng vào bảng. \ptr{B/09} mục~4 (phá đồng phẳng) và \ptr{B/10} (đo \(\rho\) và từ chối) là hai cơ chế ấy. Chỉ sau khi chúng đã hoạt động thì bảng mới có nghĩa.
+
+Cùng loại với ambiguity: giải mã sai hướng (\ptr{B/07} mục~6), tag lắp sai vị trí, và báo sai. Cả bốn đều là lỗi thô và cả bốn đều cần cơ chế phát hiện riêng.
+
+Cách trình bày đúng trong một báo cáo: \emph{ngân sách sai số, kèm một danh sách các lỗi thô đã được loại trừ và cơ chế loại trừ chúng}. Trình bày một ngân sách mà không nói về lỗi thô là trình bày một nửa sự thật, và nó là nửa dễ chịu hơn.
+
+\section{Sáu kết luận thiết kế}
+\ptrtarget{C/15/07}
+
+Đọc bảng cho ra sáu kết luận, và chúng là sản phẩm cuối cùng của chương.
+
+\emph{Một, tịnh tiến dư dả, xoay là nút thắt.} Trong bảng, ba dòng nhiễu góc quy về vị trí cộng lại chỉ 1,18\,mm, trong khi các dòng liên quan tới góc --- điểm chính, constellation, hand-eye --- chiếm phần lớn. Và cách chữa chúng là hình học và hiệu chuẩn, không phải thuật toán.
+
+\emph{Hai, baseline và tính không đồng phẳng mua được nhiều hơn detector.} Dòng ``constellation sai'' quy về sai số góc qua \(e/B\), nên tăng \(B\) giảm nó tuyến tính --- \emph{và} đồng thời giảm dòng ``nhiễu góc \(\rightarrow\) xoay''. Một thay đổi cơ khí, hai dòng cải thiện.
+
+\emph{Ba, cơ khí tấm marker là sàn sai số, và BA là cách hạ sàn.} Với constellation lấy từ CAD (\(e \approx 1{,}5\) mm thay vì 0,3), dòng ấy thành \(0{,}5 \times 1{,}5/220 \times 1000 = 3{,}4\) mm --- lớn hơn cả điểm chính, và đủ để một mình phá ngân sách.
+
+\emph{Bốn, teach-by-showing là quyết định có đòn bẩy lớn nhất.} Hệ số 3,6 ở mục~5, không dòng code xử lý ảnh nào.
+
+\emph{Năm, stop-and-go là cách rẻ nhất để hạ nhóm ngẫu nhiên.} Nó cũng xoá hai dòng mà bảng ví dụ này không có vì đã giả định robot đứng yên --- rolling shutter và blur. Nếu bạn đo khi di chuyển, hai dòng ấy xuất hiện và chúng có thể lớn.
+
+\emph{Sáu, côn dẫn hướng cơ khí đổi bản chất bài toán.} Nó không giảm một dòng nào; nó \emph{nới ngưỡng}. Với côn 15\,mm, cả ba con số ở mục~5 đều đạt thoải mái, kể cả chế độ đo tuyệt đối. Nhưng như \ptr{B/13} mục~7 cảnh báo, nó nới dòng \emph{vị trí} tốt hơn nới dòng \emph{góc}.
+
+\section{Giới hạn và chế độ hỏng}
+\ptrtarget{C/15/08}
+
+Mục này trả lời Q5, và nó là mục bắt buộc phải đọc trước khi dùng bảng để ra quyết định.
+
+\textbf{Ba lý do một tổng dưới ngưỡng không đảm bảo hệ sẽ đạt.}
+
+\emph{Lý do một: bạn có thể đã bỏ sót một nguồn.} Mười hai dòng ở mục~2A là danh sách của tôi, không phải danh sách đầy đủ của vũ trụ. Rung, trôi nhiệt, độ lún của sàn, biến dạng của khung robot khi mang tải --- mỗi hệ thống có những nguồn riêng. Một nguồn bị bỏ sót không xuất hiện dưới dạng một cảnh báo; nó xuất hiện dưới dạng một hệ thống không đạt mà không ai hiểu vì sao.
+
+\emph{Lý do hai: các con số đầu vào có bất định riêng.} Nếu bạn ước lượng sai số constellation là 0,3\,mm mà thực tế là 0,8\,mm, thì dòng ấy lớn hơn 2,7 lần và tổng đổi đáng kể. Cách xử lý đúng: mỗi con số đầu vào nên đi kèm một khoảng, và bảng nên được tính cho cả trường hợp xấu nhất --- một phép tính tốn thêm mười phút và nó thay đổi kết luận thường xuyên hơn bạn nghĩ.
+
+\emph{Lý do ba, và nó là lý do quan trọng nhất: lỗi thô không nằm trong bảng.} Mục~6. Một hệ có ngân sách 1,35\,mm nhưng chọn nhầm nghiệm ambiguity 5\% số lần là một hệ thất bại 5\% số lần, và bảng không nói gì về điều đó.
+
+\textbf{Giới hạn khác của chương.}
+
+\emph{Quy tắc cộng là xấp xỉ.} Cộng thẳng các dòng hệ thống là giả định trường hợp xấu nhất --- chúng có thể triệt tiêu nhau một phần. Ngược lại, cộng bình phương các dòng ngẫu nhiên giả định chúng độc lập, và một số dòng có thể tương quan. GUM \cite{jcgm2008gum} có cách xử lý chặt chẽ hơn với ma trận hiệp phương sai; với mục đích thiết kế thì quy tắc đơn giản đủ dùng, miễn là bạn biết nó là xấp xỉ nào.
+
+\emph{Các dòng có thể phụ thuộc nhau.} Sai số intrinsic ảnh hưởng tới kết quả đo constellation (\ptr{B/12} mục~2), nên hai dòng ấy không độc lập. Bảng bỏ qua chuyện này, và nó là một xấp xỉ về phía \emph{lạc quan}.
+
+\emph{Bảng tính ở một tư thế.} Mọi con số ở mục~3 tính tại \(Z = 0{,}5\) m. Ở các tư thế khác chúng khác, và một số dòng khác nhiều. Với một phân tích đầy đủ, phải quét toàn dải tư thế --- và đó chính là việc mà \ptr{C/16} làm bằng Monte Carlo.
+
+\section{Thực hành}
+\ptrtarget{C/15/09}
+
+Sáu bước, và chúng là quy trình tôi khuyên cho một dự án thật.
+
+\emph{Một, lập bảng bằng số ước lượng ngay ngày đầu}, kể cả khi chưa đo gì. Dùng bảng~\ref{tab:c15-bang} làm mẫu và điền số phỏng đoán. Nó sai, nhưng nó cho bạn biết đo cái gì trước.
+
+\emph{Hai, đo bốn con số quan trọng nhất} theo cảnh báo ở mục~3B: \(\sigma\), sai số điểm chính, sai số constellation, sai số bám.
+
+\emph{Ba, tính cả hai bảng} --- đo tuyệt đối và teach-by-showing --- và quyết định chế độ dựa trên chênh lệch.
+
+\emph{Bốn, tính cả trường hợp xấu nhất} với các con số đầu vào ở biên trên của khoảng bất định.
+
+\emph{Năm, viết danh sách lỗi thô và cơ chế loại trừ}, và coi nó là một phần của ngân sách chứ không phải một phụ lục.
+
+\emph{Sáu, quét toàn dải tư thế bằng Monte Carlo} (\ptr{C/16}) trước khi đặt gia công.
+
+\begin{onbai}
+\ar[3]{Chức năng quan trọng nhất của ngân sách}{Đặt mọi nguồn lên \emph{cùng một thước đo}, để lộ ra rằng thứ tự đóng góp không trùng với thứ tự mức độ thú vị. Nó là công cụ chống lại xu hướng làm việc thú vị thay vì việc có tác dụng.}
+\ar[3]{Ba loại dòng}{Ngẫu nhiên (cộng bình phương, chia \(\sqrt{N}\)); hệ thống không phụ thuộc tư thế (cộng thẳng, không chia, \emph{triệt tiêu} trong teach-by-showing); hệ thống \emph{phụ thuộc tư thế} (cộng thẳng, không chia, \emph{không} triệt tiêu) --- loại cuối tệ nhất.}
+\ar[3]{Phép kiểm phân loại}{Hai câu hỏi: lấy trung bình 100 khung thì nó giảm không (\(\Rightarrow\) ngẫu nhiên)? và nó có giống nhau ở tư thế dạy và tư thế hiện tại không (\(\Rightarrow\) triệt tiêu được)?}
+\ar[3]{Cánh tay đòn}{Sai số góc tại camera thành sai lệch vị trí \(L\,\delta\theta\) tại điểm cập. Với \(L = 0{,}5\) m, \(0{,}5^\circ\) thành \textbf{4,4 mm} --- gần hết ngân sách vị trí. Hai ngân sách không độc lập.}
+\ar[3]{Cách phát biểu ngân sách đúng}{Tại \emph{điểm cập}, bằng một đại lượng duy nhất (mm), rồi suy ra ngân sách góc. Và: giảm \(L\) --- gắn camera gần điểm cập --- là một đòn bẩy cơ khí thường bị bỏ qua.}
+\ar[3]{Ba con số của ví dụ chuẩn}{Đo tuyệt đối: 6,81 mm (không đạt). Teach-by-showing: 1,88 mm (đạt). Cộng stop-and-go \(N=30\): 1,35 mm. \textbf{Không dòng code xử lý ảnh nào khác nhau} --- khác biệt hoàn toàn ở kiến trúc.}
+\ar[3]{Kết quả bất ngờ nhất của bảng}{Nhóm hệ thống chiếm \textbf{72\%} tổng trong chế độ đo tuyệt đối. Phần lớn ngân sách nằm ở những dòng mà không thuật toán xử lý ảnh nào chạm tới.}
+\ar[3]{Dòng lớn nhất trong ví dụ}{Điểm chính sai --- 2,50 mm, tức 37\% tổng. Một buổi chụp lại ảnh hiệu chuẩn có tư thế nghiêng mạnh cho nhiều milimét hơn bất kỳ thay đổi phần mềm nào.}
+\ar[3]{Cải thiện dòng nhỏ nhất}{Từ 0,17 xuống 0,04 mm làm tổng nhóm ngẫu nhiên đổi từ 1,55 thành 1,54 --- \emph{gần như không đổi gì}. Hệ quả của phép cộng bình phương.}
+\ar[3]{Vì sao ambiguity không có dòng trong bảng}{Vì nó là \emph{lỗi thô}, không phải sai số: bảng giả định bạn đang ở gần nghiệm đúng, còn lỗi thô là việc bạn đang ở một giá trị hoàn toàn khác. Ngân sách mô tả độ chính xác của phép đo; lỗi thô là đo nhầm vật.}
+\ar[3]{Xử lý lỗi thô thế nào}{Đưa về xác suất gần không bằng cơ chế riêng (\ptr{B/09} mục 4 phá đồng phẳng; \ptr{B/10} đo \(\rho\) và từ chối), rồi trình bày kèm bảng như một danh sách đã loại trừ --- không cộng vào bảng.}
+\ar[3]{Ba lý do tổng dưới ngưỡng không đảm bảo đạt}{Có thể đã bỏ sót một nguồn; các con số đầu vào có bất định riêng (phải tính cả trường hợp xấu nhất); và lỗi thô không nằm trong bảng.}
+\ar[2]{Constellation từ CAD ăn bao nhiêu}{Với \(e \approx 1{,}5\) mm thay vì 0,3: dòng ấy thành 3,4 mm --- lớn hơn cả điểm chính, và đủ một mình phá ngân sách. Đây là lý do BA bắt buộc (\ptr{B/09} mục 5).}
+\ar[2]{Trường hợp hai điểm tiếp xúc}{Nếu cơ cấu cập có hai chấu cách nhau \(d\), yêu cầu góc chặt hơn yêu cầu vị trí theo tỉ lệ \(1/d\), vì sai lệch góc làm hai điểm lệch \emph{ngược chiều}. Khi ấy ngân sách góc mới là ngân sách chặt thật sự.}
+\ar[2]{Ba xấp xỉ của quy tắc cộng}{Cộng thẳng dòng hệ thống là trường hợp xấu nhất (chúng có thể triệt tiêu một phần); cộng bình phương giả định độc lập (một số dòng tương quan); và bảng bỏ qua việc intrinsic ảnh hưởng tới constellation --- xấp xỉ về phía \emph{lạc quan}.}
+\ar[3]{Khi nào đọc chương này}{\textbf{Sớm} --- lý tưởng nhất ngay sau \ptr{A/05}, trước cả Phần B. Bạn sẽ không hiểu hết mọi dòng, nhưng bạn sẽ biết dòng nào lớn, và biết điều đó \emph{trước khi} tiêu thời gian là khác biệt lớn nhất mà cây này tạo ra.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{Hướng dẫn GUM \cite{jcgm2008gum}}{Chuẩn quốc tế cho lan truyền bất định: phân loại nguồn, tổng hợp, và cách báo cáo}{Đọc §4--5 nếu cần xử lý chặt chẽ hơn quy tắc đơn giản ở mục 2C}
+\ud{ISO 9283 \cite{iso9283}}{Định nghĩa chuẩn của accuracy và repeatability cho robot}{Cơ sở cho việc tách hai bảng ở mục 5; dùng đúng thuật ngữ khi báo cáo}
+\ud{Kỹ thuật hệ thống trong quang học và hàng không}{Ngân sách sai số là công cụ chuẩn từ lâu trước robot học}{Truyền thống mà chương này mượn; tư duy quan trọng hơn công thức}
+\ud{Script Monte Carlo (\ptr{C/16})}{Quét toàn dải tư thế thay vì tính tại một điểm}{Bổ sung bắt buộc cho chương này; bảng tính tại một tư thế là chưa đủ}
+\ud{\repo{evo} \cite{grupp2017evo}}{Đánh giá quỹ đạo với phép căn chỉnh đúng}{Cho phần nghiệm thu; \ptr{C/16} bàn kỹ}
+\end{ungdung}
+
+\begin{duan}{Lập bảng ngân sách cho hệ của chính bạn, hai chế độ, và trường hợp xấu nhất}{1--2 ngày sau khi đã đo}
+\dmt có một bảng duy nhất nói hệ của bạn đạt hay không đạt, dòng nào lớn nhất, và việc gì nên làm tiếp --- thay cho một cảm giác mơ hồ.
+\ddl bốn con số đo được từ các mini project trước: \(\sigma\) (\ptr{B/07}), sai số điểm chính (\ptr{B/12}), sai số constellation (\ptr{B/09}), sai số bám (\ptr{B/13}). Cộng các thông số hình học của hệ: \(f\), \(Z\), \(W\), \(B\), \(L\).
+\dbc dựng bảng theo mẫu ở mục 3 với số của bạn; với mỗi con số đo được, ghi \emph{cả khoảng} chứ không chỉ giá trị trung tâm; tính ba tổng: đo tuyệt đối, teach-by-showing, và teach-by-showing cộng stop-and-go; rồi tính lại cả ba với mọi con số đầu vào ở biên trên của khoảng; cuối cùng viết danh sách các lỗi thô kèm cơ chế loại trừ và xác suất còn lại ước lượng được.
+\dxk bạn có sáu con số tổng (ba chế độ \(\times\) hai trường hợp) và một danh sách lỗi thô. Quyết định rút ra: chế độ nào, và dòng nào phải sửa trước. Kiểm tra chéo bắt buộc: cộng lại tổng bằng cách khác --- chẳng hạn cộng bình phương \emph{tất cả} các dòng như một cận dưới lạc quan --- và xác nhận rằng con số thận trọng của bạn nằm giữa cận lạc quan ấy và tổng cộng thẳng toàn bộ. Nếu không thì có lỗi số học ở đâu đó.
+\dnv \ptr{C/16} kiểm bảng này bằng Monte Carlo trên toàn dải tư thế; \ptr{E/19} dùng nó làm tiêu chí quyết định ở các bước của lộ trình.
+\end{duan}
+
+\begin{traloi}
+\tl{Phụ thuộc vào việc hai dòng ấy thuộc loại nào. Nếu cả hai là \emph{ngẫu nhiên}, chúng cộng theo bình phương: \(\sqrt{9+1} = 3{,}16\) mm --- dòng nhỏ chỉ thêm 5\%. Nếu cả hai là \emph{hệ thống}, chúng cộng thẳng trong trường hợp xấu nhất: 4,0 mm --- dòng nhỏ thêm đủ 33\%. Sự khác biệt ấy không nhỏ và nó quyết định việc có đáng tối ưu dòng nhỏ hay không. Cách kiểm phân loại đơn giản: lấy trung bình 100 khung xem nó có giảm không --- giảm thì ngẫu nhiên, không giảm thì hệ thống.}
+\tl{Vì các dòng ngẫu nhiên cộng theo bình phương, nên đóng góp của một dòng vào tổng tỉ lệ với \emph{bình phương} của nó. Một dòng chiếm 2\% tổng có giá trị bình phương chiếm khoảng 0,04\% tổng bình phương, nên xoá sạch nó cũng gần như không đổi gì. Con số cụ thể từ bảng ở mục 3: dòng ``nhiễu góc \(\rightarrow\) vị trí'' là 0,17 mm; cải thiện nó bốn lần xuống 0,04 mm làm tổng nhóm ngẫu nhiên đổi từ \(\sqrt{2{,}405} = 1{,}55\) thành \(\sqrt{2{,}377} = 1{,}54\) mm. Thay đổi 0,01 mm trên một ngân sách 5 mm --- tức 0,2\%. Đây là lập luận định lượng cho nguyên tắc ``chỉ mắt xích yếu nhất mới quyết định''.}
+\tl{Khác nhau ở toàn bộ nhóm hệ thống \emph{không phụ thuộc tư thế}: méo còn sót, điểm chính, constellation, hand-eye, và \(T^{\text{tag}}_{\text{dock}}\) --- năm dòng, tổng 4,93 mm trong ví dụ, bị loại hoàn toàn. Còn lại là nhóm ngẫu nhiên (1,55 mm) và dòng hệ thống \emph{phụ thuộc tư thế} (0,33 mm, thiên lệch do loá), vì loại sau không triệt tiêu được khi tư thế đổi. Tổng: 6,81 mm so với 1,88 mm, tức tỉ số \(3{,}6\). Đây là con số biện minh cho việc gọi teach-by-showing là mẹo lớn nhất --- một hệ số 3,6 không đạt được bằng bất kỳ cải thiện thuật toán nào trong cả cây, và nó không tốn một dòng code xử lý ảnh nào.}
+\tl{Vì nó không phải một \emph{sai số} mà là một \emph{lỗi thô}, và sự khác biệt là về bản chất chứ không về độ lớn. Một sai số là độ lệch nhỏ quanh giá trị đúng và nó cộng được với các sai số khác. Một lỗi thô là việc bạn đang ở một giá trị \emph{hoàn toàn khác} --- và khi nó xảy ra, mọi con số trong bảng vô nghĩa, vì bảng giả định bạn đang ở gần nghiệm đúng. Nói bằng hình ảnh: ngân sách mô tả độ chính xác của một phép đo, còn lỗi thô là đo nhầm vật. Nó được xử lý ở \ptr{B/09} mục 4 (phá đồng phẳng, đưa xác suất về không) và \ptr{B/10} (đo \(\rho\) và từ chối). Cách trình bày đúng: ngân sách sai số \emph{kèm} một danh sách các lỗi thô đã loại trừ và cơ chế loại trừ chúng --- trình bày một ngân sách mà không nói về lỗi thô là trình bày nửa dễ chịu của sự thật.}
+\tl{Ba lý do. Một, bạn có thể đã bỏ sót một nguồn --- mười hai dòng trong chương là danh sách của tôi, và mỗi hệ có những nguồn riêng như rung, trôi nhiệt, độ lún sàn, biến dạng khung khi mang tải; một nguồn bị bỏ sót không xuất hiện dưới dạng cảnh báo mà dưới dạng một hệ không đạt mà không ai hiểu vì sao. Hai, các con số đầu vào có bất định riêng: nếu bạn ước lượng sai số constellation là 0,3 mm mà thực tế 0,8 mm thì dòng ấy lớn hơn 2,7 lần --- nên phải tính lại bảng với mọi đầu vào ở biên trên của khoảng, một phép tính tốn mười phút và đổi kết luận thường xuyên hơn bạn nghĩ. Ba, và quan trọng nhất: lỗi thô không nằm trong bảng --- một hệ có ngân sách 1,35 mm nhưng chọn nhầm nghiệm ambiguity 5\% số lần là một hệ thất bại 5\% số lần, và bảng hoàn toàn im lặng về điều đó.}
+\end{traloi}
+
+\begin{dongian}
+Bạn có năm milimét để tiêu, và có khoảng chục khoản chi. Bảng ngân sách chỉ làm một việc: viết ra mỗi khoản ăn bao nhiêu, để bạn biết khoản nào lớn.
+
+Nghe tầm thường, nhưng nó là việc quan trọng nhất trong cả tài liệu này, vì con người có xu hướng rất mạnh là dành thời gian cho việc thú vị thay vì việc có tác dụng. Chỉnh thuật toán thì thú vị. Chụp lại mấy chục tấm ảnh hiệu chuẩn thì chán. Và trong cái bảng đó, việc chán lại là việc ăn hai phẩy năm milimét còn việc thú vị chỉ ăn một phần mười.
+
+Có một chi tiết làm bảng này khác bảng chi tiêu thường. Những khoản \emph{lúc nhiều lúc ít} thì cộng theo một quy tắc kỳ lạ: ba cộng một ra ba phẩy hai, chứ không phải bốn. Khoản nhỏ gần như biến mất. Nên với loại này, chỉ khoản lớn nhất đáng quan tâm.
+
+Còn những khoản \emph{cố định} --- tấm marker lệch một chút so với bản vẽ, camera gắn hơi nghiêng, ống kính hơi khác mô hình --- thì cộng thẳng như bình thường, và chúng không bao giờ nhỏ đi dù bạn đo bao nhiêu lần.
+
+Và đây là điều bất ngờ khi làm phép tính: \emph{mấy khoản cố định thường chiếm hơn hai phần ba}. Tức là phần lớn ngân sách của bạn đang nằm ở những chỗ mà không có dòng code nào chạm tới được.
+
+Rồi đến điều bất ngờ thứ hai, và nó là lý do cả tài liệu này tồn tại. Nếu thay vì hỏi ``robot đang ở đâu'' ta hỏi ``robot khác gì so với lúc nó cắm đúng'', thì \emph{toàn bộ} mấy khoản cố định biến mất --- vì chúng xuất hiện giống nhau ở cả hai lần và trừ đi nhau. Cùng một hệ thống, cùng một camera, cùng một phần mềm: sáu phẩy tám milimét thành một phẩy chín. Không đạt thành đạt thoải mái.
+
+Cuối cùng, một cảnh báo về chính cái bảng. Nó tính được tổng của những thứ bạn đã nghĩ tới, và nó hoàn toàn im lặng về hai thứ khác. Một là những khoản bạn quên chưa liệt kê. Hai, và tệ hơn, là chuyện \emph{nhìn nhầm} --- cái tag phẳng có hai câu trả lời, và nếu máy chọn nhầm thì nó không lệch vài milimét mà lệch mấy chục độ. Chuyện đó không phải một khoản chi trong ngân sách; nó là việc bạn đang tiêu tiền của người khác. Phải xử lý riêng, và phải xử lý trước.
+
+\chuadongian{quy tắc cộng ở đây là xấp xỉ: cộng thẳng mấy khoản cố định là giả định trường hợp xấu nhất (thực tế chúng có thể triệt tiêu nhau một phần), còn cộng theo bình phương mấy khoản ngẫu nhiên là giả định chúng độc lập (thực tế một vài cái có liên quan). Có cách tính chặt chẽ hơn, nhưng với việc thiết kế thì cách đơn giản đủ dùng --- miễn là biết mình đang xấp xỉ cái gì.}
+\motcau{Viết ra khoản nào ăn bao nhiêu, và bạn sẽ thấy phần lớn tiền đang đi vào những chỗ không có dòng code nào chạm tới.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{C/15/10}
+
+Mệnh đề chính --- \emph{các dòng hệ thống chiếm phần lớn ngân sách trong chế độ đo tuyệt đối} --- là mệnh đề rút ra từ một bảng với các con số ví dụ do tôi đặt. Nó bị bác bỏ nếu trên một hệ thực với các con số đo được, nhóm ngẫu nhiên lại chiếm phần lớn. Điều đó hoàn toàn có thể xảy ra nếu hiệu chuẩn rất tốt và constellation đã đo bằng BA --- và nếu vậy thì lời khuyên của chương đổi: khi ấy \ptr{B/08} và \ptr{B/11} mới là chương đáng đầu tư. Mini project là cách kiểm cho hệ của bạn, và tôi nhấn mạnh rằng \emph{kết luận của chương phụ thuộc vào số liệu, không phải ngược lại}.
+
+Mệnh đề thứ hai --- \emph{teach-by-showing cho hệ số cải thiện cỡ ba tới bốn lần} --- bị bác bỏ nếu mini project của \ptr{B/13} cho thấy độ lặp lại không tốt hơn độ chính xác đáng kể. Con số 3,6 ở mục~5 là hệ quả trực tiếp của bảng ví dụ, nên nó thừa hưởng toàn bộ tính không chắc chắn của bảng ấy.
+
+Mệnh đề thứ ba --- \emph{lỗi thô phải xử lý riêng, không cộng vào bảng} --- là một mệnh đề phương pháp luận chứ không thực nghiệm. Nó ``bị bác bỏ'' chỉ nếu ai đó đưa ra một cách hợp lý để cộng một sự kiện nhị phân có xác suất vào một tổng sai số liên tục --- và tôi không biết cách nào.
+
+Cuối cùng, và đây là điều tôi muốn nhấn mạnh nhất: \emph{mọi con số trong chương này là ví dụ}. Nếu bạn thấy bảng của mình cho kết luận khác, bảng của bạn đúng và bảng của tôi chỉ là minh hoạ. Giá trị của chương nằm ở \emph{cấu trúc} của phép tính và ở các câu hỏi nó buộc bạn trả lời, không ở các con số.
+
+\section{Kết nối}
+\ptrtarget{C/15/11}
+
+Chương này là nơi cả cây hội tụ, nên phần kết nối của nó là một bản đồ ngược.
+
+Nối lên trên, và đây là danh sách đầy đủ vì mỗi chương cấp một dòng. \ptr{A/05-lan-truyen-sai-so-pixel-sang-pose} cấp bốn quan hệ tỉ lệ và quy tắc cộng --- nếu chỉ đọc hai chương thì đọc chương ấy và chương này. \ptr{A/01-mo-hinh-camera-va-distortion} cấp dòng méo và dòng điểm chính, và mục~5 ở đó giải thích vì sao dòng điểm chính lớn đến thế. \ptr{A/02-homography-va-hinh-hoc-phang} mục~6 cấp dòng bias tâm ellipse. \ptr{A/04-pose-ambiguity-target-phang} cấp \emph{không} dòng nào --- và mục~6 ở đây giải thích vì sao. \ptr{A/06-hieu-ung-vat-ly-va-quang-hoc} cấp hai dòng phụ thuộc vận tốc.
+
+Từ Phần~B: \ptr{B/08} cấp \(\sigma\); \ptr{B/09} mục~5 cấp dòng constellation và mục~3 cấp \(B\); \ptr{B/12} cấp ba dòng hiệu chuẩn và thứ tự đo chúng; \ptr{B/13} quyết định \emph{chế độ}, tức quyết định bảng nào được dùng; \ptr{B/14} cấp dòng loá và cảnh báo phải dùng \(\sigma\) tệ nhất.
+
+Nối ngang. \ptr{C/16-danh-gia-va-nghiem-thu} là chương anh em và nó bổ sung chỗ chương này thiếu: bảng tính tại \emph{một} tư thế, Monte Carlo quét \emph{toàn dải}; bảng dùng các con số bạn cung cấp, nghiệm thu kiểm xem chúng có đúng không. Hai chương phải đọc cùng nhau, và thứ tự đúng là chương này trước để biết đo cái gì, rồi chương kia để đo.
+
+Nối xuống. \ptr{E/19-lo-trinh-toi-thieu} dùng bảng này làm tiêu chí quyết định ở nhiều bước: bước nào đáng làm tiếp phụ thuộc vào dòng nào đang lớn. Và một lời khuyên về thứ tự đọc lặp lại lần cuối: \emph{chương này nên đọc sớm}, vì nó là chương duy nhất cho bạn biết nên đầu tư vào đâu \emph{trước khi} bạn đã đầu tư.
+
+\begin{tukiem}
+\item Nêu ba loại dòng trong ngân sách, quy tắc cộng của từng loại, và phép kiểm phân loại bằng hai câu hỏi.
+\item Với \(L = 0{,}8\) m, ngân sách góc \(0{,}5^\circ\) tương đương bao nhiêu milimét tại điểm cập? Tính, rồi nói hệ quả cho việc chọn chỗ gắn camera.
+\item Trong bảng ví dụ, nhóm hệ thống chiếm bao nhiêu phần trăm tổng? Nêu hệ quả cho việc phân bổ công sức.
+\item Vì sao cải thiện dòng nhỏ nhất bốn lần gần như không đổi gì? Trả lời bằng phép tính cụ thể.
+\item Teach-by-showing loại những dòng nào và giữ những dòng nào? Nêu tỉ số giữa hai tổng trong ví dụ.
+\item Vì sao pose ambiguity không có dòng trong bảng, và nó được xử lý ở đâu?
+\item Nêu ba lý do một tổng dưới ngưỡng không đảm bảo hệ sẽ đạt, và nêu lý do nào bạn cho là nguy hiểm nhất.
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

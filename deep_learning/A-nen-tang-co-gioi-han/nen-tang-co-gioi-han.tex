@@ -1,0 +1,17 @@
+\documentclass[../deep_learning.tex]{subfiles}
+\begin{document}
+\part{NỀN TẢNG CÓ GIỚI HẠN}
+\begin{tomtat}
+Phần A dựng đúng lượng nền cần thiết cho bốn phần sau: ngôn ngữ toán tối thiểu, và chuỗi vật lý biến ánh sáng thành tensor mà mô hình nhìn thấy. Đọc xong bạn tự derive lại được đạo hàm khi cần, và quan trọng hơn, bạn nhận ra được khi một giả định về ảnh đầu vào đã bị vi phạm. Nếu chỉ nhớ một điều: phần lớn khoảng cách giữa lúc huấn luyện và lúc triển khai sinh ra ở khâu tạo ảnh, không ở kiến trúc mạng.
+\end{tomtat}
+
+Phần này tồn tại để phục vụ bốn phần sau, và nguyên tắc chi phối nó là \emph{học theo nhu cầu}: mỗi mục chỉ đi tới mức dùng được và giải thích được, không chứng minh định lý. Đây là một lựa chọn có chủ ý chứ không phải sự lười biếng. Một người dừng lại học trọn vẹn giải tích ma trận trước khi chạm vào mô hình đầu tiên thường không bao giờ tới được mô hình đầu tiên; ngược lại, một người bỏ hẳn phần nền sẽ đọc paper như đọc bùa chú và không bao giờ đoán được một phương pháp sẽ hỏng ở đâu. Ranh giới đúng nằm ở chỗ: học đủ để \emph{tự derive lại được khi cần} và để \emph{nhận ra khi một giả định bị vi phạm}.
+
+Hai chương của phần có vai trò rất khác nhau. Chương~1 là ngôn ngữ: đại số tuyến tính, vi phân, xác suất, lý thuyết thông tin, hình học biến đổi và xử lý tín hiệu --- không phải toàn bộ các môn đó, mà đúng những mảnh quay lại nhiều lần nhất trong phần B và C. Chương~2 là thứ bị bỏ sót nhiều nhất và cũng là thứ phân biệt người làm computer vision với người chỉ dùng CNN: ảnh không rơi từ trên trời xuống thành một tensor, nó là kết quả của một chuỗi vật lý và xử lý dài, và phần lớn khoảng cách giữa lúc huấn luyện và lúc triển khai sinh ra ở chuỗi đó chứ không ở kiến trúc mạng.
+
+Vì vậy thứ tự đọc đề xuất không phải là đọc hết phần này rồi mới sang phần B. Hãy đọc chương~2 kỹ ngay từ đầu, còn chương~1 thì đọc lướt một lượt để biết trong đó có gì, rồi quay lại từng mục khi phần sau thực sự cần đến --- mỗi mục trong chương~1 đều ghi rõ nó quay lại ở chương nào.
+\subfile{00-map}
+\subfile{01-toan-toi-thieu/toan-toi-thieu}
+\subfile{02-vat-ly-tao-anh/vat-ly-tao-anh}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

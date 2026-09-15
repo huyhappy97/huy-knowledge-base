@@ -1,0 +1,478 @@
+% ---------------------------------------------------------------------------
+% Chương 5 — Lan truyền sai số từ pixel sang pose
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-13  |  Ôn gần nhất: —
+% Phụ thuộc: A/01 (ma trận K, tiêu cự f tính bằng pixel), A/03 (PnP, sai số tái chiếu,
+%            Jacobian của phép chiếu), A/04 (vì sao xoay từ target phẳng là hướng yếu)
+% Mức độ: XƯƠNG SỐNG — chương định giá của cả cây. Mọi con số milimét ở Phần C
+%         đều sinh ra từ bốn quan hệ tỉ lệ trong chương này.
+% Kiểm chứng công thức lõi:
+%   (1) Covariance pose ≈ (J^T Σ^{-1} J)^{-1}
+%       — cửa (a) tự dẫn từ khai triển bậc hai của hàm mục tiêu bình phương tối thiểu;
+%         cửa (c) đối chiếu haralick1998propagating và kay1993 (hai nguồn độc lập).
+%   (2) δx ≈ Z σ / f  — cửa (a) vi phân u = f X / Z; cửa (b) ví dụ số mục 4: 0,17 mm.
+%   (3) δZ ≈ Z σ / w  — cửa (a) vi phân w = f W / Z; cửa (b) ví dụ số mục 4: 0,83 mm,
+%         và kiểm chéo tỉ số δZ/δx = Z/W = 5 bằng hai đường độc lập.
+%   (4) δθ ≈ δx / B   — cửa (a) hình học góc nhỏ; cửa (b) 0,167/400 = 0,024 độ.
+%   (5) Độ nhạy xoay của tag phẳng ∝ sin(góc nghiêng)
+%       — cửa (a) đạo hàm của cos theta; cửa (b) ví dụ số 0,018 px vs 2,2 px;
+%         CHƯA qua cửa (c) đối chiếu hệ số với schweighofer2006robust — nợ kiểm chứng.
+% Ghi chú trung thực: mọi con số trong chương là VÍ DỤ SỐ HỌC tự đặt có dẫn "giả sử",
+%   không phải kết quả đo của hệ nào. Giá trị σ = 0,2 px là bậc độ lớn kinh nghiệm,
+%   KHÔNG phải số đo có điều kiện xác định — xem cảnh báo ở 00-map.
+% ---------------------------------------------------------------------------
+\documentclass[../../marker.tex]{subfiles}
+\begin{document}
+\chapter{Lan truyền sai số từ pixel sang pose (Error Propagation)}
+\ptrtarget{A/05}\ptrtarget{A/05-lan-truyen-sai-so-pixel-sang-pose}
+\dependency{\ptr{A/01-mo-hinh-camera-va-distortion} (ma trận \(K\), và vì sao tiêu cự \(f\) tính bằng pixel là đại lượng duy nhất của camera xuất hiện trong mọi công thức dưới đây); \ptr{A/03-pnp-va-uoc-luong-tu-the} (PnP, sai số tái chiếu, Jacobian của phép chiếu --- chương này lấy đúng Jacobian ấy rồi đảo nó); \ptr{A/04-pose-ambiguity-target-phang} (vì sao hướng xoay là hướng yếu --- chương này định lượng cái yếu đó).}
+
+\begin{tomtat}
+Chương này biến một câu hỏi mơ hồ --- ``hệ của tôi chính xác cỡ nào'' --- thành bốn phép nhân chia làm được trên giấy trong ba mươi giây. Xuất phát điểm là một công thức duy nhất, \(\Sigma_{\text{pose}} \approx (J^{\top}\Sigma_{\text{px}}^{-1}J)^{-1}\), và toàn bộ phần còn lại của chương là việc đọc ý nghĩa vật lý của ma trận ấy trong bốn trường hợp cụ thể. Bốn kết quả: sai số ngang \(\delta x \approx Z\sigma/f\), sai số dọc trục \(\delta Z \approx Z\sigma/w\), độ nhạy xoay của một tag phẳng tỉ lệ với \(\sin\) của góc nghiêng, và sai số xoay từ một constellation có baseline \(B\) là \(\delta\theta \approx \delta x/B\). Bốn quan hệ ấy ngắn đủ để thuộc lòng và chúng là công cụ chẩn đoán hằng ngày. Nếu chỉ nhớ một điều: \emph{sai số ngang chia cho \(f\), sai số sâu chia cho \(w\), và \(w \ll f\) --- nên chiều sâu luôn tệ hơn chiều ngang chừng \(f/w\) lần}; còn xoay thì không nằm trong danh sách ấy vì nó tuân theo một quy luật khác hẳn, và đó là lý do nó là nút thắt.
+\end{tomtat}
+
+\begin{nentang}
+\kn{tiêu cự tính bằng pixel (\(f\))}{phần tử \(f_x\) hoặc \(f_y\) của ma trận \(K\). Nó không phải chiều dài vật lý của ống kính mà là tỉ số giữa tiêu cự vật lý và kích thước một pixel trên cảm biến. Với một camera 1280\(\times\)960 và trường nhìn ngang khoảng \(60^\circ\), \(f\) cỡ \(1100\) px. Đây là đại lượng duy nhất của camera xuất hiện trong công thức sai số ngang.}
+\kn{kích thước tag trên ảnh (\(w\))}{cạnh của tag đo bằng pixel trên ảnh, \(w \approx fW/Z\) với \(W\) là cạnh thật của tag và \(Z\) là khoảng cách. Nó là đại lượng quyết định sai số theo chiều sâu, và nó nhỏ hơn \(f\) rất nhiều trong mọi tình huống thực tế.}
+\kn{nhiễu định vị góc (\(\sigma\))}{độ lệch chuẩn của vị trí một góc marker trên ảnh, tính bằng pixel. Đây là đầu vào duy nhất mang tính ``chất lượng thuật toán'' trong cả chương; mọi thứ khác là hình học.}
+\kn{Jacobian của sai số tái chiếu (\(J\))}{ma trận đạo hàm riêng của toạ độ ảnh dự đoán theo sáu tham số pose, \(J = \partial \hat{u}/\partial \xi\). Mỗi góc marker đóng góp hai hàng (một cho \(u\), một cho \(v\)).}
+\kn{ma trận thông tin Fisher}{\(\mathcal{I} = J^{\top}\Sigma_{\text{px}}^{-1}J\). Nó đo lượng thông tin mà tập phép đo mang về pose; nghịch đảo của nó là cận dưới cho hiệp phương sai của mọi bộ ước lượng không chệch \cite{kay1993}.}
+\kn{baseline của constellation (\(B\))}{khoảng cách giữa hai marker xa nhau nhất trong tập marker, đo trong không gian 3D. Đây là đại lượng hình học có đòn bẩy lớn nhất trong toàn cây, và nó không phụ thuộc vào bất kỳ lựa chọn phần mềm nào.}
+\kn{fronto-parallel}{tư thế mà mặt phẳng tag song song với mặt phẳng ảnh, tức camera nhìn thẳng vuông góc vào tag. Đây là tư thế trực quan nhất và là tư thế \emph{tệ nhất} cho việc ước lượng góc nghiêng --- một nghịch lý mà mục 5 giải thích.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Bạn tăng độ phân giải camera lên gấp đôi, giữ nguyên ống kính và mọi thứ khác. Sai số vị trí của bạn cải thiện bao nhiêu lần, và vì sao câu trả lời không phải ``gấp đôi''?}
+\h{Một tag 100\,mm ở cách camera nửa mét cho sai số dọc trục khoảng 0,8\,mm. Nếu bạn dùng tag 200\,mm thay vào, sai số đó thành bao nhiêu --- và quan trọng hơn, nếu bạn thay bằng hai tag 100\,mm đặt cách nhau 200\,mm thì được gì mà tag lớn không cho?}
+\h{Vì sao sai số theo chiều sâu luôn tệ hơn sai số theo chiều ngang, và tỉ số giữa chúng bằng đại lượng nào --- hãy trả lời bằng một phân số của hai đại lượng đã có tên trong chương này.}
+\h{Robot của bạn tiếp cận dock thẳng trục, nên camera nhìn gần vuông góc vào tấm marker. Đó là tư thế trực quan nhất và là tư thế \emph{tệ nhất} cho việc đo góc. Cơ chế hình học nào tạo ra nghịch lý đó?}
+\h{Ngân sách của bạn cho phép 0,5\(^\circ\). Có hai cách tiêu tiền: mua camera tốt hơn để giảm \(\sigma\) từ 0,2\,px xuống 0,05\,px, hoặc làm tấm marker rộng thêm 30\,cm. Cách nào cho nhiều độ hơn trên mỗi đồng, và vì sao câu trả lời gần như không phụ thuộc vào con số cụ thể?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{A/05/01}
+
+Có một câu hỏi mà mọi người làm marker đều phải trả lời và gần như không ai trả lời được trong lần đầu được hỏi: \emph{hệ của bạn chính xác tới đâu?}
+
+Câu trả lời thường gặp là một con số thực nghiệm --- ``tôi đo được khoảng 3\,mm'' --- và nó có hai vấn đề. Vấn đề thứ nhất là nó chỉ đúng cho đúng cấu hình đã đo: đổi khoảng cách, đổi kích thước tag, đổi ống kính, và con số ấy không nói gì nữa. Vấn đề thứ hai nghiêm trọng hơn: nó không cho biết \emph{nên sửa gì}. Một con số ở đầu ra là tổng hợp của nhiều nguyên nhân, và nếu không tách được các thành phần thì mọi nỗ lực cải thiện đều là thử và sai.
+
+Bài toán gốc ở đây không mới và cũng không riêng của thị giác. Nó là bài toán \emph{lan truyền bất định} mà ngành đo lường đã hình thức hoá từ lâu \cite{jcgm2008gum}: có một đại lượng đo được trực tiếp với bất định đã biết, có một mô hình biến nó thành đại lượng ta quan tâm, và câu hỏi là bất định của đại lượng đích bằng bao nhiêu. Trong trường hợp của ta, đại lượng đo trực tiếp là vị trí các góc marker trên ảnh với bất định \(\sigma\) pixel, mô hình là phép chiếu phối cảnh, và đại lượng đích là sáu tham số pose.
+
+Điều làm bài toán này đáng dành một chương riêng không phải độ khó toán học --- công thức lan truyền là kiến thức chuẩn \cite{haralick1998propagating,kanatani1996statistical} --- mà là chuyện sau đây. Khi ta viết công thức lan truyền ra và đọc nó theo từng thành phần, ta phát hiện rằng \emph{sáu tham số pose không được sinh ra bình đẳng}. Hai tham số tịnh tiến ngang có bất định nhỏ, tham số tịnh tiến dọc trục có bất định lớn hơn chừng \(f/w\) lần, và các tham số xoay --- ít nhất là hai trong ba --- tuân theo một quy luật hoàn toàn khác, một quy luật trong đó \emph{góc nhìn} xuất hiện như một hệ số nhân và có thể tiến về không. Sự bất bình đẳng ấy là toàn bộ nội dung thực dụng của chương.
+
+Cách hiển nhiên hơn --- và cách gần như ai cũng thử trước --- là đo. Dựng hệ, chạy, so với thước, ra một con số. Cách này không sai và \ptr{C/16} dành hẳn cho nó. Nhưng nó có một nhược điểm chí mạng ở giai đoạn thiết kế: nó đòi hệ phải tồn tại. Khi bạn đang phải quyết định đặt hai tag hay bốn tag, cách nhau 30\,cm hay 50\,cm, có nghiêng hay không, thì không có gì để đo cả. Quyết định ấy phải được đưa ra \emph{trước}, và nó tốn tiền gia công nếu sai. Chương này tồn tại để những quyết định đó được đưa ra trên giấy.
+
+Có một cách hiển nhiên thứ hai, tinh vi hơn và cũng phổ biến hơn ở người có kinh nghiệm: chạy Monte Carlo. Thêm nhiễu vào góc, chạy PnP, xem phân bố. Cách này \emph{tốt} và \ptr{C/16} khuyến khích nó mạnh mẽ. Nhưng nó vẫn không thay thế được chương này, vì một lý do về bản chất của hiểu biết: Monte Carlo cho bạn biết \emph{kết quả là bao nhiêu} chứ không cho biết \emph{vì sao}. Nó không nói cho bạn rằng sai số sâu tệ hơn sai số ngang đúng \(f/w\) lần, nên nó không gợi ý rằng tăng \(w\) là đòn bẩy. Công thức giải tích và mô phỏng số phục vụ hai chức năng khác nhau, và cách dùng đúng là dùng cả hai: công thức để hiểu và để chọn hướng, mô phỏng để kiểm và để bắt những chỗ công thức bỏ sót.
+
+\begin{trucgiac}
+Hình dung việc ước lượng pose như việc định vị bằng cách nhìn một vật đã biết kích thước.
+
+Để biết vật đó nằm \emph{lệch trái phải} bao nhiêu, bạn nhìn xem nó nằm ở đâu trên khung nhìn. Một sai lệch nhỏ trên khung nhìn quy ra một sai lệch nhỏ trong không gian, và hệ số quy đổi là \(Z/f\) --- càng xa thì mỗi pixel càng ``đáng giá'' nhiều milimét. Đây là phép đo trực tiếp và nó tốt.
+
+Để biết vật đó ở \emph{xa gần} bao nhiêu, bạn không có cách nhìn trực tiếp. Bạn phải suy từ việc nó \emph{trông to cỡ nào}. Và ở đây có một sự khuếch đại: để biết khoảng cách chính xác 1\%, bạn phải đo được kích thước biểu kiến chính xác 1\%; nhưng kích thước biểu kiến chỉ có \(w\) pixel, nên 1\% của nó là \(w/100\) pixel --- một đại lượng nhỏ hơn nhiều so với \(f/100\). Đây là lý do chiều sâu luôn tệ hơn, và tỉ số tệ hơn đúng bằng \(f/w\).
+
+Để biết vật đó \emph{nghiêng} bao nhiêu, bạn phải nhìn vào sự \emph{biến dạng phối cảnh}: cạnh xa trông ngắn hơn cạnh gần. Nhưng nếu vật đang nhìn thẳng vào bạn thì không có cạnh nào xa hơn cạnh nào, biến dạng bằng không, và một chút nghiêng gây ra một chút biến dạng \emph{bậc hai} chứ không phải bậc một. Đó chính là lý do gần vuông góc là tệ nhất: đạo hàm của thứ bạn quan sát theo thứ bạn muốn biết đi qua không.
+
+Và đây là lối thoát: nếu thay vì một vật, bạn nhìn \emph{hai} vật cách nhau một khoảng \(B\) đã biết, thì góc quay của cặp ấy không còn phải suy từ biến dạng phối cảnh nữa. Nó suy từ chênh lệch vị trí ngang giữa hai vật --- một phép đo thuộc loại \emph{tốt}. Đó là toàn bộ lý do constellation tồn tại.
+\end{trucgiac}
+
+\section{Công thức gốc: nghịch đảo của ma trận thông tin}
+\ptrtarget{A/05/02}
+
+Mọi thứ trong chương này chảy ra từ một công thức, nên đáng dẫn nó một lần cho cẩn thận.
+
+Bài toán PnP tinh chỉnh (\ptr{A/03}) cực tiểu hoá tổng bình phương sai số tái chiếu có trọng số:
+\[
+C(\xi) \;=\; \tfrac{1}{2}\sum_{i=1}^{N} \big(u_i - \hat{u}_i(\xi)\big)^{\top}\Sigma_i^{-1}\big(u_i - \hat{u}_i(\xi)\big),
+\]
+với \(\xi \in \mathbb{R}^6\) là tham số hoá pose (ba cho tịnh tiến, ba cho xoay --- xem \ptr{A/03} về việc dùng \(\mathfrak{se}(3)\) để tránh kỳ dị), \(u_i\) là góc đo được, \(\hat{u}_i(\xi)\) là góc dự đoán, và \(\Sigma_i\) là hiệp phương sai nhiễu của góc thứ \(i\).
+
+Khai triển quanh nghiệm \(\hat{\xi}\) tới bậc hai và bỏ số hạng chứa phần dư nhân đạo hàm bậc hai --- hợp lệ khi phần dư nhỏ, tức khi mô hình đúng và nhiễu nhỏ, và đây chính là giả thiết Gauss--Newton:
+\[
+C(\hat{\xi}+\delta) \;\approx\; C(\hat{\xi}) + \tfrac{1}{2}\,\delta^{\top}\mathcal{I}\,\delta,
+\qquad
+\mathcal{I} \;=\; \sum_{i=1}^{N} J_i^{\top}\Sigma_i^{-1}J_i, \quad J_i = \frac{\partial \hat{u}_i}{\partial \xi}\bigg|_{\hat{\xi}} .
+\]
+Vì sao bước bỏ số hạng kia hợp lệ? Vì đạo hàm bậc hai của \(C\) có dạng \(\sum J^{\top}\Sigma^{-1}J - \sum r^{\top}\Sigma^{-1}\partial^2\hat{u}/\partial\xi^2\), và số hạng thứ hai tỉ lệ với phần dư \(r\). Khi mô hình đúng, phần dư là nhiễu có trung bình không, nên số hạng ấy triệt tiêu theo kỳ vọng. Khi mô hình \emph{sai} --- méo ảnh chưa khử sạch, constellation sai so với CAD --- phần dư có thành phần hệ thống và số hạng ấy không triệt tiêu. Đây là một ghi chú không hàn lâm chút nào: nó có nghĩa là \emph{công thức hiệp phương sai dưới đây tự nó giả định mô hình đúng}, và nó sẽ báo một hiệp phương sai đẹp ngay cả khi bạn đang đo quanh một giá trị sai. \ptr{C/16} quay lại chuyện này bằng phép thử tính nhất quán.
+
+Với giả thiết ấy, hiệp phương sai của pose ước lượng là
+\begin{equation}
+\Sigma_{\text{pose}} \;\approx\; \mathcal{I}^{-1} \;=\; \Big(\sum_{i} J_i^{\top}\Sigma_i^{-1}J_i\Big)^{-1}.
+\label{eq:a05-cov}
+\end{equation}
+Đây là kết quả chuẩn của lý thuyết ước lượng --- nó chính là cận Cramér--Rao mà bộ ước lượng hợp lý cực đại đạt được tiệm cận \cite[chương 3]{kay1993}, và trong ngữ cảnh thị giác nó được viết ra tường minh bởi \cite{haralick1998propagating}. Điều đáng nói là nó đúng cho \emph{mọi} bộ ước lượng không chệch: không thuật toán nào làm tốt hơn được, nên nếu \(\mathcal{I}^{-1}\) nói bạn không đạt \(0{,}5^\circ\) thì đổi thuật toán không cứu được.
+
+Trường hợp riêng hay dùng: nếu mọi góc có cùng nhiễu đẳng hướng \(\Sigma_i = \sigma^2 I_2\), thì
+\[
+\Sigma_{\text{pose}} \;\approx\; \sigma^2 \Big(\sum_i J_i^{\top}J_i\Big)^{-1}.
+\]
+Dạng này tách bạch hai thứ một cách rất sáng sủa, và sự tách bạch ấy là thông điệp trung tâm của chương: \(\sigma^2\) là \emph{chất lượng đo}, còn \((\sum J^{\top}J)^{-1}\) là \emph{hình học}. Chất lượng đo là thứ bạn mua bằng detector tốt hơn, quang học tốt hơn, trung bình nhiều khung. Hình học là thứ bạn mua bằng cách đặt các tag ở đâu. Và vì hình học vào công thức dưới dạng một ma trận nghịch đảo còn \(\sigma\) chỉ là một hệ số nhân vô hướng, \emph{hình học có thể làm sai số lớn lên vô hạn còn \(\sigma\) thì không} --- một ma trận gần suy biến có nghịch đảo lớn tuỳ ý.
+
+\begin{cannho}
+Công thức~\eqref{eq:a05-cov} chia bài toán làm hai nửa không cân xứng: \(\sigma^2\) (chất lượng đo) là một \emph{hệ số nhân}, còn hình học là một \emph{ma trận nghịch đảo}. Cải thiện \(\sigma\) gấp bốn lần thì sai số giảm bốn lần, không hơn. Sửa một hình học suy biến thì sai số giảm từ vô hạn xuống hữu hạn.
+
+Hệ quả thực hành: khi sai số của bạn lớn một cách khó hiểu, câu hỏi đầu tiên không phải ``detector của tôi có kém không'' mà là ``ma trận \(\sum J^{\top}J\) của tôi có gần suy biến theo hướng nào không''.
+\end{cannho}
+
+\section{Hai quan hệ tịnh tiến: chia cho \texorpdfstring{\(f\)}{f}, chia cho \texorpdfstring{\(w\)}{w}}
+\ptrtarget{A/05/03}
+
+Hai trường hợp đơn giản nhất, và chúng đơn giản đến mức dẫn được bằng vi phân một dòng mỗi cái.
+
+\subsection{A. Sai số ngang: chia cho tiêu cự}
+
+Phương trình chiếu cho toạ độ ngang là \(u = f\,X/Z + c_x\). Giữ \(Z\) cố định và vi phân theo \(X\):
+\[
+\frac{\partial u}{\partial X} = \frac{f}{Z}
+\quad\Longrightarrow\quad
+\delta X = \frac{Z}{f}\,\delta u .
+\]
+Với \(\delta u = \sigma\) là nhiễu định vị góc, ta được quan hệ thứ nhất:
+\begin{equation}
+\boxed{\;\delta x \;\approx\; \frac{Z\,\sigma}{f}\;}
+\label{eq:a05-lateral}
+\end{equation}
+Nếu có \(N\) góc và nhiễu của chúng độc lập, con số này còn chia thêm cho \(\sqrt{N}\) --- nhưng tôi cố ý không đưa \(\sqrt{N}\) vào công thức đóng khung, vì trong thực tế nhiễu góc trên cùng một tag \emph{không} độc lập (cùng chịu một điều kiện chiếu sáng, cùng một mức mờ, cùng một sai số méo cục bộ), nên \(\sqrt{N}\) là một lời hứa thường không được giữ. Dùng công thức không có \(\sqrt{N}\) là cách ước lượng thận trọng, và ngân sách sai số nên thận trọng.
+
+Ba điều đáng đọc ra từ~\eqref{eq:a05-lateral}. Thứ nhất, sai số ngang \emph{tuyến tính theo khoảng cách}: gần gấp đôi thì chính xác gấp đôi. Đây là lý do vì sao chiến lược coarse-to-fine ở \ptr{B/13} hoạt động --- bạn không cần chính xác ở xa, và khi tới gần thì chính xác tự đến. Thứ hai, đại lượng camera duy nhất xuất hiện là \(f\) tính bằng pixel. Thứ ba, và đây là điều quan trọng nhất: \emph{không có kích thước tag trong công thức này}. Tag lớn hay nhỏ không ảnh hưởng tới sai số ngang, miễn là vẫn phát hiện được và \(\sigma\) không đổi. Đây là một sự thật phản trực giác mà tôi khuyên nên kiểm lại bằng Monte Carlo khi mới gặp, vì nó mâu thuẫn với cảm giác ``tag lớn thì chính xác hơn''. Cảm giác ấy đúng --- nhưng nó đúng cho chiều sâu và cho góc, không đúng cho chiều ngang.
+
+\subsection{B. Sai số dọc trục: chia cho kích thước tag trên ảnh}
+
+Đây là chỗ xuất hiện sự bất bình đẳng đầu tiên giữa các trục. Chiều sâu không được đo trực tiếp; nó được suy từ kích thước biểu kiến. Với một tag cạnh thật \(W\) ở khoảng cách \(Z\), kích thước trên ảnh là \(w = fW/Z\). Vi phân theo \(Z\):
+\[
+\frac{\partial w}{\partial Z} = -\frac{fW}{Z^2} = -\frac{w}{Z}
+\quad\Longrightarrow\quad
+\delta Z = \frac{Z}{w}\,\delta w .
+\]
+Nhiễu của \emph{kích thước biểu kiến} \(\delta w\) đến từ nhiễu của hai đầu mút, nên nó cỡ \(\sigma\) (chính xác hơn là \(\sqrt{2}\sigma\) nếu hai đầu độc lập; tôi giữ \(\sigma\) cho gọn và vì lý do thận trọng đã nói). Ta được quan hệ thứ hai:
+\begin{equation}
+\boxed{\;\delta Z \;\approx\; \frac{Z\,\sigma}{w} \;=\; \frac{Z^2\,\sigma}{f\,W}\;}
+\label{eq:a05-depth}
+\end{equation}
+Dạng thứ hai của công thức --- viết theo \(W\) và \(Z\) thay vì \(w\) --- đáng nhớ riêng, vì nó cho thấy sai số sâu là \emph{bậc hai theo khoảng cách}. Xa gấp đôi thì tệ gấp bốn, không phải gấp đôi.
+
+So sánh hai công thức cho ngay tỉ số:
+\[
+\frac{\delta Z}{\delta x} \;\approx\; \frac{f}{w} \;=\; \frac{Z}{W}.
+\]
+Đây là câu trả lời cho Q3, và nó có một cách phát biểu rất dễ nhớ: \emph{sai số sâu tệ hơn sai số ngang đúng bằng tỉ số giữa khoảng cách và kích thước tag}. Tag 100\,mm ở 500\,mm thì sai số sâu tệ hơn 5 lần. Tag 100\,mm ở 3\,m thì tệ hơn 30 lần. Con số ấy giải thích vì sao mọi hệ thống marker đều thấy rằng thành phần khoảng cách là thành phần tệ nhất của tịnh tiến, và nó cũng giải thích vì sao đây là một trong số ít chỗ mà \emph{làm tag to hơn thật sự có tác dụng}.
+
+\section{Ví dụ số chuẩn của cây}
+\ptrtarget{A/05/04}
+
+Đây là ví dụ chạy xuyên suốt cả cây, và nó là ví dụ nhỏ nhất tính tay được theo yêu cầu của \code{learning-rules.md} mục~4. Giả sử:
+\[
+f = 600 \text{ px}, \quad Z = 0{,}5 \text{ m}, \quad W = 100 \text{ mm}, \quad \sigma = 0{,}2 \text{ px}.
+\]
+Kích thước tag trên ảnh: \(w = fW/Z = 600 \times 0{,}1/0{,}5 = 120\) px.
+
+Sai số ngang theo~\eqref{eq:a05-lateral}:
+\[
+\delta x = \frac{0{,}5 \times 0{,}2}{600} = \frac{0{,}1}{600} = 1{,}67\times10^{-4}\text{ m} = \mathbf{0{,}17 \text{ mm}}.
+\]
+Sai số dọc trục theo~\eqref{eq:a05-depth}:
+\[
+\delta Z = \frac{0{,}5 \times 0{,}2}{120} = \frac{0{,}1}{120} = 8{,}3\times10^{-4}\text{ m} = \mathbf{0{,}83 \text{ mm}}.
+\]
+Kiểm chéo bằng tỉ số: \(\delta Z/\delta x = 0{,}83/0{,}17 = 5\), và \(Z/W = 500/100 = 5\). Khớp. Đây là cửa kiểm chứng (b) cho cả hai công thức: chúng nhất quán với nhau ở một quan hệ độc lập với cách dẫn ra chúng.
+
+Đọc kết quả so với ngân sách 5\,mm: cả hai con số đều \emph{thoải mái}. Tịnh tiến không phải vấn đề, và nó không phải vấn đề với một biên độ lớn --- ta còn dư gần một bậc độ lớn. Đây là kết luận quan trọng nhất của ví dụ, và nó nên làm người đọc ngạc nhiên, vì nó nói rằng phần lớn công sức mà các dự án bỏ vào việc cải thiện độ chính xác vị trí là công sức tiêu vào chỗ đã dư.
+
+\begin{cambay}
+Con số \(\sigma = 0{,}2\) px trong ví dụ trên là \textbf{bậc độ lớn kinh nghiệm}, không phải số đo của một thí nghiệm có điều kiện xác định. Nó nằm trong khoảng mà người ta thường quan sát được với góc AprilTag trong điều kiện tốt, và \ptr{B/08} bàn kỹ hơn về khoảng này cùng với các phương pháp tinh chỉnh khác.
+
+Hệ quả bắt buộc: \emph{mọi con số milimét sinh ra từ nó cũng chỉ là bậc độ lớn}. Chúng đủ tốt để so sánh các phương án thiết kế với nhau, đủ tốt để biết mình dư hay thiếu một bậc, và \emph{không} đủ tốt để nghiệm thu. Trước khi nói ``hệ của tôi đạt 5\,mm'', bạn phải đo \(\sigma\) của chính hệ mình (\ptr{C/16}) và chạy lại phép tính với con số ấy.
+
+Cách sai lầm phổ biến nhất là lấy con số 0,17\,mm ở trên rồi báo cáo nó như độ chính xác của hệ thống. Nó không phải độ chính xác; nó là \emph{thành phần đóng góp của nhiễu góc vào độ lặp lại}, một dòng trong một bảng ngân sách còn có nhiều dòng khác --- và các dòng khác thường lớn hơn nó nhiều lần.
+\end{cambay}
+
+\section{Sai số xoay từ một tag phẳng: quy luật hoàn toàn khác}
+\ptrtarget{A/05/05}
+
+Hai mục trước có cùng cấu trúc: một phép vi phân, một hệ số quy đổi, một công thức sạch. Mục này không như thế, và chính sự khác biệt ấy là điều cần hiểu.
+
+Xét một tag phẳng và hỏi: nghiêng nó đi một góc nhỏ \(\delta\theta\) quanh một trục nằm \emph{trong} mặt phẳng tag thì hình chiếu trên ảnh đổi bao nhiêu? Bản chất nằm ở một quan sát hình học đơn giản.
+
+Nghiêng một tấm phẳng quanh trục nằm trong mặt phẳng của nó làm các điểm ở hai mép dịch chuyển theo chiều \emph{sâu} theo hai hướng ngược nhau: mép này lùi ra, mép kia tiến vào, với biên độ \(\pm(W/2)\sin\delta\theta\). Sự dịch chuyển theo chiều sâu ấy được camera nhìn thấy qua thay đổi của kích thước biểu kiến cục bộ --- tức qua chính cơ chế \emph{yếu} của mục~3B. Ngược lại, xoay tấm phẳng quanh trục \emph{vuông góc} với nó (tức xoay trong mặt phẳng ảnh, quanh trục quang) làm mọi điểm dịch chuyển theo chiều \emph{ngang} với biên độ \((W/2)\delta\theta\), và cái đó được nhìn thấy qua cơ chế \emph{tốt} của mục~3A.
+
+Đó là sự bất đối xứng cốt lõi, và nó cho ngay hai kết quả rất khác nhau. Với xoay trong mặt phẳng ảnh:
+\[
+\delta\theta_{\text{trong mặt phẳng}} \;\approx\; \frac{\delta x}{W/2} \;=\; \frac{2Z\sigma}{fW} \;=\; \frac{2\sigma}{w},
+\]
+tức nó tốt, và nó chỉ phụ thuộc vào kích thước tag trên ảnh. Với tag 120\,px và \(\sigma = 0{,}2\) px, con số này là \(3{,}3\times10^{-3}\) rad \(= 0{,}19^\circ\) --- vừa đủ trong ngân sách, và nó là thành phần xoay \emph{dễ nhất}.
+
+Với xoay ngoài mặt phẳng --- tức nghiêng tag --- thì phải qua cơ chế sâu, và ở đây xuất hiện hệ số \(\sin\):
+\begin{equation}
+\boxed{\;\delta\theta_{\text{ngoài mặt phẳng}} \;\gtrsim\; \frac{\delta Z}{(W/2)} \;\sim\; \frac{2Z\sigma}{w\,W}\;, \quad \text{và độ nhạy} \propto \sin\theta}
+\label{eq:a05-tilt}
+\end{equation}
+Tôi viết \(\gtrsim\) và \(\sim\) chứ không viết dấu bằng, vì con số chính xác phụ thuộc vào phân bố các góc và vào tham số hoá; đây là một \emph{quan hệ tỉ lệ} chứ không phải một đẳng thức, và nó được dùng đúng như vậy \emph{(tôi suy ra từ hình học cơ bản; cấu trúc phù hợp với phân tích trong \cite{schweighofer2006robust} và \cite{collins2014ippe} nhưng tôi chưa đối chiếu từng hệ số)}.
+
+Điều then chốt nằm ở mệnh đề thứ hai: \emph{độ nhạy tỉ lệ với \(\sin\theta\)}. Khi \(\theta \to 0\), tức khi tag ở tư thế fronto-parallel, độ nhạy tiến về không. Nghĩa là: nghiêng tag thêm một chút không làm ảnh đổi tới bậc một --- nó chỉ đổi tới bậc hai. Và một đại lượng mà phép đo chỉ phản ứng ở bậc hai là một đại lượng gần như không quan sát được.
+
+\begin{trucgiac}
+Vì sao fronto-parallel lại là tệ nhất, nói bằng hình ảnh và bằng số.
+
+Cầm một tấm bìa hình vuông và giơ thẳng trước mặt, vuông góc với hướng nhìn. Bây giờ nghiêng nó đi \(1^\circ\). Hình vuông có trông khác đi không? Gần như không --- nó vẫn là một hình vuông, chỉ ngắn lại theo một chiều đúng \(\cos 1^\circ = 0{,}99985\), tức 0,015\%. Với tag 120 px, đó là \(0{,}018\) px --- chìm hoàn toàn dưới nhiễu \(0{,}2\) px.
+
+Bây giờ nghiêng tấm bìa đi \(45^\circ\) rồi nghiêng thêm \(1^\circ\) nữa. Lần này hình dạng đổi rõ: chiều ngắn lại từ \(\cos 45^\circ = 0{,}7071\) xuống \(\cos 46^\circ = 0{,}6947\), tức \(1{,}8\%\) --- trên tag 120 px là \(2{,}2\) px, hoàn toàn đo được.
+
+Cùng một lượng nghiêng, hai mức đổi ảnh khác nhau hơn trăm lần. Đó là toàn bộ nội dung của \(\sin\theta\): đạo hàm của \(\cos\) là \(-\sin\), và \(\sin\) bằng không tại không.
+
+Bài học thực hành theo ngay: \emph{đường tiếp cận vuông góc là đường tệ nhất cho việc đo góc}. Nếu có thể chọn, hãy tiếp cận chếch, hoặc --- tốt hơn vì không đụng tới quỹ đạo robot --- nghiêng chính các tag đi so với mặt phẳng dock.
+\end{trucgiac}
+
+\section{Sai số xoay từ constellation: chia cho baseline}
+\ptrtarget{A/05/06}
+
+Mục trước kết thúc ở một tin xấu. Mục này là lối thoát, và lối thoát ấy đơn giản đến mức gần như thất vọng.
+
+Giả sử thay vì một tag, ta có hai tag cách nhau một khoảng \(B\) đã biết trong hệ dock, cả hai đều nhìn thấy được. Bây giờ hỏi: cả cụm quay đi một góc \(\delta\theta\) quanh một trục vuông góc với đường nối hai tag thì chuyện gì xảy ra? Tag thứ nhất dịch chuyển một đoạn \(\approx (B/2)\delta\theta\) theo một hướng, tag thứ hai dịch một đoạn như thế theo hướng ngược lại. Nếu trục quay được chọn sao cho dịch chuyển ấy nằm theo \emph{chiều ngang} của ảnh --- và với constellation trải rộng thì luôn có thành phần như vậy --- thì ta đo nó qua cơ chế \emph{tốt} của mục~3A, không qua cơ chế sâu.
+
+Vì vị trí của mỗi tag được xác định với sai số \(\delta x\), và góc được suy từ chênh lệch vị trí của hai tag chia cho khoảng cách giữa chúng:
+\begin{equation}
+\boxed{\;\delta\theta \;\approx\; \frac{\delta x}{B} \;=\; \frac{Z\,\sigma}{f\,B}\;}
+\label{eq:a05-baseline}
+\end{equation}
+Đây là quan hệ thứ tư và là quan hệ có giá trị thực dụng cao nhất trong cả cây.
+
+\subsection{A. Ví dụ số, tiếp nối ví dụ ở mục 4}
+
+Giữ nguyên \(f = 600\) px, \(Z = 0{,}5\) m, \(\sigma = 0{,}2\) px, nên \(\delta x = 0{,}167\) mm như đã tính. Đặt baseline \(B = 0{,}4\) m:
+\[
+\delta\theta \approx \frac{0{,}167\text{ mm}}{400\text{ mm}} = 4{,}2\times10^{-4}\text{ rad}
+= 4{,}2\times10^{-4} \times \frac{180}{\pi} = \mathbf{0{,}024^\circ}.
+\]
+So với ngân sách \(0{,}5^\circ\): ta dư \emph{hơn hai mươi lần}. Đặt cạnh con số ``dễ dàng vượt \(1\text{--}2^\circ\)'' của một tag phẳng nhìn vuông góc, chênh lệch giữa hai phương án là gần hai bậc độ lớn --- và phương án tốt hơn không đòi một dòng code nào khác, chỉ đòi đặt hai tấm tag cách nhau 40\,cm thay vì một tấm.
+
+Đây là câu trả lời cho Q5, và lý do câu trả lời không phụ thuộc con số cụ thể nằm ở cấu trúc của hai công thức. Giảm \(\sigma\) bốn lần thì cả \(\delta x\) lẫn \(\delta\theta\) giảm bốn lần --- tuyến tính, và có trần: \(\sigma\) không xuống dưới giới hạn quang học được (\ptr{A/06}). Tăng \(B\) thì \(\delta\theta\) giảm tuyến tính theo \(B\) --- cũng tuyến tính, nhưng \(B\) rẻ và gần như không có trần trong phạm vi kích thước một cái dock. Hơn nữa, và đây mới là điểm quyết định: tăng \(B\) đồng thời cho phép \emph{phá tính đồng phẳng} nếu bạn đặt hai tag ở hai độ sâu khác nhau, và cái đó khử luôn bài toán hai nghiệm của \ptr{A/04} --- một lợi ích mà giảm \(\sigma\) hoàn toàn không cho.
+
+\begin{cannho}
+Bốn quan hệ, thuộc lòng cả bốn:
+\[
+\delta x \approx \frac{Z\sigma}{f}, \qquad
+\delta Z \approx \frac{Z\sigma}{w}, \qquad
+\delta\theta_{\text{1 tag phẳng}} \sim \frac{1}{\sin\theta}\cdot\frac{Z\sigma}{wW}, \qquad
+\delta\theta_{\text{constellation}} \approx \frac{Z\sigma}{fB}.
+\]
+Đọc chúng cạnh nhau thì thấy ngay cấu trúc: tử số luôn là \(Z\sigma\); cái quyết định là \emph{mẫu số}. Mẫu số càng lớn càng tốt, và bốn mẫu số là \(f\), \(w\), \(wW\sin\theta\), \(fB\).
+
+Kết luận rút ra trong một câu: \emph{muốn xoay tốt thì tăng \(B\) và phá đồng phẳng, không phải tăng số tag đồng phẳng.} Thêm một tag thứ ba nằm giữa hai tag cũ hầu như không cải thiện gì vì nó không tăng \(B\); đẩy một tag ra xa thêm 20\,cm thì cải thiện thấy rõ.
+\end{cannho}
+
+Hình~\ref{fig:a05-hai-co-che} vẽ hai cơ chế cạnh nhau, và nó là hình nên nhớ cho cả chương.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[font=\small,>={Stealth[length=2mm]}]
+% --- trái: một tag phẳng, cơ chế biến dạng phối cảnh ---
+\begin{scope}
+\node[font=\footnotesize\bfseries,inkblue,anchor=south] at (2.3,3.4) {Một tag phẳng: đo qua biến dạng};
+\fill[inkblue] (0,1.5) circle (2pt);
+\node[font=\scriptsize,inkblue,anchor=east] at (-0.12,1.5) {cam};
+\draw[very thick,steel] (3.4,0.75) -- (3.4,2.25);
+\draw[->,tiercol] (0.12,1.52) -- (3.3,2.2);
+\draw[->,tiercol] (0.12,1.48) -- (3.3,0.8);
+\node[font=\scriptsize,steel,anchor=west,align=left] at (3.6,1.5) {\(\theta=0\):\\[-0.2em]nghiêng \(1^\circ\)\\[-0.2em]\(\Rightarrow\) 0,018 px};
+\draw[very thick,reddark,rotate around={40:(1.9,-0.15)}] (1.9,-0.9) -- (1.9,0.6);
+\node[font=\scriptsize,reddark,anchor=west,align=left] at (2.6,-0.35) {\(\theta=45^\circ\):\\[-0.2em]nghiêng \(1^\circ\)\\[-0.2em]\(\Rightarrow\) 2,2 px};
+\node[font=\scriptsize,align=center,tiercol,anchor=north] at (2.0,-1.5)
+  {độ nhạy \(\propto \sin\theta\)\\[-0.15em]\textbf{bằng 0 khi nhìn vuông góc}};
+\end{scope}
+% --- phải: constellation, cơ chế chênh lệch vị trí ---
+\begin{scope}[xshift=8.0cm]
+\node[font=\footnotesize\bfseries,inkblue,anchor=south] at (2.4,3.4) {Constellation: đo qua vị trí};
+\fill[inkblue] (0,1.5) circle (2pt);
+\node[font=\scriptsize,inkblue,anchor=east] at (-0.12,1.5) {cam};
+\draw[very thick,steel] (3.5,2.5) -- (3.5,3.0);
+\draw[very thick,steel] (3.5,0.0) -- (3.5,0.5);
+\draw[<->,thick,accent] (3.95,2.75) -- (3.95,0.25) node[midway,fill=white,inner sep=1pt,font=\scriptsize,accent] {\(B\)};
+\draw[->,tiercol] (0.12,1.56) -- (3.4,2.7);
+\draw[->,tiercol] (0.12,1.44) -- (3.4,0.3);
+\draw[very thick,reddark,dashed] (3.24,2.44) -- (3.24,2.94);
+\draw[very thick,reddark,dashed] (3.76,0.06) -- (3.76,0.56);
+\node[font=\scriptsize,reddark,anchor=west,align=left] at (4.3,1.5)
+  {quay \(\delta\theta\) \(\Rightarrow\)\\[-0.2em]hai tag dịch\\[-0.2em]ngược chiều, \(B\,\delta\theta\)};
+\node[font=\scriptsize,align=center,tiercol,anchor=north] at (2.4,-1.5)
+  {\(\delta\theta \approx \delta x/B\)\\[-0.15em]\textbf{tuyến tính theo baseline, không có \(\sin\)}};
+\end{scope}
+\end{tikzpicture}
+\caption{Hai cơ chế ước lượng góc. Bên trái, một tag phẳng: góc nghiêng chỉ lộ ra qua biến dạng phối cảnh, mà biến dạng ấy có đạo hàm tỉ lệ với \(\sin\theta\) --- bằng không đúng ở tư thế fronto-parallel, tức đúng tư thế của một robot tiếp cận thẳng trục. Hai con số trong hình là ví dụ số học cho tag 120\,px (tính ở mục~5), không phải số đo. Bên phải, một constellation baseline \(B\): góc lộ ra qua chênh lệch \emph{vị trí} của hai tag, một đại lượng đo bằng cơ chế tốt, và độ nhạy không có hệ số \(\sin\) nào cả. Đây là toàn bộ lý do vì sao lời khuyên ``tăng baseline'' thắng lời khuyên ``dùng detector tốt hơn''.}
+\label{fig:a05-hai-co-che}
+\end{figure}
+
+\section{Vì sao trung bình pose từ từng tag là sai}
+\ptrtarget{A/05/07}
+
+Công thức~\eqref{eq:a05-baseline} mang một hệ quả mà nhiều người bỏ lỡ, và nó đủ quan trọng để có mục riêng.
+
+Cách tự nhiên nhất khi nhìn thấy bốn tag là: chạy PnP cho từng tag, được bốn pose, rồi lấy trung bình. Cách này \emph{hỏng}, và nó hỏng theo hai tầng.
+
+Tầng thứ nhất là tầng thống kê, và nó tương đối dễ thấy. Pose sống trên \(SE(3)\) chứ không phải trên không gian véctơ, nên trung bình số học của các ma trận xoay không phải một ma trận xoay, và trung bình của quaternion phụ thuộc vào dấu ta gán cho từng quaternion (vì \(q\) và \(-q\) biểu diễn cùng một xoay). Có cách làm đúng --- trung bình Karcher trên \(SO(3)\) \cite{moakher2002means}, và \ptr{B/11} bàn kỹ --- nhưng ngay cả khi làm đúng, tầng thứ hai vẫn còn.
+
+Tầng thứ hai là tầng thông tin, và nó mới là tầng quyết định. Hãy nhìn kỹ vào việc ta vừa vứt đi cái gì. Pose của từng tag riêng lẻ có hiệp phương sai rất \emph{dị hướng}: chính xác cỡ 0,17\,mm theo hai chiều ngang, 0,83\,mm theo chiều sâu, và tệ tới vài độ theo hướng nghiêng. Trung bình bốn đại lượng như vậy cho ra một đại lượng có hiệp phương sai vẫn dị hướng như thế, chỉ nhỏ đi \(\sqrt{4} = 2\) lần theo mỗi hướng --- nên thành phần nghiêng vẫn tệ, chỉ tệ ít hơn hai lần.
+
+Trong khi đó, PnP hợp nhất trên toàn bộ tập góc \emph{biết} rằng bốn tag ấy gắn cứng với nhau ở những vị trí đã biết. Nó không đo bốn pose rồi gộp; nó đo \emph{một} pose bằng cách dùng toàn bộ \(4\times4 = 16\) góc, và vì các góc ấy trải trên một vùng rộng \(B\), thông tin về hướng đến từ cơ chế baseline chứ không từ cơ chế biến dạng. Cải thiện không phải \(\sqrt{4}\) lần mà là cỡ \(B/W\) lần, nhưng quan trọng hơn là nó \emph{đổi cơ chế}, và đổi cơ chế thì thoát khỏi hệ số \(\sin\theta\).
+
+Nói bằng ngôn ngữ của công thức~\eqref{eq:a05-cov}: trung bình pose là việc cộng các \(\Sigma_i\), còn PnP hợp nhất là việc cộng các \(\mathcal{I}_i = J_i^{\top}\Sigma_i^{-1}J_i\) \emph{trong cùng một hệ toạ độ}. Hai phép cộng ấy không giao hoán với phép nghịch đảo, và sự không giao hoán ấy chính là chỗ thông tin hình học nằm.
+
+\begin{cambay}
+Trung bình pose từ từng tag không chỉ kém tối ưu --- nó còn \emph{che giấu} vấn đề. Bốn pose từ bốn tag đồng phẳng sẽ có thành phần nghiêng nhảy loạn, nhưng trung bình của chúng trông mượt hơn nhiều và độ lệch chuẩn mẫu của bốn giá trị ấy trông nhỏ. Bạn sẽ báo cáo một độ lặp lại tốt cho một đại lượng vẫn đang sai có hệ thống.
+
+Phép thử phân biệt: đừng nhìn độ tản mát giữa các tag, hãy nhìn \emph{sai số tái chiếu}. PnP hợp nhất cho một con số sai số tái chiếu duy nhất, và nếu constellation của bạn sai so với mô hình thì con số ấy lớn lên và bạn thấy. Trung bình pose không có đại lượng tương đương, nên nó không có cách nào báo động.
+\end{cambay}
+
+\section{Cộng các nguồn sai số: khi nào bình phương, khi nào cộng thẳng}
+\ptrtarget{A/05/08}
+
+Chương này tính đóng góp của nhiễu góc. Ngân sách thật (\ptr{C/15}) có nhiều dòng hơn: sai số constellation so với mô hình, sai số intrinsic, sai số hand-eye, sai số bám của bộ điều khiển. Câu hỏi cộng chúng thế nào không tầm thường và trả lời sai thì ngân sách vô nghĩa.
+
+Quy tắc có hai nhánh, và ranh giới giữa chúng là \emph{ngẫu nhiên hay hệ thống}.
+
+Các nguồn \vn{ngẫu nhiên}{random} --- độc lập, trung bình không, đổi từ khung này sang khung khác --- cộng theo bình phương:
+\[
+\sigma_{\text{tổng}} = \sqrt{\sigma_1^2 + \sigma_2^2 + \cdots}.
+\]
+Nhiễu định vị góc thuộc loại này. Hệ quả quan trọng của phép cộng bình phương: \emph{nguồn nhỏ gần như không đóng góp gì}. Nếu \(\sigma_1 = 3\) mm và \(\sigma_2 = 1\) mm thì tổng là \(\sqrt{9+1} = 3{,}16\) mm --- nguồn thứ hai thêm 5\%, dù nó bằng một phần ba nguồn thứ nhất. Đây là cơ sở định lượng cho luận điểm ``mắt xích yếu nhất quyết định'' ở \ptr{00-map}, và nó nói rằng tối ưu hoá một nguồn đã nhỏ là lãng phí.
+
+Các nguồn \vn{hệ thống}{systematic} --- không đổi hoặc đổi chậm, có dấu xác định --- cộng \emph{thẳng} trong trường hợp xấu nhất:
+\[
+e_{\text{tổng}} \le e_1 + e_2 + \cdots
+\]
+Sai số kích thước tag, sai số constellation so với CAD, sai số hand-eye thuộc loại này. Chúng không trung bình mất đi khi bạn lấy nhiều khung --- lấy một nghìn khung thì chúng vẫn nguyên vẹn. Đây là lý do vì sao \(1\) mm sai số cơ khí nguy hiểm hơn nhiều so với \(1\) mm nhiễu: nhiễu chia cho \(\sqrt{N}\), sai số hệ thống thì không.
+
+Và đây là chỗ luận điểm teach-by-showing của \ptr{B/13} có cơ sở định lượng. Nếu ta điều khiển theo \emph{sai lệch tương đối} so với một pose mục tiêu đã ghi lại, thì mọi nguồn hệ thống xuất hiện ở cả hai vế và \emph{trừ đi nhau}. Ngân sách thu hẹp lại chỉ còn các nguồn ngẫu nhiên --- tức chỉ còn những nguồn chia được cho \(\sqrt{N}\). Đó là lý do kỹ thuật ấy không phải một mẹo vặt mà là một thay đổi bậc độ lớn trong bài toán.
+
+\section{Giới hạn và chế độ hỏng}
+\ptrtarget{A/05/09}
+
+Bốn công thức của chương đứng trên một tập giả thiết, và chúng hỏng khi giả thiết bị vi phạm. Bốn chỗ hỏng dưới đây đều xảy ra thật.
+
+\textbf{Giả thiết nhiễu Gauss, độc lập, đẳng hướng, trung bình không.} Vi phạm phổ biến nhất là \emph{tương quan}: bốn góc của cùng một tag chịu chung một mức mờ, một hướng chiếu sáng, một sai số méo cục bộ, nên nhiễu của chúng tương quan mạnh. Hậu quả: hiệp phương sai thật lớn hơn công thức dự đoán, và cải thiện theo \(\sqrt{N}\) không xảy ra. Vi phạm thứ hai là \emph{trung bình khác không}, tức thiên lệch --- motion blur đẩy góc về một phía, bias tâm ellipse đẩy tâm theo một hướng phụ thuộc tư thế (\ptr{A/06}). Công thức~\eqref{eq:a05-cov} hoàn toàn mù với thiên lệch: nó mô tả độ tản mát quanh \emph{giá trị mà bộ ước lượng hội tụ tới}, chứ không nói giá trị ấy có đúng không.
+
+\textbf{Giả thiết mô hình đúng.} Đã bàn ở mục~2: nếu intrinsic sai hoặc constellation sai, phần dư mang thành phần hệ thống, khai triển Gauss--Newton không còn hợp lệ, và hiệp phương sai báo về nhỏ hơn sự thật. Đây là chế độ hỏng nguy hiểm nhất vì nó đi theo chiều sai lầm: hệ thống trở nên \emph{tự tin hơn} khi nó sai nhiều hơn.
+
+\textbf{Giả thiết góc nhỏ trong các quan hệ tỉ lệ.} Công thức~\eqref{eq:a05-baseline} dùng xấp xỉ \(\sin\delta\theta \approx \delta\theta\) --- luôn đúng cho sai số cỡ phần nghìn radian, nên đây không phải giới hạn thực tế. Nhưng~\eqref{eq:a05-tilt} thì khác: nó là quan hệ tỉ lệ chứ không phải đẳng thức, và hệ số của nó phụ thuộc vào chi tiết phân bố góc mà tôi không dẫn ra. Dùng nó để \emph{so sánh} hai phương án thì được; dùng nó để dự đoán một con số tuyệt đối thì không. Với con số tuyệt đối, hãy chạy Monte Carlo (\ptr{C/16}).
+
+\textbf{Giả thiết tuyến tính hoá quanh nghiệm đúng.} Toàn bộ phân tích là \emph{cục bộ}. Nó không nói gì về khả năng bộ giải hội tụ vào một cực tiểu cục bộ khác --- và với target phẳng thì có đúng một cực tiểu khác như thế, chính là nghiệm thứ hai của \ptr{A/04}. Hiệp phương sai tính quanh nghiệm sai vẫn trông đẹp. Đây là lý do chương~4 và chương này phải đọc cùng nhau: chương này định giá nhiễu, chương kia cảnh báo về lỗi thô, và một ngân sách chỉ tính nhiễu là một ngân sách bỏ sót chi phí lớn nhất.
+
+\begin{table}[H]\centering\small
+\caption{Bốn giả thiết của chương, chỗ hỏng, và dấu hiệu nhận ra.}
+\label{tab:a05-gia-thiet}
+\begin{tabularx}{\linewidth}{@{}L{3.1cm}L{4.1cm}Y@{}}
+\toprule
+\textbf{Giả thiết} & \textbf{Vi phạm điển hình} & \textbf{Dấu hiệu nhận ra}\\
+\midrule
+Nhiễu độc lập giữa các góc & Cùng tag chịu chung blur, chiếu sáng, méo cục bộ & Lấy trung bình \(N\) khung không cải thiện theo \(1/\sqrt{N}\); độ tản mát bão hoà sớm\\
+Nhiễu trung bình không & Motion blur, bias tâm ellipse, rolling shutter & Sai số đổi dấu khi đổi chiều chuyển động; sai số phụ thuộc tư thế một cách trơn\\
+Mô hình đúng & Intrinsic sai, constellation lệch CAD, méo chưa khử sạch & Sai số tái chiếu có \emph{cấu trúc} theo vị trí ảnh, không giống nhiễu trắng\\
+Tuyến tính hoá cục bộ & Hội tụ vào nghiệm thứ hai của target phẳng & Pose nhảy giữa hai giá trị; tỉ số sai số tái chiếu của hai nghiệm gần 1\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Thực hành: dùng bốn quan hệ này trong một buổi chiều}
+\ptrtarget{A/05/10}
+
+Bốn công thức trên có một cách dùng rất cụ thể ở giai đoạn thiết kế, và nó gồm năm bước làm được trên giấy.
+
+\emph{Bước một}, viết ra bốn con số của bài toán: tiêu cự \(f\) tính bằng pixel (từ trường nhìn và độ phân giải, hoặc từ hiệu chuẩn nếu đã có), khoảng cách cuối \(Z\) ở thời điểm cần chính xác nhất, kích thước tag \(W\) dự kiến, và \(\sigma\) --- dùng \(0{,}2\) px làm giá trị mặc định thận trọng nếu chưa đo được. \emph{Bước hai}, tính \(w = fW/Z\); nếu \(w\) nhỏ hơn khoảng 60 px thì dừng lại và xem lại thiết kế, vì decode sẽ bắt đầu không tin cậy (\ptr{B/07}) và mọi phép tính sau đó là vô nghĩa. \emph{Bước ba}, tính \(\delta x\) và \(\delta Z\); gần như chắc chắn chúng sẽ nhỏ so với ngân sách, và đó là tin tốt cần được ghi nhận chứ không phải bỏ qua. \emph{Bước bốn}, tính \(\delta\theta\) cho baseline dự kiến và so với ngân sách góc; đây là dòng quyết định. \emph{Bước năm}, nếu không đạt, giải ngược công thức~\eqref{eq:a05-baseline} theo \(B\) để biết baseline tối thiểu cần bao nhiêu --- và đó là con số bạn mang sang cho người thiết kế cơ khí.
+
+Bước năm đáng nhấn mạnh vì nó là chỗ chương này trả lại giá trị lớn nhất. Giải ngược:
+\[
+B_{\min} = \frac{Z\,\sigma}{f\,\delta\theta_{\text{cho phép}}}.
+\]
+Với ví dụ của cây (\(Z = 0{,}5\) m, \(\sigma = 0{,}2\) px, \(f = 600\) px) và ngân sách góc \(0{,}5^\circ = 8{,}73\times10^{-3}\) rad, ta được \(B_{\min} = 0{,}1/(600 \times 8{,}73\times10^{-3}) = 0{,}019\) m, tức \emph{19\,mm}. Con số ấy nhỏ đến mức đáng ngờ, và nó đáng được đọc cho đúng: nó nói rằng \emph{nếu} cơ chế baseline hoạt động thuần tuý và không có nguồn sai số nào khác, thì một baseline 2\,cm đã đủ. Thực tế không như vậy, vì các nguồn hệ thống ở mục~8 --- đặc biệt là sai số của chính constellation --- chiếm phần lớn ngân sách. Cách dùng đúng của con số này là: \emph{nhiễu góc không phải ràng buộc cho baseline; ràng buộc thật đến từ độ chính xác cơ khí của tấm marker}, và \ptr{C/15} làm rõ chuyện đó bằng một bảng đầy đủ.
+
+\begin{onbai}
+\ar[3]{Công thức gốc của cả chương}{\(\Sigma_{\text{pose}} \approx (\sum_i J_i^{\top}\Sigma_i^{-1}J_i)^{-1}\) --- nghịch đảo ma trận thông tin Fisher \cite{kay1993,haralick1998propagating}. Nó là cận dưới cho \emph{mọi} bộ ước lượng không chệch, nên đổi thuật toán không vượt qua được nó.}
+\ar[3]{Sai số ngang}{\(\delta x \approx Z\sigma/f\). Tuyến tính theo khoảng cách. Không phụ thuộc kích thước tag --- đây là chỗ phản trực giác nhất trong bốn công thức.}
+\ar[3]{Sai số dọc trục}{\(\delta Z \approx Z\sigma/w = Z^2\sigma/(fW)\). Bậc hai theo khoảng cách. Tệ hơn sai số ngang đúng \(f/w = Z/W\) lần.}
+\ar[3]{Tỉ số sâu trên ngang}{\(Z/W\) --- khoảng cách chia kích thước tag. Tag 100 mm ở 500 mm: tệ hơn 5 lần. Ở 3 m: tệ hơn 30 lần.}
+\ar[3]{Xoay từ một tag phẳng}{Độ nhạy \(\propto \sin\theta\) với \(\theta\) là góc nghiêng. Bằng không ở fronto-parallel, tức đúng tư thế của robot tiếp cận thẳng trục. Đây là nguồn lỗi xoay số một.}
+\ar[3]{Xoay từ constellation}{\(\delta\theta \approx \delta x/B = Z\sigma/(fB)\). Không có hệ số \(\sin\) nào. Cải thiện tuyến tính theo baseline.}
+\ar[3]{Ví dụ số chuẩn của cây}{\(f=600\) px, \(Z=0{,}5\) m, \(W=100\) mm, \(\sigma=0{,}2\) px \(\Rightarrow\) \(w=120\) px, \(\delta x=0{,}17\) mm, \(\delta Z=0{,}83\) mm, và với \(B=0{,}4\) m thì \(\delta\theta=0{,}024^\circ\). Tất cả tính tay được.}
+\ar[3]{Kết luận một câu của chương}{Translation gần như luôn đạt; rotation là nút thắt; và cách chữa nút thắt là hình học (baseline, phá đồng phẳng) chứ không phải thuật toán.}
+\ar[2]{Vì sao trung bình pose là sai}{Hai tầng: pose sống trên \(SE(3)\) nên trung bình số học không hợp lệ \cite{moakher2002means}; và quan trọng hơn, nó vứt bỏ ràng buộc hình học giữa các tag, tức vứt bỏ đúng cơ chế baseline.}
+\ar[2]{Cộng sai số ngẫu nhiên}{Theo bình phương: \(\sqrt{\sigma_1^2+\sigma_2^2}\). Hệ quả: nguồn bằng 1/3 nguồn lớn nhất chỉ thêm 5\% vào tổng --- nên tối ưu nguồn nhỏ là lãng phí.}
+\ar[3]{Cộng sai số hệ thống}{Cộng thẳng trong trường hợp xấu nhất, và \emph{không} chia cho \(\sqrt{N}\) khi lấy trung bình nhiều khung. Đây là lý do 1 mm cơ khí nguy hiểm hơn 1 mm nhiễu.}
+\ar[2]{Baseline tối thiểu}{\(B_{\min} = Z\sigma/(f\,\delta\theta_{\text{cho phép}})\). Với ví dụ chuẩn và ngân sách \(0{,}5^\circ\): 19 mm --- nhỏ, và điều đó nói rằng ràng buộc thật không đến từ nhiễu góc mà từ cơ khí.}
+\ar[2]{Chế độ hỏng nguy hiểm nhất}{Mô hình sai (intrinsic, constellation): phần dư có thành phần hệ thống, hiệp phương sai báo về \emph{nhỏ hơn} sự thật. Hệ thống tự tin hơn khi nó sai nhiều hơn.}
+\ar[2]{Dấu hiệu mô hình sai}{Sai số tái chiếu có \emph{cấu trúc} theo vị trí ảnh --- vẽ residual theo toạ độ ảnh, nếu thấy vân thì mô hình sai chứ không phải nhiễu lớn \cite{beyer1992accurate}.}
+\ar[1]{Vì sao không đưa \(\sqrt{N}\) vào công thức}{Vì nhiễu giữa các góc cùng một tag tương quan mạnh (chung blur, chung chiếu sáng, chung méo cục bộ), nên \(\sqrt{N}\) là lời hứa thường không được giữ. Bỏ nó ra là cách ước lượng thận trọng.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{\repo{apriltag} (\code{apriltag\_pose.c})}{Tính sai số tái chiếu cho hai nghiệm IPPE --- đo trực tiếp thứ mà mục 9 gọi là cảnh báo lỗi thô}{Chỗ lý thuyết chương này gặp code; đọc kèm \ptr{A/04}}
+\ud{\repo{OpenCV} \code{solvePnPGeneric}}{Trả về nhiều nghiệm kèm sai số tái chiếu từng nghiệm}{API duy nhất cho bạn đại lượng cần để đo ambiguity}
+\ud{Hiệu chuẩn bằng target phẳng \cite{zhang2000flexible}}{Dùng target rộng và nhiều tư thế để ma trận thông tin không suy biến theo hướng nào --- đúng nguyên lý baseline của mục 6}{Hiệu chuẩn và docking là cùng một bài toán hình học}
+\ud{\repo{tagslam} \cite{pfrommer2019tagslam}}{Bài toán hợp nhất trên toàn bộ tag thay vì trung bình pose từng tag}{Hiện thân của mục 7; mức tin C, dùng làm gợi ý kiến trúc}
+\ud{Đánh giá quỹ đạo \cite{zhang2018tutorial}}{Cùng tư duy: chọn sai phép căn chỉnh thì con số sai số vô nghĩa}{Song song về phương pháp luận, khác lĩnh vực}
+\end{ungdung}
+
+\begin{duan}{Kiểm bốn quan hệ tỉ lệ bằng Monte Carlo, không cần phần cứng}{1--2 ngày}
+\dmt xác nhận bằng số rằng bốn công thức của chương đúng tới hệ số, và tự tay nhìn thấy hệ số \(\sin\theta\) làm sai số xoay nổ tung khi tag về fronto-parallel.
+\ddl tự sinh hoàn toàn. Không cần camera, không cần tag thật. Một hàm chiếu điểm với \(K\) đã biết, một tập góc 3D, một bộ sinh nhiễu Gauss.
+\dbc dựng một tag vuông cạnh \(W\) với bốn góc trong hệ dock; đặt nó ở khoảng cách \(Z\), chiếu ra ảnh bằng \(K\); thêm nhiễu Gauss \(\sigma\) vào từng toạ độ góc; chạy \code{solvePnPGeneric}; lặp 2000 lần và lấy độ lệch chuẩn của từng thành phần pose; lặp toàn bộ quy trình khi quét \(Z\), quét \(W\), quét \(\sigma\), và quét góc nghiêng \(\theta\) từ \(0^\circ\) tới \(60^\circ\); cuối cùng thay một tag bằng hai tag cách nhau \(B\) và quét \(B\).
+\dxk bạn có bốn đồ thị log--log, và độ dốc của chúng khớp với bốn công thức: \(\delta x\) dốc \(+1\) theo \(Z\), \(\delta Z\) dốc \(+2\) theo \(Z\), \(\delta\theta\) dốc \(-1\) theo \(B\), và \(\delta\theta_{\text{1 tag}}\) tăng vọt khi \(\theta \to 0\). Kiểm tra chéo bắt buộc: với \(\theta\) nhỏ, hãy \emph{cũng} kiểm xem \code{solvePnPGeneric} có trả về hai nghiệm với sai số tái chiếu gần bằng nhau không --- nếu có thì phần lớn độ tản mát bạn đang đo là lỗi thô do chọn nhầm nghiệm chứ không phải nhiễu, và hai thứ đó phải được báo cáo riêng.
+\dnv \ptr{C/16} --- script này chính là hạt nhân của mini project ở đó; \ptr{A/04} cho phần hai nghiệm.
+\end{duan}
+
+\begin{traloi}
+\tl{Không phải gấp đôi trong thực tế, dù công thức nói vậy. Tăng độ phân giải gấp đôi với cùng ống kính làm \(f\) tính bằng pixel tăng gấp đôi, nên \(\delta x = Z\sigma/f\) giảm một nửa --- \emph{nếu} \(\sigma\) tính bằng pixel giữ nguyên. Nó thường không giữ nguyên: pixel nhỏ hơn thu ít photon hơn nên tỉ số tín hiệu trên nhiễu kém đi, và quang học có thể không phân giải nổi mức chi tiết mới (giới hạn MTF, \ptr{A/06}). Nguyên tắc chung: \(f\) là đại lượng hình học thật, còn \(\sigma\) là đại lượng phụ thuộc toàn bộ chuỗi quang học và thuật toán, nên đừng cải thiện một cái mà quên kiểm cái kia.}
+\tl{Tag 200 mm cho \(w = 240\) px, nên \(\delta Z = 0{,}5\times0{,}2/240 = 0{,}42\) mm --- cải thiện đúng hai lần, tuyến tính theo \(W\). Nhưng hai tag 100 mm cách nhau 200 mm cho một thứ mà tag lớn không cho: một baseline. Sai số xoay của nó là \(\delta x/B = 0{,}167/200 = 8{,}3\times10^{-4}\) rad \(= 0{,}048^\circ\), trong khi tag đơn 200 mm vẫn chịu hệ số \(\sin\theta\) nên ở fronto-parallel thì tệ hơn hàng chục lần. Nói ngắn: tag lớn mua cho bạn chiều sâu, constellation mua cho bạn góc --- và góc mới là nút thắt.}
+\tl{Bằng \(f/w\), tương đương \(Z/W\). Lý do cơ chế: chiều ngang được đo \emph{trực tiếp} qua vị trí trên ảnh với hệ số quy đổi \(Z/f\); chiều sâu được đo \emph{gián tiếp} qua kích thước biểu kiến với hệ số quy đổi \(Z/w\). Vì \(w\) luôn nhỏ hơn \(f\) rất nhiều (tag chiếm một phần nhỏ của trường nhìn), chiều sâu luôn tệ hơn. Cách nhớ: bạn đo vị trí bằng cả khung hình làm thước, còn đo khoảng cách chỉ bằng chính cái tag làm thước.}
+\tl{Vì góc nghiêng chỉ lộ ra qua \emph{biến dạng phối cảnh}, và biến dạng ấy tỉ lệ với \(\cos\theta\) --- một hàm có đạo hàm \(-\sin\theta\), bằng không tại \(\theta = 0\). Cụ thể: nghiêng \(1^\circ\) từ tư thế vuông góc làm cạnh ngắn lại 0,015\%, tức 0,018 px trên tag 120 px, chìm dưới nhiễu. Nghiêng \(1^\circ\) từ tư thế \(45^\circ\) làm cạnh ngắn lại 1,8\%, tức 2,2 px, đo được thoải mái. Cùng một lượng nghiêng, hai mức tín hiệu cách nhau hơn trăm lần. Lối thoát có hai: tiếp cận chếch có chủ ý, hoặc --- tốt hơn vì không đụng tới quỹ đạo robot --- nghiêng chính các tag trong constellation.}
+\tl{Baseline, và chênh lệch là lớn chứ không sát sao. Giảm \(\sigma\) bốn lần (0,2 xuống 0,05 px --- một cải thiện rất khó, đòi chuyển sang ChArUco cộng quang học tốt cộng trung bình nhiều khung) làm \(\delta\theta\) giảm đúng bốn lần. Thêm 30 cm baseline lên một constellation đang có 10 cm làm \(\delta\theta\) giảm bốn lần bằng một việc duy nhất là bắt vít hai tấm tag xa nhau hơn. Lý do câu trả lời không phụ thuộc con số cụ thể: cả hai đều tuyến tính, nên tỉ lệ giá trên hiệu quả quyết định, và baseline gần như miễn phí trong phạm vi kích thước một cái dock trong khi \(\sigma\) chạm trần vật lý rất nhanh. Thêm nữa, baseline lớn hơn thường đi kèm khả năng đặt tag ở hai độ sâu khác nhau, và cái đó khử luôn bài toán hai nghiệm --- một lợi ích mà giảm \(\sigma\) hoàn toàn không cho.}
+\end{traloi}
+
+\begin{dongian}
+Tưởng tượng bạn đứng ở một đầu sân bóng và có người hỏi về một cái biển hiệu ở đầu kia.
+
+\emph{Biển nằm lệch trái phải bao nhiêu?} Dễ. Bạn nhìn nó nằm ở đâu so với khung hình trong mắt mình, rồi quy ra. Nhìn càng rõ thì trả lời càng chính xác, và độ chính xác tỉ lệ thẳng với việc bạn nhìn rõ tới đâu.
+
+\emph{Biển cách bao xa?} Khó hơn nhiều, vì bạn không nhìn thẳng được khoảng cách. Bạn phải suy: ``biển ấy cao chừng một mét, mà trông nó nhỏ thế này, vậy nó phải xa chừng ấy.'' Vấn đề là bạn đang lấy chính cái biển làm thước đo, mà cái biển thì nhỏ. Đo bằng một cái thước nhỏ thì sai nhiều hơn đo bằng một cái thước lớn --- đó là toàn bộ lý do khoảng cách khó hơn vị trí, và nó khó hơn đúng bằng tỉ số giữa cái sân và cái biển.
+
+\emph{Biển đang xoay nghiêng bao nhiêu độ?} Đây mới là chỗ thú vị, và nó không khó hơn một chút mà khó hơn theo một kiểu khác hẳn. Nếu cái biển đang quay mặt thẳng về phía bạn, thì nghiêng nó đi một độ trông \emph{y hệt}. Bạn không phát hiện được, không phải vì mắt bạn kém mà vì thật sự không có gì để phát hiện. Còn nếu cái biển đang nghiêng sẵn bốn mươi lăm độ, thì nghiêng thêm một độ nhìn thấy rõ ngay. Cùng một câu hỏi, cùng một con mắt, hai câu trả lời khác nhau hàng trăm lần --- và cái quyết định là \emph{tư thế của cái biển}, không phải chất lượng của mắt bạn.
+
+Giờ đến mẹo. Giả sử thay vì một cái biển, ở đầu sân có \emph{hai} cái cột cách nhau mười mét, và bạn biết chúng cách nhau đúng mười mét. Cả cụm quay đi một độ thì sao? Cột này dịch sang trái, cột kia dịch sang phải, mỗi cột dịch gần một tấc. Mà việc nhìn xem một cái cột dịch sang trái hay phải thì bạn giỏi --- đó là câu hỏi loại thứ nhất, câu hỏi dễ. Bạn vừa biến một câu hỏi khó thành một câu hỏi dễ, chỉ bằng cách nhìn hai vật thay vì một.
+
+Và đây là điều đáng nhớ nhất: cách làm ấy không đòi mắt tinh hơn. Nó đòi hai cái cột đặt xa nhau. Đặt chúng cách nhau hai mươi mét thay vì mười thì bạn đo góc chính xác gấp đôi --- vẫn với đúng con mắt ấy.
+
+\chuadongian{ranh giới giữa ``nhiễu'' và ``sai số hệ thống'' không nhìn ra được từ một lần đo. Cả hai đều làm con số lệch khỏi sự thật; chỉ có điều một loại thì lấy trung bình nhiều lần sẽ hết, loại kia thì không. Phân biệt chúng đòi hoặc một chuẩn bên ngoài để so, hoặc một phép thử thay đổi điều kiện có chủ ý --- và đó là việc phải làm bằng tay, không có công thức nào thay được.}
+\motcau{Sai số chia cho tiêu cự thì nhỏ, chia cho kích thước tag thì lớn hơn, còn góc thì đừng chia cho gì cả --- hãy chia cho baseline.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{A/05/11}
+
+Theo quy tắc của kho, một chương phải nói rõ điều gì sẽ bác bỏ nó. Với chương này, các mệnh đề bác bỏ được rất cụ thể --- và may mắn là chúng đều kiểm được bằng script Monte Carlo trong một buổi.
+
+Mệnh đề chính --- \emph{\(\delta\theta\) từ constellation tỉ lệ nghịch với \(B\), không có hệ số \(\sin\theta\)} --- bị bác bỏ nếu một mô phỏng cẩn thận cho thấy sai số xoay của một constellation không đồng phẳng \emph{vẫn} tăng vọt khi camera về tư thế fronto-parallel so với mặt phẳng trung bình của constellation. Tôi đã dẫn mệnh đề này bằng hình học góc nhỏ (cửa a) nhưng \emph{chưa} chạy mô phỏng, nên nó chưa qua cửa (b) --- và đây là chỗ nợ kiểm chứng lớn nhất của chương, đã ghi vào \code{99-chua-biet.md}.
+
+Mệnh đề thứ hai --- \emph{\(\delta Z/\delta x = Z/W\)} --- bị bác bỏ nếu đo được một tỉ số khác đáng kể trong mô phỏng với nhiễu Gauss độc lập. Đây là mệnh đề tôi tin nhất vì nó đã qua hai cửa: tự dẫn bằng vi phân, và kiểm nhất quán bằng ví dụ số ở mục~4 (hai công thức độc lập cho cùng tỉ số 5).
+
+Mệnh đề thứ ba --- \emph{PnP hợp nhất tốt hơn trung bình pose, và tốt hơn theo hệ số cỡ \(B/W\) chứ không phải \(\sqrt{N}\)} --- bị bác bỏ nếu mô phỏng cho thấy hai cách cho cùng độ tản mát góc trên một constellation trải rộng. Đây là mệnh đề dễ kiểm nhất và nên kiểm sớm nhất, vì nó ảnh hưởng trực tiếp tới kiến trúc phần mềm.
+
+Cuối cùng, một mệnh đề mềm hơn nhưng đáng nêu: chương này khẳng định rằng \emph{trong bài toán docking, thành phần xoay luôn là ràng buộc chặt hơn thành phần tịnh tiến}. Điều đó bị bác bỏ nếu trong một hệ thống thật, sai lệch cuối cùng bị chi phối bởi thành phần tịnh tiến --- và điều ấy hoàn toàn có thể xảy ra nếu sai số hand-eye hoặc sai số bám của bộ điều khiển lớn, vì hai nguồn ấy không nằm trong phân tích của chương này. Nói cách khác, kết luận của chương đúng trong phạm vi \emph{chuỗi quang học tới pose}, và \ptr{C/15} là chương kiểm xem nó còn đúng khi tính cả chuỗi.
+
+\section{Kết nối}
+\ptrtarget{A/05/12}
+
+Chương này là bản lề của cả cây: nó nhận công cụ từ ba chương trước và cấp số liệu cho mọi chương sau.
+
+Nối lên trên trước. \ptr{A/01-mo-hinh-camera-va-distortion} cho \(f\), đại lượng camera duy nhất trong mọi công thức ở đây --- và nó cũng cảnh báo rằng nếu méo chưa khử sạch thì giả thiết ``mô hình đúng'' ở mục~2 bị vi phạm và hiệp phương sai báo về là sai. \ptr{A/03-pnp-va-uoc-luong-tu-the} cho Jacobian \(J\); chương này chỉ làm một việc là đảo \(J^{\top}J\) và đọc ý nghĩa của các phần tử. \ptr{A/04-pose-ambiguity-target-phang} là chương song sinh: nó mô tả lỗi thô, chương này mô tả nhiễu, và một phân tích chỉ có một trong hai là một phân tích thiếu. Trên thực tế hai chương ấy nói cùng một sự thật ở hai mức: mục~5 ở đây nói độ nhạy tiến về không khi fronto-parallel, còn chương~4 nói rằng khi độ nhạy về không thì hai nghiệm trở nên không phân biệt được. Đó là cùng một hiện tượng nhìn từ hai phía.
+
+Nối xuống dưới, theo thứ tự cấp bách. \ptr{C/15-ngan-sach-sai-so} là chương nhận trực tiếp và đầy đủ nhất: nó lấy bốn công thức này, gắn số thật, cộng thêm các dòng hệ thống theo quy tắc ở mục~8, và ra bảng ngân sách. Nếu bạn chỉ đọc hai chương trong cả cây thì hãy đọc chương này và chương~15. \ptr{B/09-multi-marker-constellation} biến mục~6 thành hướng dẫn thiết kế cụ thể: đặt bao nhiêu tag, ở đâu, nghiêng bao nhiêu. \ptr{B/08-corner-refinement} là chương quyết định \(\sigma\), tức đại lượng duy nhất ở đây mà phần mềm còn ảnh hưởng được. \ptr{B/11-uoc-luong-theo-thoi-gian} khai thác chỗ mà mục~8 để ngỏ: nguồn ngẫu nhiên chia cho \(\sqrt{N}\), nên trung bình nhiều khung là cách rẻ nhất để giảm \(\sigma\) --- và nó cũng là chương giải thích vì sao cách đó \emph{không} giúp gì cho các nguồn hệ thống.
+
+Cuối cùng, một nối ngang quan trọng nhất về mặt thực hành. \ptr{B/13-docking-control} lấy mục~8 làm nền lý thuyết cho luận điểm teach-by-showing: nếu điều khiển theo sai lệch tương đối, mọi dòng \emph{hệ thống} trong ngân sách triệt tiêu và chỉ còn các dòng \emph{ngẫu nhiên}, tức chỉ còn những dòng chia được cho \(\sqrt{N}\). Chương này cung cấp lý do định lượng cho việc vì sao mẹo ấy không phải một mẹo nhỏ mà là một thay đổi bậc độ lớn.
+
+\begin{tukiem}
+\item Vì sao sai số ngang không phụ thuộc kích thước tag còn sai số dọc trục thì phụ thuộc --- hãy trả lời bằng cách chỉ ra hai đại lượng đóng vai trò ``thước đo'' trong hai trường hợp?
+\item Một đồng nghiệp đề xuất tăng số tag đồng phẳng từ bốn lên mười sáu để cải thiện độ chính xác góc. Cải thiện kỳ vọng là bao nhiêu lần, và vì sao nó không giải quyết được vấn đề gốc?
+\item Bạn đo được sai số xoay thực tế lớn hơn công thức dự đoán mười lần. Nêu ba nguyên nhân hoàn toàn khác nhau, và với mỗi nguyên nhân nêu một phép đo phân biệt nó với hai nguyên nhân kia.
+\item Công thức \(\Sigma \approx (J^\top\Sigma_{\text{px}}^{-1}J)^{-1}\) bỏ đi một số hạng trong đạo hàm bậc hai của hàm mục tiêu. Số hạng đó là gì, khi nào nó không triệt tiêu, và hậu quả đi theo chiều an toàn hay chiều nguy hiểm?
+\item Bạn lấy trung bình 100 khung hình khi robot đứng yên. Nguồn sai số nào giảm 10 lần, nguồn nào không giảm chút nào, và làm sao phân biệt hai loại đó chỉ bằng dữ liệu đo chứ không cần chân trị?
+\item Với \(Z = 2\) m thay vì 0,5 m và mọi thứ khác giữ nguyên, bốn con số của ví dụ chuẩn thành bao nhiêu? Tính nhẩm, rồi nói xem con số nào vượt ngân sách trước.
+\item Vì sao \(B_{\min} = 19\) mm tính ở mục 10 là một con số đúng nhưng dùng sai cách thì nguy hiểm --- điều gì nó không tính tới?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,253 @@
+% ============================================================================
+%  E/20-cong-cu — file chương
+%  Ngày tạo: 2026-09-07 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+%  Dependency: E/19, D/16, D/17. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../english.tex]{subfiles}
+\begin{document}
+\chapter{Công cụ: từ điển, ngữ liệu, và mô hình ngôn ngữ (Tools)}
+\ptrtarget{E/20}\ptrtarget{E/20-cong-cu}
+\dependency{\ptr{E/19} cho bốn nhánh --- mỗi công cụ phục vụ nhánh nào; \ptr{D/16} và \ptr{D/17} cho việc tra cứu bằng dữ liệu thật.}
+
+\begin{tomtat}
+Chương này chọn ra bộ công cụ tối thiểu và, quan trọng hơn, nói cách dùng chúng sao cho bạn giỏi lên. Ý trung tâm: một công cụ chỉ có ích nếu nó \emph{giữ lại phần khó} cho bạn --- phần truy xuất, phần quyết định --- và tự động hoá phần cơ học. Công cụ làm thay phần khó thì bạn dùng được kết quả nhưng không tiến bộ. Nội dung gồm: bộ công cụ tối thiểu và công cụ nào cho nhánh nào; cách dùng từ điển và ngữ liệu; hệ thống ghi chú và ôn tập; và phần dài nhất --- cách dùng mô hình ngôn ngữ có ranh giới rõ, kể cả ba việc nên giao và ba việc không bao giờ nên giao. Nếu chỉ nhớ một điều: hỏi công cụ \emph{chỗ nào có vấn đề}, đừng bảo nó \emph{sửa hộ}.
+\end{tomtat}
+
+\begin{nentang}
+\kn{từ điển cho người học}{từ điển đơn ngữ có định nghĩa bằng vốn từ hạn chế, nhãn văn vực, và cụm đi kèm.}
+\kn{công cụ ngữ liệu}{giao diện tra một kho văn bản thật: xem câu chứa từ và thống kê từ đi kèm.}
+\kn{ngữ liệu riêng}{kho văn bản do bạn tự gộp --- ba mươi bài báo trong ngành bạn.}
+\kn{ôn tập giãn cách}{phần mềm giãn dần khoảng cách giữa các lần ôn theo mức bạn nhớ.}
+\kn{ghi chú liên kết}{hệ thống ghi chú mà mỗi ghi chú là một ý và nối tới các ghi chú khác.}
+\kn{ranh giới giao việc}{quy tắc phân định phần nào bạn tự làm, phần nào giao cho công cụ.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao từ điển song ngữ không nên là công cụ chính của bạn ở trình độ này?}
+\h{Có nên nhờ mô hình ngôn ngữ viết lại đoạn văn của bạn cho hay hơn không?}
+\h{Bạn ghi rất nhiều từ và cụm nhưng không nhớ được. Vấn đề nằm ở phần mềm hay ở chỗ khác?}
+\h{Khi mô hình ngôn ngữ và tài liệu ngành của bạn nói khác nhau, tin cái nào?}
+\h{Bộ công cụ tối thiểu để bắt đầu ngay hôm nay gồm những gì?}
+\end{khoigoi}
+
+Có một nguyên tắc chạy suốt chương này, và đáng nói ngay từ đầu vì nó quyết định mọi lựa chọn còn lại.
+
+Một công cụ học tập tốt \emph{giữ lại phần khó} và tự động hoá phần cơ học. Phần khó trong học ngôn ngữ là truy xuất --- lôi một cụm ra khỏi trí nhớ khi không có gợi ý --- và quyết định --- chọn từ này thay vì từ kia và biết vì sao. Phần cơ học là tra cứu, sắp xếp, nhắc lịch ôn.
+
+Công cụ nào lấy mất phần khó thì cho bạn kết quả tốt hơn hôm nay và một khả năng kém hơn ngày mai. Đây không phải lời khuyên đạo đức mà là một mô tả cơ chế: theo \ptr{E/19} mục 3, cái luyện khả năng dùng là hành động truy xuất, nên bỏ hành động đó đi thì không có gì được luyện.
+
+\section{Bộ công cụ tối thiểu}
+
+\begin{center}\footnotesize
+\rowcolors{2}{white}{tblalt}
+\begin{longtable}{@{}L{3.5cm}L{2.0cm}L{4.4cm}L{4.6cm}@{}}
+\toprule
+\textbf{Công cụ} & \textbf{Nhánh} & \textbf{Dùng để làm gì} & \textbf{Sai lầm thường gặp}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Công cụ} & \textbf{Nhánh} & \textbf{Dùng để làm gì} & \textbf{Sai lầm thường gặp (tiếp)}\\
+\midrule
+\endhead
+Từ điển cho người học\cite{oald,ldoce} & 2 & Nghĩa, nhãn văn vực, cụm đi kèm, ví dụ thật & Dùng từ điển song ngữ thay thế\\
+Ngữ liệu\cite{coca} & 2 & Kiểm một tổ hợp, phát hiện màu sắc đánh giá & Dùng để học chủ động; quá nhiều dữ liệu\\
+Ngữ liệu riêng của bạn & 2 & Kiểm theo đúng cộng đồng bạn viết cho & Không cập nhật; quá ít bài\\
+Từ điển gốc từ\cite{etymonline} & 2 & Đoán nghĩa và văn vực qua gốc & Coi gốc từ là nghĩa hiện tại\\
+Ngân hàng cụm học thuật\cite{manchesterphrasebank} & 2 \(+\) 3 & Mẫu câu theo chức năng & Chép cả câu mang nội dung\\
+Phần mềm ôn giãn cách & 2 & Ôn cụm và thuật ngữ đúng lịch & Thẻ thiết kế sai chiều (\ptr{E/19})\\
+Hệ ghi chú liên kết\cite{ahrens2017} & 2 \(+\) 3 & Nối thuật ngữ với bài đã đọc & Ghi mà không bao giờ dùng lại\\
+Mô hình ngôn ngữ & 2 \(+\) 3 & Giải thích khác biệt, chỉ chỗ khó hiểu & Nhờ viết lại hộ --- mất phần khó\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+Câu hỏi mở đầu thứ năm hỏi bộ tối thiểu để bắt đầu hôm nay. Nếu chỉ chọn ba: một từ điển cho người học, một tệp gộp ba mươi bài báo trong ngành bạn, và một tệp văn bản làm ngân hàng cụm. Ba thứ này miễn phí hoặc gần như vậy, và chúng phủ phần lớn nhu cầu tra cứu.
+
+\section{Từ điển và ngữ liệu}
+
+Câu hỏi mở đầu thứ nhất. Từ điển song ngữ giải quyết tốt bài toán của người mới bắt đầu --- nối một từ lạ với một khái niệm đã có --- nhưng ở trình độ của bạn, bài toán đã đổi. Bạn không còn thiếu khái niệm; bạn thiếu \emph{tiêu chí chọn} giữa các từ đã biết. Và như \ptr{D/16} mục 6 chỉ ra, đó chính là ba thứ mà từ điển song ngữ không cho: văn vực, ranh giới nghĩa, và cụm đi kèm.
+
+Từ điển cho người học được thiết kế đúng cho bài toán mới này. Ba mục bạn nên đọc mà nhiều người bỏ qua: nhãn văn vực (\emph{formal}, \emph{technical}, \emph{disapproving}); các câu ví dụ, vốn được chọn từ ngữ liệu thật; và mục cụm đi kèm ở cuối.
+
+Với ngữ liệu, có một cách dùng hiệu quả và một cách dùng lãng phí. Cách lãng phí là mở nó ra và đọc lan man. Cách hiệu quả là dùng nó để trả lời \emph{một câu hỏi cụ thể} đã hình thành trong lúc viết: ``người ta nói \emph{address a limitation} hay \emph{solve a limitation}?''. Câu hỏi trước, công cụ sau.
+
+\begin{cannho}
+Thứ tự tra cứu tiết kiệm thời gian nhất: đoán trước, rồi mới tra. Viết ra phương án bạn nghĩ là đúng, rồi mới mở từ điển. Lý do không phải hình thức --- việc tự đưa ra một phương án trước khi thấy đáp án làm bạn nhớ đáp án lâu hơn hẳn so với đọc thẳng\cite{roediger2006}. Đây là cách biến mỗi lần tra cứu thành một lần luyện truy xuất nhỏ.
+\end{cannho}
+
+\section{Ghi chú và ôn tập}
+
+Câu hỏi mở đầu thứ ba: bạn ghi nhiều mà không nhớ. Vấn đề gần như không bao giờ nằm ở phần mềm. Nó nằm ở ba chỗ khác.
+
+\emph{Chỗ thứ nhất --- thiết kế sai chiều.} Đã nói ở \ptr{E/19} mục 3: thẻ đi từ tiếng Anh sang tiếng Việt chỉ luyện chiều bạn đã mạnh.
+
+\emph{Chỗ thứ hai --- ghi từ đơn thay vì cụm.} \ptr{D/17} mục 6. Một từ đơn không có chỗ bám; một cụm thì có.
+
+\emph{Chỗ thứ ba, và là chỗ lớn nhất --- ghi mà không dùng.} Ôn tập giãn cách giữ được thứ bạn ôn, nhưng thứ được dùng trong một bài viết thật thì ở lại mà gần như không cần ôn. Vì vậy quy tắc thực dụng là: mỗi cụm mới ghi vào phải được dùng ít nhất một lần trong hai tuần, hoặc bị xoá. Một ngân hàng năm mươi cụm được dùng có giá trị hơn nhiều so với năm trăm cụm nằm yên.
+
+Về hệ ghi chú: nguyên tắc hữu ích nhất là mỗi ghi chú chứa \emph{một ý} và được viết bằng câu của bạn, rồi nối tới các ghi chú khác\cite{ahrens2017}. Với mục đích ngôn ngữ, điều đó nghĩa là mỗi thuật ngữ hoặc mỗi cụm là một ghi chú, nối tới các bài mà bạn gặp nó --- và bảng thuật ngữ ở \ptr{B/10} chính là hình thức đơn giản nhất của hệ này.
+
+\section{Mô hình ngôn ngữ: ranh giới}
+
+Đây là phần dài nhất của chương, vì nó là công cụ mạnh nhất bạn có và cũng là công cụ dễ dùng sai nhất.
+
+Bắt đầu từ chỗ mạnh. Mô hình ngôn ngữ được huấn luyện để dự đoán từ từ ngữ cảnh --- đúng cơ chế mà \ptr{D/17} mô tả --- nên chúng nắm rất chắc kết hợp từ, sắc thái, và mức tự nhiên. Với ba câu hỏi ``\emph{address} hay \emph{solve} đi với \emph{limitation}'', ``khác biệt giữa \emph{indicate} và \emph{demonstrate}'', ``câu này có nghe tự nhiên trong văn kỹ thuật không'', chúng thường đáng tin hơn cảm giác của bạn.
+
+Chỗ yếu thì khác hẳn, và có ba loại. Chúng \emph{không} biết dữ liệu của bạn, nên mọi phát biểu về kết quả của bạn đều là suy đoán. Chúng nói tiếng Anh \emph{chung} chứ không nói tiếng Anh của cộng đồng hẹp bạn gửi bài, nên với thuật ngữ chuyên ngành chúng có thể sai một cách rất thuyết phục. Và chúng có xu hướng làm văn trôi chảy theo một giọng trung bình, kèm một rủi ro cụ thể mà bạn phải cảnh giác: khi được bảo ``viết lại cho hay hơn'', chúng thường \emph{nâng mức cam kết} --- biến \emph{indicate} thành \emph{demonstrate}, thêm \emph{clearly} và \emph{significantly} --- đúng cái mà \ptr{C/14} cảnh báo.
+
+Từ đó ra ranh giới. Câu hỏi mở đầu thứ hai hỏi có nên nhờ viết lại đoạn văn không; câu trả lời là không, và bảng dưới nói vì sao cùng với việc nên nhờ gì.
+
+\begin{center}\footnotesize
+\rowcolors{2}{white}{tblalt}
+\begin{longtable}{@{}L{6.6cm}L{7.8cm}@{}}
+\toprule
+\textbf{Nên giao} & \textbf{Không nên giao}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Nên giao (tiếp)} & \textbf{Không nên giao (tiếp)}\\
+\midrule
+\endhead
+``Chỗ nào trong đoạn này khó hiểu, và vì sao?'' & ``Viết lại đoạn này cho hay hơn''\\
+``Giải thích khác biệt giữa X và Y, cho ví dụ'' & ``Chọn hộ tôi từ nào'' (không kèm lý do)\\
+``Tổ hợp này có tự nhiên trong văn kỹ thuật không?'' & ``Viết phần mở bài cho bài của tôi''\\
+``Đặt ba câu hỏi mà người phản biện sẽ hỏi'' & ``Kết luận gì từ số liệu này'' (nó không có số liệu)\\
+``Cho tôi năm cách nói ý này, xếp theo mức cam kết'' & ``Dịch cả đoạn từ tiếng Việt''\\
+``Kiểm xem mỗi đoạn có đúng một ý không'' & ``Tóm tắt bài báo này để tôi khỏi đọc''\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+Nguyên tắc phân định của cột trái rất nhất quán: chúng đều là các câu hỏi \emph{chẩn đoán} hoặc \emph{so sánh}, và bạn vẫn là người quyết định và người viết. Cột phải giao đi phần khó --- và cùng với nó, giao đi cả phần học được.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[
+  b/.style={draw=greendark,fill=greenbg,rounded corners=3pt,inner sep=5pt,align=center,font=\footnotesize,text width=3.1cm,minimum height=1.1cm},
+  r/.style={draw=reddark,fill=redbg,rounded corners=3pt,inner sep=5pt,align=center,font=\footnotesize,text width=3.1cm,minimum height=1.1cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=tiercol,align=center,text width=3.2cm}]
+\node[b] (s1) {Bạn viết bản nháp};
+\node[b,right=0.45cm of s1] (s2) {Công cụ chỉ \emph{chỗ} khó hiểu};
+\node[b,right=0.45cm of s2] (s3) {\textbf{Bạn} quyết định cách sửa};
+\node[b,right=0.45cm of s3] (s4) {Bạn viết lại};
+\draw[ar] (s1) -- (s2); \draw[ar] (s2) -- (s3); \draw[ar] (s3) -- (s4);
+\node[r,below=0.9cm of s1] (t1) {Bạn viết bản nháp};
+\node[r,right=0.45cm of t1] (t2) {Công cụ viết lại hộ};
+\node[r,right=0.45cm of t2] (t3) {Bạn chép vào bài};
+\node[lb,right=0.5cm of t3,text width=3.6cm,color=reddark] {kết quả tốt hơn hôm nay, khả năng kém hơn ngày mai};
+\draw[ar] (t1) -- (t2); \draw[ar] (t2) -- (t3);
+\end{tikzpicture}
+\caption{Hai vòng lặp. Vòng trên giữ lại bước quyết định --- bước duy nhất luyện được khả năng. Vòng dưới bỏ nó đi, và cũng bỏ luôn phần học được. Khác biệt không phải công cụ mà là câu hỏi bạn đặt cho nó.}
+\label{fig:vong-lap-cong-cu}
+\end{figure}
+
+Còn câu hỏi mở đầu thứ tư --- tin cái nào khi mô hình và tài liệu ngành nói khác nhau? Tin tài liệu ngành, gần như luôn luôn. Lý do: bạn viết cho cộng đồng đó, và quy ước của họ là quy ước áp dụng. Mô hình nói về tiếng Anh chung, và với thuật ngữ chuyên ngành thì tiếng Anh chung có thể sai hoặc lạc hậu. Cách xử lý tốt nhất khi thấy khác biệt là hỏi ngược lại mô hình: ``trong tài liệu ngành tôi thấy dùng X, còn bạn đề nghị Y --- có khả năng nào X là quy ước riêng của ngành không?'' Câu hỏi đó thường cho một câu trả lời hữu ích hơn cả hai phương án ban đầu.
+
+\begin{cambay}
+Có một cách dùng nghe rất hợp lý nhưng lại tai hại nhất: viết ý bằng tiếng Việt rồi nhờ dịch sang tiếng Anh. Nó cho ra văn bản dùng được ngay, nên rất khó cưỡng. Nhưng nó bỏ qua toàn bộ nhánh sản xuất ở \ptr{E/19}, nên sau một năm làm vậy bạn viết tiếng Anh không khá hơn chút nào. Nếu bạn bí, hãy viết một câu tiếng Anh vụng còn hơn là dịch một câu tiếng Việt mượt --- câu vụng đó là chỗ bạn học được.
+\end{cambay}
+
+\section{Gốc rễ: công cụ nào cũng dịch chuyển việc học}
+
+Mỗi lần một công cụ mới xuất hiện, nó không chỉ làm việc cũ nhanh hơn --- nó thay đổi \emph{cái gì đáng học}. Chuyện này có tiền lệ dài.
+
+Từ điển đơn ngữ cho người học là một ví dụ. Trước khi chúng tồn tại, người học ngoại ngữ phụ thuộc vào từ điển song ngữ hoặc từ điển dành cho người bản ngữ --- loại thứ hai định nghĩa từ khó bằng những từ còn khó hơn. Ý tưởng định nghĩa mọi thứ bằng một vốn từ hạn chế xuất hiện từ những nỗ lực xây dựng một tiếng Anh tối giản trong nửa đầu thế kỷ 20\cite{ogden1923} và từ các danh sách từ dựa trên tần suất\cite{west1953}. Nó dịch chuyển việc học: người học không còn phải đi vòng qua tiếng mẹ đẻ.
+
+Bước thứ hai đến với ngữ liệu điện tử. Cuối những năm 1980, một từ điển được xây hoàn toàn từ ngữ liệu thật ra đời\cite{cobuild1987}, và nó đổi cả nội dung lẫn hình thức từ điển: định nghĩa viết thành câu hoàn chỉnh, ví dụ lấy từ văn bản thật, và lần đầu tiên các cụm đi kèm được liệt kê có hệ thống. Điều đó dịch chuyển việc học lần nữa --- từ ``nghĩa của từ'' sang ``cách dùng của từ'', đúng hướng mà \ptr{D/17} khai thác.
+
+Mô hình ngôn ngữ là bước thứ ba, và nó khác hai bước trước ở một điểm quan trọng. Từ điển và ngữ liệu \emph{cung cấp bằng chứng} và để bạn quyết định. Mô hình ngôn ngữ có thể \emph{đưa ra sản phẩm cuối} --- một đoạn văn hoàn chỉnh. Đây là lần đầu tiên công cụ có khả năng thay thế chính hoạt động mà việc học dựa vào.
+
+Điều đó không làm nó trở nên xấu; nó làm cho \emph{cách dùng} trở thành câu hỏi quyết định. Và câu hỏi đó không mới về bản chất: nó là cùng câu hỏi mà mọi lĩnh vực đã gặp khi có công cụ tự động hoá một kỹ năng --- máy tính bỏ túi với tính nhẩm, trình dịch với hợp ngữ, công cụ hoàn thành mã với việc viết mã. Bài học chung từ các trường hợp đó khá nhất quán: kỹ năng bị tự động hoá hoàn toàn thì mất đi và thường không sao; kỹ năng \emph{làm nền cho phán đoán} mà bị giao đi thì phán đoán cũng mất theo. Với ngôn ngữ, phán đoán là chọn từ đúng mức và biết vì sao --- nên đó là phần bạn giữ.
+
+\begin{gocre}
+\gr{Nửa đầu thế kỷ 20 --- vốn từ hạn chế}{Định nghĩa từ khó bằng từ dễ được không?}{Tiếng Anh tối giản\cite{ogden1923} và danh sách theo tần suất\cite{west1953} \(\Rightarrow\) từ điển cho người học.}
+\gr{Cuối 1980s --- từ điển từ ngữ liệu}{Từ thật sự được dùng thế nào?}{\cite{cobuild1987}: định nghĩa thành câu, ví dụ thật, cụm đi kèm \(\Rightarrow\) chuyển từ ``nghĩa'' sang ``cách dùng''.}
+\gr{Ngữ liệu tra được}{Người học kiểm tra giả thuyết của mình bằng gì?}{\cite{coca}: tra tổ hợp, thấy màu sắc đánh giá \(\Rightarrow\) phương pháp ở \ptr{D/16} mục 4.}
+\gr{Mô hình ngôn ngữ}{Công cụ có thể tạo ra sản phẩm cuối}{Lần đầu công cụ thay thế được chính hoạt động mà việc học dựa vào \(\Rightarrow\) ranh giới ở mục 4.}
+\gr{Tiền lệ ở các lĩnh vực khác}{Tự động hoá lấy đi cái gì?}{Kỹ năng thuần cơ học mất đi thường vô hại; kỹ năng làm nền cho phán đoán thì kéo phán đoán đi theo.}
+\gr{Truy xuất củng cố trí nhớ}{Vì sao ``đoán trước rồi tra'' lại hiệu quả?}{Tự đưa ra phương án trước khi thấy đáp án làm nhớ lâu hơn\cite{roediger2006}.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Lập trình}{Công cụ hoàn thành mã}{Cùng ranh giới: dùng để đề xuất và để chỉ chỗ nghi ngờ thì tốt; dùng để viết hộ những phần bạn chưa hiểu thì tích luỹ nợ.}
+\lh{Toán học}{Máy tính bỏ túi và phần mềm đại số}{Tiền lệ rõ nhất của mục 5: tính nhẩm mất đi phần lớn vô hại, nhưng trực giác về độ lớn thì cần giữ.}
+\lh{Hàng không}{Tự động hoá buồng lái}{Hiện tượng kỹ năng thủ công mai một khi tự động hoá làm phần lớn công việc --- lý do vẫn phải luyện tay định kỳ.}
+\lh{Y khoa}{Hệ hỗ trợ chẩn đoán}{Cùng nguyên tắc: hệ thống đưa ra gợi ý và cảnh báo, người quyết định và chịu trách nhiệm.}
+\lh{Giáo dục}{Hiệu ứng kiểm tra}{Cơ sở cho mẹo ``đoán trước rồi tra''\cite{roediger2006}: mỗi lần tra thành một lần luyện truy xuất.}
+\lh{Thư viện học}{Từ mục lục thẻ tới tìm kiếm toàn văn}{Mỗi bước công cụ dịch chuyển kỹ năng đáng học --- từ nhớ vị trí sang đặt câu hỏi tìm kiếm tốt.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Vì ở trình độ này bài toán của bạn đã đổi. Bạn không còn thiếu khái niệm --- bạn thiếu \emph{tiêu chí chọn} giữa các từ đã biết, và từ điển song ngữ không cho ba thứ quyết định: văn vực, ranh giới nghĩa, và cụm đi kèm (\ptr{D/16} mục 6). Từ điển cho người học được thiết kế đúng cho bài toán mới: có nhãn văn vực, ví dụ lấy từ ngữ liệu thật, và mục cụm đi kèm. Vẫn dùng từ điển song ngữ để \emph{tìm ứng viên}, rồi dùng từ điển đơn ngữ để \emph{chọn}.}
+\tl{Không. Nó bỏ đi bước quyết định --- bước duy nhất luyện được khả năng viết --- nên bạn có bài tốt hơn hôm nay và khả năng kém hơn ngày mai. Ngoài ra có một rủi ro cụ thể: khi được bảo ``viết lại cho hay hơn'', các mô hình thường \emph{nâng mức cam kết}, biến \emph{indicate} thành \emph{demonstrate} và thêm \emph{clearly}, \emph{significantly} --- đúng cái \ptr{C/14} cảnh báo. Thay vào đó hãy hỏi ``chỗ nào trong đoạn này khó hiểu, và vì sao'', rồi tự sửa.}
+\tl{Ở chỗ khác, gần như luôn luôn. Ba nguyên nhân, theo thứ tự tăng dần về mức ảnh hưởng: thẻ thiết kế sai chiều (từ tiếng Anh sang tiếng Việt chỉ luyện chiều bạn đã mạnh); ghi từ đơn thay vì cụm, nên không có chỗ bám; và lớn nhất là ghi mà không dùng. Quy tắc thực dụng: mỗi cụm mới phải được dùng ít nhất một lần trong hai tuần, hoặc bị xoá. Năm mươi cụm được dùng giá trị hơn năm trăm cụm nằm yên.}
+\tl{Tin tài liệu ngành, gần như luôn luôn --- vì bạn viết cho cộng đồng đó và quy ước của họ là quy ước áp dụng. Mô hình nói về tiếng Anh \emph{chung}, và với thuật ngữ chuyên ngành nó có thể sai một cách rất thuyết phục. Cách xử lý tốt nhất là hỏi ngược: ``tài liệu ngành tôi dùng X, bạn đề nghị Y --- có khả năng X là quy ước riêng của ngành không?'' --- câu hỏi đó thường cho câu trả lời hữu ích hơn cả hai phương án ban đầu.}
+\tl{Ba thứ, và đều miễn phí hoặc gần như vậy: một từ điển đơn ngữ cho người học; một tệp gộp ba mươi bài báo trong ngành bạn để tra bằng tìm kiếm thường; và một tệp văn bản làm ngân hàng cụm. Bộ này phủ phần lớn nhu cầu tra cứu. Thêm dần về sau: một công cụ ngữ liệu, một phần mềm ôn giãn cách với thẻ thiết kế đúng chiều, và mô hình ngôn ngữ dùng theo ranh giới ở mục 4.}
+\end{traloi}
+
+\begin{dongian}
+Có một câu hỏi mà ai học tiếng Anh bây giờ cũng phải trả lời: dùng các công cụ AI thế nào cho đúng?
+
+Có một nguyên tắc gọn để quyết định, và nó áp được cho mọi công cụ chứ không riêng AI: \emph{công cụ tốt là công cụ giữ lại phần khó cho bạn}.
+
+Phần khó khi học ngôn ngữ là gì? Là lúc bạn phải tự lôi một cụm ra khỏi đầu mà không có gợi ý, và lúc bạn phải chọn giữa hai từ và biết vì sao chọn cái này. Phần dễ là tra cứu, sắp xếp, nhắc lịch ôn.
+
+Nếu công cụ làm hộ phần dễ, bạn tiết kiệm thời gian. Nếu nó làm hộ phần khó, bạn có bài viết tốt hơn hôm nay và khả năng kém hơn ngày mai --- vì cái luyện được khả năng chính là hành động bạn vừa bỏ qua.
+
+Cụ thể với mô hình ngôn ngữ, khác biệt nằm ở \emph{câu bạn hỏi}, không ở công cụ.
+
+Nên hỏi: ``chỗ nào trong đoạn này khó hiểu?''; ``khác nhau giữa \emph{indicate} và \emph{demonstrate} là gì, cho ví dụ''; ``câu này có tự nhiên trong văn kỹ thuật không?''; ``ba câu hỏi mà người phản biện sẽ hỏi là gì?''.
+
+Không nên: ``viết lại đoạn này cho hay hơn''; ``dịch đoạn tiếng Việt này''; ``viết hộ phần mở bài''.
+
+Có một rủi ro cụ thể cần biết. Khi bạn bảo mô hình ``viết cho hay hơn'', nó thường nói \emph{mạnh hơn} mức dữ liệu của bạn cho phép --- đổi \emph{indicate} thành \emph{demonstrate}, thêm \emph{clearly} và \emph{significantly}. Đó chính là kiểu nói quá mà người phản biện sẽ bắt.
+
+Và một cảnh báo cuối: viết ý bằng tiếng Việt rồi nhờ dịch là cách dùng tai hại nhất, vì nó cho ra kết quả dùng được ngay nên rất khó bỏ. Nhưng làm vậy một năm thì tiếng Anh của bạn không khá hơn chút nào. Thà viết một câu tiếng Anh vụng --- chính chỗ vụng đó là chỗ bạn học được.
+\motcau{Hỏi công cụ chỗ nào hỏng, đừng bảo nó sửa hộ.}
+\chuadongian{Ranh giới giữa ``gợi ý'' và ``làm hộ'' mờ dần khi công cụ mạnh lên; nó cần bạn tự đặt lại theo thời gian.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Nguyên tắc chọn công cụ}{Giữ lại phần khó (truy xuất, quyết định), tự động hoá phần cơ học.}
+\ar[3]{Bộ tối thiểu ba thứ}{Từ điển cho người học; tệp gộp 30 bài trong ngành; tệp ngân hàng cụm.}
+\ar[3]{Vì sao bỏ từ điển song ngữ làm công cụ chính}{Bài toán đã đổi: bạn thiếu tiêu chí chọn, không thiếu khái niệm.}
+\ar[3]{Ba mục hay bị bỏ qua trong từ điển}{Nhãn văn vực; câu ví dụ từ ngữ liệu; mục cụm đi kèm.}
+\ar[3]{Nên hỏi mô hình gì}{Câu hỏi chẩn đoán và so sánh --- chỗ nào khó hiểu, khác biệt giữa X và Y.}
+\ar[3]{Không nên hỏi gì}{Viết lại hộ; dịch cả đoạn; viết hộ mở bài; tóm tắt để khỏi đọc.}
+\ar[2]{Rủi ro cụ thể của ``viết hay hơn''}{Mô hình nâng mức cam kết --- \emph{indicate} thành \emph{demonstrate}, thêm \emph{clearly}.}
+\ar[2]{Khi mô hình và tài liệu ngành khác nhau}{Tin tài liệu ngành; hỏi ngược mô hình xem đó có phải quy ước ngành không.}
+\ar[2]{Ba lý do ghi mà không nhớ}{Thẻ sai chiều; ghi từ đơn thay vì cụm; và lớn nhất là ghi mà không dùng.}
+\ar[2]{Quy tắc hai tuần}{Mỗi cụm mới phải được dùng một lần trong hai tuần, hoặc xoá.}
+\ar[2]{Mẹo đoán trước rồi tra}{Tự đưa phương án trước khi thấy đáp án làm nhớ lâu hơn.}
+\ar[1]{Bài học từ các lĩnh vực khác}{Kỹ năng thuần cơ học mất đi thường vô hại; kỹ năng làm nền cho phán đoán thì kéo phán đoán đi theo.}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Nhờ mô hình ngôn ngữ sửa lỗi ngữ pháp thì sao, có được không?}{Được, và đây là một trong những cách dùng an toàn nhất, vì lỗi ngữ pháp thường là phần cơ học chứ không phải phần phán đoán. Nhưng hãy làm nó thành một vòng học chứ không chỉ một vòng sửa: yêu cầu nó \emph{liệt kê} lỗi kèm giải thích thay vì trả về bản đã sửa. Nếu bạn thấy cùng một loại lỗi xuất hiện ba lần, đó là một điểm yếu cụ thể đáng cho một buổi luyện có chủ đích (\ptr{E/19} mục 4).}
+\qa{Tôi có nên đọc bản tóm tắt do máy tạo thay vì đọc bài báo không?}{Với việc \emph{sàng lọc} thì được và tiết kiệm nhiều thời gian --- đó đúng là chức năng của lượt đọc thứ nhất ở \ptr{B/05}. Với bài bạn định trích dẫn hoặc xây tiếp thì không, vì hai lý do. Bản tóm tắt bỏ mất chính xác những thứ mà \ptr{B/08} dạy bạn đọc: mức cam kết, các điều kiện, chỗ tác giả rào đón. Và bạn chịu trách nhiệm về những gì bạn trích dẫn, kể cả khi trích dẫn sai vì đọc qua bản tóm tắt.}
+\qa{Dùng phần mềm ôn giãn cách bao nhiêu thẻ một ngày là hợp lý?}{Ít hơn bạn nghĩ. Với người đi làm, mười tới hai mươi thẻ mới mỗi tuần là bền vững; nhiều hơn thì khối lượng ôn tích luỹ sẽ vượt quá thời gian bạn có và bạn bỏ hệ thống sau vài tuần. Quan trọng hơn số lượng là quy tắc hai tuần ở mục 3: chỉ đưa vào những cụm bạn thật sự định dùng. Một hệ thống nhỏ mà chạy đều tốt hơn nhiều một hệ thống lớn bị bỏ.}
+\qa{Có nên dùng bản dịch tiếng Việt của sách chuyên ngành không?}{Dùng như một chỗ dựa khi bạn mới vào một chủ đề hoàn toàn mới thì hợp lý --- hiểu khái niệm trước rồi quay lại bản gốc. Nhưng đừng để nó thành thói quen, vì hai lý do. Bạn sẽ nhớ thuật ngữ ở dạng tiếng Việt và phải dịch ngược khi viết (\ptr{B/10}). Và các bản dịch thường không giữ được sắc thái mức cam kết --- đúng phần mà \ptr{B/08} nói là quan trọng nhất để hiểu đúng ý tác giả.}
+\qa{Tôi lo dùng mô hình ngôn ngữ nhiều sẽ làm tôi phụ thuộc. Có dấu hiệu nào để tự kiểm không?}{Có một phép thử đơn giản: thử viết một đoạn ba trăm từ mà không mở công cụ nào. Nếu bạn viết được, chậm hơn nhưng vẫn ra, thì bạn đang dùng công cụ như đòn bẩy. Nếu bạn không bắt đầu nổi, thì công cụ đã thay chỗ của kỹ năng chứ không hỗ trợ nó. Làm phép thử này mỗi tháng một lần; nó cũng chính là bài luyện nhánh ba nên không tốn thêm gì.}
+\qa{Ngân hàng cụm nên tổ chức thế nào?}{Theo \emph{chức năng}, không theo bảng chữ cái. Các nhóm dùng được: nêu khoảng trống, nêu đóng góp, mô tả phương pháp, trình bày kết quả, so sánh, nêu hạn chế, chuyển phần. Lý do: khi viết, bạn tìm cụm theo việc bạn đang cần làm chứ không theo chữ cái đầu. Đây cũng là cách các ngân hàng cụm học thuật công khai tổ chức\cite{manchesterphrasebank}, và bạn có thể lấy cấu trúc đó rồi điền bằng cụm từ chính ngành mình.}
+\qa{Công cụ nào đáng bỏ tiền, công cụ nào không?}{Phần lớn những gì bạn cần là miễn phí: từ điển trực tuyến cho người học, từ điển gốc từ, ngân hàng cụm học thuật, và ngữ liệu riêng do bạn tự gộp --- cái cuối này chính là công cụ giá trị nhất và nó không tốn gì ngoài mười phút tải bài. Thứ đáng cân nhắc trả tiền là quyền truy cập đầy đủ vào một công cụ ngữ liệu lớn, nếu bạn thấy mình tra nó vài lần mỗi ngày. Đừng trả tiền cho các khoá học bài bản trước khi bạn đã chạy đều bốn nhánh ở \ptr{E/19} trong ít nhất một tháng.}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Cài đặt bộ tối thiểu ba công cụ và tra thử 10 từ}{Hôm nay}{Gộp 30 bài ngành thành một tệp là bước quan trọng nhất.}
+\bt[1]{Với 10 từ, đọc đủ ba mục: nhãn văn vực, ví dụ, cụm đi kèm}{Từ điển cho người học}{Ghi lại thông tin nào bạn chưa từng để ý.}
+\bt[2]{Áp mẹo ``đoán trước rồi tra'' cho 20 lần tra liên tiếp}{Tuần này}{Ghi tỉ lệ đoán đúng; nó tăng nhanh hơn bạn tưởng.}
+\bt[2]{Đưa một đoạn của bạn cho mô hình và hỏi ``chỗ nào khó hiểu, vì sao''}{Bài viết của bạn}{Tự sửa; không dùng bản viết lại của nó.}
+\bt[2]{So một bản ``viết lại cho hay hơn'' với bản gốc, đánh dấu chỗ mức cam kết bị nâng}{Bài viết của bạn}{Bài này để thấy rủi ro, không phải để dùng bản viết lại.}
+\bt[3]{Xây ngân hàng cụm tổ chức theo bảy nhóm chức năng ở mục 5}{Tài liệu ngành}{Mỗi nhóm ít nhất năm cụm lấy từ bài trong ngành bạn.}
+\bt[3]{Làm phép thử viết 300 từ không công cụ, mỗi tháng một lần trong ba tháng}{Bài viết của bạn}{Đo số từ và thời gian; đây vừa là bài kiểm vừa là bài luyện.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Chương này chọn bộ công cụ tối thiểu và đặt một ranh giới: công cụ giữ lại phần khó thì giúp bạn tiến bộ, công cụ lấy mất phần khó thì không. Ranh giới đó không nằm ở công cụ mà nằm ở câu hỏi bạn đặt cho nó --- hỏi chỗ nào hỏng, đừng bảo nó sửa hộ.
+
+Bây giờ bạn có khung phân bổ thời gian (\ptr{E/19}) và bộ công cụ. Còn thiếu một thứ: một lịch cụ thể cho thứ Hai tuần này, và một cách đo để biết mình có đang tiến bộ hay chỉ đang bận rộn. Chương \ptr{E/21} khép lại quyển sách bằng một lộ trình mười hai tuần, các chỉ số đo được, và một danh mục tài nguyên đã chọn lọc theo từng nhánh.
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

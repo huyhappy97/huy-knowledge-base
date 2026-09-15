@@ -1,0 +1,47 @@
+% ============================================================================
+%  D/00-map.tex — bản đồ phần D
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../algorithm.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ phần D --- Giới hạn và miền chuyên}
+
+\begin{tomtat}
+Bốn chương, hai vai trò. Chương 21 và 22 là hai \emph{miền chuyên} có bẫy số học riêng. Chương 23 và 24 là hai cách nói về \emph{giới hạn}: giới hạn do bản chất bài toán (NP-khó) và giới hạn do mô hình máy (bộ nhớ, một lượt đọc, không biết tương lai). Chương 23 là chương nên đọc kỹ nhất của phần này vì nó thay đổi cách bạn phân bổ thời gian khi gặp bài lạ.
+\end{tomtat}
+
+\subsection*{A. Phần này có gì}
+\begin{itemize}
+\item \textbf{\code{21-so-hoc-va-dai-so}} --- ước chung lớn nhất, số học modulo, nghịch đảo, sàng, phân tích thừa số, định lý phần dư Trung Hoa, luỹ thừa ma trận, FFT/NTT, đại số tuyến tính trên \(\mathbb{F}_2\).
+\item \textbf{\code{22-hinh-hoc-tinh-toan}} --- vị từ định hướng, bao lồi, quét đường, giao đoạn thẳng, cặp điểm gần nhất, và vấn đề bền vững số học.
+\item \textbf{\code{23-do-kho-va-quy-dan}} --- P, NP, NP-đầy đủ, cách dựng một quy dẫn, danh mục bài NP-khó hay gặp, và bốn cách sống chung: xấp xỉ, tham số hoá, heuristic, bộ giải.
+\item \textbf{\code{24-can-duoi-va-mo-hinh-khac}} --- cận dưới cây quyết định, lập luận đối thủ, thuật toán luồng dữ liệu, thuật toán trực tuyến và phân tích cạnh tranh, mô hình bộ nhớ ngoài và cache-oblivious, song song.
+\end{itemize}
+
+\subsection*{B. Phụ thuộc và thứ tự đọc}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.6cm and 1.0cm,
+  m/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.9cm},
+  o/.style={draw=accent,fill=amberbg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.9cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  ard/.style={-{Latex[length=2.2mm]},draw=tiercol,thick,dashed},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.3cm}]
+\node[m] (c21) {\textbf{21.} Số học và\\đại số};
+\node[m,right=of c21] (c22) {\textbf{22.} Hình học\\tính toán};
+\node[o,right=of c22] (c23) {\textbf{23.} Độ khó và\\quy dẫn};
+\node[m,below=1.05cm of c23] (c24) {\textbf{24.} Cận dưới và\\mô hình khác};
+\node[draw=rulecol,fill=codebg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,
+      text width=2.9cm,below=1.05cm of c21] (pc) {Phần C\\(mọi chương)};
+\draw[ard] (c21) -- node[lb,above=0pt] {bẫy số học chung} (c22);
+\draw[ar] (pc) -- node[lb,left=1pt,text width=1.9cm] {quy dẫn cần thuật toán đã biết} (c23);
+\draw[ar] (c23) -- node[lb,right=1pt,text width=2.0cm] {cận dưới là mặt kia của độ khó} (c24);
+\draw[ard] (c22) -- (c23);
+\end{tikzpicture}
+\caption{Phần D chủ yếu phụ thuộc vào phần C: muốn quy dẫn bài mới về một bài NP-đầy đủ, trước hết phải biết kho bài toán chuẩn. Chương 23 (tô hổ phách) là chương cốt lõi của phần.}
+\label{fig:map-D}
+\end{figure}
+
+\subsection*{C. Cốt lõi hay tham khảo}
+\textbf{Cốt lõi:} số học modulo, luỹ thừa nhanh và nghịch đảo (21); vị từ định hướng và bao lồi (22); toàn bộ phần nhận diện NP-khó và bốn cách đối phó (23). \textbf{Tham khảo:} FFT/NTT ở mức cài đặt (21); quét đường cho giao đoạn thẳng (22); chứng minh Cook--Levin (23); toàn bộ chương 24 trừ mục phân cấp bộ nhớ, vốn đã xuất hiện ở chương 3.
+\par\medskip Ở \ptr{D/22}, dùng bộ hình chạm đầu mút, chồng đoạn và tách rời để kiểm quy ước giao trước khi cài; phép quay không loại bỏ thẳng hàng.
+\end{document}

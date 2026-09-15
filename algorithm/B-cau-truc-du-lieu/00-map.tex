@@ -1,0 +1,65 @@
+% ============================================================================
+%  B/00-map.tex — bản đồ phần B
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../algorithm.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ phần B --- Cấu trúc dữ liệu}
+
+\begin{tomtat}
+Bảy chương của phần B được xếp theo thao tác mà chúng làm rẻ đi, và bản đồ này cho bạn bảng tra ngược: gặp thao tác nào thì mở chương nào. Chuỗi phụ thuộc bắt buộc là 6 \(\rightarrow\) 7 \(\rightarrow\) 9 \(\rightarrow\) 10; chương 8 (băm) và 11 (DSU) độc lập, đọc lúc nào cũng được; chương 12 cần chương 8 cho hashing chuỗi. Nếu chỉ nhớ một điều: chọn cấu trúc bằng cách liệt kê thao tác và tần suất, không bằng cách nhớ tên.
+\end{tomtat}
+
+\subsection*{A. Bảng tra ngược: thao tác \(\rightarrow\) chương}
+\begin{center}\footnotesize
+\begin{tabularx}{\linewidth}{@{}L{5.2cm}L{3.0cm}Y@{}}
+\toprule
+\textbf{Thao tác lặp lại nhiều} & \textbf{Chương} & \textbf{Cấu trúc điển hình}\\
+\midrule
+Quét cửa sổ, tổng đoạn tĩnh & 6 & hai con trỏ, tổng tiền tố\\
+Lấy phần tử nhỏ nhất liên tục & 7 & heap / hàng đợi ưu tiên\\
+``Phần tử lớn hơn kế tiếp'' & 7 & ngăn xếp đơn điệu\\
+Tra cứu chính xác theo khoá & 8 & bảng băm\\
+Tra cứu theo thứ tự, cận trên/dưới & 9 & cây tìm kiếm cân bằng\\
+Truy vấn đoạn kèm cập nhật điểm & 10 & Fenwick / segment tree\\
+Truy vấn đoạn trên mảng tĩnh & 10 & sparse table\\
+Hợp nhất hai nhóm, hỏi cùng nhóm & 11 & DSU\\
+So khớp mẫu, tiền tố chung & 12 & trie, KMP, Z, Aho--Corasick\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection*{B. Vì sao chia như vậy}
+Chia theo hình dạng --- ``mảng, danh sách liên kết, cây, đồ thị'' --- là cách chia của người đã biết đáp án. Người đang giải bài không nhìn thấy hình dạng, họ nhìn thấy thao tác: ``tôi phải hỏi tổng đoạn này một triệu lần và thỉnh thoảng sửa một phần tử''. Bảng tra ở trên chính là cầu nối từ thao tác về cấu trúc, và nó là thứ đáng thuộc nhất của cả phần B.
+
+\subsection*{C. Phụ thuộc và thứ tự đọc}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.55cm and 0.95cm,
+  m/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=2.6cm},
+  o/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=2.6cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  ard/.style={-{Latex[length=2.2mm]},draw=tiercol,thick,dashed},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.3cm}]
+\node[m] (c6) {\textbf{6.} Mảng, chuỗi\\hai con trỏ};
+\node[m,right=of c6] (c7) {\textbf{7.} Ngăn xếp,\\hàng đợi, heap};
+\node[m,right=of c7] (c9) {\textbf{9.} Cây tìm kiếm};
+\node[m,right=of c9] (c10) {\textbf{10.} Cây chỉ số,\\truy vấn đoạn};
+\node[o,below=1.0cm of c6] (c8) {\textbf{8.} Băm và\\tập hợp};
+\node[o,below=1.0cm of c7] (c11) {\textbf{11.} Hợp nhất\\tập hợp (DSU)};
+\node[m,below=1.0cm of c9] (c12) {\textbf{12.} Chuỗi và\\so khớp};
+\draw[ar] (c6) -- node[lb,above=0pt] {thứ tự xử lý} (c7);
+\draw[ar] (c7) -- node[lb,above=0pt] {trật tự đầy đủ} (c9);
+\draw[ar] (c9) -- node[lb,above=0pt] {gộp đoạn} (c10);
+\draw[ar] (c8) -- node[lb,right=2pt,text width=1.9cm] {hashing chuỗi} (c12);
+\draw[ard] (c6) -- (c8);
+\draw[ard] (c11) -- (c12);
+\draw[ard] (c10.south) to[out=-120,in=20] (c12.east);
+\end{tikzpicture}
+\caption{Phụ thuộc giữa bảy chương của phần B. Hai chương tô tím độc lập với mạch chính; chương 12 là nơi hội tụ của băm, DSU và cây chỉ số.}
+\label{fig:map-B}
+\end{figure}
+
+\subsection*{D. Cốt lõi hay tham khảo}
+\textbf{Cốt lõi:} hai con trỏ và tổng tiền tố (6); ngăn xếp đơn điệu và heap (7); băm với khoá ngẫu nhiên hoá (8); Fenwick và segment tree cơ bản kèm lazy (10); DSU với hai tối ưu (11); KMP, Z và hashing chuỗi (12). \textbf{Tham khảo:} cài đặt chi tiết cây đỏ--đen và treap (9); segment tree beats và cây bền vững (10); suffix automaton (12).
+\par\medskip Đọc bằng ví dụ: chương \ptr{B/06} có vết chạy cửa sổ và phản ví dụ số âm; chương \ptr{B/10} vẽ các khối lowbit và kiểm thứ tự hợp thành lazy.
+\end{document}

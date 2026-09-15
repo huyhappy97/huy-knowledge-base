@@ -1,0 +1,53 @@
+% ---------------------------------------------------------------------------
+% Bản đồ chương 13 — Các họ kiến trúc backbone
+% Tạo: 2026-09-03  |  Sửa gần nhất: 2026-09-03
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ chương 13 --- Các họ kiến trúc backbone}
+
+\begin{tomtat}
+Chương 13 gồm ba mục, và chúng là ba lần trả lời \emph{cùng một câu hỏi}: nên cài sẵn bao nhiêu giả định vào mô hình. Ba lần đó diễn ra trên ba loại dữ liệu và ở ba thời điểm khác nhau. Thứ tự \(1 \rightarrow 2 \rightarrow 3\) là bắt buộc vì mục 3 liên tục so sánh với cả hai mục trước. Nếu chỉ nhớ một điều: mọi kiến trúc trong chương nằm trên một trục duy nhất giữa ``nhiều giả định, ít dữ liệu'' và ``ít giả định, nhiều dữ liệu'', và không có điểm nào trên trục đó là tốt nhất một cách tuyệt đối.
+\end{tomtat}
+
+\begin{nentang}
+\kn{backbone}{phần mạng trích đặc trưng từ ảnh, dùng chung cho nhiều bài toán; phần sinh đầu ra cụ thể (nhãn, hộp, mặt nạ) được lắp thêm phía sau.}
+\kn{inductive bias}{tập giả định mà mô hình mang sẵn trước khi nhìn dữ liệu; nó là đại lượng trung tâm mà cả chương xoay quanh.}
+\kn{convolution}{phép nhân một cửa sổ trọng số nhỏ trượt khắp ảnh, cài sẵn giả định ``quan hệ gần là quan trọng'' và ``mẫu hình có ý nghĩa như nhau ở mọi vị trí''.}
+\kn{attention}{cơ chế cho mỗi vị trí lấy thông tin trực tiếp từ mọi vị trí khác bằng trọng số học được, không cần thông tin lan dần qua nhiều tầng.}
+\end{nentang}
+
+\subsection*{Có gì trong chương này}
+
+\begin{table}[H]\centering\small
+\caption{Ba mục của chương 13: câu hỏi trung tâm, phụ thuộc và mức độ đầu tư.}
+\label{tab:map-ch13}
+\begin{tabularx}{\linewidth}{@{}L{3.4cm}YL{2.4cm}L{1.9cm}@{}}
+\toprule
+\textbf{Mục} & \textbf{Câu hỏi trung tâm} & \textbf{Phụ thuộc} & \textbf{Mức độ}\\
+\midrule
+1. Dòng CNN & Mỗi thế hệ CNN gỡ nút thắt nào, và đẩy độ khó sang trục nào? & \ptr{C/12} & Cốt lõi \T{2}\\
+2. Từ chuỗi tới attention & Xử lý quan hệ xa thế nào, và cái giá của việc rút ngắn đường đi thông tin là gì? & Mục 1, \ptr{C/12/02} & Cốt lõi \T{2}\\
+3. ViT và inductive bias & Vứt bỏ giả định thị giác thì mất gì, và trả lại bằng cách nào? & Mục 1 và 2 & Cốt lõi \T{2}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection*{Vì sao lại chia như vậy}
+Cách chia phổ biến trong sách là chia theo \emph{họ kiến trúc}: CNN, RNN, Transformer. Cách đó che mất điều quan trọng nhất. Ba họ này trả lời cùng một câu hỏi thiết kế, chứ không phục vụ ba thế giới tách biệt. Ở đây ta chia theo \emph{loại dữ liệu và lượng giả định}: mục 1 là dữ liệu lưới với nhiều giả định; mục 2 là dữ liệu có thứ tự, nơi giả định lưới không dùng được; mục 3 là quay lại dữ liệu lưới nhưng với rất ít giả định.
+
+Lợi ích của cách chia này lộ ra ở hai chỗ nối. Thứ nhất, cổng của LSTM ở mục 2 và kết nối tắt của ResNet ở mục 1 hoá ra là cùng một mẹo --- tạo một đường cộng cho gradient --- và cách chia theo họ kiến trúc sẽ giấu mất điều đó. Thứ hai, mục 3 chỉ có nghĩa như một \emph{thí nghiệm đối chứng} cho mục 1: nó đo giá trị của các giả định mà mục 1 mô tả, bằng đơn vị là lượng dữ liệu.
+
+\subsection*{Đọc theo thứ tự nào}
+\begin{enumerate}
+\item Đọc tuần tự \(1 \rightarrow 2 \rightarrow 3\). Mục 3 tham chiếu liên tục sang hai mục kia nên đọc trước sẽ hụt.
+\item Nếu bạn chỉ cần chọn một backbone cho một dự án đang chạy: đọc mục 1 phần bảng dòng CNN, rồi nhảy tới mục 3 phần G (tách backbone, neck, head) và phần giới hạn. Quay lại mục 2 khi phải xử lý ảnh độ phân giải cao.
+\item Nếu bạn đến từ phía SLAM hoặc hệ thống nhúng: đọc mục 1 phần C (ba phép tính tay) trước tiên, vì đó là chỗ FLOPs, cường độ số học và độ trễ thật gặp nhau.
+\end{enumerate}
+
+\subsection*{Cốt lõi và tham khảo}
+Ba phần đáng quay lại nhiều lần: ba phép tính tay ở mục 1 (xếp chồng \(3\times3\), nút thắt \(1\times1\), depthwise separable); lập luận \(\sqrt{d}\) và bảng ba hướng chống chi phí bậc hai ở mục 2; và trục giả định--dữ liệu cùng sơ đồ backbone--neck--head ở mục 3. Ba phần đọc lướt lần đầu rồi tra lại khi cần: danh sách biến thể convolution, chi tiết các họ mã hoá vị trí, và phần mô hình không gian trạng thái --- phần cuối này thay đổi nhanh nhất nên cũng mất giá nhanh nhất.
+
+\subsection*{Nối vào phần còn lại của cây}
+Chương này tiêu thụ toàn bộ \ptr{C/12-co-che-huan-luyen} và trục đánh đổi ở \ptr{B/10-thiet-ke-kien-truc}; nó cấp đầu vào cho \ptr{C/14-bai-toan-cv-loi} (head cụ thể lắp lên backbone), \ptr{C/16-thi-giac-3d} và \ptr{C/18-pretraining-va-foundation}. Hai nhánh ngang đáng nhớ: phần FLOPs và cường độ số học nối sang \ptr{B/11-gioi-han-tinh-toan} cùng \ptr{D/20-toi-uu-va-nen-mo-hinh}; còn bài học ConvNeXt --- rằng recipe giải thích phần lớn chênh lệch được gán cho kiến trúc --- là tiền đề trực tiếp của \ptr{E/24-thi-nghiem-va-ablation}.
+\end{document}

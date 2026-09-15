@@ -1,0 +1,314 @@
+% ---------------------------------------------------------------------------
+% Chương 6 — Bất định và lan truyền sai số
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-13  |  Ôn gần nhất: —
+% Phụ thuộc: A/01 (sigma_z = z^2 sigma_d/(bf)), A/03 (Adjoint, hiệp phương sai trên đa tạp),
+%            A/04 (Lambda), A/05 (khi Lambda suy biến thì hiệp phương sai vô nghĩa)
+% Mức độ: QUAN TRỌNG (gần xương sống). Đây là chương trả lời "con số bất định có nghĩa gì không".
+% Kiểm chứng công thức lõi:
+%   (1) Sigma = Lambda^{-1} quanh nghiệm — cửa (a) từ xấp xỉ Gauss của hậu nghiệm.
+%   (2) Lan truyền bậc nhất Sigma_y = J Sigma_x J^T — cửa (a) tự dẫn; cửa (c) barfoot2017 §2.
+%   (3) sigma_z = z^2 sigma_d/(b f) — cửa (a) vi phân z = bf/d; cửa (b) đã kiểm ở A/01 mục 4C.
+%   (4) Hiệp phương sai biên khác hiệp phương sai điều kiện; khôi phục biên cần nghịch đảo thưa
+%       — cửa (c) kaess2009covariance, triggs2000ba §5.
+%   (5) NEES: E[eps] = dim khi hiệp phương sai trung thực — cửa (a) một dòng từ vết ma trận;
+%       cửa (c) barshalom2001.
+% Ghi chú trung thực: các con số trong ví dụ là tự đặt và tính tay, ghi rõ "giả sử".
+%   KHÔNG có con số thực nghiệm đo được của tôi.
+% ---------------------------------------------------------------------------
+\documentclass[../../vslam.tex]{subfiles}
+\begin{document}
+\chapter{Bất định và lan truyền sai số (Uncertainty and Error Propagation)}
+\ptrtarget{A/06}\ptrtarget{A/06-bat-dinh-va-lan-truyen-sai-so}
+\dependency{\ptr{A/01-hinh-hoc-da-thi} (quan hệ \(\sigma_z \approx z^2\sigma_d/(bf)\), hình dạng điếu xì gà); \ptr{A/03-lie-group-va-toi-uu-tren-da-tap} (Adjoint, và hiệp phương sai trên đa tạp là hiệp phương sai của \emph{nhiễu loạn}); \ptr{A/04-uoc-luong-map-va-bundle-adjustment} (ma trận thông tin \(\Lambda\)); \ptr{A/05-observability-gauge-va-suy-bien} (khi \(\Lambda\) suy biến thì hiệp phương sai theo hướng đó vô nghĩa --- điều kiện tiên quyết cho cả chương này).}
+
+\begin{tomtat}
+Bốn chương trước cho một ước lượng. Chương này hỏi câu tiếp theo, và là câu quyết định hệ thống có dùng được trong sản phẩm hay không: \emph{ước lượng ấy chính xác tới đâu, và con số bất định ta in ra có trung thực không?} Nội dung có bốn phần. Một: hiệp phương sai đến từ đâu --- \(\Sigma = \Lambda^{-1}\) quanh nghiệm --- và vì sao điều đó chỉ đúng dưới những giả thiết cụ thể. Hai: lan truyền sai số qua các phép biến đổi, với lưu ý rằng trên đa tạp phải lan truyền qua nhiễu loạn chứ không qua tham số, và Adjoint là công cụ. Ba: chuỗi lan truyền cụ thể của Visual SLAM --- từ sai số pixel, qua sai số độ sâu, tới sai số tư thế --- kèm các quan hệ tỉ lệ đáng thuộc lòng vì chúng quyết định mọi lựa chọn thiết kế phần cứng. Bốn: bệnh mãn tính của lĩnh vực, là hiệp phương sai được báo cáo nhỏ hơn sự thật một cách hệ thống; nguyên nhân, cách đo bằng NEES, và vì sao nó nguy hiểm hơn việc kém chính xác. Nếu chỉ nhớ một điều: \emph{một hệ thống biết mình sai bao nhiêu thì dùng được trong sản phẩm; một hệ thống chính xác hơn nhưng im lặng khi sai thì không}.
+\end{tomtat}
+
+\begin{nentang}
+\kn{hiệp phương sai (covariance)}{ma trận \(\Sigma\) mô tả mức tán và tương quan của sai số. Đường chéo là phương sai từng thành phần, ngoài đường chéo là tương quan --- và phần ngoài đường chéo thường mang nhiều thông tin hơn đường chéo.}
+\kn{ellipsoid bất định}{tập \(\{\mathbf{x} : \mathbf{x}^\top\Sigma^{-1}\mathbf{x} \le c\}\), hình dạng hình học của \(\Sigma\). Trục chính là véctơ riêng, độ dài trục tỉ lệ căn bậc hai giá trị riêng.}
+\kn{hiệp phương sai biên (marginal covariance)}{bất định của một biến khi đã tính tới việc mọi biến khác cũng chưa biết. Lấy bằng khối con của \(\Lambda^{-1}\) --- \emph{không} phải nghịch đảo của khối con của \(\Lambda\).}
+\kn{hiệp phương sai điều kiện (conditional covariance)}{bất định của một biến khi \emph{giả sử} mọi biến khác đã biết chính xác. Lấy bằng nghịch đảo khối con của \(\Lambda\). Luôn nhỏ hơn hoặc bằng biên, nên nhầm hai cái là nguồn của việc quá tự tin.}
+\kn{lan truyền bậc nhất}{xấp xỉ \(\Sigma_y \approx J\Sigma_x J^\top\) cho \(\mathbf{y} = f(\mathbf{x})\), với \(J\) là Jacobian. Đúng khi \(f\) gần tuyến tính trên vùng bất định; sai khi \(f\) cong mạnh trên vùng đó.}
+\kn{NEES}{\emph{normalized estimation error squared}, đại lượng \(\varepsilon = \tilde{\mathbf{x}}^\top\Sigma^{-1}\tilde{\mathbf{x}}\) với \(\tilde{\mathbf{x}}\) là sai số so với chân trị. Nếu \(\Sigma\) trung thực thì \(\mathbb{E}[\varepsilon]\) đúng bằng số chiều của \(\tilde{\mathbf{x}}\).}
+\kn{quá tự tin (overconfidence)}{trạng thái \(\Sigma\) được báo nhỏ hơn hiệp phương sai thật của sai số. Biểu hiện bằng NEES lớn hơn số chiều. Đây là bệnh mãn tính của SLAM và nguy hiểm hơn hẳn chiều ngược lại.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Bộ giải in ra tư thế kèm một ma trận \(6\times 6\). Nêu ba điều kiện phải đúng thì ma trận đó mới có nghĩa, và nói mỗi điều kiện bị vi phạm ra sao trong SLAM thật.}
+\h{Bạn cần bất định của \emph{một} landmark. Lấy khối \(3\times 3\) của nó trong \(\Lambda\) rồi nghịch đảo --- rẻ và hiển nhiên. Vì sao kết quả đó sai, sai theo chiều nào, và đại lượng đúng là gì?}
+\h{Sai số độ sâu của stereo tăng theo \emph{bình phương} khoảng cách. Dẫn lại quan hệ đó, rồi nói nó quyết định thế nào tới việc chọn đường cơ sở và tiêu cự khi thiết kế sản phẩm.}
+\h{Hệ của bạn báo sai số vị trí \(\pm 2\) cm; đo với chân trị thì sai thật là \(\pm 20\) cm. Nêu bốn cơ chế khác nhau có thể gây ra chuyện đó, và nêu phép thử phân biệt chúng --- không dùng thêm chân trị nào.}
+\h{NEES của bạn gấp bốn lần số bậc tự do. Phản xạ tự nhiên là nới hiệp phương sai lên bốn lần và con số sẽ đẹp lại. Vì sao phản xạ đó có thể đang giấu một lỗi nghiêm trọng hơn nhiều?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{A/06/01}
+
+Năm chương trước dựng một cỗ máy trả về ước lượng. Chương này hỏi câu mà người dùng cỗ máy ấy thật sự cần trả lời, và nó không phải câu ``ước lượng có đúng không'' --- vì nếu biết được điều đó thì đã không cần ước lượng.
+
+Câu đúng là: \emph{ta biết ước lượng này chính xác tới đâu?} Và nó không phải một câu hỏi học thuật. Một robot quyết định có đi qua khe cửa rộng \(80\) cm hay không cần biết sai số vị trí của nó là \(\pm 2\) cm hay \(\pm 30\) cm --- và với con số thứ hai thì hành vi đúng là dừng lại, chứ không phải đi qua và hy vọng. Một hệ AR quyết định có vẽ vật ảo lên bàn hay không cần biết bất định của mặt bàn. Một hệ thống quyết định có chấp nhận một loop closure hay không cần biết bất định của tư thế tương đối để đặt ngưỡng kiểm định hình học (\ptr{B/11}).
+
+Ai gặp bài toán này? Về nguyên tắc là mọi người; trên thực tế là rất ít người, và đó chính là vấn đề. Phần lớn công trình SLAM báo cáo ATE và dừng ở đó. Rất ít công trình báo cáo liệu hiệp phương sai của họ có \emph{trung thực} hay không, và khi có ai đo thì kết quả thường không đẹp. Đây là một trong những khoảng trống thật của lĩnh vực, và \ptr{D/22} xếp nó là hướng số hai còn nhiều chỗ trống.
+
+Trước khi có khung xác suất, cách xử lý phổ biến là kinh nghiệm: ``hệ này thường sai khoảng mười centimet''. Cách đó hỏng ở ba chỗ. Nó không phân biệt các \emph{hướng} --- nhưng như \ptr{A/01} đã chỉ ra, bất định của một điểm triangulate có dạng điếu xì gà, ngắn ngang và rất dài dọc, nên một con số vô hướng là vô nghĩa. Nó không thích ứng --- sai số thật thay đổi hàng chục lần giữa lúc nhiều đặc trưng và lúc ít. Và nó không lan truyền được sang các phép tính sau.
+
+Khung xác suất giải quyết cả ba, và nó gần như miễn phí: ma trận thông tin \(\Lambda\) ở \ptr{A/04} \emph{đã có sẵn} như sản phẩm phụ của việc giải. Đó là điều làm chương này đặc biệt: thứ ta cần đã nằm trong tay, chỉ cần biết cách đọc nó và biết khi nào không nên tin nó.
+
+Và đó là chỗ cái khó thật sự nằm. Hiệp phương sai đúng đòi hỏi mô hình đúng: trọng số đúng, nhiễu độc lập, tuyến tính hoá hợp lệ, không có sai lệch có hệ thống, và không có hướng suy biến. Trong SLAM thật, \emph{mọi} điều kiện ấy đều bị vi phạm ít nhiều. Hệ quả là con số \(\Lambda^{-1}\) có xu hướng nhỏ hơn sự thật một cách có hệ thống --- và vì nó nhỏ theo hướng lạc quan, nó là loại sai nguy hiểm.
+
+\begin{trucgiac}
+Hình dung hàm mục tiêu MAP như cái bát ở \ptr{A/05}. Đáy bát là ước lượng. Nhưng có một câu hỏi thứ hai quan trọng không kém đáy nằm ở đâu: \emph{bát rộng hay hẹp?}
+
+Một cái bát hẹp và dốc nghĩa là chỉ cần lệch một chút khỏi đáy thì phần dư đã tăng mạnh --- dữ liệu ràng buộc chặt, ta chắc chắn. Một cái bát nông và rộng nghĩa là có thể đi khá xa mà phần dư gần như không đổi --- dữ liệu ràng buộc lỏng, ta không chắc.
+
+Độ cong của bát chính là \(\Lambda\), và độ rộng là \(\Lambda^{-1}\). Đó là toàn bộ ý tưởng của mục 2.
+
+Ba hệ quả đáng giữ. Thứ nhất, bát cong \emph{khác nhau theo hướng}, nên bất định là một ellipsoid chứ không phải một con số --- và với điểm triangulate, ellipsoid ấy dẹt tới mức một con số vô hướng là vô nghĩa.
+
+Thứ hai, bát có thể \emph{phẳng hoàn toàn} theo một hướng --- đó là \ptr{A/05}, và lúc đó \(\Lambda^{-1}\) không tồn tại. Nghĩa là chương này phụ thuộc hoàn toàn vào chương trước: \emph{không được hỏi ``rộng bao nhiêu'' trước khi chắc rằng bát có đáy}.
+
+Thứ ba, và đây là chỗ tinh vi nhất: độ cong của bát mô tả \emph{hàm mục tiêu}, không mô tả \emph{sự thật}. Nếu hàm mục tiêu sai --- trọng số sai, mô hình sai, một outlier lọt vào --- thì bát vẫn có một độ cong hoàn toàn xác định, và ta vẫn tính ra một hiệp phương sai trông đẹp. Nó chỉ không liên quan gì tới sai số thật. Toàn bộ mục 5 là về khoảng cách giữa hai thứ đó.
+\end{trucgiac}
+
+\section{Hiệp phương sai từ ma trận thông tin}
+\ptrtarget{A/06/02}
+
+\subsection{A. Kết quả cơ bản}
+
+Quanh nghiệm \(\hat{\boldsymbol{\theta}}\), hậu nghiệm xấp xỉ Gauss với
+\[
+p(\boldsymbol{\theta}\mid\mathbf{z}) \;\propto\; \exp\Bigl(-\tfrac12(\boldsymbol{\theta}\boxminus\hat{\boldsymbol{\theta}})^{\top}\Lambda\,(\boldsymbol{\theta}\boxminus\hat{\boldsymbol{\theta}})\Bigr),
+\]
+nên
+
+\begin{equation}
+\Sigma \;=\; \Lambda^{-1} \;=\; \Bigl(\sum_k H_k^{\top}\Omega_k H_k\Bigr)^{-1} .
+\label{eq:a06-sigma}
+\end{equation}
+
+Suy dẫn trực tiếp từ định nghĩa Gauss (cửa a), đối chiếu \cite[§4]{barfoot2017} (cửa c).
+
+Ba giả thiết nằm ẩn trong công thức này, và đây là câu trả lời cho câu hỏi mở đầu thứ nhất. \emph{Một:} hậu nghiệm xấp xỉ Gauss quanh nghiệm, tức hàm mục tiêu xấp xỉ bậc hai trên vùng bất định --- sai khi bất định lớn và mô hình cong mạnh, chẳng hạn với điểm rất xa. \emph{Hai:} trọng số \(\Omega_k\) đúng --- tức ta thật sự biết \(\sigma\) của mỗi phép đo, và mục~5 sẽ chỉ ra ta thường không biết. \emph{Ba:} \(\Lambda\) khả nghịch, tức không có hướng không quan sát được --- \ptr{A/05}. Vi phạm giả thiết ba thì công thức không chỉ kém chính xác mà \emph{không tồn tại}.
+
+\subsection{B. Biên so với điều kiện: cái bẫy đắt nhất của chương}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ hai, và là lỗi tôi cho là phổ biến nhất liên quan tới hiệp phương sai.
+
+Muốn bất định của biến \(\boldsymbol{\theta}_a\) trong một bài toán có cả \(\boldsymbol{\theta}_b\). Có hai đại lượng khác nhau:
+\[
+\Sigma_a^{\text{đk}} = \Lambda_{aa}^{-1}
+\qquad\text{so với}\qquad
+\Sigma_a^{\text{biên}} = \bigl[\Lambda^{-1}\bigr]_{aa}
+= \bigl(\Lambda_{aa} - \Lambda_{ab}\Lambda_{bb}^{-1}\Lambda_{ba}\bigr)^{-1}.
+\]
+Cái thứ nhất là \emph{điều kiện}: bất định của \(\boldsymbol{\theta}_a\) \emph{giả sử} ta biết \(\boldsymbol{\theta}_b\) chính xác. Cái thứ hai là \emph{biên}: bất định thật, khi \(\boldsymbol{\theta}_b\) cũng chưa biết.
+
+Vì \(\Lambda_{ab}\Lambda_{bb}^{-1}\Lambda_{ba}\) nửa xác định dương, ta luôn có \(\Sigma^{\text{biên}} \succeq \Sigma^{\text{đk}}\). Nghĩa là dùng điều kiện thay cho biên \emph{luôn} cho kết quả quá lạc quan --- và mức lạc quan có thể lớn tuỳ ý khi hai biến tương quan mạnh, đúng tình huống của tư thế và landmark trong SLAM.
+
+Cái khó thực hành: \(\Lambda\) thưa nhưng \(\Lambda^{-1}\) \emph{đặc}, nên không thể nghịch đảo cả ma trận cho bài toán lớn. Cách đúng là \term{nghịch đảo thưa}: tính chỉ những phần tử của \(\Lambda^{-1}\) tương ứng với phần khác không của thừa số Cholesky, bằng một truy hồi ngược. Kaess và Dellaert \cite{kaess2009covariance} trình bày thuật toán cho ma trận căn bậc hai; chi phí tỉ lệ với số phần tử khác không của thừa số, tức chấp nhận được.
+
+\begin{cambay}
+\textbf{Nghịch đảo khối con \(\neq\) khối con của nghịch đảo.} Đây là lỗi phổ biến nhất về hiệp phương sai và nó luôn sai theo chiều nguy hiểm: kết quả quá nhỏ, tức quá tự tin.
+
+Ví dụ số tối thiểu để thấy rõ. Giả sử \(\Lambda = \begin{pmatrix} 2 & 1{,}8 \\ 1{,}8 & 2\end{pmatrix}\), tức hai biến vô hướng tương quan mạnh.
+
+Điều kiện: \(\Lambda_{aa}^{-1} = 1/2 = 0{,}5\).
+
+Biên: \(\det\Lambda = 4 - 3{,}24 = 0{,}76\), nên \(\Lambda^{-1} = \frac{1}{0{,}76}\begin{pmatrix} 2 & -1{,}8 \\ -1{,}8 & 2\end{pmatrix}\), và \([\Lambda^{-1}]_{aa} = 2/0{,}76 \approx 2{,}63\).
+
+Chênh lệch hơn \emph{năm lần} về phương sai, tức hơn hai lần về độ lệch chuẩn. Và tương quan \(0{,}9\) giữa một tư thế và một landmark nó nhìn thấy hoàn toàn bình thường trong SLAM --- thực tế nó là quy luật, vì hai đại lượng ấy chỉ được xác định \emph{cùng nhau}. (Ví dụ tự đặt, tính tay, cửa kiểm chứng b.)
+
+Quy tắc: \textbf{luôn dùng hiệp phương sai biên} trừ khi bạn thật sự đang hỏi một câu hỏi có điều kiện. Và khi ai đó đưa bạn một hiệp phương sai, hãy hỏi cho rõ đó là loại nào --- nếu họ không biết câu hỏi nghĩa là gì thì gần như chắc chắn đó là điều kiện.
+\end{cambay}
+
+\subsection{C. Hiệp phương sai trên đa tạp}
+
+Theo \ptr{A/03}, tư thế sống trên đa tạp, nên hiệp phương sai của nó phải hiểu là hiệp phương sai của \emph{nhiễu loạn}:
+\[
+T_{\text{thật}} = \hat{T} \boxplus \boldsymbol{\xi},
+\qquad \boldsymbol{\xi} \sim \mathcal{N}(\mathbf{0}, \Sigma_{6\times 6}).
+\]
+Ma trận \(6\times6\) này sống trong đại số Lie, không trong không gian tham số. Ba hệ quả thực hành.
+
+\emph{Một:} nó phụ thuộc vào quy ước trái hay phải, và chuyển giữa hai quy ước phải dùng Adjoint: \(\Sigma_{\text{trái}} = \mathrm{Ad}_T\,\Sigma_{\text{phải}}\,\mathrm{Ad}_T^{\top}\). Quên chuyển thì con số sai mà không có dấu hiệu nào.
+
+\emph{Hai:} lan truyền qua một phép biến đổi cứng \(T' = T_0 T\) dùng \(\Sigma' = \mathrm{Ad}_{T_0}\Sigma\,\mathrm{Ad}_{T_0}^{\top}\), không phải một phép cộng ma trận nào đó.
+
+\emph{Ba:} xấp xỉ Gauss trên đa tạp chỉ tốt khi bất định \emph{nhỏ so với độ cong}. Với bất định xoay cỡ vài độ thì hoàn toàn ổn; với bất định cỡ vài chục độ thì phân bố thật ``quấn quanh'' đa tạp và Gauss không mô tả nổi. Trường hợp sau xuất hiện lúc mất bám hoặc lúc relocalization thất bại --- tức đúng lúc ta cần hiệp phương sai nhất.
+
+\section{Lan truyền sai số: chuỗi của Visual SLAM}
+\ptrtarget{A/06/03}
+
+\subsection{A. Quy tắc bậc nhất}
+
+Cho \(\mathbf{y} = f(\mathbf{x})\) với \(\mathbf{x} \sim \mathcal{N}(\hat{\mathbf{x}},\Sigma_x)\). Khai triển bậc nhất quanh \(\hat{\mathbf{x}}\):
+\[
+\Sigma_y \;\approx\; J\,\Sigma_x\,J^{\top},
+\qquad J = \frac{\partial f}{\partial\mathbf{x}}\Big|_{\hat{\mathbf{x}}}.
+\]
+Đơn giản, và nó là công cụ chính. Điều đáng nhớ là \emph{khi nào nó sai}: khi \(f\) cong mạnh trên vùng bất định. Trong SLAM có đúng một chỗ điều này xảy ra thường xuyên và gây hại, và đó là quan hệ độ sâu--disparity ở mục~B.
+
+\subsection{B. Pixel sang độ sâu: quan hệ đáng thuộc lòng}
+
+Từ \ptr{A/01} mục~4C, với stereo đã hiệu chỉnh:
+\begin{equation}
+z = \frac{bf}{d}
+\quad\Longrightarrow\quad
+\boxed{\;\sigma_z \;\approx\; \frac{z^2}{b f}\,\sigma_d\;}
+\label{eq:a06-depth}
+\end{equation}
+
+Đây là quan hệ quan trọng nhất trong chương xét về hệ quả thiết kế, và nó là câu trả lời cho câu hỏi mở đầu thứ ba. Đọc nó theo ba chiều:
+
+\emph{Theo \(z\):} sai số tăng theo \emph{bình phương} khoảng cách. Gấp đôi khoảng cách thì sai số gấp bốn. Đây là lý do mọi cảm biến độ sâu dựa trên tam giác đều có một tầm hữu ích khá rõ ràng, ngoài tầm đó thì số liệu vẫn có nhưng vô dụng cho đo đạc.
+
+\emph{Theo \(b\):} sai số tỉ lệ nghịch với đường cơ sở. Gấp đôi \(b\) thì sai số giảm một nửa --- nhưng cái giá là vùng chồng lấn giữa hai camera giảm, và việc khớp điểm khó hơn vì hai góc nhìn khác nhau nhiều hơn. Đây là một đánh đổi thiết kế thật, quyết định ở \ptr{D/21}.
+
+\emph{Theo \(f\):} sai số tỉ lệ nghịch với tiêu cự, nhưng tiêu cự lớn nghĩa là trường nhìn hẹp. Lại một đánh đổi, và nó tương tác với lựa chọn mô hình camera ở \ptr{A/02}.
+
+Nhưng có một chi tiết mà công thức~\eqref{eq:a06-depth} \emph{giấu đi}, và nó quan trọng hơn bản thân công thức. Vì \(z = bf/d\) là hàm \emph{nghịch đảo}, lan truyền bậc nhất chỉ đúng khi \(\sigma_d \ll d\). Khi \(d\) nhỏ --- tức điểm ở xa --- thì \(\sigma_d/d\) không còn nhỏ, hàm cong mạnh trên vùng bất định, và phân bố của \(z\) trở nên \emph{lệch}: đuôi phía xa dài hơn đuôi phía gần rất nhiều. Ở giới hạn \(d \to \sigma_d\), phân bố của \(z\) không còn có kỳ vọng hữu hạn.
+
+Hệ quả: với điểm xa, \emph{\(\sigma_z\) không mô tả được bất định thật}, và một ellipsoid Gauss trong toạ độ XYZ là một mô tả sai. Cách đúng là làm việc trong biến \(\rho = 1/z\), nơi quan hệ trở lại tuyến tính (\(\rho = d/(bf)\)) và phân bố trở lại gần Gauss. Đây là lập luận đầy đủ đằng sau tham số hoá nghịch đảo độ sâu \cite{civera2008inversedepth}, và nó là một trong những chỗ mà một chi tiết thống kê quyết định một lựa chọn kiến trúc ở \ptr{B/08}.
+
+\subsection{C. Ví dụ nhỏ tính tay: ngân sách sai số}
+
+Giả sử một robot với stereo \(b = 12\) cm, \(f = 400\) px, \(\sigma_d = 0{,}2\) px (tinh chỉnh subpixel tốt). Nó nhìn thấy đặc trưng ở các khoảng cách khác nhau.
+
+Từ~\eqref{eq:a06-depth}: ở \(z = 1\) m, \(\sigma_z = 1/(0{,}12\times400)\times 0{,}2 \approx 0{,}004\) m. Ở \(z=3\) m: \(9/48\times0{,}2 \approx 0{,}038\) m. Ở \(z = 8\) m: \(64/48\times0{,}2 \approx 0{,}27\) m. Ở \(z=15\) m: \(225/48\times0{,}2 \approx 0{,}94\) m.
+
+Còn sai số \emph{ngang} thì sao? Nó là \(\sigma_\perp \approx (z/f)\,\sigma_u\), tuyến tính theo \(z\) chứ không bình phương. Với \(\sigma_u = 0{,}2\) px: ở \(z = 8\) m, \(\sigma_\perp = 8/400\times0{,}2 = 0{,}004\) m.
+
+So sánh ở \(z = 8\) m: sai số dọc \(0{,}27\) m, sai số ngang \(0{,}004\) m. \emph{Tỉ số gần bảy mươi lần.} Đó là điếu xì gà mà \ptr{A/01} mô tả bằng lời, giờ đã có con số. (Ví dụ tự đặt, tính tay, cửa b.)
+
+Bài học thiết kế rút ra ngay và nó thật sự dùng được: \emph{đừng vứt điểm xa đi, và cũng đừng gán cho chúng một \(\sigma\) đẳng hướng}. Điểm ở \(15\) m gần như vô dụng cho việc đo khoảng cách nhưng vẫn xác định \emph{hướng} với độ chính xác vài milimet ở khoảng cách đó, tức vài phần vạn radian. Đúng như \ptr{A/03} mục~5 chỉ ra qua khối \([\mathbf{P}_c]_\times\): điểm xa ràng buộc xoay rất tốt. Cách xử lý đúng là tham số hoá nghịch đảo độ sâu và để hiệp phương sai phản ánh sự bất đối xứng --- không phải lọc bỏ theo một ngưỡng khoảng cách, vốn là cách làm phổ biến và lãng phí.
+
+\section{Bệnh quá tự tin}
+\ptrtarget{A/06/04}
+
+\subsection{A. Đo bằng NEES}
+
+Cách duy nhất biết hiệp phương sai có trung thực không là so với chân trị. Đại lượng chuẩn là NEES \cite{barshalom2001}:
+\[
+\varepsilon = \tilde{\mathbf{x}}^{\top}\Sigma^{-1}\tilde{\mathbf{x}},
+\qquad \tilde{\mathbf{x}} = \mathbf{x}_{\text{thật}} \boxminus \hat{\mathbf{x}} .
+\]
+Nếu \(\Sigma\) trung thực thì \(\mathbb{E}[\varepsilon] = \dim(\tilde{\mathbf{x}})\). Suy dẫn một dòng: với \(\tilde{\mathbf{x}} \sim \mathcal{N}(\mathbf{0},\Sigma)\),
+\[
+\mathbb{E}[\tilde{\mathbf{x}}^\top\Sigma^{-1}\tilde{\mathbf{x}}] = \mathbb{E}[\mathrm{tr}(\Sigma^{-1}\tilde{\mathbf{x}}\tilde{\mathbf{x}}^\top)] = \mathrm{tr}(\Sigma^{-1}\Sigma) = \dim .
+\]
+(Cửa a; đối chiếu \cite{barshalom2001}, cửa c.)
+
+Cách dùng: chạy nhiều lần Monte-Carlo, tính NEES trung bình (ANEES), so với số chiều. Lớn hơn nhiều nghĩa là quá tự tin; nhỏ hơn nhiều nghĩa là quá bảo thủ. Với sáu bậc tự do của một tư thế, ANEES nên gần \(6\); giá trị \(24\) nghĩa là độ lệch chuẩn bị đánh giá thấp khoảng hai lần.
+
+Cái giá: cần chân trị. Nên trong thực tế NEES chỉ đo được trong mô phỏng hoặc trên bộ dữ liệu có hệ đo ngoài. Đây là một lý do chính đáng và hay bị bỏ qua để dựng mô phỏng, chuyện của \ptr{C/18}.
+
+\subsection{B. Bốn nguồn của quá tự tin}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ tư, và cả bốn nguồn xuất hiện lại trong các chương sau.
+
+\emph{Một --- phụ thuộc thống kê bị bỏ qua.} Khung MAP giả định phép đo độc lập (\ptr{A/04} mục~2A). Trong thực tế, các đặc trưng gần nhau chia nhau sai số hiệu chuẩn cục bộ; các quan sát liên tiếp của cùng một đặc trưng chia nhau sai số mô tả của nó. Thông tin bị \emph{đếm thừa}, nên \(\Lambda\) quá lớn, nên \(\Sigma\) quá nhỏ.
+
+\emph{Hai --- sai lệch có hệ thống bị coi là nhiễu.} Hiệu chuẩn sai một chút (\ptr{A/02} mục~4C) tạo ra phần dư có thành phần \emph{hằng}. Bình phương tối thiểu xử lý nó như nhiễu ngẫu nhiên và ``khử'' nó bằng trung bình, trong khi thực tế nó không khử được. Ước lượng lệch, mà hiệp phương sai lại không phản ánh độ lệch --- vì hiệp phương sai chỉ đo độ tán, không đo độ lệch.
+
+\emph{Ba --- thông tin giả do tuyến tính hoá.} Cơ chế ở \ptr{A/05} mục~6: marginalization với các điểm tuyến tính hoá không nhất quán tạo ra thông tin không đến từ phép đo nào.
+
+\emph{Bốn --- outlier đã bị loại nhưng chưa tính vào.} Sau RANSAC và M-estimator, ta có một tập inlier sạch. Nhưng ta \emph{chọn} tập ấy dựa trên chính dữ liệu, và bất định của bước chọn đó không được đưa vào \(\Sigma\). Hệ quả là ta hành xử như thể data association chắc chắn, trong khi nó không. Đây là nguồn khó định lượng nhất trong bốn.
+
+\subsection{C. Vì sao chiều lạc quan nguy hiểm hơn}
+
+Một điểm đáng dừng lại vì nó định hình cách thiết kế hệ thống.
+
+Quá \emph{bảo thủ} --- báo hiệp phương sai lớn hơn thật --- làm hệ thống kém hiệu quả: nó từ chối loop closure hợp lệ, nó đi chậm hơn cần thiết, nó yêu cầu nhiều dữ liệu hơn. Khó chịu, nhưng \emph{an toàn}.
+
+Quá \emph{tự tin} làm hệ thống đưa ra quyết định sai một cách tự tin: chấp nhận loop closure sai và gập cả bản đồ (\ptr{B/11}), đi qua khe hẹp mà nó không thật sự biết mình đang ở đâu, khai báo relocalization thành công khi không phải (\ptr{B/12}). Trong mỗi trường hợp, hậu quả không phải một ước lượng kém mà là một \emph{hỏng hóc}.
+
+Hệ quả thiết kế: khi không chắc, \emph{nới hiệp phương sai}. Điều này nghe phản khoa học --- ta đang cố tình báo cáo một con số ta biết là sai --- và nó đúng là một sự thoả hiệp. Nhưng nó là sự thoả hiệp đúng, vì phân bố hậu quả không đối xứng. Điều kiện là phải \emph{ghi lại} rằng mình đã nới và nới bao nhiêu; nới lặng lẽ là cách nhanh nhất để một hệ số \(\times 5\) tuỳ tiện trở thành một hằng số bất khả xâm phạm mà ba năm sau không ai biết từ đâu ra.
+
+\begin{cambay}
+\textbf{ANEES lớn không tự động nghĩa là hiệp phương sai quá nhỏ.} Đây là cái bẫy quan trọng nhất của mục này, và là câu trả lời cho câu hỏi mở đầu thứ năm.
+
+NEES giả định mô hình \emph{đúng dạng} và chỉ có thể sai \emph{độ lớn}. Nếu bạn có một sai lệch có hệ thống --- hiệu chuẩn sai, sai lệch thời gian chưa bù, một vật động chưa loại --- thì phần dư mang thành phần có hệ thống và NEES lớn \emph{vì lý do đó}, không phải vì \(\Sigma\) nhỏ.
+
+Nới \(\Sigma\) lên bốn lần sẽ làm con số đẹp lại và \textbf{giấu lỗi gốc vào trọng số}. Ba tháng sau, khi hệ thống hỏng ở một điều kiện khác, không ai biết vì sao.
+
+Phép thử phân biệt, và nó không cần thêm chân trị: \textbf{kiểm tương quan giữa phần dư và các đại lượng khác}. Phần dư tương quan với tốc độ góc thì là sai lệch thời gian hoặc rolling shutter. Tương quan với vị trí trong ảnh thì là mô hình camera (\ptr{A/02} mục 4). Tương quan với nhiệt độ thì là trôi hiệu chuẩn. Tăng đều theo thời gian chạy thì là một biến chưa được ước lượng. Không tương quan với gì cả --- lúc đó, và chỉ lúc đó, mới thật sự là chuyện trọng số.
+\end{cambay}
+
+\begin{ungdung}
+\ud{GTSAM \cite{dellaert2017factorgraphs}}{\code{Marginals} tính hiệp phương sai biên từ Bayes tree}{Cài đặt của mục 2B --- chú ý API phân biệt rõ biên và điều kiện}
+\ud{Ceres \cite{ceres}}{\code{Covariance} với nghịch đảo thưa; cảnh báo khi ma trận suy biến}{Việc nó \emph{từ chối} khi suy biến là đúng và hiếm; xem \ptr{A/05}}
+\ud{OpenVINS \cite{geneva2020openvins}}{Mô phỏng có chân trị; tính NEES trực tiếp}{Một trong ít hệ mã nguồn mở đo nhất quán chứ không chỉ đo độ chính xác}
+\ud{\cite{civera2008inversedepth}}{Nghịch đảo độ sâu cho phân bố gần Gauss với điểm xa}{Nguồn của lập luận mục 3B --- một chi tiết thống kê quyết định một lựa chọn kiến trúc}
+\ud{\cite{kaess2009covariance}}{Khôi phục hiệp phương sai từ ma trận căn bậc hai}{Thuật toán làm mục 2B khả thi cho bài toán lớn}
+\end{ungdung}
+
+\begin{duan}{Đo NEES của chính bộ giải BA của bạn, rồi tìm ra vì sao nó lớn}{3 ngày}
+\dmt chuyển từ ``hệ thống của tôi chính xác'' sang ``hệ thống của tôi trung thực về việc nó chính xác tới đâu'' --- hai khẳng định rất khác nhau.
+\ddl tự sinh, vì bạn cần chân trị hoàn hảo. Sinh quỹ đạo, bản đồ, và quan sát với nhiễu Gauss \emph{đã biết} \(\sigma\). Đây là chỗ mô phỏng không thay thế được.
+\dbc dùng bộ giải BA từ \ptr{A/04}; chạy \(100\) lần Monte-Carlo với nhiễu khác nhau; mỗi lần tính sai số so với chân trị và hiệp phương sai biên; tính ANEES cho tư thế và so với \(6\); rồi \emph{cố tình} đưa vào từng nguồn quá tự tin ở mục 4B một cách riêng lẻ --- thêm tương quan giữa các quan sát gần nhau, thêm một sai lệch hiệu chuẩn nhỏ, thêm \(2\%\) outlier vượt qua bộ lọc --- và đo lại ANEES sau mỗi lần.
+\dxk bạn có một bảng: nguồn sai lệch \(\times\) ANEES, cho thấy mỗi nguồn đẩy ANEES lên bao nhiêu. Bạn phải quan sát được rằng với dữ liệu \emph{hoàn hảo} và trọng số \emph{đúng}, ANEES rất gần \(6\) --- nếu không thì có lỗi trong cài đặt hiệp phương sai, nhiều khả năng là nhầm biên với điều kiện, và đó là một kết quả đáng giá hơn cả bài tập. Thêm một cột: với mỗi nguồn, ghi lại phần dư tương quan với đại lượng nào --- đó là bảng chẩn đoán ở khối \emph{Cạm bẫy}, do chính bạn dựng.
+\dnv \ptr{C/18-danh-gia-va-phuong-phap-luan} biến quy trình này thành phương pháp đánh giá chuẩn; \ptr{D/21-tu-prototype-len-mass-production} biến nó thành giám sát sức khoẻ tại hiện trường, nơi không có chân trị và phải dùng đại lượng thay thế.
+\end{duan}
+
+\begin{traloi}
+\tl{Ba điều kiện. (1) \emph{Hậu nghiệm xấp xỉ Gauss} quanh nghiệm --- bị vi phạm với điểm rất xa, nơi quan hệ độ sâu--disparity cong mạnh và phân bố lệch. (2) \emph{Trọng số \(\Omega\) đúng} --- gần như luôn bị vi phạm, vì ta hiếm khi biết \(\sigma\) thật của mỗi phép đo, và mục 4B liệt kê bốn cách nó sai. (3) \emph{\(\Lambda\) khả nghịch}, tức không có hướng không quan sát được --- bị vi phạm trong mọi cấu hình suy biến ở \ptr{A/05}, và khi đó công thức không chỉ kém chính xác mà \emph{không tồn tại}.}
+\tl{Vì \(\bigl[\Lambda^{-1}\bigr]_{aa} \neq \bigl[\Lambda_{aa}\bigr]^{-1}\). Nghịch đảo khối con cho hiệp phương sai \emph{điều kiện} --- bất định giả sử mọi biến khác đã biết chính xác. Đại lượng đúng là hiệp phương sai \emph{biên}, khối con của nghịch đảo. Vì \(\Sigma^{\text{biên}} \succeq \Sigma^{\text{đk}}\), sai luôn theo chiều quá lạc quan, và mức chênh lớn tuỳ ý khi tương quan mạnh --- ví dụ ở khối \emph{Cạm bẫy} cho chênh hơn năm lần với tương quan \(0{,}9\), vốn là chuyện bình thường giữa một tư thế và landmark nó nhìn thấy. Cách tính đúng cho bài toán lớn là nghịch đảo thưa \cite{kaess2009covariance}.}
+\tl{Từ \(z = bf/d\), vi phân cho \(\partial z/\partial d = -bf/d^2 = -z^2/(bf)\), nên \(\sigma_z \approx z^2\sigma_d/(bf)\). Hệ quả thiết kế: tăng \(b\) giảm sai số tuyến tính nhưng giảm vùng chồng lấn và làm khớp điểm khó hơn; tăng \(f\) giảm sai số tuyến tính nhưng thu hẹp trường nhìn. Cả hai là đánh đổi thật phải quyết ở \ptr{D/21} dựa trên tầm làm việc mục tiêu. Quan trọng không kém: công thức này \emph{giấu} một điều --- nó là lan truyền bậc nhất qua một hàm nghịch đảo, nên nó mất hiệu lực khi \(\sigma_d/d\) không còn nhỏ, tức đúng với điểm xa. Lúc đó phân bố lệch và \(\sigma_z\) không mô tả nổi bất định thật; cách đúng là làm việc trong \(\rho = 1/z\).}
+\tl{Bốn cơ chế: (1) phụ thuộc thống kê bị bỏ qua nên thông tin bị đếm thừa; (2) sai lệch có hệ thống bị xử lý như nhiễu --- hiệp phương sai đo độ tán chứ không đo độ lệch; (3) thông tin giả do tuyến tính hoá không nhất quán trong marginalization; (4) bất định của bước chọn inlier không được tính vào. Phép thử phân biệt không cần chân trị: kiểm tương quan của phần dư với các đại lượng khác --- với tốc độ góc thì là \(t_d\) hoặc rolling shutter; với vị trí trong ảnh thì là mô hình camera; với nhiệt độ thì là trôi hiệu chuẩn; tăng đều theo thời gian thì là một biến chưa ước lượng; không tương quan với gì thì mới là chuyện trọng số.}
+\tl{Vì NEES giả định mô hình \emph{đúng dạng} và chỉ sai \emph{độ lớn}. Với một sai lệch có hệ thống, phần dư mang thành phần có hệ thống và NEES lớn vì lý do đó chứ không phải vì \(\Sigma\) nhỏ. Nới \(\Sigma\) lên bốn lần làm con số đẹp lại và giấu lỗi gốc vào trọng số --- ba tháng sau, khi hệ hỏng ở điều kiện khác, không ai biết vì sao. Cần chạy phép thử tương quan ở câu trên \emph{trước} khi nới. Và nếu sau cùng vẫn quyết định nới, phải \emph{ghi lại} đã nới bao nhiêu và vì sao; nới lặng lẽ là cách nhanh nhất biến một hệ số tuỳ tiện thành một hằng số bất khả xâm phạm.}
+\end{traloi}
+
+\begin{dongian}
+Nếu ai đó hỏi bạn bây giờ mấy giờ và bạn nói ``khoảng ba giờ chiều'', bạn đã nói hai điều: một con số, và một mức độ tin. Chữ ``khoảng'' mới là phần quan trọng. Nếu bạn vừa nhìn đồng hồ thì ``khoảng'' nghĩa là sai vài phút; nếu bạn vừa ngủ dậy trong một căn phòng không cửa sổ thì ``khoảng'' nghĩa là sai vài giờ. Cùng một câu trả lời, hai ý nghĩa hoàn toàn khác.
+
+Cái máy cũng phải nói hai điều như vậy. Nó nói ``tôi đang ở đây'', và nó phải nói thêm ``tôi tin điều đó tới mức nào''. Phần thứ hai quyết định người ta dùng câu trả lời của nó ra sao: nếu máy nói ``tôi ở đây, sai số hai centimet'' thì robot đi qua khe cửa; nếu nói ``sai số ba mươi centimet'' thì robot nên dừng lại nhìn kỹ hơn.
+
+Có ba chuyện cần biết về phần thứ hai.
+
+Chuyện thứ nhất: mức tin \emph{không giống nhau theo mọi hướng}. Cái máy nhìn thấy một cái cây ở xa: nó biết cây đó nằm về \emph{hướng} nào cực kỳ chính xác, nhưng cây đó cách bao xa thì nó mơ hồ. Nói ``sai số một mét'' là vô nghĩa --- một mét theo hướng nào? Phải nói ``sai số vài milimet ngang, một mét dọc''.
+
+Chuyện thứ hai: mức tin ấy được tính ra từ chính phép tính tìm vị trí, gần như miễn phí. Không cần làm gì thêm. Nhưng --- và đây là chuyện thứ ba, quan trọng nhất --- \emph{con số đó chỉ đúng nếu mọi giả định đằng sau nó đúng}. Nếu cái thước bạn dùng để đo bị cong mà bạn không biết, bạn sẽ đo rất nhất quán và rất tự tin, và rất sai. Máy cũng vậy, và nó không có cách nào tự phát hiện.
+
+Hậu quả là một bệnh rất phổ biến: máy nói ``tôi khá chắc'' nhiều hơn mức nó có quyền nói. Và cái bệnh này nguy hiểm theo một chiều chứ không phải hai chiều. Một cái máy quá thận trọng thì chỉ chậm chạp và phiền phức. Một cái máy quá tự tin thì đâm vào tường --- một cách rất quả quyết.
+
+\chuadongian{chỗ không rút gọn được: cách duy nhất để \emph{biết} máy có quá tự tin hay không là so nó với sự thật, và trong đời thật thì không có sự thật để so. Đó là lý do mô phỏng quan trọng hơn vẻ ngoài, và là lý do việc tìm ra một cách tự chẩn đoán mà không cần chân trị vẫn là một bài toán mở --- xem \ptr{D/22}.}
+\motcau{Một con số không kèm mức tin thì chưa phải một phép đo; và một mức tin không được kiểm thì chỉ là một con số nữa.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{A/06/05}
+
+Mệnh đề chính --- \emph{\(\Sigma = \Lambda^{-1}\) dưới ba giả thiết đã nêu} --- là suy dẫn toán học, nên nó chỉ sai nếu tôi dẫn sai. Cái \emph{có thể} bị bác bỏ là mệnh đề ẩn rằng ba giả thiết đủ gần đúng để con số dùng được. Nó bị bác bỏ nếu một hệ đo được ANEES gần đúng số chiều trong thời gian dài trên dữ liệu thật --- không phải mô phỏng --- mà không nhờ một hệ số nới thủ công nào. Tôi chưa thấy công trình nào báo cáo điều đó, nhưng tôi cũng chưa khảo sát có hệ thống \emph{(tôi suy ra, chưa đối chiếu nguồn)}; nếu nó tồn tại thì nó sẽ làm thay đổi đánh giá của \ptr{D/22} về hướng nghiên cứu số hai.
+
+Mệnh đề thứ hai --- \emph{hiệp phương sai biên luôn lớn hơn hoặc bằng điều kiện} --- là một bất đẳng thức đại số, kiểm được bằng ví dụ số ở mục~2B (cửa b) và chứng minh được từ tính nửa xác định dương của phần bù Schur (cửa a).
+
+Mệnh đề thứ ba --- \emph{SLAM quá tự tin một cách hệ thống} --- là mệnh đề thực nghiệm và là mệnh đề tôi tin nhất trong chương, nhưng cũng là mệnh đề tôi có ít bằng chứng trực tiếp nhất. Nó được thiết lập cho EKF-SLAM \cite{huang2008fej,hesch2014consistency}. Với các hệ tối ưu hoá hiện đại, tôi \emph{suy ra} từ bốn cơ chế ở mục~4B rằng bệnh vẫn còn, nhưng tôi không có số liệu về mức độ. Nó bị bác bỏ nếu một khảo sát trên nhiều hệ và nhiều bộ dữ liệu cho thấy ANEES phân bố quanh số chiều chứ không lệch lên. Đó là một thí nghiệm đáng làm và tôi không biết ai đã làm.
+
+Mệnh đề thứ tư --- \emph{quá tự tin nguy hiểm hơn quá bảo thủ} --- là một phán đoán về sự bất đối xứng của hậu quả, không phải một sự kiện đo được. Nó có thể sai trong ứng dụng mà chi phí của việc quá thận trọng rất cao --- một robot phải hoàn thành nhiệm vụ trong thời gian giới hạn, hoặc một hệ phải chấp nhận đủ số loop closure để bản đồ không vỡ. Nêu rõ điều này vì quy tắc ``khi không chắc thì nới'' ở mục~4C không phải quy tắc phổ quát mà là một lựa chọn phụ thuộc ứng dụng.
+
+\section{Kết nối}
+\ptrtarget{A/06/06}
+
+Chương này khép lại Phần~A, và nó phụ thuộc vào tất cả các chương trước theo một cách rất trực tiếp.
+
+Nối lên trên. \ptr{A/05-observability-gauge-va-suy-bien} là điều kiện tiên quyết tuyệt đối: không được hỏi ``bất định bao nhiêu'' trước khi chắc rằng \(\Lambda\) khả nghịch. Hai chương này nên đọc liền và ôn cùng nhau. \ptr{A/04-uoc-luong-map-va-bundle-adjustment} cho \(\Lambda\), và kỹ thuật nghịch đảo thưa ở mục~2B dùng đúng thừa số Cholesky mà bộ giải đã tính. \ptr{A/03-lie-group-va-toi-uu-tren-da-tap} cho Adjoint và lời nhắc rằng hiệp phương sai trên đa tạp là của nhiễu loạn. \ptr{A/01-hinh-hoc-da-thi} cho quan hệ độ sâu, và chương này biến nó thành một ngân sách sai số có số. \ptr{A/02-mo-hinh-camera} cho một trong bốn nguồn quá tự tin: sai lệch hiệu chuẩn bị xử lý như nhiễu.
+
+Nối xuống dưới. \ptr{B/08-mo-hinh-phan-du} nhận lập luận ở mục~3B: tham số hoá nghịch đảo độ sâu tồn tại vì phân bố trong biến \(z\) lệch còn trong biến \(1/z\) thì không. \ptr{B/11-loop-closure-va-nhat-quan-toan-cuc} dùng hiệp phương sai để đặt ngưỡng kiểm định hình học, và bệnh quá tự tin ở mục~4 là lý do ngưỡng ấy phải bảo thủ hơn lý thuyết. \ptr{B/12-relocalization} có cùng vấn đề ở dạng gắt hơn: một reloc sai có hại hơn không reloc, nên ngưỡng chấp nhận phải dựa trên một hiệp phương sai đáng tin. \ptr{C/15-hop-nhat-da-cam-bien} là nơi hiệp phương sai đúng trở thành điều kiện bắt buộc chứ không phải điều tốt nên có: khi ghép nhiều nguồn, trọng số tương đối giữa chúng \emph{chính là} tỉ số hiệp phương sai, và sai một nguồn thì cả hệ lệch.
+
+\ptr{C/18-danh-gia-va-phuong-phap-luan} là chương mở rộng trực tiếp: nó đặt NEES bên cạnh ATE và lập luận rằng hai con số đo hai thứ khác nhau, không thay thế nhau. \ptr{D/21-tu-prototype-len-mass-production} là chỗ chương này gặp thực tế khắc nghiệt nhất: tại hiện trường không có chân trị, nên phải tìm đại lượng thay thế --- số inlier, số điều kiện, vết hiệp phương sai, tỉ lệ tracking --- và chương 21 bàn về việc chọn chúng. \ptr{D/22-huong-nghien-cuu-con-trong} xếp ``bất định đáng tin'' là hướng số hai, và lý do nằm trọn trong mục~4 của chương này.
+
+Nối ngang: \code{../IMU\_Fusion/} chương 5 bàn NEES và tính nhất quán cho trường hợp quán tính, với FEJ và InEKF là hai cách chữa; \code{../marker/} chương 5 làm ngân sách sai số pixel-sang-tư thế cho bài toán docking, nơi yêu cầu là milimet nên mọi thứ trong chương này phải làm chặt hơn một bậc.
+
+\begin{tukiem}
+\item Nêu ba giả thiết của \(\Sigma = \Lambda^{-1}\), và với mỗi cái nói nó bị vi phạm thế nào trong SLAM thật và hậu quả theo chiều nào.
+\item Vì sao nghịch đảo khối con khác khối con của nghịch đảo, và sai theo chiều nào? Tự làm lại ví dụ số \(2\times2\) với tương quan \(0{,}9\).
+\item Tự dẫn lại \(\sigma_z \approx z^2\sigma_d/(bf)\), rồi tính \(\sigma_z\) và \(\sigma_\perp\) ở \(z = 10\) m với \(b=12\) cm, \(f=400\) px, \(\sigma = 0{,}2\) px. Tỉ số bao nhiêu, và nó nói gì về hình dạng ellipsoid?
+\item Vì sao lan truyền bậc nhất mất hiệu lực với điểm xa, và tham số hoá nào chữa được? Trả lời bằng ngôn ngữ hình dạng phân bố.
+\item Nêu bốn nguồn của quá tự tin, và với mỗi nguồn nêu một phép thử phát hiện không cần chân trị.
+\item ANEES bằng ba lần số chiều. Nêu hai cách giải thích hoàn toàn khác nhau và phép đo phân biệt chúng.
+\item Vì sao quá tự tin nguy hiểm hơn quá bảo thủ, và nêu một ứng dụng mà điều ngược lại đúng?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

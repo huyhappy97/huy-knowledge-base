@@ -1,0 +1,647 @@
+% 98-thuat-ngu.tex — SINH TỰ ĐỘNG bởi scratchpad/gen_terms.py. Đừng sửa tay.
+% Bảng ánh xạ thuật ngữ: English -> cách gọi chuẩn tiếng Việt, kèm chương định nghĩa lần đầu.
+\documentclass[deep_learning.tex]{subfiles}
+\begin{document}
+\chapter*{Bảng ánh xạ thuật ngữ}
+\addcontentsline{toc}{chapter}{Bảng ánh xạ thuật ngữ}
+\markboth{BẢNG ÁNH XẠ THUẬT NGỮ}{}
+
+\begin{tomtat}
+Bảng này chốt \textbf{một khái niệm, một cách gọi} cho toàn cây: mỗi thuật ngữ tiếng Anh chỉ có đúng một cách gọi tiếng Việt chuẩn, kèm chương định nghĩa nó lần đầu. Dùng nó khi gặp một từ lạ giữa chừng, hoặc khi viết thêm chương mới. Cột \emph{Định nghĩa ở} bấm được: nhấp vào là nhảy thẳng tới chương định nghĩa thuật ngữ đó. Nếu chỉ nhớ một điều: những từ mà bản dịch gây khó hiểu hơn bản gốc thì cây này cố ý \emph{không dịch} --- chúng được đánh dấu ``giữ nguyên tiếng Anh'' và bạn sẽ gặp đúng dạng đó trong mọi paper.
+\end{tomtat}
+
+\begingroup\small
+\setlength{\LTpre}{0.6em}\setlength{\LTpost}{0.6em}
+\begin{longtable}{@{}L{5.2cm}L{5.9cm}L{2.6cm}@{}}
+\toprule
+\textbf{English} & \textbf{Cách gọi chuẩn} & \textbf{Định nghĩa ở}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{English} & \textbf{Cách gọi chuẩn} & \textbf{Định nghĩa ở}\\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\emph{3D box} & hộp 3D & \ptr{B/05}\\
+\emph{3D convolution} & tích chập ba chiều & \ptr{C/15}\\
+\emph{3D vision} & thị giác 3D & \ptr{C/16}\\
+\emph{ablation} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/03}\\
+\emph{absolute trajectory error} & sai số quỹ đạo tuyệt đối & \ptr{B/07}\\
+\emph{accuracy} & độ chính xác & \ptr{A/01}\\
+\emph{activation} & kích hoạt & \ptr{B/11}\\
+\emph{activation function} & hàm kích hoạt & \ptr{B/10}\\
+\emph{active learning} & học chủ động & \ptr{B/06}\\
+\emph{AdaGrad} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{AdaIN} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/17}\\
+\emph{Adam} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{AdamW} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{adapter} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{adaptive overfitting} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{add-one-in} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/24}\\
+\emph{adjoint} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{adjoint method} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{adversarial example} & mẫu đối kháng & \ptr{C/17}\\
+\emph{aleatoric} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/25}\\
+\emph{Aliasing} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{all-reduce} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{AMP} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{anchor} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/03}\\
+\emph{anchor-free} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{annotation guideline} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/05}\\
+\emph{aperture problem} & bài toán khẩu độ & \ptr{C/15}\\
+\emph{approximate nearest neighbour} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{argmax} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{arithmetic intensity} & cường độ số học & \ptr{B/11}\\
+\emph{ASPP} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{assumption} & giả định & \ptr{B/03}\\
+\emph{đặt không chỉnh} & ill-posed & \ptr{C/17}\\
+\emph{ATE} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{atrous / dilated convolution} & tích chập giãn & \ptr{C/14}\\
+\emph{ATSS} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{attention} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{augmentation} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{AUPRC} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{AUROC} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{autodiff} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{autograd} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{autoregressive} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/17}\\
+\emph{autotune} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/24}\\
+\emph{backbone} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{backend} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{backpropagation} & lan truyền ngược & \ptr{A/01}\\
+\emph{backpropagation through time} & BPTT & \ptr{C/13}\\
+\emph{backward pass} & lượt ngược & \ptr{A/01}\\
+\emph{baseline} & đường cơ sở & \ptr{C/16}\\
+\emph{batch} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{batch normalization} & chuẩn hoá theo batch & \ptr{A/01}\\
+\emph{batch size} & kích thước batch & \ptr{A/01}\\
+\emph{BatchNorm} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/11}\\
+\emph{bbox} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/05}\\
+\emph{behavioral testing} & kiểm thử hành vi & \ptr{B/07}\\
+\emph{benchmark} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{bf16} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{bias--variance} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{bộ phân biệt} & discriminator & \ptr{C/17}\\
+\emph{bootstrap} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{bottom-up} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{bounding box} & hộp giới hạn & \ptr{B/09}\\
+\emph{brightness constancy} & độ sáng không đổi & \ptr{A/02}\\
+\emph{broadcasting} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{buffer} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{bundle adjustment} & hiệu chỉnh chùm tia & \ptr{A/01}\\
+\emph{calibrated} & đã hiệu chuẩn & \ptr{A/01}\\
+\emph{calibration} & hiệu chuẩn & \ptr{A/02}\\
+\emph{calibration set} & tập hiệu chuẩn & \ptr{E/25}\\
+\emph{camera pose} & pose camera & \ptr{C/16}\\
+\emph{capacity} & sức chứa & \ptr{B/04}\\
+\emph{captioning} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{catastrophic forgetting} & quên thảm khốc & \ptr{C/18}\\
+\emph{causal} & nhân quả & \ptr{C/15}\\
+\emph{centering} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{chain rule} & Quy tắc chuỗi & \ptr{A/01}\\
+\emph{channel} & kênh & \ptr{C/13}\\
+\emph{Channel gating} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{channels-last} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/11}\\
+\emph{checkpoint} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/03}\\
+\emph{Cholesky} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{chuyển phong cách} & style transfer & \ptr{C/17}\\
+\emph{class-balanced loss} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{classifier-free guidance} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/17}\\
+\emph{CNN} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/13}\\
+\emph{col2im} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{Color jitter} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{compound scaling} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{computation graph} & đồ thị tính toán & \ptr{D/19}\\
+\emph{concept drift} & trôi khái niệm & \ptr{B/08}\\
+\emph{condition number} & số điều kiện & \ptr{A/01}\\
+\emph{confidence} & độ tin cậy & \ptr{E/25}\\
+\emph{confidence interval} & khoảng tin cậy & \ptr{B/07}\\
+\emph{Confident learning} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/06}\\
+\emph{conformal prediction} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{confusion matrix} & ma trận nhầm lẫn & \ptr{B/07}\\
+\emph{công thức huấn luyện} & recipe & \ptr{C/13}\\
+\emph{consistency} & nhất quán & \ptr{B/09}\\
+\emph{contrastive} & Tương phản & \ptr{C/18}\\
+\emph{contrastive loss} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{ControlNet} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/17}\\
+\emph{convex} & lồi & \ptr{A/01}\\
+\emph{Convolution} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{copy} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{corpus} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{corruption} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/02}\\
+\emph{cosine similarity} & độ tương đồng cosine & \ptr{C/18}\\
+\emph{Cost-sensitive learning} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{covariance} & hiệp phương sai & \ptr{A/01}\\
+\emph{covariate shift} & dịch chuyển hiệp biến & \ptr{B/08}\\
+\emph{cross-attention} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/17}\\
+\emph{cross-entropy} & entropy chéo & \ptr{A/01}\\
+\emph{cross-validation} & kiểm định chéo & \ptr{B/06}\\
+\emph{CTC} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{CUDA core} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/11}\\
+\emph{CUDA graph} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/11}\\
+\emph{cuDNN} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/24}\\
+\emph{curse of dimensionality} & lời nguyền số chiều & \ptr{B/04}\\
+\emph{CutMix} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{damping} & giảm chấn & \ptr{A/01}\\
+\emph{data association} & liên kết dữ liệu & \ptr{C/15}\\
+\emph{data augmentation} & tăng cường dữ liệu & \ptr{A/02}\\
+\emph{data distribution} & phân phối dữ liệu & \ptr{C/17}\\
+\emph{data flow diagram} & sơ đồ luồng dữ liệu & \ptr{B/03}\\
+\emph{data leakage} & rò rỉ dữ liệu & \ptr{A/01}\\
+\emph{data loss} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{dataloader} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/03}\\
+\emph{datasheet} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/05}\\
+\emph{Datasheets for Datasets} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/06}\\
+\emph{DDP} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{dead ReLU} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{Deformable convolution} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{demosaicing} & khử khảm & \ptr{A/01}\\
+\emph{denoising} & khử nhiễu & \ptr{C/17}\\
+\emph{dense matching} & khớp dày đặc & \ptr{C/16}\\
+\emph{depth camera} & camera độ sâu & \ptr{A/02}\\
+\emph{depthwise} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{descriptor} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{determinism} & tính tất định & \ptr{D/19}\\
+\emph{Dice coefficient} & Dice & \ptr{B/09}\\
+\emph{dịch chuyển miền} & domain gap & \ptr{A/02}\\
+\emph{dict} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{differentiable} & khả vi & \ptr{C/16}\\
+\emph{diffusion} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/17}\\
+\emph{diffusion transformer} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/17}\\
+\emph{Dilated conv} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{disparity} & thị sai & \ptr{C/16}\\
+\emph{distillation} & chưng cất & \ptr{C/13}\\
+\emph{distortion} & méo ống kính & \ptr{A/02}\\
+\emph{distribution} & phân phối & \ptr{A/01}\\
+\emph{domain adaptation} & thích nghi miền & \ptr{B/08}\\
+\emph{domain gap} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{domain generalization} & tổng quát hoá miền & \ptr{B/08}\\
+\emph{domain shift} & lệch phân phối & \ptr{C/16}\\
+\emph{double descent} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{drift} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{DRO} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{dựng ảnh ở góc nhìn mới} & novel view synthesis & \ptr{C/16}\\
+\emph{dựng ảnh thể tích} & volume rendering & \ptr{C/16}\\
+\emph{dynamic batching} & batching động & \ptr{D/21}\\
+\emph{dynamic range} & Dải động & \ptr{A/02}\\
+\emph{đề xuất vùng} & proposal & \ptr{C/14}\\
+\emph{early fusion} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{ECE} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/25}\\
+\emph{effect size} & cỡ hiệu ứng & \ptr{E/24}\\
+\emph{effective receptive field} & trường tiếp nhận hiệu dụng & \ptr{B/10}\\
+\emph{eigendecomposition} & phân rã trị riêng & \ptr{A/01}\\
+\emph{eigenvalue} & trị riêng & \ptr{A/01}\\
+\emph{eigenvector} & vector riêng & \ptr{A/01}\\
+\emph{EMA} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{embedding} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/06}\\
+\emph{empirical risk minimization} & tối thiểu hoá rủi ro thực nghiệm & \ptr{B/04}\\
+\emph{ensemble} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{Entropy} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{epistemic} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/25}\\
+\emph{epoch} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{ERM} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{expected calibration error} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{expected risk} & rủi ro kỳ vọng & \ptr{B/04}\\
+\emph{export} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{exposure} & phơi sáng & \ptr{A/02}\\
+\emph{extrinsic calibration} & hiệu chỉnh ngoại & \ptr{B/06}\\
+\emph{extrinsics} & ma trận ngoại tại & \ptr{A/02}\\
+\emph{factor graph} & đồ thị nhân tố & \ptr{D/19}\\
+\emph{failure case} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/03}\\
+\emph{failure mode} & chế độ hỏng & \ptr{B/03}\\
+\emph{false negative} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{false positive} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{feature map} & bản đồ đặc trưng & \ptr{C/17}\\
+\emph{feature pyramid network} & FPN & \ptr{C/13}\\
+\emph{feature pyramid network, FPN} & kim tự tháp đặc trưng & \ptr{C/14}\\
+\emph{feed-forward} & tiến thẳng & \ptr{B/04}\\
+\emph{feed-forward geometry} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{feedback loop} & vòng phản hồi & \ptr{B/08}\\
+\emph{fine-grained classification} & phân loại chi tiết & \ptr{C/14}\\
+\emph{Fine-tune} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{finite difference} & sai phân hữu hạn & \ptr{C/12}\\
+\emph{fisheye} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{fixed-pattern noise} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/02}\\
+\emph{floater} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{FLOPs} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/11}\\
+\emph{flow matching} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/17}\\
+\emph{focal} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{Focal loss} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{foreground--background imbalance} & mất cân bằng nền--vật thể & \ptr{C/14}\\
+\emph{forward} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{forward operator} & toán tử thuận & \ptr{C/17}\\
+\emph{forward pass} & lượt xuôi & \ptr{C/18}\\
+\emph{Forward-mode autodiff} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{foundation model} & mô hình nền tảng & \ptr{C/18}\\
+\emph{fp16} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{freeze} & đóng băng & \ptr{C/17}\\
+\emph{frontend} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{fully connected} & kết nối đầy đủ & \ptr{C/14}\\
+\emph{fully-connected} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{gamma} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/02}\\
+\emph{gate} & cổng & \ptr{C/13}\\
+\emph{gauge} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{gauge freedom} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{Gauss--Newton} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{Gauss--Newton matrix} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{Gaussian noise} & nhiễu Gauss & \ptr{C/17}\\
+\emph{Gaussian splatting} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{GEMM} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/11}\\
+\emph{generalization} & tổng quát hoá & \ptr{C/12}\\
+\emph{generative model} & mô hình sinh & \ptr{C/17}\\
+\emph{Gimbal lock} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{global average pooling} & gộp trung bình toàn cục & \ptr{C/15}\\
+\emph{Goodhart's law} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{Grad-CAM} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/25}\\
+\emph{gradient} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{gradient check} & kiểm tra gradient & \ptr{A/01}\\
+\emph{gradient checkpointing} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{gradient clipping} & cắt ngưỡng gradient & \ptr{C/12}\\
+\emph{gradient descent} & hạ gradient & \ptr{A/01}\\
+\emph{Gram matrix} & ma trận Gram & \ptr{C/17}\\
+\emph{graph break} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{Gridding artifact} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{ground truth} & chân trị & \ptr{B/05}\\
+\emph{grounding} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{guidance} & dẫn hướng & \ptr{C/17}\\
+\emph{guided backpropagation} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/25}\\
+\emph{Gumbel-softmax} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{half precision} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{hallucination} & ảo giác & \ptr{C/18}\\
+\emph{hard constraint} & ràng buộc cứng & \ptr{B/03}\\
+\emph{hard negative mining} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{harmonic mean} & trung bình điều hoà & \ptr{B/07}\\
+\emph{head} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{heatmap} & bản đồ nhiệt & \ptr{C/14}\\
+\emph{Hessian} & Ma trận Hessian & \ptr{A/01}\\
+\emph{heteroscedastic loss} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{hidden state} & trạng thái ẩn & \ptr{C/13}\\
+\emph{hierarchy} & phân cấp & \ptr{C/13}\\
+\emph{Hinge loss} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{HOG} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{homogeneous coordinates} & Toạ độ đồng nhất & \ptr{A/01}\\
+\emph{hook} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{Huber loss} & hàm Huber & \ptr{B/09}\\
+\emph{Hungarian matching} & ghép cặp Hungary & \ptr{B/09}\\
+\emph{hyperparameter} & siêu tham số & \ptr{C/12}\\
+\emph{hyperparameter tuning} & tinh chỉnh siêu tham số & \ptr{E/23}\\
+\emph{identifiability} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{ill-conditioned} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{ill-posed} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{im2col} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{image captioning} & Sinh mô tả ảnh & \ptr{C/15}\\
+\emph{image signal processor} & ISP & \ptr{A/02}\\
+\emph{implicit field} & trường ẩn & \ptr{C/16}\\
+\emph{implicit regularization} & chính quy hoá ngầm & \ptr{C/12}\\
+\emph{inductive bias} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{inference} & suy luận & \ptr{C/18}\\
+\emph{influence function} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/06}\\
+\emph{InfoNCE} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{information matrix} & ma trận thông tin & \ptr{B/04}\\
+\emph{inlier} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{inter-annotator agreement} & mức đồng thuận giữa người gán nhãn & \ptr{B/05}\\
+\emph{interpolation} & nội suy & \ptr{A/01}\\
+\emph{interpolation threshold} & ngưỡng nội suy & \ptr{B/04}\\
+\emph{intersection over union, IoU} & giao trên hợp & \ptr{C/14}\\
+\emph{inverted dropout} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{inverted residual} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/20}\\
+\emph{IoU} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/05}\\
+\emph{Jacobian} & ma trận Jacobian & \ptr{A/01}\\
+\emph{Joint detection-tracking} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/15}\\
+\emph{k-nearest neighbours} & k láng giềng gần nhất & \ptr{B/04}\\
+\emph{kernel fusion} & hợp nhất kernel & \ptr{B/11}\\
+\emph{keyframe} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{keypoint} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/05}\\
+\emph{KNN} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{knowledge distillation} & chưng cất tri thức & \ptr{A/01}\\
+\emph{Kullback--Leibler divergence} & phân kỳ KL & \ptr{A/01}\\
+\emph{label assignment} & gán mẫu & \ptr{B/03}\\
+\emph{label shift} & dịch chuyển nhãn & \ptr{B/08}\\
+\emph{label smoothing} & làm mượt nhãn & \ptr{A/01}\\
+\emph{Lambertian} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{late fusion} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{latency} & độ trễ & \ptr{B/03}\\
+\emph{latent diffusion} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/17}\\
+\emph{latent space} & không gian ẩn & \ptr{C/17}\\
+\emph{latent variable} & biến ẩn & \ptr{C/17}\\
+\emph{layer} & tầng & \ptr{C/12}\\
+\emph{learning curve} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{learning path} & lộ trình & \ptr{E/26}\\
+\emph{learning rate} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{least squares} & Bình phương tối thiểu & \ptr{A/01}\\
+\emph{leave-one-out} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/24}\\
+\emph{letterbox} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{Lịch learning rate} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{Lie algebra} & đại số Lie & \ptr{A/01}\\
+\emph{likelihood} & độ hợp lý & \ptr{A/01}\\
+\emph{likelihood ratio} & tỉ số độ hợp lý & \ptr{B/08}\\
+\emph{limitations} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/03}\\
+\emph{linear probe} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{linear scaling rule} & quy tắc tỉ lệ tuyến tính & \ptr{C/12}\\
+\emph{lô} & batch & \ptr{C/12}\\
+\emph{locality} & tính cục bộ & \ptr{C/13}\\
+\emph{Log-sum-exp} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{logit} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/20}\\
+\emph{Long-tail} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/08}\\
+\emph{long-tail distribution} & phân bố đuôi dài & \ptr{C/14}\\
+\emph{loop closing} & phát hiện đóng vòng & \ptr{B/03}\\
+\emph{loop closure} & đóng vòng & \ptr{C/16}\\
+\emph{LoRA} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{loss} & hàm mất mát & \ptr{C/18}\\
+\emph{loss function} & hàm mất mát & \ptr{A/01}\\
+\emph{loss landscape} & bề mặt hàm mất mát & \ptr{A/01}\\
+\emph{loss scaling} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{low-rank approximation} & xấp xỉ hạng thấp & \ptr{A/01}\\
+\emph{LPIPS} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{LSTM} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/13}\\
+\emph{lưới đặc trưng} & feature map & \ptr{C/15}\\
+\emph{manifold} & đa tạp & \ptr{A/01}\\
+\emph{manifold hypothesis} & giả thuyết đa tạp & \ptr{B/04}\\
+\emph{mAP} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/05}\\
+\emph{marching cubes} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{mask} & mặt nạ & \ptr{C/14}\\
+\emph{mask classification} & phân loại mặt nạ & \ptr{C/14}\\
+\emph{masked attention} & attention có mặt nạ & \ptr{C/14}\\
+\emph{masked modeling} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{master weights} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{Matthews correlation coefficient} & hệ số tương quan Matthews & \ptr{B/07}\\
+\emph{max-pooling} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{maximum a posteriori} & cực đại hoá hậu nghiệm & \ptr{B/09}\\
+\emph{maximum a posteriori, MAP} & Cực đại hậu nghiệm & \ptr{A/01}\\
+\emph{maximum likelihood estimation} & cực đại hoá độ hợp lý & \ptr{B/09}\\
+\emph{maximum likelihood estimation, MLE} & Ước lượng độ hợp lý cực đại & \ptr{A/01}\\
+\emph{mean intersection over union, mIoU} & giao trên hợp trung bình & \ptr{C/14}\\
+\emph{mean matching accuracy} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{memory bandwidth} & băng thông bộ nhớ & \ptr{B/11}\\
+\emph{mesh} & mesh & \ptr{C/16}\\
+\emph{metric learning} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{minibatch} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{missing data} & dữ liệu thiếu & \ptr{B/06}\\
+\emph{mixed precision} & độ chính xác hỗn hợp & \ptr{D/19}\\
+\emph{Mixup} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{MLE} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{MLP} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{mode collapse} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/17}\\
+\emph{mode của phân phối} & mode & \ptr{C/17}\\
+\emph{model} & mô hình & \ptr{A/01}\\
+\emph{model cards} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/05}\\
+\emph{moiré} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/02}\\
+\emph{momentum} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{motion blur} & Ảnh mờ do chuyển động & \ptr{C/16}\\
+\emph{multi-object tracking} & bám nhiều mục tiêu & \ptr{C/15}\\
+\emph{multi-task loss} & hàm mất mát đa nhiệm & \ptr{C/14}\\
+\emph{multi-view stereo} & MVS & \ptr{C/16}\\
+\emph{multiple comparisons} & so sánh bội & \ptr{E/24}\\
+\emph{near-duplicate} & trùng lặp gần đúng & \ptr{B/06}\\
+\emph{nearest-neighbor} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{neck} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{negative} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{NeRF} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{nested cross-validation} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{Nesterov} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{neural rendering} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{NHWC} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/11}\\
+\emph{no free lunch} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{noise floor} & sàn nhiễu & \ptr{E/24}\\
+\emph{non-identifiability} & không xác định được & \ptr{C/16}\\
+\emph{non-maximum suppression} & triệt phi cực đại & \ptr{B/03}\\
+\emph{non-maximum suppression, NMS} & triệt phi cực đại & \ptr{C/14}\\
+\emph{normalization} & chuẩn hoá & \ptr{B/09}\\
+\emph{numerical gradient check} & kiểm tra gradient số & \ptr{D/19}\\
+\emph{độ hợp lý} & likelihood & \ptr{C/17}\\
+\emph{object detection} & Phát hiện vật thể & \ptr{C/14}\\
+\emph{objective function} & hàm mục tiêu & \ptr{C/17}\\
+\emph{odds} & tỉ số cược & \ptr{B/08}\\
+\emph{đơn vị mét} & metric & \ptr{C/16}\\
+\emph{one-stage} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/03}\\
+\emph{open-set} & tập lớp mở & \ptr{C/14}\\
+\emph{open-vocabulary detection} & phát hiện từ vựng mở & \ptr{C/18}\\
+\emph{operating point} & điểm vận hành & \ptr{B/07}\\
+\emph{opset} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/21}\\
+\emph{optical flow} & dòng quang & \ptr{A/02}\\
+\emph{optimal transport assignment} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{optimization profile} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/21}\\
+\emph{optimizer} & bộ tối ưu & \ptr{B/05}\\
+\emph{oracle} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/24}\\
+\emph{out-of-distribution detection} & phát hiện ngoài phân phối & \ptr{B/08}\\
+\emph{outlier} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{output stride} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{overfitting} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{paired comparison} & so sánh theo cặp & \ptr{E/24}\\
+\emph{panoptic quality} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{parameter} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{patch} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{PEFT} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{perceptual hash} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/06}\\
+\emph{perceptual loss} & mất mát tri giác & \ptr{B/09}\\
+\emph{permutation invariance} & bất biến hoán vị & \ptr{C/16}\\
+\emph{perplexity} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/25}\\
+\emph{perspective projection} & phép chiếu phối cảnh & \ptr{C/16}\\
+\emph{phân kỳ Kullback--Leibler} & KL divergence & \ptr{C/17}\\
+\emph{photometric consistency} & nhất quán trắc quang & \ptr{B/09}\\
+\emph{pillar} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{pix2pix} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/17}\\
+\emph{plugin} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/21}\\
+\emph{point cloud} & point cloud & \ptr{C/16}\\
+\emph{point map} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{pointer-ordered containers} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/24}\\
+\emph{polygon} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/05}\\
+\emph{Pooling} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{population} & quần thể & \ptr{B/05}\\
+\emph{positional encoding} & mã hoá vị trí & \ptr{C/13}\\
+\emph{positive} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{post-norm} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{Posterior collapse} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{pre-norm} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{precision} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{predictor} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{prefetch} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{pretraining} & tiền huấn luyện & \ptr{C/18}\\
+\emph{principal component analysis, PCA} & phân tích thành phần chính & \ptr{A/01}\\
+\emph{prior} & tiên nghiệm & \ptr{C/16}\\
+\emph{profile} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{profiler} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{projection} & phép chiếu & \ptr{A/01}\\
+\emph{prompt} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/05}\\
+\emph{proper scoring rule} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{proxy} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{pseudo-labeling} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/06}\\
+\emph{pull request} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/23}\\
+\emph{QR} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{quantile loss} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{quantization} & lượng tử hoá & \ptr{A/01}\\
+\emph{query} & truy vấn & \ptr{C/14}\\
+\emph{RandAugment} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{random label noise} & nhiễu ngẫu nhiên & \ptr{B/06}\\
+\emph{Random resized crop} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{rank} & hạng & \ptr{A/01}\\
+\emph{rank collapse} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{raw agreement} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/06}\\
+\emph{re-parameterization} & tái tham số hoá & \ptr{D/20}\\
+\emph{read noise} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/02}\\
+\emph{recall} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{receptive field} & trường tiếp nhận & \ptr{B/10}\\
+\emph{recipe} & công thức huấn luyện & \ptr{E/23}\\
+\emph{recurrent neural network, RNN} & mạng hồi quy & \ptr{C/13}\\
+\emph{region proposal network, RPN} & mạng đề xuất vùng & \ptr{C/14}\\
+\emph{regularization} & chính quy hoá & \ptr{A/01}\\
+\emph{relative pose error} & sai số tương đối & \ptr{B/07}\\
+\emph{reliability} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{reliability diagram} & biểu đồ độ tin cậy & \ptr{B/07}\\
+\emph{relocalization} & tái định vị & \ptr{B/03}\\
+\emph{ReLU} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{representation} & biểu diễn & \ptr{B/04}\\
+\emph{reprojection error} & sai số tái chiếu & \ptr{A/01}\\
+\emph{resampling} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/05}\\
+\emph{residual} & phần dư & \ptr{B/08}\\
+\emph{residual connection} & kết nối tắt & \ptr{B/10}\\
+\emph{resolution} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{reverse} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{Reverse-mode autodiff} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{reverse-mode automatic differentiation} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{reweighting} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/05}\\
+\emph{ridge point} & điểm gãy & \ptr{B/11}\\
+\emph{RMSProp} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{RoIAlign} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{RoIPooling} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{Rolling shutter} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{roofline} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/03}\\
+\emph{RPE} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{runtime} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{saddle point} & điểm yên ngựa & \ptr{A/01}\\
+\emph{saliency map} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/25}\\
+\emph{sampler} & bộ lấy mẫu & \ptr{C/17}\\
+\emph{sampler distillation} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/17}\\
+\emph{sampling frame} & khung lấy mẫu & \ptr{B/05}\\
+\emph{sampling theorem} & Định lý lấy mẫu & \ptr{A/01}\\
+\emph{sanity ablation} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/24}\\
+\emph{scale ambiguity} & nhập nhằng thang đo & \ptr{A/02}\\
+\emph{scaling laws} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{score} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/17}\\
+\emph{score function} & hàm điểm & \ptr{C/17}\\
+\emph{SDF} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{seed} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/03}\\
+\emph{segmentation} & phân vùng & \ptr{B/09}\\
+\emph{selection bias} & thiên lệch chọn mẫu & \ptr{B/06}\\
+\emph{selective search} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{self-distillation} & Tự chưng cất & \ptr{C/18}\\
+\emph{self-supervised} & tự giám sát & \ptr{B/04}\\
+\emph{self-supervised learning} & học tự giám sát & \ptr{C/18}\\
+\emph{semi-supervised learning} & học bán giám sát & \ptr{B/06}\\
+\emph{sensitivity} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{sequence} & chuỗi & \ptr{C/13}\\
+\emph{set} & tập hợp & \ptr{C/14}\\
+\emph{set prediction} & dự đoán tập hợp & \ptr{C/14}\\
+\emph{SGD} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{shape} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{shortcut learning} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/02}\\
+\emph{shot noise} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/02}\\
+\emph{signal-to-noise ratio} & SNR & \ptr{C/17}\\
+\emph{signed distance function} & SDF & \ptr{C/16}\\
+\emph{singular value decomposition, SVD} & phân rã giá trị kỳ dị & \ptr{A/01}\\
+\emph{skyline} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/24}\\
+\emph{SLAM} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{slice} & lát & \ptr{C/14}\\
+\emph{slice analysis} & phân tích theo lát cắt & \ptr{E/24}\\
+\emph{slice-based evaluation} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{SNR} & tỉ số tín hiệu trên nhiễu & \ptr{A/02}\\
+\emph{softmax} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{softmax cross-entropy loss} & softmax loss & \ptr{D/19}\\
+\emph{sparse convolution} & tích chập thưa & \ptr{C/16}\\
+\emph{Sparsity} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/20}\\
+\emph{specificity} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{spectral bias} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{spherical harmonics} & hàm điều hoà cầu & \ptr{C/16}\\
+\emph{squared error} & sai số bình phương & \ptr{B/04}\\
+\emph{stack trace} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{state space model, SSM} & mô hình không gian trạng thái & \ptr{C/13}\\
+\emph{stereo} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{stereo baseline} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{stochastic gradient descent} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{stochastic gradient descent, SGD} & hạ gradient ngẫu nhiên & \ptr{C/12}\\
+\emph{stock} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{stop} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/03}\\
+\emph{stop-gradient} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{straight-through estimator} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{stratified} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{stride} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{structure from motion} & SfM & \ptr{C/16}\\
+\emph{style loss} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{subspace} & không gian con & \ptr{A/01}\\
+\emph{supervision signal} & tín hiệu giám sát & \ptr{B/03}\\
+\emph{surrogate loss} & hàm thay thế & \ptr{B/09}\\
+\emph{symmetric function} & hàm đối xứng & \ptr{C/16}\\
+\emph{synthetic data} & dữ liệu tổng hợp & \ptr{B/06}\\
+\emph{systematic label noise} & nhiễu hệ thống & \ptr{B/06}\\
+\emph{t-SNE} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{taxonomy} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/05}\\
+\emph{teacher} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/09}\\
+\emph{temperature} & nhiệt độ & \ptr{C/18}\\
+\emph{temperature scaling} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{template} & mẫu chuẩn & \ptr{B/10}\\
+\emph{temporal action localization} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/15}\\
+\emph{temporal IoU} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/15}\\
+\emph{tensor} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{tensor core} & lõi tensor & \ptr{B/11}\\
+\emph{test set contamination} & nhiễm bẩn tập kiểm tra & \ptr{C/18}\\
+\emph{test-time augmentation} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{TF32} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{E/24}\\
+\emph{thermal} & camera nhiệt & \ptr{A/02}\\
+\emph{thermal throttling} & giảm xung do nhiệt & \ptr{B/11}\\
+\emph{thiên lệch quy nạp} & inductive bias & \ptr{A/02}\\
+\emph{throughput} & thông lượng & \ptr{B/11}\\
+\emph{thuật toán tối ưu} & optimizer & \ptr{C/12}\\
+\emph{tiến thẳng} & feed-forward & \ptr{C/17}\\
+\emph{timestamp} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/03}\\
+\emph{tinh chỉnh} & fine-tune & \ptr{C/18}\\
+\emph{token} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/10}\\
+\emph{tone mapping} & ánh xạ tone & \ptr{A/02}\\
+\emph{top-down} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{topology} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{track} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/02}\\
+\emph{tracker} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{Tracking-by-detection} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/15}\\
+\emph{training recipe} & công thức huấn luyện & \ptr{E/23}\\
+\emph{transfer learning} & học chuyển giao & \ptr{C/18}\\
+\emph{transformer} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{translation equivariance} & đẳng biến tịnh tiến & \ptr{A/01}\\
+\emph{triangulation} & tam giác hoá & \ptr{C/16}\\
+\emph{triplet loss} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/14}\\
+\emph{trong ngữ cảnh GPU} & kernel & \ptr{B/11}\\
+\emph{true negative} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{true positive} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{trung bình trượt luỹ thừa} & EMA & \ptr{C/12}\\
+\emph{trường bức xạ} & radiance field & \ptr{C/16}\\
+\emph{tương phản} & contrastive & \ptr{C/18}\\
+\emph{Tversky loss} & Tversky & \ptr{B/09}\\
+\emph{UMAP} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{uncertainty} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/07}\\
+\emph{underfit} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{unit of analysis} & đơn vị phân tích & \ptr{B/05}\\
+\emph{validation} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{vanishing and exploding gradient} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/12}\\
+\emph{variance} & phương sai & \ptr{C/12}\\
+\emph{vector-Jacobian product, VJP} & tích vector-Jacobian & \ptr{C/12}\\
+\emph{view} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{vision encoder} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\emph{Vision Transformer} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/13}\\
+\emph{vision-language} & thị giác--ngôn ngữ & \ptr{C/18}\\
+\emph{vision-language model} & VLM & \ptr{C/18}\\
+\emph{vision-language model, VLM} & mô hình thị giác--ngôn ngữ & \ptr{C/18}\\
+\emph{visual-inertial SLAM} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{ViT} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{voxel} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/16}\\
+\emph{warmup} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{watermark} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{B/04}\\
+\emph{weak supervision} & giám sát yếu & \ptr{B/06}\\
+\emph{weight} & trọng số & \ptr{A/01}\\
+\emph{weight decay} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{weight sharing} & chia sẻ trọng số & \ptr{B/10}\\
+\emph{white balance} & cân bằng trắng & \ptr{A/02}\\
+\emph{whitening} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{A/01}\\
+\emph{worker} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{D/19}\\
+\emph{zero-shot} & \emph{\color{tiercol}giữ nguyên tiếng Anh} & \ptr{C/18}\\
+\end{longtable}
+\endgroup
+\end{document}

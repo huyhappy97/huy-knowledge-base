@@ -1,0 +1,72 @@
+% ============================================================================
+%  ĐỊNH VỊ BẰNG MARKER — master gộp toàn cây thành một PDF liền mạch.
+%  Ngày tạo: 2026-09-13 | Sửa gần nhất: 2026-09-13 | Ôn gần nhất: chưa
+%  Nguồn: lộ trình tự soạn (Tầng 1 nguyên lý, Tầng 2 giải thuật, Tầng 4 framework,
+%         cộng phần ngân sách sai số cho mục tiêu 5 mm / 0,5 độ).
+%  Dependency: không (gốc cây). Mức độ: cốt lõi.
+%  Build: ./build.sh            (chỉ master)
+%         ./build.sh all        (thêm PDF riêng cho từng phần/chương)
+% ============================================================================
+\documentclass[11pt,a4paper,oneside]{report}
+\usepackage{subfiles}
+\input{\subfix{preamble/common}}
+\addbibresource{\subfix{refs.bib}}
+\hypersetup{pdftitle={Định vị bằng marker — cây tri thức fiducial marker cho docking chính xác},
+            pdfsubject={Fiducial marker, PnP, constellation, ngân sách sai số cho docking 5 mm / 0,5 độ}}
+\begin{document}
+
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture, overlay]
+  \fill[inkblue] (current page.north west) rectangle ++(1.5cm,-\paperheight);
+  \fill[accent]  ($(current page.north west)+(1.5cm,0)$) rectangle ++(0.22cm,-\paperheight);
+  \node[anchor=north east, inner sep=0pt]
+    at ($(current page.north east)+(-1.6cm,-2.3cm)$)
+    {\fontsize{170}{170}\selectfont\sffamily\bfseries\color{inkblue!7}TAG};
+\end{tikzpicture}
+
+\vspace*{4.2cm}
+\begin{flushleft}
+{\sffamily\bfseries\color{accent}\large ĐỊNH VỊ BẰNG DẤU HIỆU NHÂN TẠO\par}
+\vspace{0.5cm}
+{\sffamily\bfseries\color{inkblue}\fontsize{40}{45}\selectfont
+CÂY TRI THỨC\\[0.12em] MARKER\par}
+\vspace{0.9cm}
+{\color{accent}\rule{7cm}{2.4pt}}\par
+\vspace{0.9cm}
+{\large\color{inkblue!85}
+Trình bày theo mạch\\[0.25em]
+\textbf{vấn đề} \(\rightarrow\) \textbf{giải pháp} \(\rightarrow\) \textbf{giả định} \(\rightarrow\) \textbf{giá phải trả}\par}
+\end{flushleft}
+
+\vfill
+\begin{flushleft}
+{\itshape\color{tiercol}``Mục tiêu 5 mm / 0,5\(^\circ\) không bị giới hạn bởi thuật toán,\\
+mà bởi ngân sách sai số.''\par}
+{\footnotesize\sffamily\color{tiercol}luận điểm trung tâm của cây --- Phần C, chương 15\par}
+\vspace{1.1cm}
+{\footnotesize\sffamily\color{inkblue}\textbf{Năm phần}\quad
+A · Nguyên lý và toán học \quad B · Giải thuật và phương pháp\\[0.25em]
+\phantom{\textbf{Năm phần}}\quad C · Ngân sách sai số \quad D · Framework và công cụ \quad E · Lộ trình\par}
+\vspace{0.5em}
+{\footnotesize\sffamily\color{tiercol}Bản gộp toàn cây --- \today\par}
+\end{flushleft}
+\end{titlepage}
+
+\pagenumbering{roman}
+\subfile{00-map}
+\cleardoublepage
+\tableofcontents
+\cleardoublepage
+\pagenumbering{arabic}
+
+\subfile{A-nguyen-ly-va-toan-hoc/nguyen-ly-va-toan-hoc}
+\subfile{B-giai-thuat-va-phuong-phap/giai-thuat-va-phuong-phap}
+\subfile{C-ngan-sach-sai-so/ngan-sach-sai-so}
+\subfile{D-framework-va-cong-cu/framework-va-cong-cu}
+\subfile{E-lo-trinh/lo-trinh}
+
+\subfile{99-chua-biet}
+
+\printbibliography[title={Nguồn}]
+\end{document}

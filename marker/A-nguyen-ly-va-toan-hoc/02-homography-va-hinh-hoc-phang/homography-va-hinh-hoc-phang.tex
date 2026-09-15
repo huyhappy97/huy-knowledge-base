@@ -1,0 +1,320 @@
+% ---------------------------------------------------------------------------
+% Chương 2 — Homography và hình học phẳng
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-13  |  Ôn gần nhất: —
+% Phụ thuộc: A/01 (ma trận K, toạ độ chuẩn hoá, giả định ảnh đã khử méo)
+% Mức độ: QUAN TRỌNG — công cụ nền, nhưng đọc lướt được nếu đã quen hình học
+%         đa khung nhìn. Trừ mục 5 (cross-ratio) và mục 6 (bias tâm ellipse).
+% Kiểm chứng công thức lõi:
+%   (1) H = K [r1 r2 t] cho mặt phẳng Z=0
+%       — cửa (a) tự dẫn bằng cách đặt Z=0 vào phương trình chiếu;
+%         cửa (c) hartley2004 §8.1 (kiến thức chuẩn).
+%   (2) Phân rã H -> pose: r1 = H1/λ, r2 = H2/λ, r3 = r1 x r2, λ = ||H1||
+%       — cửa (a) tự dẫn từ tính trực chuẩn của R;
+%         cửa (c) zhang2000flexible §3.1 (chép ý, đổi ký hiệu).
+%   (3) Số điều kiện của H xấu đi khi diện tích tag trên ảnh nhỏ
+%       — cửa (a) lập luận qua chuẩn hoá Hartley; cửa (b) CHƯA có ví dụ số.
+%         NỢ KIỂM CHỨNG một phần.
+%   (4) Tâm của hình chiếu ≠ hình chiếu của tâm (với hình tròn)
+%       — cửa (c) heikkila2000geometric (nguồn chuẩn) và mallon2007bias;
+%         cửa (a) dẫn qua cross-ratio ở mục 5.
+% Ghi chú trung thực: chương không có số đo thực nghiệm. Các con số là ví dụ
+%   số học tự đặt có dẫn "giả sử".
+% ---------------------------------------------------------------------------
+\documentclass[../../marker.tex]{subfiles}
+\begin{document}
+\chapter{Homography và hình học phẳng (Homography and Planar Geometry)}
+\ptrtarget{A/02}\ptrtarget{A/02-homography-va-hinh-hoc-phang}
+\dependency{\ptr{A/01-mo-hinh-camera-va-distortion} (ma trận \(K\), toạ độ chuẩn hoá, và --- quan trọng --- cảnh báo rằng mọi thứ trong chương này giả định ảnh \emph{đã được khử méo}; nếu chưa thì không có homography nào khớp được).}
+
+\begin{tomtat}
+Chương này dựng công cụ cho trường hợp riêng mà toàn bộ bài toán marker rơi vào: mọi điểm điều khiển nằm trên một mặt phẳng. Trường hợp riêng ấy đơn giản hơn trường hợp tổng quát một cách đáng kể --- quan hệ giữa mặt phẳng vật và mặt phẳng ảnh là một phép biến đổi tuyến tính trong toạ độ thuần nhất, gọi là homography, chỉ có tám bậc tự do và giải được bằng bốn điểm. Ba điều đáng mang ra khỏi chương. Một, công thức \(H = K[r_1\,r_2\,\mathbf{t}]\) và phép phân rã ngược để lấy pose --- nó là cách khởi tạo chuẩn cho PnP. Hai, số điều kiện của \(H\) xấu đi nhanh khi tag nhỏ trên ảnh, và đó là lý do định lượng cho việc đặt ngưỡng kích thước tối thiểu. Ba, và đây là mục ít người biết nhất: \emph{tâm của hình chiếu không bằng hình chiếu của tâm}. Với marker tròn, sự thật ấy tạo ra một thiên lệch có hệ thống phụ thuộc tư thế, và nó là lý do marker tròn cần hiệu chỉnh conic chứ không dùng thẳng tâm ellipse.
+\end{tomtat}
+
+\begin{nentang}
+\kn{homography}{phép biến đổi tuyến tính khả nghịch trên toạ độ thuần nhất 2D, biểu diễn bởi một ma trận \(3\times3\) xác định sai khác một hệ số. Nó là quan hệ chính xác giữa hai ảnh của cùng một mặt phẳng, và cũng là quan hệ giữa mặt phẳng vật và ảnh của nó.}
+\kn{bậc tự do của \(H\)}{tám, không phải chín: ma trận có chín phần tử nhưng nhân toàn bộ với một hằng số cho cùng một phép biến đổi, nên một bậc tự do là dư. Hệ quả thực hành: cần bốn cặp điểm tương ứng (mỗi cặp cho hai phương trình) để xác định \(H\).}
+\kn{DLT}{\en{Direct Linear Transform}, phương pháp giải \(H\) bằng cách viết các ràng buộc thành một hệ tuyến tính thuần nhất \(A\mathbf{h} = 0\) rồi lấy véctơ kỳ dị ứng với giá trị kỳ dị nhỏ nhất.}
+\kn{chuẩn hoá Hartley}{phép biến đổi tiền xử lý đưa tập điểm về trung bình không và khoảng cách trung bình tới gốc bằng \(\sqrt{2}\), trước khi chạy DLT. Nó không phải một mẹo làm đẹp: nó thay đổi số điều kiện của \(A\) vài bậc độ lớn, và bỏ nó là lỗi cài đặt kinh điển \cite[§4.4]{hartley2004}.}
+\kn{số điều kiện (condition number)}{tỉ số giữa giá trị kỳ dị lớn nhất và nhỏ nhất của một ma trận. Nó đo mức khuếch đại sai số: số điều kiện \(10^6\) nghĩa là nhiễu đầu vào có thể bị nhân lên triệu lần ở một hướng nào đó của nghiệm.}
+\kn{tỉ số kép (cross-ratio)}{đại lượng gồm bốn điểm thẳng hàng, \((AC/BC)/(AD/BD)\), và là bất biến \emph{duy nhất} của phép chiếu phối cảnh trên một đường thẳng. Mọi thứ khác --- khoảng cách, tỉ số hai đoạn, trung điểm --- đều không bảo toàn.}
+\kn{conic}{đường cong bậc hai trên mặt phẳng, biểu diễn bởi ma trận đối xứng \(3\times3\): \(\mathbf{x}^\top C\,\mathbf{x} = 0\). Đường tròn và ellipse đều là conic, và ảnh phối cảnh của một conic vẫn là một conic --- đây là tính chất làm marker tròn xử lý được bằng đại số tuyến tính.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Homography có tám bậc tự do còn pose chỉ có sáu. Hai bậc dư ấy chứa gì, và tại sao sự dư thừa ấy lại là một công cụ chẩn đoán miễn phí?}
+\h{Bạn vẽ một vòng tròn lên tấm marker rồi tìm tâm của ellipse mà nó tạo ra trên ảnh. Vì sao điểm bạn vừa tìm \emph{không} phải hình chiếu của tâm vòng tròn, và sai lệch ấy phụ thuộc vào cái gì?}
+\h{Tag của bạn co lại từ 200\,px xuống 40\,px trên ảnh khi robot lùi ra xa. Nhiễu góc \(\sigma\) không đổi. Pose lại xấu đi nhanh hơn nhiều so với tỉ lệ \(1/w\) mà \ptr{A/05} dự đoán. Cơ chế nào trong chương này giải thích phần vượt trội đó?}
+\h{Một đồng nghiệp cài DLT để giải homography, không chuẩn hoá điểm trước, và kết quả ``chạy được'' trên dữ liệu thử. Vì sao nó sẽ hỏng trên dữ liệu thật, và hỏng theo kiểu nào?}
+\h{Trong bốn bất biến sau, cái nào được phép chiếu phối cảnh bảo toàn: khoảng cách, tỉ số hai đoạn thẳng hàng, trung điểm, tỉ số kép? Và vì sao câu trả lời quyết định cách bạn thiết kế marker?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{A/02/01}
+
+Bài toán ước lượng pose từ ảnh nói chung là một bài toán khó: sáu ẩn, quan hệ phi tuyến, nhiều nghiệm, cần lặp. Nhưng bài toán marker rơi vào một trường hợp riêng mà hình học ưu ái đặc biệt --- \emph{mọi điểm điều khiển nằm trên một mặt phẳng} --- và trường hợp riêng ấy có một cấu trúc đẹp đến mức đáng dành một chương.
+
+Cấu trúc ấy là thế này. Khi vật là một mặt phẳng, quan hệ giữa toạ độ trên mặt phẳng vật và toạ độ trên ảnh là \emph{tuyến tính} trong toạ độ thuần nhất. Không có phép chia phi tuyến còn lại, không cần lặp, không có nhiều nghiệm ở tầng này: bốn điểm là đủ và lời giải là một bài toán trị riêng. Đây là lý do lịch sử vì sao hiệu chuẩn camera bằng target phẳng --- phương pháp Zhang \cite{zhang2000flexible} --- lại thay thế được các phương pháp cũ dùng vật hiệu chuẩn ba chiều đắt tiền: mặt phẳng dễ chế tạo chính xác, và toán học của nó dễ hơn.
+
+Cấu trúc ấy cũng là lý do vì sao mọi detector marker đều dùng homography ở giữa quy trình. ArUco rectify vùng tag về hình vuông chuẩn bằng homography rồi mới lấy mẫu các ô bit \cite{garrido2014automatic}; không có bước ấy thì việc đọc bit từ một tứ giác méo là một cơn ác mộng. AprilTag dùng homography để khởi tạo pose trước khi tinh chỉnh. ChArUco dùng nó để dự đoán vị trí các góc chessboard sau khi đã định danh bằng các ô ArUco.
+
+Nhưng chương này không tồn tại chỉ để trình bày một công cụ tiện lợi. Nó tồn tại vì hình học phẳng mang theo \emph{hai cái bẫy} mà người dùng công cụ không thấy.
+
+Cái bẫy thứ nhất là về điều kiện số. Homography luôn giải được về mặt đại số, kể cả khi bốn điểm gần trùng nhau hoặc gần thẳng hàng --- bộ giải trả về một ma trận và không báo lỗi. Nhưng chất lượng của ma trận ấy phụ thuộc dữ dội vào hình học của bốn điểm, và sự phụ thuộc ấy không xuất hiện trong bất kỳ thông báo nào. Mục~4 định lượng chuyện này, và nó giải thích một hiện tượng mà \ptr{A/05} một mình không giải thích được: vì sao pose xấu đi \emph{nhanh hơn} tỉ lệ tuyến tính khi tag co lại.
+
+Cái bẫy thứ hai tinh vi hơn nhiều và nó là lý do chính tôi xếp chương này ở mức quan trọng thay vì tham khảo. Phép chiếu phối cảnh \emph{không bảo toàn trung điểm}. Nghe thì vô hại, nhưng nó có một hệ quả rất cụ thể: nếu bạn vẽ một hình tròn và tìm tâm của ellipse mà nó tạo trên ảnh, điểm bạn tìm được \emph{không} phải hình chiếu của tâm hình tròn. Sai lệch ấy là một thiên lệch có hệ thống, nó phụ thuộc tư thế, và nó là nguồn sai số chính khi dùng marker tròn nếu không hiệu chỉnh. Kết quả này đã được biết rõ trong cộng đồng hiệu chuẩn camera từ hai thập niên \cite{heikkila2000geometric,mallon2007bias} và nó vẫn tiếp tục làm người mới bất ngờ.
+
+\begin{trucgiac}
+Hình dung việc chiếu bóng một tấm bìa lên tường bằng một cái đèn pin.
+
+Nếu tấm bìa song song với tường, bóng của nó là một bản phóng to trung thực: hình vuông vẫn vuông, trung điểm vẫn ở giữa, hai đoạn bằng nhau vẫn bằng nhau. Đây là phép đồng dạng, và mọi trực giác hình học quen thuộc đều còn đúng.
+
+Nghiêng tấm bìa đi, và mọi thứ bắt đầu lệch. Hình vuông thành hình thang. Cạnh xa đèn trông ngắn hơn cạnh gần. Và --- đây là chỗ đáng chú ý --- \emph{trung điểm của cạnh không còn chiếu thành trung điểm của bóng}: vì phần gần đèn bị phóng to nhiều hơn phần xa, điểm giữa bị đẩy về phía xa.
+
+Cái mà phép chiếu \emph{vẫn} bảo toàn không phải là khoảng cách hay tỉ lệ mà là một đại lượng phức tạp hơn gồm bốn điểm, gọi là tỉ số kép. Bốn điểm thẳng hàng có một con số gắn với chúng, và con số ấy giống hệt nhau ở vật và ở bóng, dù nghiêng thế nào. Nó là bất biến \emph{duy nhất}, và mọi thứ đơn giản hơn nó đều không bảo toàn.
+
+Giờ áp vào marker. Một cái tag vuông có bốn góc, và bốn góc ấy là bốn điểm rời rạc xác định rõ --- phép chiếu đưa chúng đi đâu thì đi, ta vẫn biết điểm nào là điểm nào. Nhưng một cái marker tròn thì không có góc: cái ta đo được là \emph{tâm của đường cong}, mà tâm là một khái niệm dựa trên trung điểm, mà trung điểm thì không bảo toàn. Ta đang đo một thứ không phải thứ ta nghĩ mình đang đo.
+\end{trucgiac}
+
+\section{Homography của một mặt phẳng}
+\ptrtarget{A/02/02}
+
+Dẫn công thức, vì nó ngắn và vì mỗi bước đều nói một điều.
+
+Chọn hệ toạ độ trên mặt phẳng marker sao cho mặt phẳng ấy là \(Z = 0\). Một điểm trên marker có toạ độ \((X, Y, 0)\). Áp mô hình chiếu của \ptr{A/01}:
+\[
+\begin{pmatrix} u \\ v \\ 1\end{pmatrix}
+\sim K\,[\,\mathbf{r}_1 \; \mathbf{r}_2 \; \mathbf{r}_3 \; \mathbf{t}\,]
+\begin{pmatrix} X \\ Y \\ 0 \\ 1\end{pmatrix}
+= K\,[\,\mathbf{r}_1 \; \mathbf{r}_2 \; \mathbf{t}\,]
+\begin{pmatrix} X \\ Y \\ 1\end{pmatrix},
+\]
+trong đó \(\mathbf{r}_i\) là các cột của \(R\), và dấu \(\sim\) nghĩa là bằng nhau sai khác một hệ số khác không.
+
+Cột thứ ba \(\mathbf{r}_3\) biến mất vì nó nhân với \(Z = 0\). Đó là toàn bộ mẹo, và nó đáng dừng lại một câu: chính việc \emph{mất} một cột làm cho quan hệ trở thành một ma trận \(3\times3\) --- tức một phép biến đổi tuyến tính giữa hai mặt phẳng --- thay vì một phép chiếu từ ba chiều xuống hai chiều. Ta định nghĩa
+\begin{equation}
+H \;=\; K\,[\,\mathbf{r}_1 \; \mathbf{r}_2 \; \mathbf{t}\,].
+\label{eq:a02-H}
+\end{equation}
+
+Đây cũng là chỗ trả lời Q1 về hai bậc tự do dư. \(H\) có tám bậc tự do (chín phần tử trừ một hệ số tỉ lệ). Pose có sáu. Vậy hai bậc dư nằm ở đâu? Chúng nằm ở chỗ một ma trận \(3\times3\) bất kỳ \emph{không} nhất thiết có dạng \(K[\mathbf{r}_1\,\mathbf{r}_2\,\mathbf{t}]\) với \(\mathbf{r}_1, \mathbf{r}_2\) trực chuẩn. Hai ràng buộc \(\|\mathbf{r}_1\| = \|\mathbf{r}_2\|\) và \(\mathbf{r}_1^\top\mathbf{r}_2 = 0\) chính là hai bậc tự do bị loại đi khi ta đi từ \(H\) tổng quát về một pose hợp lệ.
+
+Và đây là chỗ sự dư thừa trở thành công cụ chẩn đoán miễn phí --- phần thứ hai của Q1. Sau khi tính \(H\) từ dữ liệu bằng DLT, ta có thể kiểm xem \(K^{-1}H\) có \emph{thật sự} thoả hai ràng buộc trực chuẩn không. Nếu hai cột đầu của \(K^{-1}H\) có độ dài lệch nhau 20\% hoặc tích vô hướng của chúng khác không đáng kể, thì một trong ba điều đã sai: các điểm không thực sự đồng phẳng, ảnh chưa khử méo đúng, hoặc \(K\) sai. Phép kiểm ấy tốn vài dòng code và nó bắt được cả ba lỗi phổ biến nhất --- đáng ngạc nhiên là rất ít cài đặt làm nó.
+
+\section{Phân rã \texorpdfstring{\(H\)}{H} thành pose}
+\ptrtarget{A/02/03}
+
+Đi ngược từ \(H\) về \((R, \mathbf{t})\). Từ~\eqref{eq:a02-H}, đặt \(M = K^{-1}H = [\,\mathbf{m}_1\;\mathbf{m}_2\;\mathbf{m}_3\,]\). Về nguyên tắc \(\mathbf{m}_1 = \lambda\mathbf{r}_1\), \(\mathbf{m}_2 = \lambda\mathbf{r}_2\), \(\mathbf{m}_3 = \lambda\mathbf{t}\) với một hệ số \(\lambda\) chưa biết.
+
+Vì \(\|\mathbf{r}_1\| = 1\), ta có \(\lambda = \|\mathbf{m}_1\|\). Trong thực tế, do nhiễu, \(\|\mathbf{m}_1\| \neq \|\mathbf{m}_2\|\), nên cách dùng phổ biến là lấy trung bình:
+\[
+\lambda = \tfrac{1}{2}\big(\|\mathbf{m}_1\| + \|\mathbf{m}_2\|\big).
+\]
+Rồi
+\[
+\mathbf{r}_1 = \mathbf{m}_1/\lambda, \qquad
+\mathbf{r}_2 = \mathbf{m}_2/\lambda, \qquad
+\mathbf{r}_3 = \mathbf{r}_1 \times \mathbf{r}_2, \qquad
+\mathbf{t} = \mathbf{m}_3/\lambda .
+\]
+Cột thứ ba lấy bằng tích có hướng vì \(R\) trực giao thuận. Đây là quy trình chuẩn, chép ý từ \cite[§3.1]{zhang2000flexible} với ký hiệu đổi sang của cây.
+
+Ma trận \(R\) thu được theo cách này \emph{không} trực giao chính xác vì nhiễu, nên phải chiếu nó về \(SO(3)\) gần nhất. Cách đúng là qua phân tích SVD: nếu \(R = U\Sigma V^\top\) thì ma trận trực giao gần nhất theo chuẩn Frobenius là \(UV^\top\) --- một kết quả cổ điển gọi là bài toán Procrustes trực giao. Cần chú ý một chi tiết cài đặt: phải kiểm \(\det(UV^\top) = +1\); nếu ra \(-1\) thì đã thu được một phép phản xạ chứ không phải phép quay, và phải đổi dấu cột cuối của \(V\).
+
+Cũng có một tình huống dấu cần xử lý: \(H\) xác định sai khác một hệ số, kể cả dấu, nên có thể ra \(\mathbf{t}\) với \(t_z < 0\) --- tức marker nằm \emph{sau} camera. Vô lý về vật lý, nên nếu gặp thì đổi dấu toàn bộ \(H\) rồi làm lại.
+
+\begin{cambay}
+Phép phân rã ở mục này cho ra một pose \emph{hợp lệ}, không phải pose \emph{tốt nhất}. Ba lý do, và cả ba đều dẫn tới cùng một kết luận thực hành.
+
+Thứ nhất, DLT cực tiểu hoá một sai số đại số (\(\|A\mathbf{h}\|\)) chứ không phải sai số hình học có ý nghĩa. Đại lượng ta thật sự quan tâm là sai số tái chiếu tính bằng pixel, và hai thứ đó không tỉ lệ với nhau.
+
+Thứ hai, phép trung bình \(\lambda\) và phép chiếu về \(SO(3)\) đều là những cách sửa \emph{sau khi} đã có nghiệm, không phải cách tìm nghiệm tốt hơn. Chúng đảm bảo kết quả là một pose hợp lệ nhưng không đảm bảo nó tối ưu theo tiêu chí nào cả.
+
+Thứ ba, phép phân rã không nói gì về bài toán hai nghiệm của \ptr{A/04}. Nó cho ra một nghiệm, và nghiệm ấy có thể là nghiệm sai.
+
+Kết luận: \emph{luôn coi kết quả phân rã \(H\) là điểm khởi đầu, không phải kết quả}. Chạy tinh chỉnh phi tuyến trên sai số tái chiếu sau đó (\ptr{A/03}), và với target phẳng thì dùng IPPE để lấy \emph{cả hai} nghiệm thay vì phân rã \(H\) --- IPPE làm đúng việc này và làm tốt hơn \cite{collins2014ippe}.
+\end{cambay}
+
+\section{Điều kiện số: vì sao tag nhỏ tệ hơn công thức dự đoán}
+\ptrtarget{A/02/04}
+
+Đây là mục có giá trị thực hành cao nhất trong chương, và nó trả lời Q3.
+
+\ptr{A/05} cho quan hệ \(\delta Z \approx Z\sigma/w\) --- sai số dọc trục tỉ lệ nghịch với kích thước tag trên ảnh. Đó là một quan hệ tuyến tính và nó đúng trong chế độ hoạt động tốt. Nhưng người ta quan sát được rằng khi tag co xuống dưới một ngưỡng nào đó, chất lượng pose xuống dốc nhanh hơn nhiều so với \(1/w\). Cơ chế của phần vượt trội ấy nằm ở chương này.
+
+Bài toán DLT là giải hệ thuần nhất \(A\mathbf{h} = 0\), với \(A\) dựng từ toạ độ các điểm tương ứng. Chất lượng nghiệm phụ thuộc vào \emph{số điều kiện} của \(A\), tức tỉ số giữa giá trị kỳ dị lớn nhất và nhỏ nhất. Số điều kiện càng lớn thì nhiễu đầu vào càng bị khuếch đại.
+
+Có hai cơ chế làm số điều kiện xấu đi.
+
+\emph{Cơ chế thứ nhất, và nó khắc phục được: thang đo không đồng nhất.} Các phần tử của \(A\) gồm các tích như \(u X\), \(u\), \(X\), và \(1\). Nếu \(u\) cỡ \(10^3\) (toạ độ pixel) còn \(X\) cỡ \(10^{-1}\) (mét), thì các phần tử của \(A\) trải qua nhiều bậc độ lớn, và số điều kiện tệ ngay từ đầu bất kể hình học có tốt hay không. Cách khắc phục là \emph{chuẩn hoá Hartley}: đưa cả hai tập điểm về trung bình không và khoảng cách trung bình \(\sqrt{2}\) trước khi dựng \(A\), rồi biến đổi ngược \(H\) sau khi giải \cite[§4.4]{hartley2004}. Đây không phải tuỳ chọn --- nó cải thiện số điều kiện vài bậc độ lớn, và bỏ nó là lỗi cài đặt kinh điển. Đây cũng là câu trả lời cho Q4: code không chuẩn hoá ``chạy được'' trên dữ liệu thử vì dữ liệu thử thường có thang đo hiền, và nó hỏng trên dữ liệu thật theo kiểu khó truy nhất --- kết quả không sai hẳn mà chỉ kém chính xác một cách thất thường, tệ hơn ở một số tư thế và ổn ở tư thế khác.
+
+\emph{Cơ chế thứ hai, và nó không khắc phục được bằng code: hình học của bốn điểm.} Kể cả sau khi chuẩn hoá, số điều kiện vẫn phụ thuộc vào việc bốn điểm phân bố thế nào. Bốn điểm trải rộng thành một tứ giác gần vuông cho điều kiện tốt; bốn điểm gần trùng nhau, gần thẳng hàng, hoặc tạo thành một tứ giác rất dẹt cho điều kiện xấu. Và khi tag co nhỏ trên ảnh, bốn góc của nó \emph{gần trùng nhau} theo nghĩa toạ độ pixel của chúng chênh nhau ít --- nên điều kiện xấu đi.
+
+Vì sao điều đó gây tệ hơn tuyến tính? Vì hai hiệu ứng chồng lên nhau. Sai số góc \(\sigma\) cố định chiếm một \emph{tỉ lệ} ngày càng lớn trong kích thước tag khi tag co lại (hiệu ứng thứ nhất, tuyến tính, đã có trong \ptr{A/05}), và đồng thời phép giải trở nên kém điều kiện nên khuếch đại phần sai số ấy nhiều hơn (hiệu ứng thứ hai). Tích của hai hiệu ứng tệ hơn mỗi cái riêng lẻ.
+
+\emph{Ghi chú trung thực:} tôi dẫn cơ chế này bằng lập luận về số điều kiện (cửa a) nhưng tôi \emph{chưa} có ví dụ số đo mức độ vượt trội so với \(1/w\) (cửa b chưa qua). Vì vậy tôi phát biểu nó ở dạng định tính --- ``tệ hơn tuyến tính'' --- chứ không gán một số mũ. Đây là một mục trong \code{99-chua-biet.md}, và nó đo được dễ dàng bằng script Monte Carlo của \ptr{C/16}.
+
+\begin{cannho}
+Hai quy tắc thực hành rút ra từ mục này, và cả hai đều rẻ.
+
+Một, \emph{luôn chuẩn hoá điểm trước DLT}. Nếu bạn dùng \code{findHomography} của OpenCV thì nó đã làm sẵn; nếu bạn tự cài thì đừng bỏ qua.
+
+Hai, \emph{đặt một ngưỡng kích thước tag tối thiểu và từ chối phát hiện dưới ngưỡng ấy}. Ngưỡng thường dùng là khoảng 40--60 px cho cạnh tag, nhưng con số đúng cho hệ của bạn phải đo: chạy Monte Carlo với \(w\) giảm dần và tìm chỗ sai số bắt đầu chệch khỏi đường \(1/w\). Đó là ngưỡng của bạn.
+
+Hệ quả thiết kế quan trọng hơn cả hai: đây chính là lý do của chiến lược \emph{nested multi-scale tags} ở \ptr{B/09} --- tag lớn cho cự ly xa, tag nhỏ cho cự ly gần, sao cho luôn có ít nhất một tag nằm trong dải kích thước tốt trên ảnh.
+\end{cannho}
+
+\section{Bất biến của phép chiếu: chỉ có tỉ số kép}
+\ptrtarget{A/02/05}
+
+Mục này ngắn nhưng nó là nền của mục~6, nên đừng lướt.
+
+Câu hỏi: phép chiếu phối cảnh bảo toàn cái gì? Danh sách ngắn hơn trực giác gợi ý nhiều.
+
+\emph{Không} bảo toàn: khoảng cách (hiển nhiên); tỉ số hai đoạn thẳng hàng (cạnh xa trông ngắn hơn); trung điểm (hệ quả của điều trước); song song (hai đường ray gặp nhau ở đường chân trời); góc; diện tích.
+
+\emph{Có} bảo toàn: tính thẳng hàng (đường thẳng vẫn là đường thẳng); tính đồng quy; bậc của đường cong đại số (conic vẫn là conic); và \emph{tỉ số kép}.
+
+Tỉ số kép của bốn điểm thẳng hàng \(A, B, C, D\) là
+\[
+\mathrm{cr}(A,B;C,D) = \frac{\overline{AC}/\overline{BC}}{\overline{AD}/\overline{BD}},
+\]
+và nó giống hệt nhau ở vật và ở ảnh. Đây là câu trả lời cho Q5, và điều đáng chú ý không phải bản thân công thức mà là \emph{tính duy nhất} của nó: tỉ số kép là bất biến độc lập duy nhất của phép chiếu trên một đường thẳng, nên bất kỳ đại lượng nào bạn muốn đo mà bảo toàn qua phép chiếu thì phải viết được theo nó.
+
+Hệ quả thiết kế cho marker, và đây là chỗ mục này trả giá trị. Một marker mã hoá thông tin bằng \emph{khoảng cách} hoặc bằng \emph{tỉ lệ hai đoạn} sẽ không đọc được tin cậy dưới góc nghiêng, vì những đại lượng ấy không bảo toàn. Một marker mã hoá bằng \emph{cấu trúc rời rạc} --- các ô đen trắng trong một lưới, như ArUco và AprilTag --- thì đọc được, vì sau khi rectify bằng homography thì lưới trở lại đều. Và một marker mã hoá bằng tỉ số kép trực tiếp thì đọc được mà \emph{không cần} rectify --- một ý tưởng đẹp đã được dùng trong một số thiết kế marker nhưng nó không thắng được cách tiếp cận lưới về mặt thực dụng, vì đo bốn điểm chính xác khó hơn đọc một ô sáng hay tối.
+
+\section{Bias tâm ellipse: tâm chiếu không bằng chiếu của tâm}
+\ptrtarget{A/02/06}
+
+Đây là mục ít được biết nhất và có giá trị cao nhất trong chương, và nó là câu trả lời cho Q2.
+
+Vẽ một hình tròn bán kính \(R\) lên tấm marker. Ảnh của nó dưới phép chiếu phối cảnh là một ellipse --- điều này đúng và nó là hệ quả của việc conic chiếu thành conic. Bây giờ câu hỏi: tâm của ellipse ấy có phải là ảnh của tâm hình tròn không?
+
+Không. Và lý do nằm đúng ở mục~5: tâm của hình tròn là trung điểm của mọi dây cung đi qua nó, mà trung điểm \emph{không} bảo toàn qua phép chiếu. Cụ thể hơn: xét một đường kính của hình tròn nằm theo hướng nghiêng ra xa camera. Nửa gần camera được phóng to nhiều hơn nửa xa, nên trên ảnh, ảnh của tâm bị đẩy về phía \emph{xa}, trong khi tâm của ellipse --- theo định nghĩa là trung điểm của các dây cung của chính ellipse --- nằm ở chỗ khác.
+
+Kết quả này là kiến thức chuẩn trong hiệu chuẩn camera chính xác \cite{heikkila2000geometric}, và Mallon cùng Whelan đã so sánh định lượng mức thiên lệch của các loại target khác nhau, cho thấy target tròn chịu thiên lệch mà target chessboard thì không \cite{mallon2007bias}. Đây là một trong số ít chỗ trong cây mà tôi có được hai nguồn độc lập khẳng định cùng một điều, nên mức tin cậy cao.
+
+Thiên lệch phụ thuộc vào ba thứ, và biết chúng là biết khi nào lo. Nó tăng theo \emph{kích thước hình tròn so với khoảng cách} --- hình tròn nhỏ ở xa thì thiên lệch nhỏ. Nó tăng theo \emph{góc nghiêng} --- fronto-parallel thì thiên lệch bằng không (một trong số ít chỗ mà fronto-parallel là tư thế tốt). Và nó tăng theo \emph{độ lệch khỏi tâm ảnh}, vì tia nhìn tới một hình tròn ở rìa ảnh chếch nhiều hơn.
+
+\emph{Cách chữa} là dùng \emph{đại số conic} thay vì lấy tâm ellipse. Ảnh của hình tròn là một conic \(C\) mà ta khớp được từ các điểm biên; từ \(C\) và \(K\) đã biết, có thể giải ra mặt phẳng chứa hình tròn và vị trí tâm thật của nó bằng cách phân tích trị riêng của \(K^\top C K\). Chi tiết nằm ngoài phạm vi chương này --- \ptr{B/08} bàn trong bối cảnh tinh chỉnh --- nhưng điều cần nhớ ở đây là: \emph{tồn tại cách chữa đúng, và nó bắt buộc nếu dùng marker tròn cho phép đo chính xác}.
+
+\begin{cannho}
+Bias tâm ellipse là một \emph{thiên lệch có hệ thống phụ thuộc tư thế}, không phải nhiễu. Ba hệ quả.
+
+Một, nó không giảm khi lấy trung bình nhiều khung. Nó thuộc loại nguồn ``hệ thống'' ở \ptr{A/05} mục~8.
+
+Hai, nó thay đổi khi robot di chuyển, vì góc nghiêng và vị trí trên ảnh đều đổi. Nghĩa là nó \emph{không} triệt tiêu hoàn toàn trong sơ đồ teach-by-showing của \ptr{B/13} --- nó chỉ triệt tiêu ở đúng tư thế đã ghi, và sai lệch tăng dần khi robot lệch khỏi tư thế ấy.
+
+Ba, và đây là điều đáng nói nhất: nó là một lý do thực chất để \emph{ưu tiên góc chessboard hơn marker tròn} cho khâu đo tinh, dù marker tròn có độ chính xác định vị tâm rất cao. Một phép đo chính xác quanh một giá trị thiên lệch thì không bằng một phép đo kém chính xác hơn mà không thiên lệch --- nhất là khi ngân sách của bạn là 5\,mm và các nguồn hệ thống là những nguồn chiếm phần lớn ngân sách ấy.
+\end{cannho}
+
+\section{Giới hạn và chế độ hỏng}
+\ptrtarget{A/02/07}
+
+\textbf{Giả thiết ảnh đã khử méo.} Toàn bộ chương giả định phép chiếu là pinhole thuần. Nếu còn méo, không tồn tại homography nào khớp được các điểm, và DLT sẽ trả về một ma trận ``tốt nhất'' trong nghĩa bình phương tối thiểu --- tức một ma trận sai với residual không giải thích được. Dấu hiệu: residual của \(H\) có cấu trúc không gian (\ptr{A/01} mục~6), và phép kiểm trực chuẩn ở mục~2 thất bại.
+
+\textbf{Giả thiết các điểm thực sự đồng phẳng.} Nếu bốn góc tag không đồng phẳng do tấm marker cong, thì cũng không có homography nào khớp. Điều này quan trọng hơn vẻ ngoài: một tờ giấy in tag dán lên bề mặt cong lệch vài milimét khỏi mặt phẳng, và với tag 100\,mm thì vài milimét là một sai lệch tương đối đáng kể. Đây là lý do \ptr{00-map} nhấn mạnh nền cứng phẳng.
+
+\textbf{Giả thiết tương ứng điểm đúng.} DLT giả định bạn biết điểm nào tương ứng điểm nào. Với tag có mã thì đúng --- decode cho biết hướng. Nhưng nếu decode sai hướng (xoay 90 độ) thì bạn có bốn tương ứng sai và \(H\) sẽ là một phép quay 90 độ so với đúng, mà residual thì vẫn nhỏ vì hình vuông đối xứng. Đây là một chế độ hỏng thầm lặng và nó thuộc về \ptr{B/07}.
+
+\textbf{Homography chỉ áp dụng cho một mặt phẳng.} Nếu constellation của bạn không đồng phẳng --- và \ptr{A/04} vừa khuyên mạnh rằng nó \emph{nên} không đồng phẳng --- thì không có một homography chung cho cả tập. Bạn có một homography cho mỗi mặt phẳng, và việc gộp chúng lại phải làm ở tầng PnP chứ không ở tầng homography. Đây là một giới hạn có cấu trúc, không phải một bất tiện: nó nói rằng homography là công cụ cho \emph{từng tag}, còn công cụ cho \emph{constellation} là PnP hợp nhất (\ptr{B/09}).
+
+\section{Thực hành}
+\ptrtarget{A/02/08}
+
+Ba việc.
+
+\emph{Một, thêm phép kiểm trực chuẩn vào pipeline.} Sau khi có \(H\), tính \(M = K^{-1}H\) và kiểm hai đại lượng: tỉ số \(\|\mathbf{m}_1\|/\|\mathbf{m}_2\|\) (nên gần 1) và \(|\mathbf{m}_1^\top\mathbf{m}_2|/(\|\mathbf{m}_1\|\|\mathbf{m}_2\|)\) (nên gần 0). Ghi cả hai vào log. Chúng bắt được méo chưa khử, \(K\) sai, và marker không phẳng --- ba lỗi mà không có chỉ số nào khác trong pipeline phát hiện được.
+
+\emph{Hai, đặt ngưỡng kích thước tag tối thiểu} và ghi nhận khi bị từ chối, thay vì âm thầm trả về một pose kém.
+
+\emph{Ba, nếu dùng marker tròn, hiệu chỉnh conic hoặc chấp nhận thiên lệch một cách có ý thức.} ``Có ý thức'' nghĩa là: ước lượng biên độ thiên lệch cho dải tư thế vận hành của bạn, đưa nó vào bảng ngân sách ở \ptr{C/15} như một dòng hệ thống, và kiểm rằng tổng vẫn trong ngưỡng. Cách tệ nhất là không biết nó tồn tại.
+
+\begin{onbai}
+\ar[3]{Homography của mặt phẳng}{\(H = K[\mathbf{r}_1\,\mathbf{r}_2\,\mathbf{t}]\); có được vì đặt \(Z=0\) làm cột \(\mathbf{r}_3\) biến mất, biến phép chiếu 3D-2D thành biến đổi tuyến tính 2D-2D.}
+\ar[3]{Bậc tự do của \(H\)}{Tám (9 phần tử trừ 1 hệ số tỉ lệ). Pose có sáu. Hai bậc dư chính là hai ràng buộc trực chuẩn \(\|\mathbf{r}_1\|=\|\mathbf{r}_2\|\) và \(\mathbf{r}_1^\top\mathbf{r}_2=0\).}
+\ar[3]{Dùng hai bậc dư làm gì}{Phép kiểm miễn phí: tính \(M=K^{-1}H\) và kiểm hai cột đầu có trực chuẩn không. Thất bại \(\Rightarrow\) méo chưa khử, hoặc \(K\) sai, hoặc điểm không đồng phẳng.}
+\ar[2]{Phân rã \(H\) thành pose}{\(\lambda = \frac{1}{2}(\|\mathbf{m}_1\|+\|\mathbf{m}_2\|)\); \(\mathbf{r}_i = \mathbf{m}_i/\lambda\); \(\mathbf{r}_3 = \mathbf{r}_1\times\mathbf{r}_2\); \(\mathbf{t}=\mathbf{m}_3/\lambda\); rồi chiếu về \(SO(3)\) bằng SVD, nhớ kiểm \(\det = +1\) \cite{zhang2000flexible}.}
+\ar[3]{Phân rã \(H\) là khởi tạo, không phải kết quả}{DLT cực tiểu sai số \emph{đại số}, không phải sai số tái chiếu; các phép sửa \(\lambda\) và chiếu \(SO(3)\) đảm bảo hợp lệ chứ không tối ưu; và nó không xử lý bài toán hai nghiệm. Luôn tinh chỉnh sau đó.}
+\ar[3]{Chuẩn hoá Hartley}{Đưa điểm về trung bình không, khoảng cách trung bình \(\sqrt{2}\) trước DLT \cite[§4.4]{hartley2004}. Cải thiện số điều kiện vài bậc. Bỏ nó là lỗi cài đặt kinh điển, và triệu chứng là kém chính xác thất thường chứ không sai hẳn.}
+\ar[3]{Vì sao tag nhỏ tệ hơn \(1/w\)}{Hai hiệu ứng chồng nhau: \(\sigma\) chiếm tỉ lệ lớn hơn trong \(w\) (tuyến tính, đã có ở \ptr{A/05}), \emph{và} bốn góc gần nhau làm DLT kém điều kiện nên khuếch đại thêm. Tích của hai hiệu ứng.}
+\ar[2]{Ngưỡng kích thước tag}{Thường 40--60 px cho cạnh, nhưng phải đo cho hệ mình: chạy Monte Carlo với \(w\) giảm dần, tìm chỗ sai số chệch khỏi đường \(1/w\). Đây là lý do của chiến lược nested multi-scale ở \ptr{B/09}.}
+\ar[3]{Bất biến duy nhất của phép chiếu}{Tỉ số kép của bốn điểm thẳng hàng. \emph{Không} bảo toàn: khoảng cách, tỉ số hai đoạn, trung điểm, song song, góc, diện tích. Có bảo toàn: thẳng hàng, đồng quy, bậc của conic.}
+\ar[3]{Tâm chiếu \(\neq\) chiếu của tâm}{Hệ quả trực tiếp của việc trung điểm không bảo toàn. Với hình tròn, tâm của ellipse ảnh không phải ảnh của tâm hình tròn \cite{heikkila2000geometric,mallon2007bias}.}
+\ar[3]{Bias tâm ellipse phụ thuộc gì}{Tăng theo kích thước hình tròn so với khoảng cách; tăng theo góc nghiêng (bằng 0 ở fronto-parallel); tăng theo độ lệch khỏi tâm ảnh.}
+\ar[3]{Vì sao bias ellipse nguy hiểm}{Nó là \emph{thiên lệch hệ thống phụ thuộc tư thế}: không giảm theo \(\sqrt{N}\), và không triệt tiêu hoàn toàn trong teach-by-showing vì nó đổi khi tư thế đổi. Đây là lý do thực chất để ưu tiên góc chessboard cho khâu đo tinh.}
+\ar[2]{Hệ quả thiết kế của tỉ số kép}{Marker mã hoá bằng khoảng cách hoặc tỉ lệ hai đoạn không đọc được dưới góc nghiêng. Marker mã hoá bằng lưới ô rời rạc thì đọc được sau khi rectify --- đó là lý do ArUco và AprilTag đều dùng lưới.}
+\ar[1]{Homography không dùng cho constellation không đồng phẳng}{Mỗi mặt phẳng một \(H\) riêng; gộp phải làm ở tầng PnP. Giới hạn có cấu trúc: \(H\) là công cụ cho từng tag, PnP hợp nhất là công cụ cho constellation.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{\repo{OpenCV} \code{findHomography}}{DLT có chuẩn hoá Hartley sẵn, kèm RANSAC tuỳ chọn}{Đã làm đúng phần chuẩn hoá --- đừng tự cài lại trừ khi có lý do}
+\ud{ArUco \cite{garrido2014automatic}}{Rectify vùng tag về hình vuông chuẩn bằng \(H\) rồi lấy mẫu ô bit}{Ứng dụng trực tiếp nhất của homography trong pipeline marker}
+\ud{Hiệu chuẩn Zhang \cite{zhang2000flexible}}{Lấy \(H\) từ mỗi ảnh target phẳng, rồi từ nhiều \(H\) giải ra \(K\) qua ràng buộc trực chuẩn}{Dùng đúng hai bậc tự do dư ở mục 2 làm phương trình cho \(K\)}
+\ud{Heikkilä \cite{heikkila2000geometric}}{Hiệu chỉnh bias tâm bằng đại số conic cho target điểm tròn}{Nguồn chuẩn cho mục 6; đọc nếu dùng marker tròn}
+\ud{CCTag \cite{calvet2016cctag}, WhyCon \cite{krajnik2014whycon}}{Marker tròn đồng tâm; độ chính xác định vị tâm rất cao, nhưng phải xử lý bias}{Minh hoạ đánh đổi ở mục 6: precision cao, bias khác không}
+\end{ungdung}
+
+\begin{duan}{Đo bias tâm ellipse bằng mô phỏng, và so với góc chessboard}{1 ngày}
+\dmt biến ``tâm chiếu khác chiếu của tâm'' từ một mệnh đề thành một con số milimét cho dải tư thế của bạn, để quyết định có dùng được marker tròn hay không.
+\ddl mô phỏng thuần. Sinh một hình tròn bán kính \(R\) trên mặt phẳng marker bằng cách lấy mẫu dày các điểm trên biên; chiếu chúng bằng \(K\) và một pose đã biết.
+\dbc với mỗi tư thế, chiếu tập điểm biên ra ảnh; khớp một ellipse lên tập điểm chiếu; lấy tâm ellipse; so sánh với hình chiếu của tâm hình tròn thật (tính trực tiếp); ghi lại độ lệch tính bằng pixel; quét góc nghiêng từ \(0^\circ\) tới \(60^\circ\), quét tỉ số \(R/Z\), quét vị trí trên ảnh từ tâm ra rìa; cuối cùng quy độ lệch pixel thành milimét bằng hệ số \(Z/f\) của \ptr{A/05}.
+\dxk bạn có một bảng ba chiều và phát biểu được một câu kiểu ``với \(R/Z < 0{,}05\) và góc nghiêng dưới \(20^\circ\), bias tâm dưới \(X\) px tức \(Y\) mm, chấp nhận được''. Kiểm tra chéo bắt buộc: ở \(0^\circ\) nghiêng, bias phải bằng không tới sai số số học --- nếu không thì code khớp ellipse của bạn có lỗi, không phải bias có thật.
+\dnv \ptr{B/08} cho cách hiệu chỉnh bằng conic; \ptr{C/15} nhận con số milimét này như một dòng hệ thống trong ngân sách.
+\end{duan}
+
+\begin{traloi}
+\tl{Hai bậc dư chứa hai \emph{ràng buộc trực chuẩn}: một ma trận \(3\times3\) bất kỳ không nhất thiết có dạng \(K[\mathbf{r}_1\,\mathbf{r}_2\,\mathbf{t}]\) với \(\mathbf{r}_1,\mathbf{r}_2\) là hai cột của một ma trận quay, và hai điều kiện \(\|\mathbf{r}_1\| = \|\mathbf{r}_2\|\) cùng \(\mathbf{r}_1^\top\mathbf{r}_2 = 0\) chính là hai bậc bị loại khi đi từ \(H\) tổng quát về pose. Sự dư thừa ấy thành công cụ chẩn đoán vì nó cho ta một phép kiểm không tốn thêm dữ liệu: tính \(M = K^{-1}H\) và xem hai cột đầu có thật sự trực chuẩn không. Nếu không, thì hoặc ảnh chưa khử méo đúng, hoặc \(K\) sai, hoặc các điểm không thực sự đồng phẳng --- ba lỗi phổ biến nhất, và không có chỉ số nào khác trong pipeline bắt được cả ba.}
+\tl{Vì tâm hình tròn được định nghĩa qua trung điểm của các dây cung, mà phép chiếu phối cảnh \emph{không bảo toàn trung điểm}: nửa đường kính gần camera được phóng to nhiều hơn nửa xa, nên ảnh của tâm bị đẩy lệch so với tâm hình học của ellipse ảnh \cite{heikkila2000geometric}. Sai lệch phụ thuộc ba thứ: kích thước hình tròn so với khoảng cách (tỉ số \(R/Z\) càng lớn càng lệch), góc nghiêng (bằng không ở fronto-parallel, tăng theo góc), và độ lệch khỏi tâm ảnh. Điểm quan trọng: đây là \emph{thiên lệch có hệ thống phụ thuộc tư thế}, nên nó không giảm khi lấy trung bình nhiều khung và nó không triệt tiêu hoàn toàn trong teach-by-showing.}
+\tl{Số điều kiện của bài toán DLT. Sai số của \ptr{A/05} giả định bài toán được giải tốt và chỉ tính việc \(\sigma\) chiếm tỉ lệ ngày càng lớn trong \(w\) --- một hiệu ứng tuyến tính. Nhưng khi bốn góc tag gần nhau trên ảnh, ma trận \(A\) trong \(A\mathbf{h}=0\) trở nên kém điều kiện, nên nó \emph{khuếch đại} phần sai số ấy thêm một hệ số nữa. Hai hiệu ứng nhân nhau chứ không cộng, nên tổng thể tệ hơn \(1/w\). Cách chữa không phải thuật toán tốt hơn mà là đảm bảo luôn có tag đủ lớn trên ảnh --- tức chiến lược nested multi-scale.}
+\tl{Vì dữ liệu thử thường có thang đo hiền: toạ độ nhỏ, tag ở giữa ảnh, tư thế đơn giản. Trên dữ liệu thật, các phần tử của ma trận \(A\) trải qua nhiều bậc độ lớn (tích \(uX\) với \(u \sim 10^3\) và \(X \sim 10^{-1}\)), nên số điều kiện tệ ngay từ cách dựng bài toán. Kiểu hỏng đặc biệt khó chịu: nó \emph{không} sai hẳn --- kết quả vẫn gần đúng --- mà chỉ kém chính xác một cách thất thường, tốt ở tư thế này và tệ ở tư thế khác, không lặp lại được. Người ta sẽ đi tìm nguyên nhân ở detector, ở ánh sáng, ở camera, và không tìm ra, vì nguyên nhân nằm ở một dòng code tiền xử lý bị thiếu.}
+\tl{Chỉ tỉ số kép. Ba cái kia đều không bảo toàn, và trung điểm không bảo toàn là hệ quả của việc tỉ số hai đoạn không bảo toàn. Câu trả lời quyết định thiết kế marker theo một cách rất cụ thể: bất kỳ sơ đồ mã hoá nào dựa trên khoảng cách hoặc trên tỉ lệ hai đoạn đều không đọc được tin cậy dưới góc nghiêng, còn sơ đồ dựa trên \emph{cấu trúc rời rạc} --- các ô sáng tối trong một lưới --- thì đọc được, vì homography đưa lưới méo trở lại lưới đều và việc còn lại chỉ là hỏi mỗi ô sáng hay tối. Đó chính là lý do cả ArUco lẫn AprilTag đều chọn lưới ô, và đó cũng là lý do bước rectify bằng homography xuất hiện trong mọi pipeline marker.}
+\end{traloi}
+
+\begin{dongian}
+Chiếu bóng một tấm bìa lên tường bằng đèn pin. Nếu tấm bìa song song với tường thì bóng là bản phóng to trung thực --- hình vuông vẫn vuông, điểm giữa vẫn ở giữa. Nghiêng tấm bìa đi thì bóng thành hình thang, và ở đây bắt đầu những chuyện bất ngờ.
+
+Bất ngờ thứ nhất, và nó là tin tốt: dù nghiêng thế nào, có một công thức đơn giản biến toạ độ trên tấm bìa thành toạ độ trên tường. Chỉ cần biết bốn điểm đi đâu là suy ra được mọi điểm khác. Đây là lý do máy tính đọc được cái tag dù nó nghiêng: nó ``nắn'' cái hình thang trở lại thành hình vuông rồi mới đọc các ô đen trắng.
+
+Bất ngờ thứ hai là tin xấu, và ít người để ý. Điểm giữa của một cạnh trên tấm bìa \emph{không} chiếu thành điểm giữa của cạnh bóng. Nghe thì nhỏ nhặt, nhưng nó phá hỏng một thứ ta hay tin tưởng: cái tâm. Nếu bạn vẽ một vòng tròn lên tấm bìa, bóng của nó là một hình bầu dục --- và tâm của hình bầu dục ấy không phải bóng của tâm vòng tròn. Chúng lệch nhau. Càng nghiêng thì càng lệch.
+
+Điều này quan trọng vì có những loại marker dùng vòng tròn thay vì hình vuông, và cách đo của chúng là tìm tâm cái hình bầu dục. Cách ấy đo được rất chính xác --- tâm một hình bầu dục thì xác định sắc nét hơn nhiều so với góc một hình vuông. Nhưng nó chính xác quanh một chỗ hơi lệch, và chỗ lệch ấy thay đổi khi robot di chuyển. Đo chính xác quanh một chỗ sai thì không bằng đo hơi kém quanh chỗ đúng --- nhất là khi cái sai ấy không lộ ra ở bất cứ con số nào.
+
+Còn một chuyện nữa về kích thước. Khi cái tag còn to trên ảnh, việc tính toán rất ổn định. Khi nó co nhỏ lại, bốn góc xúm gần nhau, và việc suy ra hướng nghiêng từ bốn điểm sát nhau giống như đoán hướng của một cây kim từ việc nhìn hai đầu của nó --- hai đầu càng gần thì đoán càng tệ, và tệ nhanh hơn bạn nghĩ. Đó là lý do người ta hay dán một cái tag to và một cái tag nhỏ cạnh nhau: xa thì đọc cái to, gần thì đọc cái nhỏ, và lúc nào cũng có một cái ở kích thước vừa phải.
+
+\chuadongian{vì sao đúng \emph{tỉ số kép} chứ không phải một đại lượng nào khác là bất biến duy nhất --- chuyện này có chứng minh, nhưng nó thuộc hình học xạ ảnh và không rút gọn thành một câu trực quan được. Điều dùng được thì đơn giản: đừng tin bất cứ phép đo nào dựa trên khoảng cách hay điểm giữa, trừ khi đã nắn ảnh về đúng dạng trước.}
+\motcau{Nắn được hình thang về hình vuông thì đọc được mọi thứ, nhưng cái tâm thì đừng tin --- nó không nằm ở chỗ bạn tưởng.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{A/02/09}
+
+Mệnh đề chính --- \emph{tâm của ellipse ảnh không phải ảnh của tâm hình tròn, và sai lệch tăng theo góc nghiêng} --- là mệnh đề tôi tin ở mức cao vì nó qua cửa (c) với hai nguồn độc lập \cite{heikkila2000geometric,mallon2007bias} và qua cửa (a) bằng lập luận về trung điểm. Nó bị bác bỏ nếu mô phỏng của mini project cho ra bias bằng không ở mọi góc nghiêng --- và nếu bạn thấy thế thì gần như chắc chắn code khớp ellipse của bạn đang có lỗi chứ không phải mệnh đề sai.
+
+Mệnh đề thứ hai --- \emph{tag nhỏ làm pose xấu nhanh hơn \(1/w\) do số điều kiện} --- là mệnh đề yếu nhất về kiểm chứng trong chương, như đã ghi ở mục~4. Nó bị bác bỏ nếu Monte Carlo cho thấy sai số pose bám sát đường \(1/w\) xuống tới kích thước tag rất nhỏ, chỉ xấu đi khi decode bắt đầu thất bại. Nếu vậy thì ngưỡng kích thước tối thiểu nên được đặt theo tiêu chí decode chứ không theo tiêu chí điều kiện số, và lời khuyên ở mục~4 cần sửa.
+
+Mệnh đề thứ ba --- \emph{phép kiểm trực chuẩn bắt được méo chưa khử, \(K\) sai, và điểm không đồng phẳng} --- bị bác bỏ nếu có một trường hợp trong ba trường hợp ấy mà hai chỉ số trực chuẩn vẫn nằm trong ngưỡng bình thường. Tôi dẫn nó từ cấu trúc của công thức (cửa a) và chưa kiểm bằng mô phỏng cả ba trường hợp; đây là một phép kiểm rẻ và nên làm.
+
+\section{Kết nối}
+\ptrtarget{A/02/10}
+
+Chương này là chương công cụ, và nó cấp ba thứ cho phần còn lại của cây.
+
+Nối lên trên. \ptr{A/01-mo-hinh-camera-va-distortion} là điều kiện tiên quyết theo nghĩa mạnh: nếu ảnh còn méo thì không tồn tại homography nào khớp, và mọi kết quả của chương này vô nghĩa. Phép kiểm trực chuẩn ở mục~2 chính là cách phát hiện tình trạng ấy, nên hai chương gắn với nhau theo cả hai chiều.
+
+Nối ngang trong Phần~A. \ptr{A/03-pnp-va-uoc-luong-tu-the} nhận phép phân rã \(H\) làm một trong các cách khởi tạo, nhưng nó cũng giải thích vì sao IPPE là lựa chọn tốt hơn cho target phẳng. \ptr{A/04-pose-ambiguity-target-phang} có gốc rễ ở đây: phép phân rã \(H\) vốn đã cho nhiều nghiệm, và chương~4 giải thích ý nghĩa hình học của chúng. \ptr{A/05-lan-truyen-sai-so-pixel-sang-pose} nhận từ mục~4 phần bổ sung cho công thức \(1/w\) của nó --- chương~5 cho quan hệ tiệm cận, chương này cho biết quan hệ ấy hỏng ở đâu.
+
+Nối xuống Phần~B. \ptr{B/07-detection-pipeline} dùng homography ở khâu rectify, và mục~5 ở đây giải thích vì sao khâu ấy cần thiết: không rectify thì lưới ô không đều và việc đọc bit không tin cậy. \ptr{B/08-corner-refinement} nhận mục~6 làm cơ sở cho phần hiệu chỉnh conic của marker tròn, và nó cũng nhận luận điểm rằng góc chessboard không chịu thiên lệch này --- một lý do thực chất cho lựa chọn target lai ở \ptr{00-map}. \ptr{B/09-multi-marker-constellation} nhận từ mục~4 lý do định lượng cho chiến lược nested multi-scale, và từ mục~7 lý do vì sao constellation không đồng phẳng phải xử lý ở tầng PnP chứ không ở tầng homography.
+
+Cuối cùng, nối sang \ptr{C/15-ngan-sach-sai-so}: bias tâm ellipse ở mục~6 là một dòng \emph{hệ thống} trong bảng ngân sách, và mini project của chương này là cách định giá dòng ấy bằng số.
+
+\begin{tukiem}
+\item Homography có tám bậc tự do, pose có sáu. Chỉ ra chính xác hai ràng buộc chiếm phần dư, và mô tả một phép kiểm dùng chúng bắt được ba lỗi khác nhau.
+\item Vì sao đặt \(Z = 0\) lại biến một phép chiếu 3D--2D thành một biến đổi 2D--2D, và điều đó ngừng đúng khi nào?
+\item Một đồng nghiệp bỏ bước chuẩn hoá Hartley. Mô tả kiểu hỏng --- cụ thể là vì sao nó khó truy hơn một lỗi làm kết quả sai hẳn.
+\item Vì sao sai số pose xấu đi nhanh hơn \(1/w\) khi tag co nhỏ, và hai hiệu ứng nào đang nhân với nhau?
+\item Phép chiếu phối cảnh bảo toàn đúng một bất biến trên đường thẳng. Nêu nó, và giải thích vì sao điều đó buộc mọi họ tag hiện đại phải mã hoá bằng lưới ô rời rạc.
+\item Bạn dùng marker tròn vì nó cho \(\sigma\) nhỏ nhất trong mọi loại target. Nêu lý do có thể làm lựa chọn ấy vẫn sai cho bài toán 5\,mm, và nêu điều kiện mà dưới đó nó lại đúng.
+\item Constellation của bạn gồm ba tag trên ba mặt phẳng khác nhau. Bạn tính được mấy homography, và vì sao không gộp chúng lại ở tầng homography được?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

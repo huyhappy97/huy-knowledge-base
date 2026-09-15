@@ -1,0 +1,196 @@
+% lo-trinh-hoc.tex — Chương 26: lộ trình học theo mục tiêu.
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: không bắt buộc — chương này là bản đồ điều hướng, đọc được ngay từ đầu.
+% Mức độ: cốt lõi
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Lộ trình học theo mục tiêu (Learning Paths by Goal)}
+\ptrtarget{E/26}\ptrtarget{E/26-lo-trinh-hoc}
+\dependency{không bắt buộc. Đây là chương điều hướng, nên đọc \emph{trước} khi bắt đầu và đọc lại mỗi khi đổi mục tiêu.}
+
+\begin{tomtat}
+Hai mươi lăm chương trước không phải một hàng đợi phải đi hết theo thứ tự. Chương này cắt chúng thành sáu lộ trình theo mục tiêu, mỗi lộ trình nói rõ đọc chương nào, theo thứ tự nào, chương nào bỏ được và bỏ thì mất gì. Đọc xong bạn biết mình cần đọc bao nhiêu phần trăm của cây để đạt mục tiêu đang có, thay vì đọc tuần tự rồi bỏ dở ở giữa. Nếu chỉ nhớ một điều: mục tiêu quyết định lộ trình, và lộ trình ngắn nhất tới một mục tiêu cụ thể thường chỉ chiếm một phần ba số chương.
+\end{tomtat}
+
+\begin{nentang}
+\kn{lộ trình (learning path)}{một thứ tự đọc có chủ đích, chọn ra tập chương tối thiểu đủ cho một mục tiêu; khác với mục lục ở chỗ nó \emph{loại bỏ} chương không cần.}
+\kn{tầng bán rã \T{1}--\T{4}}{nhãn ở tiêu đề mỗi chương cho biết kiến thức đó sống được bao lâu: \T{1} là toán và vật lý, \T{4} là công cụ. Khi thời gian eo hẹp, cắt \T{4} trước.}
+\kn{chương cốt lõi}{chương mà nếu bỏ thì các chương sau biến thành danh sách quy tắc phải học thuộc; trong bảng dưới đánh dấu ``bắt buộc''.}
+\kn{mini project}{bài tập vài giờ tới hai ngày ở cuối mỗi chương, trong cây này đều gắn với visual SLAM để chúng nối thành một chuỗi liên tục.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Nếu chỉ cần fine-tune một mô hình có sẵn cho một tác vụ hẹp, bao nhiêu phần trăm của cây này là thừa?}
+\h{Vì sao lộ trình ``đưa lên thiết bị biên'' lại bắt đầu từ một chương ở Phần B chứ không từ Phần D?}
+\h{Vì sao lộ trình dài nhất không phải lộ trình học hết mọi chương?}
+\h{Nếu mục tiêu là áp dụng vào SLAM production, chương nào bạn có thể đọc lướt vì đã biết, và chương nào tuyệt đối không được lướt?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+
+Một cây tri thức bốn trăm trang có một chế độ hỏng rất phổ biến: người đọc bắt đầu từ chương một, đi được đến chương bảy hoặc tám, rồi dừng, và phần dừng lại thường là phần họ cần nhất. Nguyên nhân không phải thiếu kỷ luật mà là sai thứ tự. Thứ tự tuyến tính tối ưu cho việc trình bày, không tối ưu cho việc \emph{dùng được sớm}, và một người không thấy kiến thức của mình biến thành thứ chạy được thì sẽ mất động lực trước khi tới chương có giá trị nhất với họ.
+
+Chương này sửa điều đó bằng cách thừa nhận rằng không có một thứ tự đúng. Có sáu mục tiêu thường gặp, và mỗi mục tiêu có một tập chương tối thiểu cùng một thứ tự riêng. Nguyên tắc chung là mọi lộ trình đều phải chạm ba chương nền, còn lại thì cắt theo mục tiêu.
+
+\begin{trucgiac}
+Cây này giống một thành phố chứ không giống một con đường. Mục lục là danh sách tên phố; chương này là bản đồ tuyến xe buýt. Cùng một thành phố, người đi làm và người đi du lịch lên hai tuyến khác nhau, và cả hai đều đúng. Sai lầm duy nhất là đi bộ qua từng con phố theo thứ tự bảng chữ cái.
+\end{trucgiac}
+
+\section{Ba chương nền, mọi lộ trình đều phải chạm}
+
+Trước khi chia nhánh, có ba chương mà mọi lộ trình đều đi qua, vì bỏ chúng thì mọi chương sau mất chỗ bám.
+
+\begin{itemize}
+\item \ptr{B/03} --- cách đọc một hệ thống lạ. Không có nó thì bạn đọc repo theo tên module thay vì theo giả định, và mọi chương Phần C trở thành danh mục kiến trúc.
+\item \ptr{B/04} --- nền của việc học từ dữ liệu, và trục đánh đổi giữa giả định và dữ liệu. Đây là trục quay lại nhiều nhất trong cả cây.
+\item \ptr{C/12} --- cơ chế huấn luyện. Không hiểu vì sao gradient chết thì mọi mô hình là hộp đen, kể cả khi bạn chỉ fine-tune.
+\end{itemize}
+
+\section{Sáu lộ trình}
+
+\subsection{A. Fine-tune một mô hình có sẵn cho tác vụ hẹp}
+
+Mục tiêu: có kết quả dùng được nhanh nhất, chấp nhận chưa hiểu hết bên trong. Đây là lộ trình ngắn nhất, khoảng một phần ba cây.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Lộ trình A --- fine-tune. Bảy chương, ước lượng ba tới bốn tuần kể cả mini project.}
+\label{tab:lotrinh-a}
+\begin{tabularx}{\linewidth}{@{}c L{2.0cm} Y L{3.3cm}@{}}
+\toprule
+\textbf{\#} & \textbf{Chương} & \textbf{Vì sao cần} & \textbf{Bỏ thì mất gì}\\
+\midrule
+1 & \ptr{B/05} & Định nghĩa nhãn và đơn vị phân tích; sai ở đây thì không sửa được ở bước sau & Mô hình học đúng thứ bạn không muốn\\
+2 & \ptr{B/07} & Chia dữ liệu và chọn metric; chống rò rỉ & Số đẹp mà vô nghĩa\\
+3 & \ptr{B/03} & Đọc được repo và mô hình bạn định dùng & Không biết nó giả định gì\\
+4 & \ptr{C/18} & Quyết định scratch, frozen hay fine-tune theo lượng dữ liệu & Chọn sai chế độ, tốn gấp mấy lần\\
+5 & \ptr{C/12} & Đủ để chẩn đoán khi loss không giảm & Bế tắc không biết hỏi gì\\
+6 & \ptr{B/09} & Loss phải khớp điều bạn thật sự muốn & Tối ưu nhầm mục tiêu\\
+7 & \ptr{E/24} & Biết cải thiện là thật hay là nhiễu & Tự lừa mình\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bỏ được trong lộ trình này: toàn bộ Phần A trừ khi ảnh đầu vào có vấn đề vật lý, cả \ptr{C/16} và \ptr{C/17}, và phần lớn Phần D cho tới khi thật sự phải triển khai.
+
+\subsection{B. Hiểu cơ chế và tự huấn luyện từ đầu}
+
+Mục tiêu: không còn hộp đen nào. Lộ trình này nặng nhất về Phần C.
+
+Thứ tự: \ptr{B/04} \ra \ptr{C/12} \ra \ptr{D/19} (giai đoạn tự viết bằng NumPy, làm ngay sau chương 12 chứ không đợi tới Phần D) \ra \ptr{C/13} \ra \ptr{B/09} \ra \ptr{B/10} \ra \ptr{C/14} \ra \ptr{E/24}. Phần A đọc theo nhu cầu, mỗi khi một mục ở Phần C cần tới. Ước lượng tám tới mười tuần.
+
+\subsection{C. Đưa mô hình lên thiết bị biên với ngân sách độ trễ}
+
+Lộ trình này bắt đầu từ Phần B chứ không từ Phần D, và đó là điểm dễ gây bất ngờ nhất. Lý do là mọi quyết định nén và tăng tốc chỉ có nghĩa sau khi bạn biết hệ đang nghẽn ở đâu, mà điều đó thuộc \ptr{B/11}.
+
+Thứ tự: \ptr{B/11} \ra \ptr{B/10} \ra \ptr{D/20} \ra \ptr{D/21} \ra \ptr{C/13} (chỉ phần backbone nhẹ) \ra \ptr{D/22}. Ước lượng ba tới bốn tuần. Bỏ được: \ptr{C/16}, \ptr{C/17}, phần lớn Phần A.
+
+\subsection{D. Áp dụng vào SLAM production}
+
+Đây là lộ trình dài nhất trong sáu lộ trình, nhưng không phải lộ trình đọc hết mọi chương. Nó cắt bỏ mô hình sinh và phần lớn kinh tế học pretraining, đổi lại đi rất sâu vào hình học, chuỗi thời gian và độ tin cậy. Đây cũng là lộ trình duy nhất đi hết Phần F, phần áp dụng học sâu vào chính bài toán SLAM.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Lộ trình D --- SLAM production. Năm giai đoạn, ước lượng mười tám tới hai mươi bốn tuần.}
+\label{tab:lotrinh-d}
+\begin{tabularx}{\linewidth}{@{}L{2.1cm} L{4.2cm} Y@{}}
+\toprule
+\textbf{Giai đoạn} & \textbf{Chương, theo thứ tự} & \textbf{Điều bạn có được ở cuối giai đoạn}\\
+\midrule
+1. Nền &
+\ptr{A/02} \ra \ptr{B/03} \ra \ptr{B/04} &
+Biết ảnh vào hệ của bạn đã qua những gì, và biết đọc một repo học sâu như đọc một hệ thống\\
+2. Cơ chế &
+\ptr{C/12} \ra \ptr{D/19} \ra \ptr{C/13} \ra \ptr{B/09} &
+Tự huấn luyện và chẩn đoán được một mô hình; hiểu backbone đủ để chọn\\
+3. Miền của bạn &
+\ptr{C/15} \ra \ptr{C/16} \ra \ptr{B/08} \ra \ptr{B/11} &
+Nối được flow, tracking, hình học và ngân sách tính toán vào hệ SLAM sẵn có\\
+4. Đưa ra thật &
+\ptr{D/20} \ra \ptr{D/21} \ra \ptr{E/24} \ra \ptr{E/25} \ra \ptr{D/22} &
+Chạy trên thiết bị trong ngân sách, và chứng minh được cải thiện là thật\\
+5. Áp dụng &
+\ptr{F/27} \ra chọn theo nỗi đau: \ptr{F/28}, \ptr{F/29}, \ptr{F/30}, \ptr{F/34} \ra \ptr{F/31} &
+Quyết định được có nên thay một khối cổ điển bằng mạng hay không, và bảo vệ được quyết định đó bằng số đo\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Hai lưu ý riêng cho lộ trình này. Thứ nhất, \emph{đọc lướt được} là \ptr{A/01} và phần hình học của \ptr{A/02} nếu bạn đã quen SE(3) và hiệu chỉnh chùm tia, cùng phần ATE và RPE của \ptr{B/07}. Thứ hai, \emph{tuyệt đối không lướt} là \ptr{B/05} và \ptr{B/06}: định nghĩa nhãn và chất lượng nhãn là chỗ người có nền hình học hay chủ quan nhất, vì trong SLAM cổ điển không có khái niệm nhãn do người gán. Thứ ba, giai đoạn 5 không đọc tuần tự: sau \ptr{F/27}, chọn chương theo nỗi đau đang gặp, và bỏ hẳn \ptr{F/32} cùng \ptr{F/33} nếu bài toán của bạn chỉ là quỹ đạo chứ không phải bản đồ dày hay ngữ nghĩa.
+
+\subsection{E. Đọc paper và làm nghiên cứu}
+
+Thứ tự: \ptr{E/23} \ra \ptr{B/03} \ra \ptr{E/24} \ra \ptr{B/04} \ra một chương Phần C thuộc lĩnh vực bạn chọn \ra \ptr{E/25}. Ước lượng bốn tuần, và lộ trình này nên chạy \emph{song song} với mọi lộ trình khác chứ không nối tiếp, vì nó đổi cách bạn đọc mọi chương còn lại.
+
+\subsection{F. Học toàn bộ}
+
+Thứ tự đầy đủ là A \ra B \ra C \ra D \ra E \ra F theo số chương, với ba ngoại lệ đáng làm khác đi: đọc \ptr{A/02} kỹ ngay từ đầu nhưng \ptr{A/01} thì đọc lướt rồi quay lại theo nhu cầu; làm giai đoạn NumPy của \ptr{D/19} ngay sau \ptr{C/12}; và đọc \ptr{E/23} cùng \ptr{E/24} song song với Phần C thay vì để tới cuối. Ước lượng sáu tới chín tháng với nhịp mười giờ mỗi tuần.
+
+\section{Chuỗi mini project chạy xuyên cây}
+
+Mỗi chương kết thúc bằng một mini project gắn với visual SLAM, và chúng được thiết kế để nối thành một chuỗi liên tục thay vì hai mươi lăm bài tập rời. Chuỗi đó thay cho một dự án lớn duy nhất ở cuối, vì một dự án lớn có hai nhược điểm: nó dồn toàn bộ rủi ro vào một lần, và nó chỉ cho phản hồi sau nhiều tuần, tức vi phạm đúng điều kiện phản hồi nhanh mà \ptr{C/12} và \ptr{E/24} nói là bắt buộc.
+
+Cách dùng chuỗi này: làm mini project của mọi chương trên lộ trình bạn chọn, bỏ qua mini project của chương bạn đã cắt. Mỗi bài đều có dòng \emph{Xong khi} nêu một tiêu chí đo được, nên bạn biết chắc lúc nào được đi tiếp thay vì tự hỏi đã đủ chưa.
+
+\begin{cambay}
+Đừng đọc hết một lộ trình rồi mới bắt đầu làm. Chuỗi mini project chỉ có tác dụng khi mỗi bài được làm ngay sau chương của nó, lúc kiến thức còn tươi và lúc sai lầm còn rẻ. Đọc trước rồi làm sau biến chuỗi thành một dự án lớn duy nhất, tức đúng thứ chương này đang cố tránh.
+\end{cambay}
+
+\section{Giới hạn và trường hợp hỏng}
+
+Sáu lộ trình này là phán đoán về thứ tự phụ thuộc, không phải kết quả đo được; một người có nền khác bạn sẽ cần thứ tự khác. Ước lượng thời gian giả định nhịp mười giờ mỗi tuần và đã có nền kỹ sư phần mềm, nên nó sẽ sai đáng kể với người mới hoàn toàn. Và điều quan trọng nhất: một lộ trình đọc xong không tạo ra năng lực. Chỉ chuỗi mini project mới tạo, còn lộ trình chỉ quyết định bạn làm những bài nào.
+
+\begin{cannho}
+Mục tiêu quyết định lộ trình. Chọn một trong sáu, cắt thẳng tay những chương không nằm trên đó, và làm mini project của từng chương ngay sau khi đọc nó. Ba chương không bao giờ được cắt là \ptr{B/03}, \ptr{B/04} và \ptr{C/12}.
+\end{cannho}
+
+\begin{onbai}
+\ar[3]{Ba chương không bao giờ được cắt}{\ptr{B/03} đọc hệ thống lạ, \ptr{B/04} nền học từ dữ liệu, \ptr{C/12} cơ chế huấn luyện. Bỏ một trong ba thì mọi chương sau mất chỗ bám.}
+\ar[3]{Lộ trình}{Một thứ tự đọc chọn theo mục tiêu, kèm danh sách chương được phép cắt. Chọn lộ trình là chọn thứ mình \emph{không} học.}
+\ar[3]{Chuỗi mini project}{Bài tập cuối mỗi chương, nối liên tục thay cho một dự án lớn duy nhất ở cuối khoá.}
+\ar[2]{Vì sao chuỗi thay cho một dự án lớn?}{Dự án lớn dồn hết rủi ro vào một lần và chỉ cho phản hồi sau nhiều tuần, tức vi phạm điều kiện phản hồi nhanh mà \ptr{C/12} và \ptr{E/24} đòi hỏi.}
+\ar[2]{Vì sao lộ trình biên bắt đầu từ Phần B chứ không Phần D?}{Vì mọi kỹ thuật nén và tăng tốc chỉ có nghĩa sau khi biết hệ nghẽn ở đâu, mà chẩn đoán nghẽn nằm ở \ptr{B/11}.}
+\ar[2]{Vì sao lộ trình nghiên cứu chạy song song chứ không nối tiếp?}{Vì nó đổi cách bạn đọc mọi chương khác. Để tới cuối thì bạn đã đọc xong bằng thói quen cũ.}
+\ar[2]{Ba ngoại lệ của thứ tự A đến F}{Đọc \ptr{A/02} kỹ ngay nhưng \ptr{A/01} lướt trước; làm giai đoạn NumPy của \ptr{D/19} ngay sau \ptr{C/12}; đọc \ptr{E/23} và \ptr{E/24} song song với Phần C.}
+\ar[2]{Giai đoạn 5 của lộ trình SLAM}{Phần F, và nó không đọc tuần tự: sau \ptr{F/27} thì chọn chương theo nỗi đau đang gặp.}
+\ar[1]{Hai chương của Phần F bỏ được nếu chỉ cần quỹ đạo}{\ptr{F/32} bản đồ neural và \ptr{F/33} ngữ nghĩa. Chúng phục vụ bản đồ dày và nhiệm vụ, không phục vụ độ chính xác quỹ đạo.}
+\ar[1]{Dòng \emph{Xong khi}}{Tiêu chí đo được của mỗi mini project, để biết lúc nào được đi tiếp thay vì tự hỏi đã đủ chưa.}
+\ar[2]{Đọc hết một lộ trình rồi mới làm --- hỏng ở đâu?}{Nó biến chuỗi mini project trở lại thành một dự án lớn duy nhất, đúng thứ chương này cố tránh.}
+\ar[2]{Ước lượng thời gian ở đây giả định gì?}{Nhịp mười giờ mỗi tuần và đã có nền kỹ sư phần mềm. Sai đáng kể với người mới hoàn toàn.}
+\end{onbai}
+
+\begin{duan}{Viết lộ trình của chính bạn thành lịch chạy được}{1--2 ngày, rồi chạy tuần đầu}
+\dmt Biến sáu lộ trình trừu tượng thành một lịch có ngày tháng, để tuần sau bạn mở ra là biết đọc chương nào và làm bài nào, không phải quyết định lại.
+\ddl Không cần dữ liệu. Cần danh sách chương của cây, quỹ thời gian thật mỗi tuần của bạn, và một câu phát biểu mục tiêu trong một dòng.
+\dbc Chọn một trong sáu lộ trình theo mục tiêu đó. Liệt kê các chương của nó và \emph{gạch tên} những chương bị cắt --- viết ra danh sách bị cắt quan trọng ngang danh sách phải đọc. Chia theo tuần với nhịp thật của bạn chứ không nhịp lý tưởng. Với mỗi tuần, ghi kèm mini project của chương đó và dòng \emph{Xong khi} của nó. Cuối cùng đặt một mốc rà lại sau bốn tuần.
+\dxk Bạn có một bảng gồm tuần, chương, mini project, tiêu chí xong; và bạn đã hoàn thành mini project của tuần đầu tiên đúng theo tiêu chí đó.
+\dnv \ptr{E/24} cho cách đo tiến độ mà không tự lừa mình; \ptr{B/03} là chương đầu tiên của mọi lộ trình.
+\end{duan}
+
+\begin{traloi}
+\tl{Khoảng hai phần ba. Lộ trình A chỉ cần bảy chương; toàn bộ Phần A, hai chương 3D và mô hình sinh, cùng phần lớn Phần D đều bỏ được cho tới khi thật sự triển khai.}
+\tl{Vì mọi kỹ thuật nén và tăng tốc chỉ có nghĩa sau khi biết hệ nghẽn ở đâu, mà chẩn đoán nghẽn thuộc \ptr{B/11}. Bắt đầu từ Phần D thì bạn chọn kỹ thuật trước khi biết bệnh.}
+\tl{Vì lộ trình dài nhất là lộ trình SLAM production, và nó vẫn cắt bỏ mô hình sinh cùng phần lớn kinh tế học pretraining. Học hết mọi chương là lộ trình \emph{rộng} nhất, không phải \emph{sâu} nhất theo một mục tiêu.}
+\tl{Lướt được phần toán ở \ptr{A/01}, phần hình học nhiều view ở \ptr{A/02}, và phần ATE cùng RPE ở \ptr{B/07}. Không được lướt \ptr{B/05} và \ptr{B/06}, vì nhãn do người gán là khái niệm không tồn tại trong SLAM cổ điển.}
+\end{traloi}
+
+\begin{dongian}
+Hình dung bạn có bản đồ một thành phố và mười giờ rảnh mỗi tuần. Bản đồ vẽ mọi con đường, nhưng bạn không đi hết được, và cũng không cần. Việc đầu tiên không phải chọn đường nào để đi mà là nói ra bạn muốn đến đâu; khi đã nói được điều đó thì phần lớn con đường tự loại mình.
+
+Chương này làm đúng ba việc. Nó hỏi bạn muốn đến đâu, và ép câu trả lời gói trong một dòng. Nó đưa sáu con đường đã có người đi, kèm danh sách những khu phố bạn được quyền không ghé. Và nó nhắc rằng đi bộ mới tính là đi: mỗi chương có một bài tập nhỏ, làm ngay sau khi đọc, vì kiến thức còn tươi và sai lầm còn rẻ.
+
+\motcau{Chọn lộ trình thực chất là chọn thứ mình sẽ không học, và đó mới là quyết định khó.}
+\chuadongian{Vì sao ba chương nền lại đúng là ba chương đó, chứ không phải ba chương khác --- đây là phán đoán về thứ tự phụ thuộc, chưa ai đo được.}
+\end{dongian}
+
+\section{Kết nối}
+
+Chương này là bản đồ của toàn cây, nên nó nối tới mọi chương. Hai liên kết đáng nhớ nhất: \ptr{E/24} giải thích vì sao mọi lộ trình đều kết thúc bằng chương thực nghiệm, và \ptr{B/03} là chương duy nhất xuất hiện trong cả sáu lộ trình.
+
+\begin{tukiem}
+\item Mục tiêu của bạn, viết trong một dòng, dẫn tới lộ trình nào trong sáu lộ trình?
+\item Ba chương nào không bao giờ được cắt, và vì sao cắt một trong ba lại làm hỏng mọi chương sau?
+\item Lộ trình đưa mô hình lên thiết bị biên bắt đầu từ Phần B chứ không Phần D --- lý do là gì?
+\item Vì sao chuỗi mini project thay cho một dự án lớn duy nhất ở cuối, và hai nhược điểm của dự án lớn là gì?
+\item Giai đoạn 5 của lộ trình SLAM không đọc tuần tự; bạn chọn chương của Phần F theo tiêu chí nào?
+\item Nếu bạn đọc hết một lộ trình trước rồi mới làm bài tập, điều gì hỏng?
+\end{tukiem}
+\end{document}

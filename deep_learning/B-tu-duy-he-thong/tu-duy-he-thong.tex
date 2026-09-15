@@ -1,0 +1,24 @@
+\documentclass[../deep_learning.tex]{subfiles}
+\begin{document}
+\part{TƯ DUY HỆ THỐNG}
+\begin{tomtat}
+Phần B trả lời một câu hỏi duy nhất: làm sao ra quyết định thiết kế đúng khi chưa có mô hình nào chạy. Chín chương là chín dạng ràng buộc --- cách đọc một hệ thống lạ, nền lý thuyết của việc học, định nghĩa bài toán, chất lượng nhãn, chia dữ liệu, dịch chuyển phân phối, hàm mất mát, kiến trúc, và phần cứng. Đọc xong bạn loại được phần lớn phương án sai trước khi viết dòng code đầu tiên. Nếu chỉ nhớ một điều: đây là phần có chu kỳ bán rã dài nhất của cây --- kiến trúc trong Phần C sẽ cũ, cách suy nghĩ ở đây thì không.
+\end{tomtat}
+
+Toàn bộ phần này trả lời một câu hỏi duy nhất: \textbf{làm sao ra quyết định thiết kế đúng khi chưa có mô hình nào chạy?} Đó là câu hỏi bị bỏ qua nhiều nhất, vì nó không có code để chạy và không có con số để khoe, nhưng nó quyết định phần lớn kết quả cuối cùng. Một dự án chọn sai đơn vị phân tích ở tuần đầu, hoặc chia dữ liệu để lọt rò rỉ, sẽ cho ra những con số đẹp và vô nghĩa suốt sáu tháng sau đó, và không kiến trúc nào cứu được.
+
+Cách đọc phần này khác với cách đọc một giáo trình. Mỗi chương là \emph{một dạng ràng buộc}, và mọi kỹ thuật xuất hiện trong đó đều là câu trả lời cho một thất bại cụ thể đã xảy ra trước nó. Chương~3 đưa ra quy trình đọc một hệ thống lạ và nguyên lý xuyên suốt cả cây rằng độ khó không biến mất mà chỉ bị đẩy đi chỗ khác. Chương~4 dựng nền lý thuyết tối thiểu về việc học từ dữ liệu, và giới thiệu trục đánh đổi trung tâm giữa giả định và dữ liệu mà mọi phần sau sẽ gặp lại. Chương~5 tới~8 đi theo vòng đời của dữ liệu: định nghĩa bài toán, chất lượng nhãn, chia dữ liệu và giao thức đánh giá, rồi chuyện gì xảy ra khi phân phối lúc triển khai không còn giống lúc huấn luyện. Chương~9 tới~11 chuyển sang ba ràng buộc thiết kế còn lại: hàm mất mát phát biểu điều ta thật sự muốn, kiến trúc phát biểu giả định về lời giải, và phần cứng phát biểu giới hạn cuối cùng mà không lập luận nào vượt qua được.
+
+Đây là phần thuộc tầng \T{2}, tức tầng có chu kỳ bán rã dài nhất trong cây. Kiến trúc trong phần C sẽ cũ; cách suy nghĩ trong phần B thì không.
+\subfile{00-map}
+\subfile{03-giai-phau-he-thong/giai-phau-he-thong}
+\subfile{04-nen-tang-hoc-tu-du-lieu/nen-tang-hoc-tu-du-lieu}
+\subfile{05-thiet-ke-bai-toan/thiet-ke-bai-toan}
+\subfile{06-chat-luong-du-lieu/chat-luong-du-lieu}
+\subfile{07-chia-du-lieu-va-danh-gia/chia-du-lieu-va-danh-gia}
+\subfile{08-dich-chuyen-phan-phoi/dich-chuyen-phan-phoi}
+\subfile{09-thiet-ke-ham-mat-mat/thiet-ke-ham-mat-mat}
+\subfile{10-thiet-ke-kien-truc/thiet-ke-kien-truc}
+\subfile{11-gioi-han-tinh-toan/gioi-han-tinh-toan}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,26 @@
+% 00-map.tex — bản đồ Phần B: có gì, mức đầu tư, thứ tự đọc.
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: ../00-map.tex | Mức độ: điều hướng
+\documentclass[../deep_learning.tex]{subfiles}
+\begin{document}
+\begin{table}[H]\centering\small
+\caption{Bản đồ Phần B: các chương, nội dung, và mức đầu tư đề xuất.}
+\begin{tabularx}{\linewidth}{@{}L{0.8cm}L{4.0cm}YL{2.6cm}@{}}
+\toprule
+\textbf{Ch.} & \textbf{Thư mục} & \textbf{Nội dung} & \textbf{Mức}\\
+\midrule
+3 & \code{03-giai-phau-he-thong} & Quy trình đọc một hệ thống lạ; nguyên lý độ khó bị đẩy đi chỗ khác & \textbf{cốt lõi}\\
+4 & \code{04-nen-tang-hoc-tu-du-lieu} & ERM, biểu diễn, manifold, inductive bias, trục đánh đổi giả định và dữ liệu & \textbf{cốt lõi}\\
+5 & \code{05-thiet-ke-bai-toan} & Đơn vị phân tích, định nghĩa nhãn, taxonomy, dạng đầu ra, population và sampling frame & \textbf{cốt lõi}\\
+6 & \code{06-chat-luong-du-lieu} & Nhiễu nhãn, agreement, tài liệu hoá dữ liệu, phát hiện nhãn sai & cốt lõi\\
+7 & \code{07-chia-du-lieu-va-danh-gia} & Leakage, chia theo nhóm và thời gian, chọn metric, đánh giá theo slice & \textbf{cốt lõi}\\
+8 & \code{08-dich-chuyen-phan-phoi} & Các loại shift, domain adaptation và generalization, long-tail, OOD & cốt lõi\\
+9 & \code{09-thiet-ke-ham-mat-mat} & Loss như phát biểu về phân phối; khoảng cách giữa loss và metric & \textbf{cốt lõi}\\
+10 & \code{10-thiet-ke-kien-truc} & Inductive bias trong kiến trúc, receptive field, đa tỉ lệ, backbone/neck/head & cốt lõi\\
+11 & \code{11-gioi-han-tinh-toan} & Vì sao FLOPs không dự đoán được latency; roofline, bộ nhớ activation & cốt lõi\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent Đọc tuần tự. Chương 3 và 4 là tiền đề của bảy chương còn lại; chương 5 tới 8 đi theo vòng đời dữ liệu; chương 9 tới 11 là ba ràng buộc thiết kế còn lại.
+\end{document}

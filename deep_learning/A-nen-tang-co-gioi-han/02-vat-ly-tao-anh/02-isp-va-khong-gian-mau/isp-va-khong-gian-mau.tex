@@ -1,0 +1,146 @@
+% ============================================================================
+%  A/02-vat-ly-tao-anh/02-isp-va-khong-gian-mau
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: A/02/01-anh-sang-va-nhieu. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{ISP, RAW so với sRGB và không gian màu (Image Signal Processing and Color Spaces)}
+\ptrtarget{A/02-vat-ly-tao-anh/02}\ptrtarget{A/02-vat-ly-tao-anh/02-isp-va-khong-gian-mau}\ptrtarget{A/02/02}\ptrtarget{A/02/02-isp-va-khong-gian-mau}
+\dependency{\ptr{A/02-vat-ly-tao-anh/01-anh-sang-va-nhieu} (mô hình nhiễu affine --- mục này theo dấu nhiễu ấy qua từng tầng xử lý); \ptr{A/01/04-hinh-hoc-va-tin-hieu} (lấy mẫu --- khử khảm là một bài toán lấy mẫu).}
+
+\begin{tomtat}
+Mục này mở hộp đen giữa cảm biến và tensor đầu vào: một tấm ảnh sRGB đã đi qua khử khảm, cân bằng trắng, gamma, ánh xạ tone và nén JPEG trước khi mô hình nhìn thấy nó, và mỗi tầng phá một giả định khác nhau. Đọc xong bạn biết vì sao ``tăng độ sáng'' trên sRGB không tương đương tăng phơi sáng (tính ra được con số: gấp đôi phơi sáng chỉ làm giá trị sRGB tăng khoảng \(37\%\)), vì sao giả thiết nhiễu độc lập từng pixel sai sau khử khảm, và augmentation màu nào có nghĩa vật lý. Nếu chỉ nhớ một điều: \emph{ISP là một phép biến đổi phi tuyến, phụ thuộc nội dung, và không khả nghịch} --- nên mọi phép mô phỏng vật lý phải làm ở miền tuyến tính rồi mới dựng ảnh lại, chứ không làm thẳng trên sRGB.
+\end{tomtat}
+
+\begin{nentang}
+\kn{ISP (image signal processor)}{chuỗi xử lý bên trong máy ảnh biến số đo thô của cảm biến thành ảnh xem được. Nó được thiết kế cho mắt người chứ không cho mô hình.}
+\kn{RAW so với sRGB}{RAW là số đo gần như thô, còn \emph{tuyến tính} theo lượng ánh sáng --- gấp đôi ánh sáng thì gấp đôi giá trị. sRGB là ảnh đã qua ISP: phi tuyến, phụ thuộc nội dung, và không khôi phục lại RAW được một cách chính xác.}
+\kn{ma trận lọc màu Bayer và khử khảm}{mỗi pixel của cảm biến chỉ đo được \emph{một} trong ba màu, sắp theo một hoa văn cố định gọi là Bayer; khử khảm là bước nội suy hai màu còn thiếu tại mỗi pixel.}
+\kn{cân bằng trắng (white balance)}{nhân mỗi kênh màu với một hệ số để vật màu trắng trông trắng dưới nguồn sáng hiện tại. Hệ số này được ước lượng từ chính cảnh, nên nó thay đổi theo nội dung ảnh.}
+\kn{gamma}{phép nén dải sáng bằng hàm mũ khoảng \(1/2{,}2\), để các mã số được phân bố đều theo cảm nhận của mắt thay vì đều theo năng lượng ánh sáng. Đây là chỗ ảnh mất tính tuyến tính.}
+\kn{ánh xạ tone (tone mapping)}{điều chỉnh độ sáng và tương phản, thường \emph{cục bộ} --- cùng một mức sáng ở hai vùng khác nhau của ảnh có thể bị xử lý khác nhau.}
+\kn{JPEG và DCT}{JPEG chia ảnh thành các khối \(8\times8\), biến mỗi khối thành các hệ số tần số bằng phép biến đổi cosin rời rạc (DCT), rồi làm tròn thô các hệ số tần số cao. Đây là nén mất mát: thông tin bị bỏ đi không lấy lại được.}
+\kn{tăng cường dữ liệu (data augmentation)}{sinh thêm mẫu huấn luyện bằng cách biến đổi mẫu có sẵn --- lật, xoay, đổi màu, thêm nhiễu --- nhằm dạy mô hình rằng những biến đổi đó không làm đổi nhãn.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Người mới coi ảnh đầu vào là ``dữ liệu thô''. Nó không phải. Giữa photon và mảng số mà \code{cv2.imread} trả về có một chuỗi xử lý dài, phần lớn do nhà sản xuất thiết kế cho \emph{mắt người}, không cho mô hình. Chuỗi ấy phi tuyến, phụ thuộc nội dung ảnh, thay đổi theo từng hãng máy, và phần lớn là không khả nghịch. Mọi giả định ngầm mà ta mang từ vật lý --- nhiễu độc lập từng pixel, giá trị pixel tỉ lệ với ánh sáng, cùng vật thể cho cùng màu --- đều bị một tầng nào đó trong chuỗi phá vỡ.
+
+\textbf{Học xong mục này thì làm được gì mà trước đó không làm được?} Ba việc: thiết kế augmentation có cơ sở vật lý thay vì chọn theo thói quen; dự đoán trước cái gì hỏng khi huấn luyện trên JPEG rồi triển khai trên luồng RAW hoặc trên một hãng camera khác; và biết khi nào phải bỏ công lấy RAW thay vì tiếp tục làm việc trên sRGB.
+
+\begin{trucgiac}
+ISP giống một phiên dịch viên có phong cách riêng. Bạn đưa cho anh ta một biên bản đo đạc khô khan (ảnh RAW) và anh ta trả lại một bản dịch \emph{dễ nghe}: cân đối lại màu cho hợp mắt, nhấn chỗ này, làm dịu chỗ kia, cắt bớt chi tiết mà anh ta cho là không ai để ý. Bản dịch đẹp hơn bản gốc và hầu hết người đọc thích nó hơn. Nhưng nếu công việc của bạn là \emph{đo đạc} thì rắc rối bắt đầu. Đổi hãng máy, đổi firmware, đổi chế độ chụp đều là đổi phiên dịch viên. Số liệu của bạn đổi theo, dù hiện thực ngoài kia không đổi chút nào.
+\end{trucgiac}
+
+\subsection{B. Chuỗi ISP: mỗi tầng phá một giả định}
+Hình~\ref{fig:isp-chain} vẽ chuỗi điển hình và đánh dấu chỗ mỗi giả định vỡ.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.42cm and 0.62cm,
+  blk/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=1.85cm},
+  lin/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=1.85cm},
+  ar/.style={-{Latex[length=2.0mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.0cm}]
+\node[lin] (raw) {\textbf{RAW}\\Bayer, tuyến tính};
+\node[lin,right=of raw] (dm) {Khử khảm};
+\node[lin,right=of dm] (wb) {Cân bằng trắng};
+\node[blk,right=of wb] (gm) {Gamma};
+\node[blk,right=of gm] (tm) {Ánh xạ tone\\+ khử nhiễu};
+\node[blk,right=of tm] (jp) {Nén JPEG};
+\draw[ar] (raw) -- node[lb,below=1pt] {nhiễu thành có tương quan} (dm);
+\draw[ar] (dm) -- node[lb,below=1pt] {hệ số phụ thuộc cảnh} (wb);
+\draw[ar] (wb) -- node[lb,below=1pt] {mất tuyến tính} (gm);
+\draw[ar] (gm) -- node[lb,below=1pt] {cục bộ, phụ thuộc nội dung} (tm);
+\draw[ar] (tm) -- node[lb,below=1pt] {mất tần số cao, có khối 8\(\times\)8} (jp);
+\end{tikzpicture}}
+\caption{Chuỗi ISP điển hình. Ba khối đầu (tô tím) còn ở miền tuyến tính --- đây là nơi duy nhất mô hình nhiễu \(\operatorname{Var}=aI+b\) còn đúng. Từ gamma trở đi, mọi phép mô phỏng vật lý làm trực tiếp trên giá trị pixel đều sai. Nhãn dưới mũi tên là giả định bị phá ở bước đó.}
+\label{fig:isp-chain}
+\end{figure}
+
+
+\lk{A/01}{cùng nguyên lý với}{giảm mẫu màu 4:2:0 trong JPEG là aliasing có chủ ý --- cùng cơ chế với bước giảm mẫu trong kiến trúc mạng}
+Đi qua từng tầng, mỗi tầng để lại một hệ quả cụ thể cho việc huấn luyện:
+
+\begin{itemize}
+\item \textbf{Khử khảm} --- cảm biến chỉ đo một kênh màu tại mỗi pixel qua ma trận lọc màu Bayer, nên hai phần ba giá trị màu là \emph{nội suy}. Hai hệ quả. Thứ nhất, chi tiết màu tần số cao sinh hoa văn giả: \en{moiré} và ``răng cưa màu''. Thứ hai, nhiễu trở nên có tương quan cả về không gian lẫn giữa các kênh. Giả định ``nhiễu độc lập từng pixel'' chết ngay ở tầng đầu tiên.
+\item \textbf{Cân bằng trắng} --- nhân mỗi kênh với một hệ số ước lượng từ chính cảnh. Hệ quả: cùng một vật thể cho ra màu khác nhau tuỳ cảnh xung quanh; mọi đặc trưng dựa trên màu tuyệt đối đều không đáng tin, và \emph{hệ số này thay đổi giữa hai khung hình liên tiếp} khi cảnh đổi.
+\item \textbf{Gamma} --- nén dải sáng bằng hàm mũ khoảng \(1/2{,}2\) để phân bố mã đều theo cảm nhận của mắt. Đây là chỗ mất tuyến tính, và là chỗ mọi tính toán vật lý phải dừng lại.
+\item \textbf{Ánh xạ tone và khử nhiễu} --- \emph{cục bộ} và phụ thuộc nội dung: cùng một mức sáng ở hai vùng khác nhau của ảnh có thể bị xử lý khác nhau. 
+\lk{A/02/03}{ràng buộc bởi}{hình học trực tiếp và ghép ảnh ở mục camera dựa trên giả định này, nên chính sách ISP đặt một trần lên độ chính xác của chúng}
+Điều này phá thẳng giả định \vn{độ sáng không đổi}{brightness constancy}, mà \vn{dòng quang}{optical flow} và SLAM trực tiếp lại dựa vào. Đó chính là lý do các hệ thống VO trực tiếp phải hiệu chuẩn quang trắc --- một chỗ nối rất thật với nền của bạn.
+\item \textbf{Nén JPEG} --- chuyển sang YCbCr, giảm mẫu kênh màu (thường 4:2:0, tức độ phân giải màu chỉ còn một nửa mỗi chiều), rồi lượng tử hoá hệ số DCT trên từng khối \(8\times8\). Hệ quả: mất tần số cao, xuất hiện cấu trúc khối, và vật nhỏ có màu là dấu hiệu chính --- đèn giao thông xa chẳng hạn --- mất đúng cái dấu hiệu ấy.
+\end{itemize}
+
+\subsection{C. Vì sao augmentation trên sRGB không tương đương thao tác vật lý}
+Đây là hệ quả quan trọng nhất của mục này, và nó tính ra được bằng số.
+
+\textbf{Ví dụ tính tay.} Xấp xỉ đường cong sRGB bằng \(V = L^{1/2{,}2}\) với \(L\) là ánh sáng tuyến tính. Tăng gấp đôi thời gian phơi sáng nghĩa là \(L \to 2L\), nên
+\[
+V' = (2L)^{1/2{,}2} = 2^{0{,}4545}\,L^{1/2{,}2} \approx 1{,}37\,V .
+\]
+Nói bằng lời: \emph{gấp đôi ánh sáng thật chỉ làm giá trị pixel sRGB tăng khoảng 37\%, không phải 100\%.} Nhân giá trị sRGB lên gấp đôi tương ứng với tăng ánh sáng thật \(2^{2{,}2}\approx 4{,}6\) lần --- một phép augmentation mạnh hơn nhiều so với ý định.
+
+Sai lệch về hệ số còn là phần nhẹ. Phần nặng là \emph{hành vi của nhiễu}: phơi sáng thật gấp đôi làm SNR tăng \(\sqrt{2}\) lần, còn nhân giá trị pixel thì nhân cả tín hiệu lẫn nhiễu nên SNR không đổi. Mô hình học từ augmentation kiểu này rút ra một quy luật sai --- rằng ảnh sáng và ảnh tối đáng tin như nhau.
+
+\begin{mach}[Mạch 2 --- từ ``augmentation trông có vẻ hợp lý'' tới quy trình đúng]
+\item \vd{muốn mô hình chịu được thay đổi ánh sáng.} \gp nhân giá trị pixel sRGB với một hệ số ngẫu nhiên. \gd giá trị pixel tỉ lệ với ánh sáng. \gia giả định sai vì gamma, nên biên độ thực tế lệch vài lần và hành vi nhiễu hoàn toàn sai.
+\item \vd{vậy làm ở miền tuyến tính.} \gp gỡ gamma (\(L = V^{2{,}2}\)), nhân hệ số, áp gamma lại. \hq bây giờ hệ số đúng nghĩa vật lý. \vdm nhiễu vẫn không đúng: ảnh sáng lên nhưng vẫn mang nhiễu của mức phơi sáng cũ.
+\item \vd{cần cả nhiễu đúng.} \gp gỡ toàn bộ ISP về RAW xấp xỉ: gỡ gamma, gỡ cân bằng trắng, gỡ ma trận màu. Mô phỏng phơi sáng và nhiễu shot cộng read ở đó, rồi dựng lại ảnh qua một ISP mô phỏng \cite{brooks2019unprocessing}. \gia phải biết hoặc đoán tham số ISP của camera; kết quả là xấp xỉ, không phải RAW thật.
+\item \vd{khi nào thì bỏ hẳn sRGB và lấy RAW thật?} \gp khi bài toán \emph{là} bài toán tín hiệu mức thấp --- khử nhiễu, HDR, chụp thiếu sáng, đo đạc quang học --- hoặc khi phải triển khai qua nhiều hãng camera khác nhau. \gia dữ liệu nặng gấp nhiều lần, hầu như không có mô hình tiền huấn luyện nào nhận RAW, và pipeline phải tự viết.
+\end{mach}
+
+\subsection{D. Không gian màu: chọn cái nào cho việc gì}
+\begin{table}[H]\centering\small
+\caption{Bốn không gian màu thường gặp. Cột cuối là cột quyết định.}
+\label{tab:khong-gian-mau}
+\begin{tabularx}{\linewidth}{@{}L{1.5cm}L{3.0cm}YL{4.0cm}@{}}
+\toprule
+\textbf{Không gian} & \textbf{Cơ chế} & \textbf{Mạnh khi nào} & \textbf{Hỏng khi nào}\\
+\midrule
+RGB & Ba kênh gần với cảm biến và màn hình & Mặc định; mọi mô hình tiền huấn luyện dùng nó & Phụ thuộc thiết bị; khoảng cách Euclid giữa hai màu không tương ứng cảm nhận\\
+HSV & Tách sắc độ, độ bão hoà, độ sáng & Ngưỡng màu thủ công, augmentation sắc độ rẻ tiền & Sắc độ vô định khi bão hoà thấp (vùng xám, vùng tối) nên nhiễu sắc độ nổ tung; không đều theo cảm nhận\\
+YUV / YCbCr & Tách độ chói khỏi hai kênh màu & Nén và truyền video; xử lý riêng độ chói & Đã có giảm mẫu màu sẵn trong hầu hết luồng thật, nên chi tiết màu mất trước khi bạn chạm vào\\
+Lab & Xấp xỉ đều theo cảm nhận quanh một điểm trắng & Đo khác biệt màu, tô màu ảnh, chuẩn hoá phong cách & Phụ thuộc điểm trắng giả định; chuyển đổi phi tuyến nên nhiễu bị biến dạng khó lường\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
+\lk{D}{tiền đề}{phân biệt augmentation \emph{mô phỏng miền} với augmentation \emph{chính quy hoá} ở chương huấn luyện bắt nguồn từ đúng tiêu chí này}
+Từ bảng trên rút ra tiêu chí thực dụng cho augmentation màu: một phép biến đổi \emph{có nghĩa vật lý} khi nó tương ứng với một thứ có thể thật sự xảy ra ở khâu tạo ảnh.
+
+\begin{itemize}
+\item \textbf{Có nghĩa vật lý:} thay đổi hệ số cân bằng trắng (nhân từng kênh ở miền tuyến tính --- tương ứng đổi nguồn sáng); thay đổi phơi sáng ở miền tuyến tính kèm điều chỉnh nhiễu; thêm nhiễu shot cộng read ở miền tuyến tính; thay đổi chất lượng nén JPEG; làm mờ chuyển động dọc theo một hướng hợp lý.
+\item \textbf{Ít hoặc không có nghĩa vật lý:} xoay sắc độ biên độ lớn (không nguồn sáng nào làm vậy); nhiễu Gauss cường độ cố định trên sRGB; đảo kênh màu; thay đổi độ tương phản độc lập từng kênh. Chúng vẫn có ích như một dạng chính quy hoá. Nhưng đừng nhầm chúng với mô phỏng điều kiện triển khai. Khi báo cáo, hãy nói rõ đó là chính quy hoá, không phải mô phỏng miền.
+\end{itemize}
+
+\subsection{E. Giới hạn và trường hợp hỏng}
+\begin{itemize}
+\item \textbf{Gỡ xử lý chỉ là xấp xỉ.} ISP thật có các bước không công bố, phụ thuộc firmware, và một số bước cục bộ thì về nguyên tắc không khả nghịch. Ảnh ``RAW tổng hợp'' luôn khác RAW thật, và độ lệch ấy đủ lớn để mô hình khử nhiễu tụt điểm --- lý do các tập dữ liệu chụp thật vẫn cần thiết \cite{abdelhamed2018sidd}.
+\item \textbf{Bỏ ISP không phải lúc nào cũng tốt hơn.} ISP là kết quả của hàng chục năm kỹ thuật. Với các bài toán ngữ nghĩa mức cao, ảnh sRGB đã xử lý thường cho kết quả tốt hơn RAW thô. Lý do đơn giản: mô hình tiền huấn luyện đã quen với thống kê của ảnh sRGB. RAW đáng công khi bài toán là bài toán tín hiệu mức thấp.
+\item \textbf{Không gian màu không giải quyết được vấn đề gốc.} Chuyển sang Lab hay HSV không lấy lại được thông tin đã bị lượng tử hoá hay giảm mẫu; nó chỉ sắp xếp lại thông tin còn sót. Nếu chi tiết màu đã mất ở bước 4:2:0 thì mọi phép đổi toạ độ đều vô ích.
+\end{itemize}
+
+\begin{cambay}
+Huấn luyện trên JPEG chất lượng 90 rồi triển khai trên luồng ít nén hoặc RAW là dịch chuyển miền theo chiều \emph{ít người ngờ}: mô hình đã học rằng vùng phẳng thì thật sự phẳng (vì lượng tử hoá DCT xoá nhiễu ở đó) và biên có cấu trúc khối. Ảnh ít nén mang lại nhiễu tần số cao mà mô hình chưa từng thấy, và nó thường hỏng trước ở các bài toán mức thấp --- phân đoạn biên, đếm vật nhỏ --- chứ không phải ở phân loại toàn ảnh. Cách phòng vệ rẻ nhất là đưa mức nén thành một tham số augmentation ngay từ đầu.
+\end{cambay}
+
+\begin{cannho}
+Ảnh sRGB không phải phép đo, nó là một \emph{bản dịch phi tuyến phụ thuộc nội dung} của phép đo. Mọi thao tác mang ý nghĩa vật lý --- phơi sáng, nhiễu, cân bằng trắng --- phải làm ở miền tuyến tính rồi mới dựng lại ảnh; làm thẳng trên sRGB thì bạn đang mô phỏng một hiện tượng không tồn tại. \T{1}
+\end{cannho}
+
+\subsection{F. Kết nối}
+Mục này tiếp nối trực tiếp \ptr{A/02/01}: mô hình nhiễu affine chỉ đúng ở ba khối đầu của Hình~\ref{fig:isp-chain}, và toàn bộ phần còn lại của chuỗi là lý do vì sao nó không quan sát được trên ảnh sRGB. Nó là tiền đề của \ptr{A/02/04}, nơi ta thấy mỗi loại cảm biến có một ``ISP'' riêng với các tầng méo riêng. Theo chiều ngang, nó nối với ba chỗ. Với \ptr{A/01/04}, vì giảm mẫu màu 4:2:0 chính là aliasing có chủ ý. Với \code{B} về thiết kế pipeline dữ liệu. Và với \code{D} về augmentation, nơi ta phân biệt rạch ròi augmentation \emph{mô phỏng miền} với augmentation \emph{chính quy hoá} --- một phân biệt bắt nguồn từ đúng mục này.
+
+\begin{tukiem}
+\item Vì sao augmentation ``tăng độ sáng'' trên ảnh sRGB không tương đương tăng phơi sáng thật? Nêu cả sai lệch về hệ số lẫn sai lệch về nhiễu.
+\item Nếu train trên JPEG chất lượng 90 và triển khai trên luồng RAW, hỏng ở đâu trước và vì sao?
+\item Sau khử khảm, giả định nào của mô hình nhiễu ở mục trước không còn đúng? Hệ quả với một mô hình khử nhiễu là gì?
+\item Vì sao ánh xạ tone cục bộ phá vỡ giả định độ sáng không đổi, và các hệ VO trực tiếp xử lý chuyện đó bằng cách nào?
+\item Khi nào thì đáng bỏ công lấy RAW thay vì tiếp tục dùng sRGB, và cái giá cụ thể là gì?
+\item Kể hai phép augmentation màu có nghĩa vật lý và hai phép không có. Với hai phép sau, chúng vẫn có thể có ích --- ích ở khía cạnh nào?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,75 @@
+% ============================================================================
+%  VISUAL SLAM — master gộp toàn cây thành một PDF liền mạch.
+%  Ngày tạo: 2026-09-13 | Sửa gần nhất: 2026-09-13 | Ôn gần nhất: chưa
+%  Nguồn: lộ trình tự soạn (Tầng 1 nguyên lý, Tầng 2 giải thuật, Tầng 4 framework,
+%         phần mass production, tám hướng còn trống, lộ trình năm giai đoạn).
+%  Dependency: ../IMU_Fusion (phần quán tính), ../marker (phần fiducial).
+%  Mức độ: cốt lõi.
+%  Build: ./build.sh            (chỉ master)
+%         ./build.sh all        (thêm PDF riêng cho từng phần/chương)
+% ============================================================================
+\documentclass[11pt,a4paper,oneside]{report}
+\usepackage{subfiles}
+\input{\subfix{preamble/common}}
+\addbibresource{\subfix{refs.bib}}
+\hypersetup{pdftitle={Visual SLAM — cây tri thức},
+            pdfsubject={Visual SLAM, SfM, hiệu chuẩn và localization như một bài toán MAP duy nhất}}
+\begin{document}
+
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture, overlay]
+  \fill[inkblue] (current page.north west) rectangle ++(1.5cm,-\paperheight);
+  \fill[accent]  ($(current page.north west)+(1.5cm,0)$) rectangle ++(0.22cm,-\paperheight);
+  \node[anchor=north east, inner sep=0pt]
+    at ($(current page.north east)+(-1.6cm,-2.3cm)$)
+    {\fontsize{150}{150}\selectfont\sffamily\bfseries\color{inkblue!7}SLAM};
+\end{tikzpicture}
+
+\vspace*{4.2cm}
+\begin{flushleft}
+{\sffamily\bfseries\color{accent}\large ĐỊNH VỊ VÀ DỰNG BẢN ĐỒ BẰNG THỊ GIÁC\par}
+\vspace{0.5cm}
+{\sffamily\bfseries\color{inkblue}\fontsize{40}{45}\selectfont
+CÂY TRI THỨC\\[0.12em] VISUAL SLAM\par}
+\vspace{0.9cm}
+{\color{accent}\rule{7cm}{2.4pt}}\par
+\vspace{0.9cm}
+{\large\color{inkblue!85}
+Trình bày theo mạch\\[0.25em]
+\textbf{vấn đề} \(\rightarrow\) \textbf{giải pháp} \(\rightarrow\) \textbf{giả định} \(\rightarrow\) \textbf{giá phải trả}\par}
+\end{flushleft}
+
+\vfill
+\begin{flushleft}
+{\itshape\color{tiercol}``SLAM, SfM, hiệu chuẩn và localization là một bài toán MAP duy nhất.\\
+Chúng chỉ khác nhau ở chỗ biến nào được fix, biến nào để tự do,\\
+và chuyển động nào làm cho biến đó trở nên quan sát được.''\par}
+{\footnotesize\sffamily\color{tiercol}luận đề trung tâm của cây --- Chương 4, 5 và 14\par}
+\vspace{1.1cm}
+{\footnotesize\sffamily\color{inkblue}\textbf{Năm phần}\quad
+A · Nguyên lý và toán học \quad B · Front-end và back-end\\[0.25em]
+\phantom{\textbf{Năm phần}}\quad C · Hệ thống SLAM đầy đủ \quad D · Thực tế và sản xuất\\[0.25em]
+\phantom{\textbf{Năm phần}}\quad E · Framework và lộ trình\par}
+\vspace{0.5em}
+{\footnotesize\sffamily\color{tiercol}Bản gộp toàn cây --- \today\par}
+\end{flushleft}
+\end{titlepage}
+
+\pagenumbering{roman}
+\subfile{00-map}
+\cleardoublepage
+\tableofcontents
+\cleardoublepage
+\pagenumbering{arabic}
+
+\subfile{A-nguyen-ly-va-toan-hoc/nguyen-ly-va-toan-hoc}
+\subfile{B-front-end-va-back-end/front-end-va-back-end}
+\subfile{C-he-thong-slam-day-du/he-thong-slam-day-du}
+\subfile{D-thuc-te-va-san-xuat/thuc-te-va-san-xuat}
+\subfile{E-framework-va-lo-trinh/framework-va-lo-trinh}
+
+\subfile{99-chua-biet}
+
+\printbibliography[title={Nguồn}]
+\end{document}

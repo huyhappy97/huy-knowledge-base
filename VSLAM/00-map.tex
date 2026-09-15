@@ -1,0 +1,123 @@
+% 00-map.tex — bản đồ gốc của cây VSLAM: có gì, vì sao chia thế, đọc theo thứ tự nào.
+% Ngày tạo: 2026-09-13 | Sửa gần nhất: 2026-09-13 | Ôn gần nhất: chưa
+% Dependency: không (gốc cây) | Mức độ: cốt lõi — đọc đầu tiên
+\documentclass[vslam.tex]{subfiles}
+\begin{document}
+\chapter*{Bản đồ cây}
+\ptrtarget{00-map}
+\addcontentsline{toc}{chapter}{Bản đồ cây}
+\markboth{BẢN ĐỒ CÂY}{}
+
+\begin{tomtat}
+Đây là bản đồ điều hướng của cả cây: nó nói cây gồm gì, vì sao được chia thành năm phần theo thứ tự đó, và bốn luận điểm sẽ gặp lại ở gần như mọi chương. Đọc xong bạn biết nên bắt đầu từ đâu, chương nào là xương sống phải tự dẫn lại công thức, chương nào chỉ cần biết là có. Nếu chỉ nhớ một điều: \emph{SLAM, SfM, hiệu chuẩn và localization không phải bốn bài toán} --- cả bốn đều là ước lượng hậu nghiệm cực đại trên cùng một đồ thị nhân tử, và chúng chỉ khác nhau ở chỗ biến nào được fix, biến nào để tự do, và chuyển động nào làm biến đó trở nên quan sát được. Toàn bộ cây được dựng để làm rõ câu đó và để chỉ ra khi nào nó hỏng.
+\end{tomtat}
+
+Cây này được dựng từ một lộ trình tự soạn, với một mục tiêu hẹp và một mục tiêu rộng. Mục tiêu hẹp: \emph{hiểu Visual SLAM tới mức tự dẫn lại được công thức và đoán trước được chỗ hệ thống sẽ hỏng}. Mục tiêu rộng: \emph{đưa được một hệ thị giác từ nguyên mẫu chạy trên EuRoC lên dây chuyền sản xuất hàng nghìn máy}. Hai mục tiêu đó nghe như hai nghề khác nhau, và trong phần lớn tài liệu chúng đúng là hai nghề khác nhau --- học thuật viết về cái thứ nhất, còn cái thứ hai gần như không có tài liệu. Cây này cố ý đặt cả hai vào cùng một khung, vì chúng chia nhau đúng một bộ nguyên lý.
+
+\section*{Luận đề trung tâm: một bài toán, nhiều cái tên (One Problem, Many Names)}
+
+Người mới vào lĩnh vực học Visual SLAM như một danh sách các hệ thống: ORB-SLAM làm thế này, DSO làm thế kia, COLMAP là chuyện khác, Kalibr lại là chuyện khác nữa. Mỗi hệ có bài báo riêng, mã nguồn riêng, ký hiệu riêng. Cách học đó cho cảm giác tiến bộ vì danh sách dài thêm mỗi tuần, nhưng nó không bao giờ hội tụ: hệ thứ hai mươi vẫn phải học lại từ đầu.
+
+Cách nhìn đúng gọn hơn nhiều. Mọi bài toán trong nhóm này đều là: \emph{cực tiểu hoá tổng phần dư có trọng số trên một đồ thị nhân tử}, với các biến gồm tư thế (quỹ đạo), cấu trúc (bản đồ, landmark), tham số hiệu chuẩn (nội, ngoại, sai lệch thời gian, độ lệch) và gauge. Bộ giải là một; hàm mục tiêu là một; lý thuyết về khi nào nghiệm tồn tại cũng là một. Thứ duy nhất phân biệt các bài toán là \emph{biến nào được giữ cố định}, như Bảng~\ref{tab:mot-bai-toan} trình bày.
+
+\begin{table}[H]\centering\small
+\caption{Cùng một bài toán MAP, khác nhau ở chỗ fix biến nào. Cột cuối là câu hỏi observability tương ứng --- chính là câu hỏi quyết định bài toán có nghiệm hay không.}
+\label{tab:mot-bai-toan}
+\begin{tabularx}{\linewidth}{@{}L{2.6cm}L{3.3cm}L{3.0cm}Y@{}}
+\toprule
+\textbf{Bài toán} & \textbf{Fix} & \textbf{Tự do} & \textbf{Điều kiện để nghiệm tồn tại}\\
+\midrule
+Hiệu chuẩn ngoại tuyến & Cấu trúc (target đã biết) & Nội, ngoại, \(t_d\), quỹ đạo & Chuyển động đủ đa dạng về hướng và độ sâu\\
+SLAM & Hiệu chuẩn & Tư thế \(+\) cấu trúc & Đủ parallax; cảnh tĩnh; không xoay thuần\\
+VIO \(+\) hiệu chuẩn trực tuyến & Không gì & Tất cả & Kích thích riêng cho từng tham số, kiểm theo thời gian thực\\
+Localization & Bản đồ \(+\) hiệu chuẩn & Tư thế & Đủ điểm khớp đúng, hình học không suy biến\\
+SfM & Không gì & Tư thế \(+\) cấu trúc, gauge tự do & Đồ thị ảnh liên thông; đủ overlap\\
+Docking bằng marker & Constellation (đã biết) & Tư thế tương đối & Marker đủ lớn trong ảnh; không ở tư thế lưỡng nghĩa\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Hệ quả thực tiễn của bảng này lớn hơn vẻ ngoài của nó. Thứ nhất, \emph{mọi kỹ năng bạn học ở một ô đều dùng lại được ở ô khác}: viết được một nhân tử chiếu cho BA thì viết được nó cho hiệu chuẩn, và ngược lại. Thứ hai, và quan trọng hơn, câu hỏi ``biến này có hội tụ không'' \emph{luôn} là câu hỏi observability, không bao giờ là câu hỏi cài đặt. Khi hiệu chuẩn ngoại trực tuyến trôi lung tung, khi tỉ lệ đơn mắt sai, khi relocalization cho một tư thế trông hợp lý nhưng lệch nửa mét --- ba triệu chứng đó có chung một gốc, và chương~5 là chỗ nói về cái gốc ấy.
+
+\begin{trucgiac}
+Hình dung mọi phép đo là một cái lò xo nối các biến chưa biết. Nghiệm của bài toán là vị trí cân bằng của cả hệ lò xo. Các bài toán trong Bảng~\ref{tab:mot-bai-toan} khác nhau ở chỗ bạn \emph{hàn cứng} biến nào vào tường: hàn cấu trúc thì hệ giải ra tham số hiệu chuẩn, hàn hiệu chuẩn thì hệ giải ra quỹ đạo và bản đồ, không hàn gì thì hệ giải ra tất cả --- nếu có đủ lò xo.
+
+Cái ``nếu'' cuối câu chính là observability, và nó là chỗ khó thật sự. Nếu có một hướng mà dịch chuyển theo hướng đó không làm căng thêm bất kỳ lò xo nào, thì hệ có vô số vị trí cân bằng. Bộ giải vẫn trả về một con số, trông vẫn tự tin, và con số đó vô nghĩa theo đúng hướng ấy.
+
+Một cách nói khác cho cùng ý, dùng được ngay khi debug: \emph{calibration target chỉ là một cách giảm phương sai bằng cách fix cấu trúc}. Khi không fix được cấu trúc, bạn phải dùng chuyển động để thay thế. Đó là toàn bộ khác biệt giữa hiệu chuẩn trong phòng lab và hiệu chuẩn trực tuyến trên robot đang chạy.
+\end{trucgiac}
+
+\section*{Vì sao chia thành năm phần (The Five Parts)}
+
+Năm phần không phải năm chủ đề song song mà là năm tầng câu hỏi nối tiếp nhau. Phần~A trả lời \emph{camera thật sự đo cái gì, và ngôn ngữ toán nào đủ để nói về chuyển động và cấu trúc}. Phần~B trả lời \emph{làm thế nào biến chuỗi ảnh thành một ước lượng dùng được}, và nó chia đôi theo đúng ranh giới mà lĩnh vực tự chia: front-end lo chuyện tìm ra phép đo, back-end lo chuyện ghép phép đo thành trạng thái. Phần~C là chỗ các mảnh rời trở thành một \emph{hệ thống}: quản lý bản đồ, hiệu chuẩn như một nhánh của SLAM, hợp nhất đa cảm biến, biểu diễn dày, học máy, và cách đánh giá. Phần~D là phần ít tài liệu học thuật nhất và tạo ra giá trị thật nhiều nhất: thế giới thực và dây chuyền sản xuất. Phần~E là tầng công cụ và lộ trình --- cố ý đặt cuối vì nó hết hạn nhanh nhất.
+
+\begin{table}[H]\centering\small
+\caption{Năm phần, câu hỏi mỗi phần trả lời, và mức độ ưu tiên.}
+\label{tab:nam-phan}
+\begin{tabularx}{\linewidth}{@{}L{0.7cm}L{3.6cm}YL{2.0cm}@{}}
+\toprule
+& \textbf{Phần} & \textbf{Câu hỏi nó trả lời} & \textbf{Mức}\\
+\midrule
+A & Nguyên lý và toán học & Camera đo cái gì, và cần đúng bao nhiêu toán để nói về nó? & \textbf{cốt lõi}\\
+B & Front-end và back-end & Biến chuỗi ảnh thành trạng thái thế nào, và mỗi cách hỏng ở đâu? & \textbf{cốt lõi}\\
+C & Hệ thống SLAM đầy đủ & Ghép các mảnh thành một hệ chạy được lâu dài thế nào? & \textbf{cốt lõi}\\
+D & Thực tế và sản xuất & Vì sao hệ chạy tốt trên EuRoC lại chết ở nhà khách hàng? & \textbf{cốt lõi}\\
+E & Framework và lộ trình & Ai đã cài sẵn cái gì, và đọc theo thứ tự nào? & công cụ\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng~\ref{tab:nam-phan} cũng là thứ tự đọc đề xuất cho lần đầu, với một ngoại lệ đáng kể: nếu bạn đã có một hệ thống đang chạy và đang đau ở một chỗ cụ thể, hãy đọc chương~24 trước để biết đi thẳng tới đâu. Từ lần thứ hai trở đi, cách đọc hiệu quả hơn là trộn các chương xa nhau và tự kiểm tra chéo, vì gần như mọi chương trong cây đều là một cách nhìn khác của cùng vài nguyên lý.
+
+Một lưu ý về phạm vi. Cây này \emph{không} lặp lại phần quán tính và phần fiducial, vì hai nhánh đó đã có cây riêng: \code{../IMU\_Fusion/} cho tiền tích phân, bộ lọc, khởi tạo thị giác--quán tính và hiệu chuẩn camera--IMU; \code{../marker/} cho detection marker, lưỡng nghĩa tư thế phẳng, constellation và ngân sách sai số docking. Chỗ nào giao nhau thì cây này trỏ sang bằng đường dẫn tương đối chứ không chép lại. Đây là quy tắc \emph{một nguồn duy nhất} của kho, và nó quan trọng hơn sự tiện lợi của việc đọc một chỗ.
+
+\section*{Ba mức ưu tiên, đánh dấu ngay ở tiêu đề chương (Three Priority Levels)}
+
+Không phải chương nào cũng đáng đầu tư như nhau. Cây dùng đúng ba mức, lấy từ quy ước trong lộ trình gốc, và mức xuất hiện ngay ở dòng đầu mỗi chương.
+
+\begin{table}[H]\centering\small
+\caption{Ba mức ưu tiên và cách đọc tương ứng.}
+\label{tab:ba-muc}
+\begin{tabularx}{\linewidth}{@{}L{2.0cm}L{4.3cm}Y@{}}
+\toprule
+\textbf{Mức} & \textbf{Nghĩa} & \textbf{Cách đọc tương ứng}\\
+\midrule
+\muc{3} xương sống & Không hiểu thì không hiểu được Visual SLAM & Đọc kỹ, \textbf{tự dẫn lại công thức trên giấy}, làm ví dụ nhỏ tính tay, trả lời hết câu hỏi tự kiểm\\
+\muc{2} quan trọng & Cần hiểu ý tưởng và biết khi nào dùng & Đọc hiểu cơ chế và điều kiện áp dụng; không cần tự dẫn lại toàn bộ\\
+\muc{1} bổ trợ & Biết là có, tra khi gặp vấn đề cụ thể & Đọc lướt một lượt để biết trong đó có gì, quay lại khi cần\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Phân bố không đều là có chủ ý. Trong Phần~A, chương~3 (Lie group), chương~4 (MAP và BA) và chương~5 (observability) là \muc{3}. Trong Phần~B, chương~7 (đặc trưng và data association), chương~8 (mô hình phần dư), chương~9 (paradigm back-end) và chương~11 (loop closure) là \muc{3}. Trong Phần~C, chương~13 (quản lý bản đồ) và chương~14 (hiệu chuẩn) là \muc{3} --- chương~13 vì nó bị coi nhẹ nhất mà ảnh hưởng production lớn nhất, chương~14 vì nó là chỗ luận đề trung tâm được chứng minh bằng tay. Trong Phần~D, chương~19 và~21 là \muc{3} vì mục tiêu của cây có bao gồm mass production.
+
+\section*{Bốn nguyên lý xuyên suốt (Recurring Principles)}
+
+Bốn ý dưới đây xuất hiện lại ở những chỗ tưởng như không liên quan, và nhận ra chúng là dấu hiệu đã đọc đúng.
+
+Thứ nhất, \term{camera đo hướng, không đo khoảng cách}. Một điểm ảnh xác định một tia, không xác định một điểm. Mọi thông tin về độ sâu trong hệ thị giác đều đến từ \emph{sự khác biệt giữa hai tia}, tức từ parallax, và parallax chỉ sinh ra khi camera \emph{dịch chuyển}. Đây là gốc của việc xoay thuần không triangulate được, của việc tỉ lệ đơn mắt không quan sát được, của việc điểm xa có bất định độ sâu lớn hơn điểm gần theo một quy luật cụ thể mà chương~6 sẽ tính ra, và của việc stereo có đường cơ sở cố định nên có thước đo còn mono thì không.
+
+Thứ hai, \term{sai số có cấu trúc là dấu hiệu mô hình sai, sai số ngẫu nhiên là dấu hiệu nhiễu}. Khi phần dư reprojection phân bố ngẫu nhiên quanh không, bạn đang ở chế độ lành mạnh và chỉ cần trọng số đúng. Khi phần dư có hoa văn --- tăng dần ra rìa ảnh, xoáy quanh tâm, tương quan với tốc độ góc --- thì không có lượng dữ liệu nào cứu được, vì bạn đang khớp một mô hình sai. Phân biệt \emph{model mismatch} với \emph{parameter error} là kỹ năng chẩn đoán có giá trị cao nhất trong cả cây, và nó xuất hiện lại ở chương~2 (mô hình distortion), chương~14 (chất lượng hiệu chuẩn), chương~18 (NEES) và chương~21 (giám sát sức khoẻ tại hiện trường).
+
+Thứ ba, \term{quan sát được hay không là tính chất của cặp (mô hình, chuyển động), không phải của thuật toán}. Không thuật toán nào ước lượng được một đại lượng mà dữ liệu không chứa thông tin về nó. Khi hệ thống hỏng, câu hỏi đầu tiên phải là ``chuyển động vừa rồi có kích thích đủ để đại lượng này quan sát được không'', chứ không phải ``có nên đổi sang bộ giải khác không''. Nguyên lý này chung với cây \code{../IMU\_Fusion/} và được phát biểu ở đó cho trường hợp quán tính; chương~5 ở đây phát biểu nó cho trường hợp thuần thị giác, nơi nó còn gắt hơn vì mono thiếu cả tỉ lệ.
+
+Thứ tư, \term{biết mình đang sai quan trọng hơn là không bao giờ sai}. Một hệ thống có tỉ lệ lỗi 2\,\% nhưng phát hiện được 90\,\% số lần lỗi thì dùng được trong sản phẩm; một hệ thống có tỉ lệ lỗi 1\,\% nhưng im lặng khi lỗi thì không. Nguyên lý này chi phối toàn bộ Phần~D, và nó là lý do chương~6 (bất định) và chương~18 (đánh giá) được xếp mức cao hơn vẻ ngoài ``phụ trợ'' của chúng. Nó cũng là lý do hướng nghiên cứu số~2 và số~4 ở chương~22 được đánh giá là còn nhiều khoảng trống thật.
+
+\section*{Cách dùng cây (How to Use This Tree)}
+
+Mỗi thư mục có một tệp \code{00-map.tex} nói nhánh đó gồm gì và vì sao chia như vậy; đó là chỗ nên đọc trước khi vào nội dung. Mỗi tài liệu mở đầu bằng một dòng \emph{Phụ thuộc} cho biết cần đọc gì trước, và kết bằng một mục \emph{Kết nối} trỏ sang các nhánh liên quan cùng một câu giải thích quan hệ. Cuối mỗi tài liệu là ba tới bảy câu hỏi tự kiểm; theo lịch ôn của kho, hãy trả lời chúng \emph{trước} khi mở lại bài, sau vài ngày, hai tuần, hai tháng, rồi nửa năm.
+
+Tệp \code{99-chua-biet.md} ở gốc cây là sổ những điều chưa biết theo tinh thần của Feynman: mỗi mục là một câu hỏi cụ thể mà tôi biết là mình chưa trả lời được. Nó chỉ có ích khi được thu ngắn dần, nên mỗi lần giải quyết xong một mục thì chuyển nó thành một đoạn trong bài chính và ghi ngày.
+
+\begin{cambay}
+Cây này hiện ở trạng thái \textbf{bản nháp có kiểm soát}, và cần biết rõ điều đó trước khi dựa vào nó.
+
+\code{refs.bib} được soạn từ trí nhớ về các công trình gốc: tên tác giả, năm và venue đủ chính xác để tra cứu, nhưng \emph{chưa} được đối chiếu với trang gốc của nhà xuất bản. Theo \code{learning-rules.md} mục~5, như vậy là chưa qua cửa kiểm chứng nào. Trước khi trích dẫn ra ngoài cây hoặc dùng để ra quyết định thật, phải mở bản gốc.
+
+Quan trọng không kém: cây này \textbf{không chứa con số thực nghiệm nào do tôi đo được}. Mọi con số xuất hiện trong bài đều là một trong ba loại --- ký hiệu toán, kết quả tính tay từ một ví dụ tự đặt, hoặc con số được dẫn nguồn kèm điều kiện đo. Chỗ nào tôi suy ra mà chưa đối chiếu được nguồn thì ghi thẳng \emph{(tôi suy ra, chưa đối chiếu nguồn)}. Một bảng so sánh APE giữa các hệ thống mà không kèm điều kiện đo là thứ cây này cố ý không có, vì các con số công bố của các nhóm khác nhau thường \emph{không so sánh được với nhau}.
+\end{cambay}
+
+\section*{Câu hỏi còn mở (Open Questions)}
+
+Bốn điều cần xử lý khi quay lại cây này. Thứ nhất, toàn bộ \code{refs.bib} cần một lượt đối chiếu với nguồn gốc, và mỗi entry cần được dán mức tin A/B/C \emph{sau khi} đã mở được ít nhất abstract. Thứ hai, các công thức lõi --- đặc biệt là quan hệ sai số pixel sang sai số độ sâu ở chương~6, phép khử landmark bằng Schur ở chương~4, và điều kiện suy biến của homography ở chương~1 --- cần được kiểm bằng một ví dụ số nhỏ chạy được, và mã kiểm nên nằm trong thư mục \code{code/} cạnh chương tương ứng. Thứ ba, Phần~E chốt tại tháng 9/2026 và là phần hết hạn nhanh nhất; rà lại mỗi sáu tháng. Thứ tư, và đây là khoản nợ lớn nhất về mặt phương pháp: cây này được viết theo \code{learning-rules.md} (kho đã hiểu và sắp xếp xong), \emph{không} theo \code{research-rules.md} (khảo sát có search log, ma trận tổng hợp, chỉ tiêu 25--40 công trình). Chương~22 --- tám hướng còn trống --- là chương duy nhất chạm vào địa hạt nghiên cứu, và nó cần được nâng lên thành một dự án \code{survey/} đúng chuẩn trước khi dùng để chọn đề tài thật.
+\end{document}

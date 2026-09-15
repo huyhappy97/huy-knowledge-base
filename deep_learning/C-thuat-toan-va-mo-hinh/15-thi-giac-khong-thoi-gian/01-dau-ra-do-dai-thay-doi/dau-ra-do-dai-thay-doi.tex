@@ -1,0 +1,186 @@
+\documentclass[../../../deep_learning.tex]{subfiles}
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: C/13/02 (attention), B/05 (dạng đầu ra). Mức độ: cốt lõi.
+\begin{document}
+\section{Đầu ra độ dài thay đổi và sự ra đời của attention (Variable-Length Outputs and the Birth of Attention)}
+\ptrtarget{C/15-thi-giac-khong-thoi-gian/01}\ptrtarget{C/15-thi-giac-khong-thoi-gian/01-dau-ra-do-dai-thay-doi}\ptrtarget{C/15/01}\ptrtarget{C/15/01-dau-ra-do-dai-thay-doi}
+\dependency{\ptr{C/13-kien-truc-backbone/02-tu-chuoi-toi-attention} (RNN, LSTM, attention --- mục này là \emph{động cơ} của mục đó, nên đọc mục này trước sẽ dễ hơn); \ptr{B/05-thiet-ke-bai-toan} (dạng đầu ra).}
+
+\begin{tomtat}
+Mục này kể lại đúng một sự kiện: \en{attention} không sinh ra từ mong muốn làm kiến trúc đẹp hơn, mà sinh ra để gỡ một nút thắt rất cụ thể --- việc nén cả một ảnh vào một vector duy nhất trước khi sinh câu mô tả. Đọc xong bạn hiểu \emph{vì sao} self-attention của Transformer là hiển nhiên chứ không bí ẩn, và bạn nhận ra được cùng một nút thắt ở những nơi khác, kể cả trong pipeline SLAM của chính mình. Nếu chỉ nhớ một điều: ở đâu một hệ thống nén thông tin có cấu trúc thành một vector cố định \emph{trước khi} biết sẽ cần phần nào, ở đó có một nút thắt. Attention là cách chuẩn để gỡ nó, bằng cách hoãn phép nén tới lúc biết đang cần gì.
+\end{tomtat}
+
+\begin{nentang}
+\kn{token}{một đơn vị rời rạc của chuỗi đầu ra --- thường là một từ hoặc một mảnh từ. Mô hình sinh câu bằng cách dự đoán token tiếp theo, lặp lại tới khi gặp token kết thúc.}
+\kn{RNN và LSTM}{mạng xử lý chuỗi bằng cách mang theo một \emph{trạng thái ẩn} (một vector) từ bước này sang bước sau. LSTM là biến thể có cổng, giúp trạng thái giữ được thông tin qua nhiều bước hơn.}
+\kn{encoder--decoder}{encoder biến đầu vào thành biểu diễn số; decoder sinh đầu ra từ biểu diễn đó. Ở đây encoder là CNN nhìn ảnh, decoder là mạng sinh câu.}
+\kn{feature map (lưới đặc trưng)}{đầu ra không gian của CNN: một lưới, ví dụ \(14\times14\), mỗi ô là một vector mô tả một vùng ảnh. Giữ nguyên lưới nghĩa là giữ nguyên thông tin ``ở đâu''.}
+\kn{global average pooling}{phép lấy trung bình mọi ô của lưới đặc trưng để ra một vector duy nhất. Rất tiện cho phân loại, nhưng nó xoá sạch thông tin vị trí.}
+\kn{attention}{cơ chế cho một bên (bên cần thông tin) tính một bộ trọng số trên các phần của bên kia (bên có thông tin), rồi lấy tổ hợp có trọng số. Trọng số phụ thuộc vào việc đang cần gì, nên phép nén được ``hoãn'' tới lúc có truy vấn.}
+\kn{self-attention}{trường hợp hai bên là cùng một tập: mỗi phần tử tự tính trọng số trên mọi phần tử khác của chính chuỗi đó. Đây là khối cơ bản của Transformer.}
+\end{nentang}
+
+\subsection{Đặt vấn đề}
+Toàn bộ chương 14 giả định một điều mà ta không để ý: đầu ra tuy có thể là tập hợp nhưng \emph{mỗi phần tử} của nó vẫn có hình dạng cố định --- một khung là bốn số, một mask là một lưới nhị phân. \vn{Sinh mô tả ảnh}{image captioning} phá vỡ cả điều đó: đầu ra là một câu, dài ngắn tuỳ ảnh, và mỗi từ phụ thuộc vào các từ trước. Đây là lần đầu thị giác máy tính phải sinh ra một chuỗi, và nó buộc phải mượn bộ máy của xử lý ngôn ngữ.
+
+Giải pháp đầu tiên nghe rất hợp lý. Cho ảnh qua CNN, lấy vector đặc trưng ở tầng áp chót, dùng nó làm trạng thái khởi tạo cho một \vn{mạng hồi quy}{recurrent neural network, RNN} hoặc \en{LSTM} \cite{hochreiter1997lstm}, rồi để mạng đó sinh từng \en{token} một. Kiến trúc này chạy được và cho ra những câu nghe khá trôi chảy. Nhưng nó chứa một giả định chết người: rằng \emph{một} vector cố định --- thường 512 hay 2048 số --- đủ để trả lời mọi câu hỏi mà mọi từ trong câu sẽ đặt ra. Khi mạng đang sinh từ ``con chó'', nó cần biết chi tiết ở góc dưới bên trái; khi sinh từ ``bãi cỏ'', nó cần chi tiết ở nền. Vector kia phải chứa sẵn cả hai, và cả những chi tiết cho mọi câu khác mà nó không biết trước.
+
+\textbf{Học xong mục này bạn làm được gì mà trước đó không làm được?} Bạn phát hiện được nút thắt kiểu ``nén trước, dùng sau'' trong một kiến trúc bất kỳ, kể cả kiến trúc không dính gì tới ngôn ngữ. Bạn cũng biết attention là công cụ chuẩn để gỡ nó, và biết cái giá phải trả khi gỡ.
+
+\begin{trucgiac}
+Hãy tưởng tượng bạn phải kể lại một bộ phim cho người khác, nhưng luật chơi là: xem xong, bạn chỉ được ghi \emph{một} câu tóm tắt vào giấy, rồi trả lại băng phim, và từ đó chỉ được nhìn tờ giấy để kể suốt hai mươi phút. Bạn sẽ kể trôi chảy, nhưng mọi chi tiết đều là bịa hợp lý. Attention là việc bỏ luật đó đi: mỗi khi kể đến một cảnh, bạn được phép tua lại băng và nhìn đúng cảnh ấy. Không có gì huyền bí --- toàn bộ ý tưởng chỉ là \emph{hoãn việc nén lại cho tới khi biết mình đang cần gì}.
+\end{trucgiac}
+
+\subsection{A. Từ một vector tới một cái nhìn có chọn lọc}
+
+\begin{mach}[Mạch 1 --- đầu ra độ dài thay đổi]
+\item \vd{đầu ra là một câu, không phải một nhãn.} \gp gắn một bộ giải mã chuỗi lên trên bộ trích đặc trưng: CNN cho vector, RNN/LSTM sinh từng token, huấn luyện bằng \vn{entropy chéo}{cross-entropy} trên từng vị trí token. \gd đặc trưng toàn cục của ảnh chứa đủ thông tin cho toàn bộ câu. \hq lần đầu tiên một hệ thị giác sinh được đầu ra có độ dài thay đổi.
+\item \vd{một vector duy nhất là nghẽn cổ chai thông tin.} Mọi chi tiết không gian bị nén trước khi ta biết sẽ cần chi tiết nào; và nén \emph{có mất mát} thì không đảo ngược được. \gp ``Show, Attend and Tell'' giữ nguyên lưới đặc trưng không gian \cite{xu2015show}. Ở mỗi bước sinh từ, bộ giải mã tính một phân bố trọng số trên các ô lưới. Tổ hợp có trọng số của các ô đó là đầu vào cho bước ấy. \hq đây là nơi attention xuất hiện lần đầu trong thị giác, và nó ra đời để gỡ một nút thắt cụ thể chứ không phải vì đẹp. Ý tưởng gốc đến từ dịch máy, nơi cùng một nghẽn cổ chai xuất hiện ở dạng vector câu nguồn \cite{bahdanau2015neural}.
+\item \vd{nếu attention hữu ích cho quan hệ giữa \emph{câu và ảnh}, tại sao không dùng cho quan hệ giữa \emph{các phần của cùng một ảnh}?} \gp đó chính là bước đi tới self-attention và \en{transformer} \cite{vaswani2017attention}, và đó là lý do nên đọc mục này \emph{trước} \ptr{C/13-kien-truc-backbone/02-tu-chuoi-toi-attention}: khi đã thấy nút thắt, self-attention trở thành hệ quả hiển nhiên thay vì một phát minh từ trên trời rơi xuống.
+\end{mach}
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  b/.style={draw=steel,fill=bluebg,rounded corners=2pt,align=center,inner sep=5pt,text width=2.7cm},
+  n/.style={draw=reddark,fill=redbg,rounded corners=2pt,align=center,inner sep=5pt,text width=2.4cm},
+  g/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,align=center,inner sep=5pt,text width=2.7cm},
+  e/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=tiercol,align=center,text width=3.0cm}]
+\node[b] (i1) at (0,1.9) {Ảnh};
+\node[b] (c1) at (3.2,1.9) {CNN};
+\node[n] (v1) at (6.4,1.9) {\textbf{một vector}\\ \footnotesize 512 số};
+\node[b] (r1) at (9.8,1.9) {LSTM sinh câu};
+\draw[e] (i1)--(c1); \draw[e] (c1)--(v1); \draw[e] (v1)--(r1);
+\node[lb] at (13.6,1.9) {mọi từ dùng chung một bản nén};
+\node[b] (i2) at (0,-1.9) {Ảnh};
+\node[b] (c2) at (3.2,-1.9) {CNN};
+\node[g] (v2) at (6.4,-1.9) {\textbf{lưới đặc trưng}\\ \footnotesize \(14\times14\times512\)};
+\node[b] (r2) at (9.8,-1.9) {LSTM + attention};
+\draw[e] (i2)--(c2); \draw[e] (c2)--(v2); \draw[e] (v2)--(r2);
+\draw[e,dashed,color=violetdark] (r2.south) to[bend left=45] (v2.south);
+\node[lb,color=violetdark,text width=6.0cm,anchor=north] at (8.1,-3.15) {mỗi bước sinh từ, hỏi lại lưới: ``lúc này cần nhìn đâu?''};
+\node[lb] at (13.6,-1.9) {phần nén được hoãn tới lúc biết cần gì};
+\end{tikzpicture}}
+\caption{Cùng một pipeline, khác nhau đúng một chỗ. Nhánh trên nén lưới đặc trưng thành một vector \emph{trước} khi biết câu sẽ nói gì; nhánh dưới giữ nguyên lưới và để bộ giải mã truy vấn lại nó ở mỗi bước. Mũi tên đứt là toàn bộ nội dung của attention --- một vòng phản hồi từ nơi cần thông tin về nơi có thông tin.}
+\label{fig:captioning-bottleneck}
+\end{figure}
+
+\subsection{B. Nút thắt lớn tới mức nào --- một phép tính}
+Hình~\ref{fig:captioning-bottleneck} sẽ thuyết phục hơn nhiều khi kèm con số. Lưới đặc trưng của một CNN trước tầng gộp toàn cục có kích thước điển hình \(14\times14\times512\), tức \(196 \times 512 = 100\,352\) số. Sau \vn{gộp trung bình toàn cục}{global average pooling} chỉ còn \(512\) số. Tỉ số nén là \(196{:}1\), và điều quan trọng không phải tỉ số mà là \emph{cái gì bị mất}: phép gộp lấy trung bình theo không gian, nên nó xoá sạch thông tin ``đặc trưng này nằm ở đâu''. Một câu mô tả cần đúng thông tin đó để nói ``con chó \emph{bên trái} người đàn ông''.
+
+\lk{C/13/02}{hệ quả của}{self-attention là bước tiếp theo hiển nhiên khi đem chính cơ chế này áp cho quan hệ giữa các phần bên trong một đầu vào, thay vì giữa hai đầu vào khác nhau.}
+Nói gọn thì attention thay phép trung bình đều bằng phép trung bình có trọng số, với trọng số phụ thuộc vào việc bộ giải mã đang cần gì: gọi \(a_i\) là vector đặc trưng của ô thứ \(i\), và \(\alpha_i\) là trọng số attention tại bước sinh từ hiện tại. Đầu vào của bước đó là \(z = \sum_i \alpha_i a_i\), với \(\sum_i \alpha_i = 1\). Công thức này nói một điều rất đơn giản: \emph{vẫn nén thành một vector, nhưng nén lại một lần cho mỗi từ, và mỗi lần nén theo một cách khác nhau}. Trường hợp \(\alpha_i = 1/196\) với mọi \(i\) chính là gộp trung bình toàn cục --- mô hình cũ là một trường hợp riêng của mô hình mới.
+
+\begin{figure}[H]\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  cell/.style={draw=rulecol,minimum size=0.52cm,inner sep=0pt},
+  hot/.style={draw=violetdark,fill=violetbg,minimum size=0.52cm,inner sep=0pt,line width=0.7pt},
+  b/.style={draw=steel,fill=bluebg,rounded corners=2pt,align=center,inner sep=4pt,text width=2.4cm},
+  e/.style={-{Latex[length=2.2mm]},draw=steel},
+  ev/.style={-{Latex[length=2.2mm]},draw=violetdark,thick},
+  lb/.style={font=\scriptsize\itshape,color=tiercol,align=center}]
+\foreach \i in {0,...,4}\foreach \j in {0,...,4}{\node[cell] at (\i*0.54,\j*0.54) {};}
+\node[hot] at (1.08,1.62) {}; \node[hot] at (1.62,1.62) {}; \node[hot] at (1.08,1.08) {};
+\node[lb,anchor=north,text width=3.2cm] at (1.08,-0.5) {lưới đặc trưng \(a_1\ldots a_{196}\)\\ (giữ nguyên, không gộp)};
+\node[b] (st) at (5.4,2.4) {Trạng thái decoder\\ ở bước sinh từ thứ \(t\)};
+\node[b] (sc) at (5.4,0.6) {Điểm tương hợp\\ \(e_i = f(h_t, a_i)\)};
+\node[b] (sm) at (9.0,0.6) {\(\alpha = \mathrm{softmax}(e)\)\\ \(\sum_i \alpha_i = 1\)};
+\node[b] (z)  at (12.6,0.6) {\(z_t = \sum_i \alpha_i a_i\)};
+\node[b] (w)  at (12.6,2.4) {Từ tiếp theo};
+\draw[e] (st) -- (sc);
+\draw[ev] (2.4,1.35) -- (sc);
+\node[lb,anchor=north,text width=2.8cm] at (3.3,0.02) {mỗi ô được chấm điểm};
+\draw[e] (sc)--(sm); \draw[e] (sm)--(z); \draw[e] (z)--(w);
+\draw[ev] (w) to[bend left=26] (st);
+\node[lb,color=violetdark,anchor=south,text width=3.6cm] at (9.0,3.15) {trạng thái mới cho trọng số mới};
+\node[lb,color=violetdark,anchor=north,text width=6.4cm] at (9.0,-0.35) {Vẫn nén thành \emph{một} vector --- nhưng nén lại một lần cho mỗi từ, và mỗi lần theo một cách khác};
+\node[lb,color=reddark,anchor=west,text width=3.6cm] at (14.6,1.5) {Đặt \(\alpha_i = 1/196\) thì công thức trở về đúng gộp trung bình toàn cục};
+\end{tikzpicture}}
+\caption{Cơ chế attention viết ra thành luồng tính. Điều đáng chú ý không phải công thức mà là vòng phản hồi: trạng thái của bộ giải mã quyết định trọng số, trọng số quyết định vector đưa vào bước sau, và bước sau lại đổi trạng thái. Mô hình cũ là trường hợp riêng khi trọng số bị ép bằng nhau, nên đây là một phép tổng quát hoá chứ không phải một kiến trúc cạnh tranh.}
+\label{fig:attention-mechanism}
+\end{figure}
+
+Hình~\ref{fig:attention-mechanism} cũng cho thấy chi phí: phần chấm điểm phải chạy lại cho \emph{mỗi} từ trên \emph{mọi} ô lưới, nên tổng chi phí tỉ lệ với tích số ô nhân số bước sinh --- mầm mống của vấn đề bậc hai ở mục sau.
+
+\begin{table}[H]\centering\small
+\caption{Ba cách đưa thông tin ảnh vào bộ giải mã chuỗi.}
+\label{tab:attention-variants}
+\begin{tabularx}{\linewidth}{@{}L{2.3cm}YYL{3.6cm}@{}}
+\toprule
+\textbf{Cách} & \textbf{Cơ chế} & \textbf{Giá phải trả} & \textbf{Hỏng khi nào}\\
+\midrule
+Một vector toàn cục & Gộp trung bình rồi khởi tạo trạng thái & Rẻ nhất, một lần tính & Câu cần chi tiết cục bộ hoặc quan hệ không gian; mô hình bịa chi tiết hợp lý\\
+Soft attention & Trung bình có trọng số, khả vi & Chi phí tỉ lệ số ô \(\times\) số từ & Ảnh nhiều vật giống nhau: trọng số dàn đều, không chọn được\\
+Hard attention & Lấy mẫu rời rạc một ô & Rẻ khi chạy, nhưng không khả vi & Phải huấn luyện bằng ước lượng gradient có phương sai cao; kém ổn định\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\lk{C/14/02}{cùng nguyên lý với}{mỗi truy vấn của DETR ``hỏi'' feature map xem vật của nó ở đâu --- đúng vòng phản hồi từ nơi cần thông tin về nơi có thông tin.}
+
+\subsection{C. Cùng một nút thắt trong pipeline SLAM}
+Chỗ nối này đáng dừng lại, vì nó cho thấy nút thắt trên không phải chuyện riêng của ngôn ngữ. Một hệ \en{SLAM} nhận diện nơi đã đi qua bằng cách nén cả khung hình thành một mô tả toàn cục --- túi từ trực quan hoặc một vector nhúng --- rồi so mô tả đó với cơ sở dữ liệu \cite{mur2017orbslam2, campos2021orbslam3}. Bước nén ấy có \emph{đúng} tính chất của nghẽn cổ chai: nó xảy ra trước khi biết sẽ cần kiểm chứng điều gì, nên nó vứt bỏ hình học.
+
+Và giải pháp mà cộng đồng SLAM dùng cũng có đúng cấu trúc của attention: sau khi mô tả toàn cục đề cử vài ứng viên, hệ thống \emph{quay lại} các đặc trưng riêng lẻ để ghép cặp và kiểm chứng bằng ràng buộc hình học. Nói cách khác, mô tả toàn cục chỉ dùng để \emph{chọn nơi cần nhìn kỹ}, chứ không dùng để kết luận --- y hệt vai trò của phân bố \(\alpha\) trong công thức trên. Nếu bạn thấy self-attention khó hình dung, hãy nghĩ nó như bước kiểm chứng đặc trưng đó, chỉ khác là trọng số được học thay vì được tính bằng RANSAC.
+\lk{C/16}{cùng nguyên lý với}{nhận diện nơi đã đi qua nén khung hình thành một mô tả toàn cục rồi phải quay lại đặc trưng để kiểm chứng hình học --- cùng cấu trúc ``đề cử rồi nhìn kỹ'' của attention.}
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  b/.style={draw=steel,fill=bluebg,rounded corners=2pt,align=center,inner sep=4pt,text width=2.7cm},
+  hb/.style={draw=reddark,fill=redbg,rounded corners=2pt,align=center,inner sep=4pt,text width=2.7cm},
+  gb/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,align=center,inner sep=4pt,text width=2.7cm},
+  e/.style={-{Latex[length=2.2mm]},draw=steel},
+  ttl/.style={font=\sffamily\bfseries\small\color{inkblue},anchor=west},
+  lb/.style={font=\scriptsize\itshape,color=tiercol,align=center,text width=6.4cm}]
+\node[ttl] at (-2.9,1.6) {Captioning};
+\node[b]  (a1) at (0,1.6)   {Ảnh};
+\node[hb] (a2) at (3.7,1.6) {Nén thành\\ một vector};
+\node[b]  (a3) at (7.4,1.6) {Sinh câu};
+\node[gb] (a4) at (11.6,1.6){Attention: quay lại\\ \emph{lưới đặc trưng} ở mỗi từ};
+\draw[e] (a1)--(a2); \draw[e] (a2)--(a3);
+\draw[e,draw=violetdark,thick] (a3) to[bend right=26] (a4);
+\draw[e,draw=violetdark,thick] (a4) to[bend right=26] (a3);
+\node[ttl] at (-2.9,-1.9) {Nhận diện nơi đã qua trong SLAM};
+\node[b]  (b1) at (0,-1.9)   {Khung hình};
+\node[hb] (b2) at (3.7,-1.9) {Nén thành một\\ mô tả toàn cục};
+\node[b]  (b3) at (7.4,-1.9) {Đề cử vài\\ khung ứng viên};
+\node[gb] (b4) at (11.6,-1.9){Quay lại \emph{đặc trưng riêng lẻ}:\\ ghép cặp \(+\) kiểm chứng hình học};
+\draw[e] (b1)--(b2); \draw[e] (b2)--(b3);
+\draw[e,draw=violetdark,thick] (b3) to[bend right=26] (b4);
+\draw[e,draw=violetdark,thick] (b4) to[bend right=26] (b3);
+\node[lb,anchor=north,text width=13.0cm] at (5.8,-3.3) {Cùng một cấu trúc: bản nén toàn cục chỉ dùng để \emph{chọn nơi cần nhìn kỹ}, không dùng để kết luận. Khác biệt duy nhất là trọng số quay lại được học (attention) hay được tính bằng ràng buộc hình học (RANSAC).};
+\end{tikzpicture}}
+\caption{Nghẽn cổ chai ``nén trước, dùng sau'' không phải chuyện riêng của ngôn ngữ. Hệ SLAM gặp đúng nó khi nén một khung hình thành một mô tả toàn cục để tra cứu, và giải đúng theo cách của attention: dùng bản nén để đề cử, rồi quay về nguồn thông tin đầy đủ để kiểm chứng. Nhận ra được cấu trúc này thì self-attention thôi trông giống một phát minh xa lạ.}
+\label{fig:bottleneck-slam}
+\end{figure}
+
+Hình~\ref{fig:bottleneck-slam} là lý do mục này nên đọc trước phần Transformer: khi mẫu thiết kế đã quen, phần công thức chỉ còn là chi tiết.
+
+\subsection{D. Giới hạn và trường hợp hỏng}
+
+\begin{itemize}
+\item \textbf{Thước đo của captioning rất yếu.} Các độ đo dựa trên trùng khớp \(n\)-gram thưởng cho câu ``an toàn'': đúng ngữ pháp và giống câu tham chiếu. Vì thế một mô hình sinh mô tả chung chung có thể ghi điểm cao hơn một mô hình mô tả đúng nhưng diễn đạt khác. \emph{Hệ quả thực tế}: cải tiến trên bảng xếp hạng không bảo đảm cải tiến khi người dùng thật đọc.
+\item \textbf{Mô hình bịa chi tiết.} Vì bộ giải mã được huấn luyện để sinh câu \emph{hợp lý}, nó lấp chỗ trống bằng thứ thường đúng --- ``người đàn ông cầm ván lướt sóng'' cho một ảnh bãi biển không có ván. Nút thắt càng chặt thì hiện tượng này càng nặng, nên đây là triệu chứng chẩn đoán được.
+\item \textbf{Bản đồ attention không phải lời giải thích.} Rất dễ nhìn \(\alpha\) rồi tin rằng mô hình ``đang nhìn vào đó vì lý do đó''. Các kiểm tra tính đúng đắn cho thấy nhiều loại bản đồ nổi bật vẫn trông hợp lý ngay cả khi trọng số mô hình bị làm hỏng \cite{adebayo2018sanity}, nên trọng số attention là \emph{manh mối chẩn đoán}, không phải bằng chứng.
+\item \textbf{Chi phí tăng theo tích số ô \(\times\) số bước.} Với ảnh phân giải cao hoặc câu dài, phần attention có thể vượt chi phí của chính CNN. Đây là mầm mống của vấn đề bậc hai ở mục sau, khi số ô còn nhân thêm với số khung hình.
+\end{itemize}
+
+\begin{cannho}
+Nghẽn cổ chai thông tin xuất hiện ở \emph{mọi} chỗ mà hệ thống nén dữ liệu có cấu trúc thành một vector cố định trước khi biết sẽ cần phần nào. Attention không phải một loại tầng mạng, nó là một mẫu thiết kế: \emph{giữ nguyên nguồn, và hoãn việc nén tới lúc có truy vấn}. Nhận ra mẫu này rồi thì Transformer, cross-attention trong DETR, và cả bước kiểm chứng hình học trong SLAM đều là cùng một thứ. \T{2}
+\end{cannho}
+
+\subsection{E. Kết nối}
+\ptr{C/13-kien-truc-backbone/02-tu-chuoi-toi-attention} là nơi hình thức hoá đầy đủ; mục này là động cơ của nó, nên thứ tự đọc tự nhiên là mục này trước. \ptr{C/14-bai-toan-cv-loi/02-detection-mot-giai-doan} dùng lại chính cơ chế này dưới dạng truy vấn của DETR: mỗi truy vấn ``hỏi'' feature map xem vật của nó ở đâu. \ptr{C/15-thi-giac-khong-thoi-gian/02-bieu-dien-video} là bước kế tiếp trực tiếp: khi nguồn không chỉ là một lưới không gian mà là một khối không-thời gian, chi phí attention nhân lên và trở thành ràng buộc thiết kế chính.
+
+\begin{tukiem}
+\item Vì sao nén ảnh thành một vector \emph{trước} khi sinh câu lại là một quyết định tồi, trong khi nén ảnh thành một vector trước khi phân loại thì hoàn toàn ổn?
+\item Chứng minh bằng một câu rằng gộp trung bình toàn cục là trường hợp riêng của soft attention. Điều đó nói gì về quan hệ giữa hai kiến trúc?
+\item Hard attention rẻ hơn khi chạy nhưng ít được dùng. Vì sao?
+\item Vì sao không nên đọc bản đồ attention như một lời giải thích về nguyên nhân?
+\item Trong một hệ thống bạn đã làm, nghẽn cổ chai kiểu ``nén trước, dùng sau'' nằm ở đâu, và hệ thống đó bù lại bằng bước ``quay lại nguồn'' nào?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,277 @@
+% ============================================================================
+%  E/28-lo-trinh-va-ngan-hang-bai-tap — file chương
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+%  Dependency: A/02, E/27. Mức độ: cốt lõi — chương dùng lại nhiều nhất.
+% ============================================================================
+\documentclass[../../algorithm.tex]{subfiles}
+\begin{document}
+\chapter{Lộ trình luyện tập và ngân hàng bài tập (Training Plan and Problem Bank)}
+\ptrtarget{E/28}\ptrtarget{E/28-lo-trinh-va-ngan-hang-bai-tap}
+\dependency{\ptr{A/02} cho nguyên lý luyện tập có chủ đích và vòng upsolving; \ptr{E/27} cho việc luyện dưới sức ép. Đây là chương bạn sẽ mở lại nhiều lần nhất.}
+
+\begin{tomtat}
+Chương cuối biến 27 chương trước thành thứ mang theo được: một lịch luyện cụ thể, một cách theo dõi tiến bộ, và một ngân hàng bài tập phân loại theo chương. Nội dung gồm ba phần. Phần một là cấu trúc một buổi luyện và một tuần luyện, cùng bốn công cụ theo dõi --- nhật ký lỗi, danh sách mẫu, lịch ôn ngắt quãng, và ba chỉ số tiến bộ. Phần hai là ba lộ trình theo mục tiêu: 12 tuần cho phỏng vấn, 6 tháng cho thi đấu, và một nhịp duy trì cho người đi làm. Phần ba là ngân hàng bài tập được nhóm theo chủ đề, đủ dùng cho vài tháng. Nếu chỉ nhớ một điều: tiến bộ đến từ số bài bạn \emph{giải xong sau khi đã bí}, nên hãy thiết kế lịch luyện quanh việc upsolving chứ không quanh số bài đã đọc lời giải.
+\end{tomtat}
+
+\begin{nentang}
+\kn{buổi luyện}{một phiên có mục tiêu hẹp, thời lượng cố định và một cách kiểm tra kết quả --- khác với ``ngồi giải bài tới khi chán''.}
+\kn{ôn ngắt quãng}{ôn lại một nội dung ở các khoảng cách tăng dần (1 ngày, 3 ngày, 1 tuần, 1 tháng), vì trí nhớ được củng cố mạnh nhất ngay trước lúc sắp quên.}
+\kn{danh sách mẫu}{sổ ghi các ý tưởng cốt lõi ở dạng tổng quát, mỗi mẫu một câu không nhắc tới đề bài cụ thể (\ptr{A/01}).}
+\kn{nhật ký lỗi}{với mỗi lần sai: hiểu sai điều gì, dấu hiệu nào lẽ ra đã gợi ý đúng, lần sau kiểm tra gì.}
+\kn{vùng luyện}{mức khó mà bạn giải được khoảng một nửa số bài; dễ hơn thì không học được gì, khó hơn thì không đọng lại (\ptr{A/02}).}
+\kn{chỉ số tiến bộ}{đại lượng đo được để biết mình có tiến không --- ví dụ tỉ lệ giải được ở một mức khó cố định, chứ không phải cảm giác.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao ``giải càng nhiều bài càng tốt'' lại là lời khuyên nguy hiểm?}
+\h{Nếu mỗi ngày chỉ có một giờ, phân bổ thế nào cho hiệu quả nhất?}
+\h{Làm sao biết mình đang tiến bộ, khi cảm giác chủ quan gần như luôn sai?}
+\h{Nên học kiến thức mới hay giải bài nhiều hơn --- và tỉ lệ nào là hợp lý?}
+\h{Vì sao lộ trình nào cũng đổ vỡ sau vài tuần, và cách thiết kế nào chống lại điều đó?}
+\end{khoigoi}
+
+Sau khi đọc xong 27 chương, câu hỏi thực tế duy nhất còn lại là: sáng mai làm gì. Chương này trả lời câu đó.
+
+Nguyên tắc nền đã được nêu ở \ptr{A/02} và đáng nhắc lại vì mọi thứ trong chương này đều suy ra từ nó: luyện tập chỉ tạo tiến bộ khi có mục tiêu hẹp, mức khó hơi vượt khả năng, phản hồi nhanh, và có sửa sai. Bốn điều kiện đó biến thành bốn quyết định thiết kế: buổi luyện phải có mục tiêu viết ra được; bài phải chọn ở vùng bạn giải được khoảng một nửa; phải có chấm bài hoặc stress test; và phải có nhật ký lỗi cùng bước upsolving. Lịch luyện nào thiếu một trong bốn thì tiêu tốn thời gian mà không đổi được gì.
+
+\section{Cấu trúc một buổi và một tuần}
+
+\emph{Một buổi 60 phút} có cấu trúc dùng được như sau: 10 phút ôn --- đọc lại nhật ký lỗi và một bảng active recall của chương đang học; 40 phút giải một bài ở vùng luyện, có bấm giờ; 10 phút cho bước bốn --- viết một câu về ý tưởng cốt lõi vào danh sách mẫu, và ghi nhật ký nếu sai. Tỉ lệ có thể xê dịch, nhưng đừng cắt 10 phút cuối: đó là phần biến một lần giải bài thành kiến thức dùng lại được.
+
+\emph{Một tuần} nên có ba loại buổi khác nhau, và sự xen kẽ này quan trọng hơn tổng số giờ. \emph{Buổi kiến thức:} đọc một mục của quyển sách này hoặc một chủ đề mới, rồi cài thử ngay và cho vào thư viện. \emph{Buổi bài tập:} ba tới năm bài cùng một chủ đề, để nhận diện thành phản xạ. \emph{Buổi thi:} một kỳ thi ảo tính giờ, xen kẽ nhiều chủ đề, kèm upsolving sau đó. Tỉ lệ hợp lý cho người mới là 2:3:1 mỗi tuần; càng về sau càng nghiêng về buổi thi.
+
+Về câu hỏi ``học kiến thức mới hay giải bài'', tỉ lệ thường dùng là khoảng một phần ba thời gian cho kiến thức mới và hai phần ba cho bài tập --- và tỉ lệ đó nên dịch dần về phía bài tập. Lý do: kiến thức không có nhu cầu đi kèm sẽ bay hết trong hai tuần, còn bài tập thì vừa củng cố cái cũ vừa lộ ra cái còn thiếu.
+
+\section{Bốn công cụ theo dõi}
+
+\emph{Nhật ký lỗi.} Ba dòng cho mỗi lần sai. Sau một tháng, phân loại chúng thành ba nhóm: hiểu sai đề, sai ý tưởng, sai cài đặt. Tỉ lệ ba nhóm nói cho bạn biết phải luyện gì --- và nó thường gây bất ngờ, vì phần lớn người học nghĩ mình yếu ý tưởng trong khi thực tế mất điểm nhiều nhất ở hai nhóm kia.
+
+\emph{Danh sách mẫu.} Mỗi bài giải xong, một câu tổng quát không nhắc đề bài. ``Khi tìm cực trị trên mọi đoạn, cố định điểm cuối và duy trì đáp án tốt nhất kết thúc tại đó.'' Sau vài tháng, danh sách này là tài sản có giá trị nhất bạn tích luỹ được, và nó chính là các \emph{khối tri thức} mà nghiên cứu về chuyên gia cờ vua mô tả (\ptr{A/02}).
+
+\emph{Lịch ôn ngắt quãng.} Với mỗi chủ đề đã học, ôn lại sau 1 ngày, 3 ngày, 1 tuần, 1 tháng. ``Ôn'' ở đây nghĩa là \emph{tự truy xuất}: che bảng active recall và tự trả lời, hoặc giải một bài cũ từ trang trắng --- không phải đọc lại.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[yscale=0.85,xscale=1.0]
+\draw[-{Latex[length=2.2mm]},thick,color=tiercol] (0,0) -- (11.2,0) node[right,font=\scriptsize] {thời gian};
+\foreach \x/\lab in {0.5/{học}, 1.4/{+1 ngày}, 3.0/{+3 ngày}, 5.4/{+1 tuần}, 9.4/{+1 tháng}}{
+  \draw[color=accent,very thick] (\x,-0.18) -- (\x,0.18);
+  \node[font=\scriptsize,color=accent,anchor=south,rotate=35] at (\x,0.25) {\lab};}
+\draw[domain=0.5:11,samples=100,smooth,very thick,color=steel]
+  plot (\x, {-1.5 + 1.5*exp(-(\x-0.5)/3.5)});
+\node[font=\scriptsize,color=steel,anchor=west,text width=4.6cm] at (5.6,-1.35)
+  {đường quên tự nhiên nếu không ôn};
+\node[font=\scriptsize,color=tiercol,anchor=west,text width=4.9cm] at (0.2,-2.4)
+  {Mỗi lần ôn phải là \emph{tự truy xuất} --- che bảng active recall và tự trả lời, hoặc giải lại một bài cũ từ trang trắng --- chứ không phải đọc lại.};
+\end{tikzpicture}
+\caption{Lịch ôn ngắt quãng. Các mốc đặt ở khoảng cách tăng dần vì trí nhớ được củng cố mạnh nhất khi việc truy xuất khó nhưng vẫn thành công: ôn quá sớm thì tốn công, ôn quá muộn thì phải học lại từ đầu.}
+\label{fig:spaced}
+\end{figure}
+
+\emph{Ba chỉ số tiến bộ.} Cảm giác chủ quan gần như luôn sai, nên hãy đo. Chỉ số một: tỉ lệ giải được ở một mức khó \emph{cố định} --- nếu mức khó cũng tăng thì bạn không so được. Chỉ số hai: thời gian trung bình để giải một bài ở mức bạn đã quen. Chỉ số ba, và là chỉ số tốt nhất: số bài bạn \emph{upsolve tới nơi tới chốn} mỗi tuần.
+
+\begin{cannho}
+Ba việc chiếm chưa tới mười phút mỗi buổi nhưng tạo ra phần lớn tiến bộ: viết một câu mẫu sau mỗi bài giải xong; ghi ba dòng nhật ký sau mỗi lần sai; và upsolve ít nhất một bài mỗi tuần \emph{từ trang trắng}. Nếu phải cắt lịch luyện vì bận, hãy cắt phần đọc kiến thức mới chứ đừng cắt ba việc này.
+\end{cannho}
+
+\section{Ba lộ trình theo mục tiêu}
+
+\subsection{Lộ trình 12 tuần --- chuẩn bị phỏng vấn}
+
+Giả định 8--10 giờ mỗi tuần. Mục tiêu: giải được một bài mức trung bình trong 35 phút với quy trình bảy bước ở \ptr{E/27}.
+
+\begin{center}\footnotesize
+\begin{tabularx}{\linewidth}{@{}L{1.9cm}L{4.6cm}Y@{}}
+\toprule
+\textbf{Tuần} & \textbf{Nội dung} & \textbf{Tiêu chí kiểm tra khách quan}\\
+\midrule
+1 & Chương \ptr{A/01}, \ptr{A/03}; mảng, hai con trỏ (\ptr{B/06}) & Thuộc bảng giới hạn \(\rightarrow\) độ phức tạp; giải 10 bài dễ\\
+2 & Băm, tập hợp (\ptr{B/08}); ngăn xếp, hàng đợi (\ptr{B/07}) & Nhận ra dạng cửa sổ trượt trong 2 phút; 12 bài\\
+3 & Sắp xếp, tìm kiếm nhị phân (\ptr{C/14}, \ptr{C/19}) & Viết nhị phân đúng từ trang trắng, có stress test\\
+4 & Cây và đệ quy (\ptr{B/09}); duyệt cây & 10 bài cây; viết được duyệt trước/giữa/sau không cần tra\\
+5 & Đồ thị: duyệt rộng, duyệt sâu (\ptr{C/17}) & Nhận ra bài đồ thị trá hình; 10 bài\\
+6 & Đồ thị: đường đi ngắn nhất, tô-pô & Chọn đúng thuật toán theo giả thiết trọng số\\
+7 & Quy hoạch động một chiều và ba lô (\ptr{C/16}) & Viết được năm bước ra giấy trước khi gõ, mọi bài\\
+8 & Quy hoạch động hai chuỗi và trên cây & 10 bài; tự phát hiện được trạng thái thiếu\\
+9 & Tham lam (\ptr{C/15}); heap & Chứng minh hoặc bác bỏ được tiêu chí bằng stress test\\
+10 & Ôn tập trộn chủ đề; \ptr{E/25} & 3 buổi thi ảo trộn chủ đề, mỗi buổi 2 bài trong 70 phút\\
+11 & Phỏng vấn thử theo cặp (\ptr{E/27}) & 4 buổi phỏng vấn thử; ghi âm và nghe lại\\
+12 & Ôn nhật ký lỗi và danh sách mẫu & Giải lại 10 bài cũ từ trang trắng, đạt trên 80\%\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Lưu ý về cách dùng bảng này: cột thứ ba mới là phần quan trọng. Một tuần ``xong'' không phải khi bạn đọc hết nội dung mà khi bạn đạt tiêu chí kiểm tra --- nếu chưa đạt thì kéo dài thêm vài ngày thay vì chạy tiếp.
+
+\subsection{Lộ trình 6 tháng --- thi đấu}
+
+Giả định 10--15 giờ mỗi tuần. Cấu trúc theo tháng: tháng 1--2 phủ phần B (cấu trúc dữ liệu) và các chương \ptr{C/13}--\ptr{C/16}; tháng 3--4 phủ \ptr{C/17}--\ptr{C/20} và \ptr{D/21}; tháng 5 phủ \ptr{B/10}, \ptr{B/12}, \ptr{D/22}; tháng 6 dành hoàn toàn cho thi ảo và upsolving.
+
+Mỗi tuần trong sáu tháng đó nên có: một kỳ thi ảo tính giờ; upsolving toàn bộ đề đó cho tới khi giải hết hoặc hiểu hết; và hai buổi chủ đề. Đây là nhịp mà phần lớn người tiến bộ nhanh đều theo, và điểm khác biệt của họ so với người luyện nhiều mà không tiến thường nằm ở chữ ``toàn bộ'' trong bước upsolving.
+
+\subsection{Nhịp duy trì --- người đi làm}
+
+Nếu mục tiêu là không quên và tiến chậm nhưng đều: một bài mỗi tuần ở vùng luyện, cộng một kỳ thi ảo mỗi tháng, cộng đọc lại danh sách mẫu mỗi tháng. Tổng khoảng hai giờ mỗi tuần. Điều quan trọng hơn khối lượng là tính liên tục --- và câu trả lời cho câu hỏi mở đầu thứ năm nằm ở đây: lộ trình đổ vỡ vì đặt mục tiêu theo ngày bận nhất chứ không theo ngày bình thường. Hãy đặt mức tối thiểu mà bạn chắc chắn làm được kể cả ngày tệ nhất, rồi làm thêm khi rảnh.
+
+\section{Ngân hàng bài tập}
+
+Phần này gom các bài theo chủ đề. Nguồn được ghi bằng tên bài để bạn tra; các tập bài được nhắc tới gồm CSES\cite{cses}, chuỗi bài quy hoạch động của AtCoder, và các bài kinh điển trên LeetCode. Cách dùng: chọn một chủ đề, làm theo thứ tự mức độ, và upsolve mọi bài không giải được trong 60 phút.
+
+\begin{baitap}[Ngân hàng --- Nền tảng và mảng (\ptr{B/06})]
+\bt[1]{Increasing Array, Missing Number, Repetitions}{CSES Introductory\cite{cses}}{Khởi động; luyện đọc đề và xử lý ca biên.}
+\bt[1]{Distinct Numbers, Apartments, Ferris Wheel}{CSES Sorting\cite{cses}}{Sắp xếp như nước đi mở đầu; hai con trỏ ở dạng đơn giản nhất.}
+\bt[2]{Sum of Two Values, Sum of Three Values, Sum of Four Values}{CSES Sorting\cite{cses}}{Ba mức của cùng một ý: cố định bớt biến rồi hai con trỏ hoặc băm.}
+\bt[2]{Maximum Subarray Sum, Subarray Sums I và II}{CSES Sorting\cite{cses}}{Tổng tiền tố; mẫu ``điều kiện đoạn thành điều kiện hai điểm mút''.}
+\bt[2]{Playlist, Traffic Lights, Room Allocation}{CSES Sorting\cite{cses}}{Cửa sổ trượt và tập hợp có thứ tự; kiểm tính đơn điệu trước khi cài.}
+\bt[3]{Subarray Divisibility, Subarray Distinct Values, Array Division}{CSES Sorting\cite{cses}}{Ba hướng khác nhau: modulo, cửa sổ, nhị phân trên đáp án.}
+\bt[3]{Trapping Rain Water, Longest Substring Without Repeating Characters}{LeetCode}{Hai bài phỏng vấn kinh điển; giải mỗi bài bằng hai cách.}
+\end{baitap}
+
+\begin{baitap}[Ngân hàng --- Ngăn xếp, hàng đợi, heap (\ptr{B/07})]
+\bt[1]{Valid Parentheses, Min Stack}{LeetCode}{Ngăn xếp cơ bản; chú ý ca dư ngoặc mở.}
+\bt[2]{Nearest Smaller Values}{CSES Sorting\cite{cses}}{Ngăn xếp đơn điệu chuẩn; viết bất biến trước.}
+\bt[2]{Sliding Window Maximum, Sliding Window Median}{LeetCode; CSES\cite{cses}}{Deque đơn điệu và hai heap; so hai công cụ.}
+\bt[2]{Josephus Problem I và II, Towers}{CSES Sorting\cite{cses}}{Cấu trúc phù hợp quyết định độ dài code.}
+\bt[3]{Largest Rectangle in Histogram, Maximal Rectangle}{LeetCode}{Ngăn xếp đơn điệu ở mức khó; bài thứ hai quy về bài thứ nhất.}
+\bt[3]{Tasks and Deadlines, Reading Books, Factory Machines}{CSES Sorting\cite{cses}}{Tham lam kèm heap và nhị phân trên đáp án.}
+\end{baitap}
+
+\begin{baitap}[Ngân hàng --- Truy vấn đoạn và DSU (\ptr{B/10}, \ptr{B/11})]
+\bt[1]{Static Range Sum Queries, Static Range Minimum Queries}{CSES Range Queries\cite{cses}}{Tổng tiền tố và sparse table; hiểu vì sao không hoán đổi được.}
+\bt[2]{Dynamic Range Sum Queries, Dynamic Range Minimum Queries, Range Xor Queries}{CSES Range Queries\cite{cses}}{Fenwick và cây phân đoạn; chú ý phần tử trung hoà.}
+\bt[2]{Range Update Queries, Hotel Queries, List Removals}{CSES Range Queries\cite{cses}}{Mảng hiệu, đi xuống trên cây, và cây chỉ số cho vị trí thứ \(k\).}
+\bt[2]{Road Construction, Road Reparation, Building Roads}{CSES Graph\cite{cses}}{DSU và cây khung nhỏ nhất; đếm số nhóm sau mỗi cạnh.}
+\bt[3]{Range Updates and Sums, Polynomial Queries, Subarray Sum Queries}{CSES Range Queries\cite{cses}}{Lazy propagation; bài cuối cần thiết kế phép gộp bốn giá trị.}
+\bt[3]{Distinct Values Queries, Salary Queries, Forest Queries II}{CSES Range Queries\cite{cses}}{Nén toạ độ, xử lý ngoại tuyến, và cấu trúc hai chiều.}
+\bt[3]{New Roads Queries, Dynamic Connectivity}{CSES Advanced\cite{cses}}{DSU với thời gian; kết hợp \ptr{B/10} và \ptr{B/11}.}
+\end{baitap}
+
+\begin{baitap}[Ngân hàng --- Quy hoạch động (\ptr{C/16})]
+\bt[1]{Frog 1, Frog 2, Vacation}{AtCoder Educational DP}{Ba bài nhập môn; viết đủ năm bước ra giấy.}
+\bt[1]{Dice Combinations, Minimizing Coins, Coin Combinations I và II}{CSES DP\cite{cses}}{Hai bài cuối khác nhau đúng ở thứ tự vòng lặp --- giải thích được vì sao.}
+\bt[2]{Knapsack 1, Knapsack 2, LCS}{AtCoder Educational DP}{Ba lô hai chiều và họ hai chuỗi; chú ý mẹo đảo vai trò ở Knapsack 2.}
+\bt[2]{Book Shop, Array Description, Edit Distance, Removal Game}{CSES DP\cite{cses}}{Bốn họ trạng thái khác nhau trong cùng một buổi.}
+\bt[2]{Grid 1, Coins, Sushi, Deque}{AtCoder Educational DP}{Đếm, xác suất, kỳ vọng, và trò chơi --- bốn kiểu mục tiêu.}
+\bt[3]{Increasing Subsequence, Projects, Elevator Rides, Counting Towers}{CSES DP\cite{cses}}{Tăng tốc bằng cấu trúc dữ liệu và quy hoạch động mặt nạ bit.}
+\bt[3]{Matching, Independent Set, Subtree, Grouping}{AtCoder Educational DP}{Mặt nạ bit và quy hoạch động trên cây, mức khó.}
+\bt[3]{Digit Sum, Permutation, Intervals, Tower}{AtCoder Educational DP}{Quy hoạch động trên chữ số và các bài cần sắp xếp trước khi quy hoạch động.}
+\end{baitap}
+
+\begin{baitap}[Ngân hàng --- Đồ thị (\ptr{C/17}, \ptr{C/18})]
+\bt[1]{Counting Rooms, Labyrinth, Building Teams}{CSES Graph\cite{cses}}{Duyệt rộng và duyệt sâu; truy vết đường đi.}
+\bt[2]{Message Route, Round Trip, Monsters}{CSES Graph\cite{cses}}{Duyệt rộng nhiều nguồn và phát hiện chu trình.}
+\bt[2]{Shortest Routes I và II, Flight Discount, High Score}{CSES Graph\cite{cses}}{Dijkstra, Floyd--Warshall, đồ thị nhiều tầng, và chu trình âm.}
+\bt[2]{Course Schedule, Longest Flight Route, Game Routes}{CSES Graph\cite{cses}}{Quy hoạch động theo thứ tự tô-pô.}
+\bt[3]{Planets and Kingdoms, Giant Pizza, Flight Routes Check}{CSES Graph\cite{cses}}{Thành phần liên thông mạnh và ứng dụng cho bài lôgic hai giá trị.}
+\bt[3]{Company Queries I và II, Distance Queries, Counting Paths}{CSES Tree\cite{cses}}{Nhảy nhị phân, tổ tiên chung, và kỹ thuật hiệu trên cây.}
+\bt[3]{Download Speed, Police Chase, School Dance, Distinct Routes}{CSES Graph\cite{cses}}{Luồng cực đại, lát cắt nhỏ nhất, ghép đôi, và truy vết đường.}
+\bt[3]{Necessary Roads, Necessary Cities}{CSES Advanced\cite{cses}}{Cầu và khớp; chú ý cạnh song song.}
+\end{baitap}
+
+\begin{baitap}[Ngân hàng --- Chuỗi, số học, hình học (\ptr{B/12}, \ptr{D/21}, \ptr{D/22})]
+\bt[1]{Word Combinations, String Matching}{CSES String\cite{cses}}{Trie và so khớp; làm bằng cả băm lẫn hàm Z.}
+\bt[2]{Finding Borders, Finding Periods, Longest Palindrome}{CSES String\cite{cses}}{Hàm tiền tố và Manacher.}
+\bt[3]{Distinct Substrings, Repeating Substring, Substring Order I}{CSES String\cite{cses}}{Mảng hậu tố và LCP; bài cuối là lý do rõ nhất để học chúng.}
+\bt[1]{Exponentiation, Counting Divisors}{CSES Math\cite{cses}}{Luỹ thừa nhanh và sàng lưu ước nhỏ nhất.}
+\bt[2]{Binomial Coefficients, Distributing Apples, Bracket Sequences I}{CSES Math\cite{cses}}{Tổ hợp modulo và mô hình chia kẹo.}
+\bt[3]{Fibonacci Numbers, Graph Paths I, Exponentiation II}{CSES Math\cite{cses}}{Luỹ thừa ma trận và định lý Euler cho số mũ lớn.}
+\bt[1]{Point Location Test, Polygon Area}{CSES Geometry\cite{cses}}{Vị từ định hướng và công thức dây giày, hoàn toàn số nguyên.}
+\bt[2]{Line Segment Intersection, Point in Polygon, Polygon Lattice Points}{CSES Geometry\cite{cses}}{Xử lý suy biến; kiểm bằng toạ độ nhỏ.}
+\bt[3]{Convex Hull, Minimum Euclidean Distance}{CSES Geometry\cite{cses}}{Quét đơn điệu và chia để trị.}
+\end{baitap}
+
+\begin{baitap}[Ngân hàng --- Tổng hợp và kỹ năng nghề]
+\bt[2]{Apple Division, Meet in the Middle}{CSES Introductory, Advanced\cite{cses}}{Duyệt tập con và gặp nhau ở giữa --- nhận ra qua giới hạn \(n\).}
+\bt[2]{Viết khung stress test và dùng nó tìm một phản ví dụ thật}{\ptr{E/25}}{Công cụ dùng lại cả đời; đây là bài tập có lợi ích lâu nhất.}
+\bt[2]{Xây thư viện mẫu sáu cấu trúc, mỗi cái có stress test}{\ptr{E/27}}{DSU, cây phân đoạn lazy, Dijkstra, luồng, hình học, số học modulo.}
+\bt[3]{Thi ảo một đề cũ, upsolve toàn bộ}{Codeforces / AtCoder}{Lặp lại hằng tuần; đây là nguồn tiến bộ chính.}
+\bt[3]{Chọn 10 bài đã giải và viết một câu mẫu cho mỗi bài}{Danh sách mẫu của bạn}{Kiểm tra: câu đó có dùng lại được cho bài khác không.}
+\bt[3]{Đọc mã nguồn một thư viện bạn dùng và tìm một thuật toán trong sách này}{\ptr{E/26}}{So bản kỹ thuật hoá với bản trong sách; ghi lại khác biệt.}
+\end{baitap}
+
+\section{Gốc rễ: vì sao lộ trình lại có hình dạng như vậy}
+
+Các lựa chọn thiết kế trong chương này không tuỳ tiện; mỗi cái đến từ một kết quả đã nhắc ở \ptr{A/02}.
+
+Việc \emph{xen kẽ chủ đề} thay vì học tuần tự từng khối đến từ một phát hiện lặp lại trong nghiên cứu về học tập: luyện xen kẽ nhiều loại bài cho kết quả kém hơn khi đo ngay sau buổi tập, nhưng tốt hơn rõ rệt khi đo sau vài tuần. Lý do là luyện tuần tự cho phép bạn dùng cùng một phương pháp cho cả loạt bài mà không phải \emph{chọn} phương pháp --- và chọn phương pháp mới là kỹ năng cần cho bài thật. Đây cũng là lý do mục 1 khuyên có buổi thi trộn chủ đề mỗi tuần.
+
+Việc \emph{ôn ngắt quãng} đến từ một quan sát còn cổ hơn: trí nhớ được củng cố mạnh nhất khi việc truy xuất là khó nhưng vẫn thành công --- tức là ngay trước lúc sắp quên. Ôn quá sớm thì tốn công mà không thêm gì; ôn quá muộn thì phải học lại. Các khoảng cách tăng dần là cách xấp xỉ thực dụng cho điều đó.
+
+Việc đặt \emph{upsolving} làm trung tâm đến từ cơ chế đã giải thích ở \ptr{A/02}: trong lúc vật lộn, bạn tạo ra những lỗ hổng rất cụ thể trong hiểu biết, và thông tin mới chỉ dính khi có lỗ hổng để lấp. Đó cũng là lý do chỉ số tiến bộ tốt nhất không phải số bài đã đọc lời giải mà là số bài đã upsolve tới nơi.
+
+Cuối cùng, việc đặt \emph{mức tối thiểu rất thấp} cho nhịp duy trì đến từ một quan sát thực dụng chứ không phải nghiên cứu: lộ trình hỏng không phải vì người ta lười mà vì họ thiết kế cho ngày lý tưởng. Một lịch đòi hai giờ mỗi ngày sẽ đứt ở tuần thứ ba, và cái đứt đó tốn hơn nhiều so với việc chỉ làm ba mươi phút. Tính liên tục có giá trị kép: nó giữ trí nhớ, và nó giữ thói quen --- thứ khó xây lại hơn kiến thức.
+
+\begin{gocre}
+\gr{Nghiên cứu về luyện xen kẽ}{Học tuần tự từng khối cho cảm giác tiến nhanh hơn.}{Xen kẽ kém hơn khi đo ngay, tốt hơn khi đo sau vài tuần --- vì nó buộc bạn \emph{chọn} phương pháp, kỹ năng cần cho bài thật.}
+\gr{Nghiên cứu về ôn ngắt quãng}{Ôn lại ngay thì tốn công, ôn muộn thì phải học lại.}{Củng cố mạnh nhất khi truy xuất khó nhưng vẫn thành công; khoảng cách tăng dần là cách xấp xỉ thực dụng.}
+\gr{1993 --- Ericsson và cộng sự}{Vì sao cùng số giờ mà người tiến người không.}{Bốn điều kiện của luyện có chủ đích; toàn bộ thiết kế của chương này suy ra từ đó (\ptr{A/02}).}
+\gr{Văn hoá thi đấu hiện đại}{Người luyện nhiều mà không tiến.}{Upsolving tới nơi tới chốn thành chuẩn; số bài upsolve là chỉ số tốt hơn số bài đã xem lời giải.}
+\gr{Kinh nghiệm thực tế về duy trì thói quen}{Lộ trình đổ vỡ sau vài tuần.}{Đặt mức tối thiểu theo ngày tệ nhất chứ không theo ngày lý tưởng; tính liên tục quý hơn khối lượng.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Thể thao}{Chu kỳ hoá: xen kẽ khối lượng, cường độ và phục hồi}{Cấu trúc ba loại buổi mỗi tuần chính là chu kỳ hoá thu nhỏ. Cùng bài học: cường độ cao liên tục không bền, và nghỉ là một phần của kế hoạch chứ không phải sự thất bại.}
+\lh{Âm nhạc}{Tập chậm từng đoạn khó, rồi ghép}{Buổi chủ đề tương ứng với tập đoạn khó; buổi thi ảo tương ứng với chơi cả bản. Thiếu loại thứ hai thì bạn giỏi từng đoạn mà không chơi được cả bài.}
+\lh{Y khoa, hàng không}{Rà soát sau ca / sau chuyến bay}{Nhật ký lỗi là bản cá nhân của các quy trình đó. Điểm mạnh của bản thể chế: nó bắt buộc và không phụ thuộc tâm trạng --- điều bạn có thể bắt chước bằng cách gắn nó vào cuối mỗi buổi.}
+\lh{Học máy}{Học theo chương trình, dừng sớm, chọn mẫu khó}{Vùng luyện tương ứng với việc chọn mẫu có gradient hữu ích: quá dễ thì không học được gì, quá khó thì tín hiệu nhiễu. Khác biệt: bạn tự chọn được bài, mô hình thì không.}
+\lh{Quản lý công việc}{Mục tiêu đo được, mốc kiểm tra định kỳ}{Cột ``tiêu chí kiểm tra khách quan'' trong bảng lộ trình chính là điều này. Không có tiêu chí thì ``xong một tuần'' trở thành ``đã đọc hết'', vốn không đo được gì.}
+\lh{Nghiên cứu khoa học}{Sổ thí nghiệm, bình duyệt}{Danh sách mẫu là sổ ghi kết quả; thứ người tự học thiếu nhất là bình duyệt, và thay thế gần nhất là viết editorial công khai hoặc luyện theo cặp.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Vì ``nhiều'' thường có nghĩa là nhiều bài \emph{vừa sức}, mà vừa sức thì không tạo ra sai lệch dự đoán để học. Nó còn khuyến khích một thói quen tệ: đọc lời giải sớm để kịp chỉ tiêu số bài. Điều kiện đúng gồm bốn phần --- mục tiêu hẹp, mức hơi quá sức, phản hồi nhanh, có sửa sai --- và ``giải nhiều'' chỉ thoả phần cuối một cách hình thức. Chỉ số tốt hơn là số bài bạn giải xong \emph{sau khi đã bí}.}
+\tl{10 phút ôn (đọc nhật ký lỗi và một bảng active recall), 40 phút giải một bài ở vùng luyện có bấm giờ, 10 phút cho bước bốn --- viết một câu mẫu và ghi nhật ký nếu sai. Nếu phải cắt, hãy cắt phần đọc kiến thức mới chứ đừng cắt 10 phút cuối, vì đó là phần biến một lần giải bài thành thứ dùng lại được. Và quan trọng hơn tỉ lệ là tính đều đặn: một giờ mỗi ngày trong sáu tháng hơn hẳn tám giờ mỗi cuối tuần.}
+\tl{Bằng ba chỉ số đo được. Tỉ lệ giải được ở một mức khó \emph{cố định} --- điểm mấu chốt là mức phải cố định, nếu không bạn đang so hai thứ khác nhau. Thời gian trung bình cho một bài ở mức đã quen. Và số bài upsolve tới nơi mỗi tuần, chỉ số tốt nhất trong ba cái. Cảm giác chủ quan sai theo cả hai chiều: sau một buổi trôi chảy bạn thấy mình giỏi lên, còn khi gặp một chủ đề mới bạn thấy mình tệ đi --- cả hai đều không phản ánh tiến bộ thật.}
+\tl{Khoảng một phần ba cho kiến thức mới, hai phần ba cho bài tập, và tỉ lệ nên dịch dần về phía bài tập theo thời gian. Lý do: kiến thức không có nhu cầu đi kèm sẽ bay hết trong hai tuần, còn bài tập vừa củng cố cái cũ vừa lộ ra cái còn thiếu --- nên nó tự dẫn bạn tới nội dung cần học tiếp. Ngoại lệ: khi bắt đầu một chủ đề hoàn toàn mới, hãy dành nguyên một buổi cho kiến thức rồi cài thử ngay trong buổi đó.}
+\tl{Vì phần lớn lộ trình được thiết kế cho ngày lý tưởng chứ không cho ngày bận nhất. Một lịch đòi hai giờ mỗi ngày sẽ đứt ở tuần thứ ba, và cái đứt đó tốn hơn nhiều so với việc chỉ làm ba mươi phút mỗi ngày --- vì xây lại thói quen khó hơn giữ nó. Cách thiết kế chống lại điều đó gồm ba phần: đặt mức tối thiểu mà bạn chắc chắn làm được kể cả ngày tệ nhất; làm cho tiến bộ nhìn thấy được bằng một bảng đánh dấu; và gắn buổi luyện vào một khung giờ cố định thay vì ``khi nào rảnh''.}
+\end{traloi}
+
+\begin{dongian}
+Sau khi gấp sách lại, câu hỏi duy nhất còn lại là sáng mai làm gì. Câu trả lời gọn thế này.
+
+Mỗi buổi luyện, hãy dành mười phút đầu nhìn lại những lỗi cũ của mình, bốn mươi phút giải một bài đủ khó để bạn phải vật lộn, và mười phút cuối ghi lại hai thứ: ý chính của bài vừa giải viết thành một câu không nhắc tới đề bài, và nếu có sai thì sai vì sao. Mười phút cuối là phần dễ bị cắt nhất và cũng là phần tạo ra phần lớn tiến bộ.
+
+Mỗi tuần, hãy có một buổi làm bài trộn nhiều chủ đề, có bấm giờ, như thi thật. Lý do: khi bạn luyện một chủ đề liên tiếp, bạn không phải \emph{chọn} phương pháp --- bạn biết trước bài này là quy hoạch động. Bài thật không nói cho bạn biết điều đó, nên kỹ năng chọn phải luyện riêng.
+
+Và sau mỗi lần bí, hãy quay lại làm cho xong chứ đừng chỉ đọc lời giải rồi gật đầu. Cảm giác ``à hoá ra thế'' rất dễ nhầm với việc đã học được. Phép thử duy nhất đáng tin là đóng lời giải lại và tự viết từ trang trắng.
+
+Cuối cùng, về khối lượng: đừng lên kế hoạch cho ngày đẹp trời. Hãy chọn một mức nhỏ mà bạn chắc chắn làm được kể cả hôm mệt nhất --- ba mươi phút cũng được --- rồi làm thêm khi rảnh. Lộ trình hỏng gần như luôn vì lý do này, chứ không phải vì thiếu tài liệu hay thiếu bài tập.
+\motcau{Tiến bộ đến từ những bài bạn giải xong \emph{sau khi} đã bí, không phải từ những bài bạn đọc lời giải.}
+\chuadongian{Không có lịch luyện nào đúng cho mọi người; ba lộ trình ở đây là điểm xuất phát để bạn sửa theo dữ liệu của chính mình.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Bốn điều kiện chi phối mọi lịch luyện}{Mục tiêu hẹp; mức hơi quá sức; phản hồi nhanh; có sửa sai. Thiếu một thì thời gian trôi mà năng lực đứng.}
+\ar[3]{Cấu trúc một buổi 60 phút}{10 phút ôn \(+\) 40 phút giải bài có bấm giờ \(+\) 10 phút viết câu mẫu và ghi nhật ký. Đừng cắt 10 phút cuối.}
+\ar[3]{Ba loại buổi trong tuần}{Buổi kiến thức, buổi bài tập cùng chủ đề, buổi thi ảo trộn chủ đề. Tỉ lệ khởi đầu 2:3:1, dịch dần về phía thi.}
+\ar[3]{Vì sao phải trộn chủ đề}{Luyện tuần tự thì bạn không phải \emph{chọn} phương pháp; bài thật không cho biết trước nên kỹ năng chọn phải luyện riêng.}
+\ar[3]{Bốn công cụ theo dõi}{Nhật ký lỗi; danh sách mẫu; lịch ôn ngắt quãng (1 ngày, 3 ngày, 1 tuần, 1 tháng); ba chỉ số tiến bộ.}
+\ar[3]{Ba chỉ số tiến bộ}{Tỉ lệ giải được ở mức khó \emph{cố định}; thời gian trung bình ở mức đã quen; số bài upsolve tới nơi mỗi tuần (tốt nhất).}
+\ar[2]{Phân loại nhật ký lỗi}{Hiểu sai đề / sai ý tưởng / sai cài đặt. Tỉ lệ ba nhóm quyết định bạn nên luyện gì, và nó thường gây bất ngờ.}
+\ar[2]{Tỉ lệ kiến thức và bài tập}{Khoảng 1:2, dịch dần về phía bài tập; kiến thức không có nhu cầu đi kèm sẽ quên trong hai tuần.}
+\ar[2]{Ôn nghĩa là gì}{Tự truy xuất --- che bảng active recall và tự trả lời, hoặc giải lại từ trang trắng. \emph{Không} phải đọc lại.}
+\ar[2]{Vì sao lộ trình đổ vỡ}{Thiết kế cho ngày lý tưởng thay vì ngày bận nhất. Đặt mức tối thiểu theo ngày tệ nhất, làm thêm khi rảnh.}
+\ar[2]{Tiêu chí ``xong một tuần''}{Không phải đọc hết nội dung mà là đạt tiêu chí kiểm tra khách quan; chưa đạt thì kéo dài thay vì chạy tiếp.}
+\ar[1]{Nhịp duy trì cho người đi làm}{Một bài mỗi tuần ở vùng luyện, một kỳ thi ảo mỗi tháng, đọc lại danh sách mẫu mỗi tháng --- khoảng hai giờ mỗi tuần.}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Tôi nên bắt đầu từ chương nào nếu đã biết cơ bản?}{Đọc \ptr{A/01} và \ptr{A/02} trước, dù đã biết --- chúng quyết định cách bạn dùng phần còn lại. Sau đó vào thẳng phần C: \ptr{C/15}, \ptr{C/16}, \ptr{C/17}, \ptr{C/19} là bốn chương có tỉ lệ ứng dụng cao nhất. Quay lại phần B khi một bài đòi hỏi một cấu trúc bạn chưa vững, và đọc \ptr{E/25} sớm vì stress test là công cụ bạn nên có ngay từ đầu.}
+\qa{Làm sao chọn được bài ở đúng vùng luyện?}{Dùng hệ thống phân loại độ khó của nền tảng bạn dùng và chọn mức mà bạn giải được khoảng một nửa. Kiểm tra định kỳ: nếu ba buổi liên tiếp bạn giải hết trong dưới 15 phút thì nâng mức; nếu hai buổi liên tiếp không giải được gì và đọc lời giải vẫn mù mờ thì hạ. Với các tập bài có thứ tự như CSES\cite{cses}, cứ đi tuần tự trong một chủ đề cũng đủ tạo độ khó tăng dần.}
+\qa{Tôi quên hết những gì đã học ba tháng trước. Làm sao?}{Đó là hiện tượng bình thường và có cách chữa cụ thể: ôn ngắt quãng bằng \emph{truy xuất} chứ không phải đọc lại. Mỗi tuần, dành mười phút giải lại một bài cũ ngẫu nhiên từ trang trắng và che bảng active recall của một chương cũ để tự trả lời. Nếu bạn có danh sách mẫu, việc đọc lại nó mỗi tháng cũng rất hiệu quả vì mỗi câu mẫu là một khoá gợi nhớ cho cả một nhóm bài.}
+\qa{Nên dùng một ngôn ngữ hay nhiều ngôn ngữ?}{Một, và thành thạo nó. Trong thi đấu, việc gõ nhanh và không phải nghĩ về cú pháp là lợi thế thật; trong phỏng vấn, sự lúng túng về ngôn ngữ làm mất thời gian quý. Học ngôn ngữ thứ hai khi có lý do cụ thể --- công việc yêu cầu, hoặc bạn cần một tính năng mà ngôn ngữ hiện tại không có. Điều đáng đầu tư hơn là hiểu sâu các cấu trúc dữ liệu chuẩn của ngôn ngữ bạn dùng, kể cả hằng số và hành vi ở trường hợp biên.}
+\qa{Tôi luyện một mình, không có ai đánh giá. Thay thế thế nào?}{Ba thứ thay thế được phần lớn vai trò của người hướng dẫn. Chấm bài tự động cho phản hồi đúng/sai tức thì. Stress test cho phản hồi \emph{ở đâu} sai (\ptr{E/25}). Và việc viết editorial công khai hoặc giải thích cho người khác cho phản hồi về việc bạn có thực sự hiểu không --- chỗ bạn viết không trôi chính là chỗ bạn chưa hiểu. Nếu tìm được một bạn luyện cùng để phỏng vấn thử lẫn nhau thì đó là bổ sung có giá trị nhất.}
+\qa{Bao lâu thì thấy tiến bộ rõ rệt?}{Với nhịp 8--10 giờ mỗi tuần và luyện đúng cách, phần lớn người thấy khác biệt rõ sau khoảng 8--12 tuần --- đủ để nâng một bậc độ khó. Nhưng có một giai đoạn khó chịu ở khoảng tuần thứ ba tới thứ sáu, khi bạn đã biết nhiều hơn nhưng chưa nhận diện đủ nhanh, nên cảm giác không tiến. Đó là lúc các chỉ số đo được ở mục 2 có giá trị nhất: chúng cho thấy tiến bộ mà cảm giác chưa thấy.}
+\qa{Sau khi đọc hết quyển sách này thì đọc gì tiếp?}{Chọn theo mục tiêu, và chỉ một quyển làm trục chính. Muốn nhận diện bài toán rộng hơn: sách của Skiena\cite{skiena2020}, đặc biệt nửa danh mục. Muốn học cách \emph{thiết kế} thuật toán: Kleinberg--Tardos\cite{kleinberg2006}. Muốn thi đấu: Laaksonen\cite{laaksonen2017} và các bài tập kèm theo. Muốn đi sâu về chứng minh và đệ quy: Erickson\cite{erickson2019}. Và quan trọng hơn mọi quyển sách: duy trì nhịp giải bài, vì đọc thêm mà không giải thì chỉ tăng cảm giác quen thuộc.}
+\end{hoidap}
+
+\section*{Kết chương và kết sách}
+
+Quyển sách này bắt đầu bằng một quan sát ở chương \ptr{A/01}: khi bạn bí, cái thiếu hầu như không bao giờ là một thuật toán chưa từng nghe tên, mà là một quy trình để chạy khi chưa biết làm gì. Hai mươi tám chương sau, quy trình đó đã được cụ thể hoá: bốn bước để đối mặt với bài lạ, hai thước đo để tự chấm ý tưởng, một kho cấu trúc dữ liệu chọn theo thao tác cần làm rẻ, tám khuôn tư duy để sinh lời giải, một ý thức về giới hạn để biết khi nào nên dừng, và một bộ kỹ năng nghề để đưa ý tưởng thành chương trình chạy được.
+
+Nhưng phần quyết định không nằm trong sách. Nó nằm ở việc bạn có mở một bài ra vào sáng mai hay không, có viết một câu mẫu sau khi giải xong hay không, và có quay lại làm cho xong bài mình đã bí hay không. Ba việc đó tốn mười phút mỗi ngày và chúng là toàn bộ khác biệt giữa người đọc xong một quyển sách và người giỏi lên.
+
+Chúc bạn luyện đều, bí nhiều, và mỗi lần bí đều học được một điều mới.
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

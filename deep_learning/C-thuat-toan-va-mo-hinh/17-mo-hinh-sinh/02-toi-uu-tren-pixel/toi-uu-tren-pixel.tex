@@ -1,0 +1,250 @@
+% ---------------------------------------------------------------------------
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: C/17-mo-hinh-sinh/01; C/12-co-che-huan-luyen/01-co-hoc-cua-gradient
+%  Mức độ: cốt lõi — ý tưởng cắt ngang, dùng lại ở chương 25
+% ---------------------------------------------------------------------------
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Tối ưu trên pixel thay vì trên trọng số (Optimizing Pixels, Not Weights)}
+\ptrtarget{C/17-mo-hinh-sinh/02}\ptrtarget{C/17-mo-hinh-sinh/02-toi-uu-tren-pixel}\ptrtarget{C/17/02}\ptrtarget{C/17/02-toi-uu-tren-pixel}
+\dependency{\ptr{C/12-co-che-huan-luyen/01-co-hoc-cua-gradient} (gradient chảy về đâu là do ta chọn); \ptr{C/17-mo-hinh-sinh/01-bon-ho-mo-hinh-sinh} (hàm mất mát quyết định kiểu thất bại); \ptr{C/13-kien-truc-backbone/01-dong-cnn} (bản đồ đặc trưng theo tầng).}
+
+\begin{tomtat}
+Có một ý tưởng đơn giản nối liền năm kỹ thuật trông chẳng liên quan gì tới nhau: đóng băng một mạng đã huấn luyện, coi \emph{ảnh} là biến cần tối ưu, rồi hạ gradient trên chính pixel. Đổi hàm mục tiêu là được một kỹ thuật khác --- đảo ngược đặc trưng, DeepDream, trực quan hoá lớp, mẫu đối kháng, và chuyển phong cách. Đọc xong bạn viết được cả năm bằng cùng một vòng lặp mười dòng, và hiểu vì sao chuyển phong cách phiên bản tiến thẳng là ví dụ sạch nhất của mẫu hình ``đẩy chi phí từ lúc chạy sang lúc huấn luyện''. Nếu chỉ nhớ một điều: tối ưu trên pixel tìm ra đúng những hướng mà mạng và mắt người \emph{bất đồng}; khi hai bên tình cờ đồng ý ta gọi kết quả là nghệ thuật, khi bất đồng ta gọi nó là mẫu đối kháng --- cùng một cơ chế.
+\end{tomtat}
+
+\begin{nentang}
+\kn{lan truyền ngược (backpropagation)}{thuật toán tính đạo hàm của một đại lượng đầu ra theo mọi nút của một đồ thị tính toán khả vi. Nó không phân biệt ``tham số'' với ``dữ liệu'' --- đó là tiền đề của cả mục này.}
+\kn{bản đồ đặc trưng (feature map)}{tensor đầu ra của một tầng tích chập: một chồng ``ảnh'' nhỏ hơn, mỗi kênh phản ứng với một loại mẫu hình thị giác.}
+\kn{đóng băng (freeze)}{đặt cờ không tính gradient cho trọng số của một mạng, để nó chỉ còn đóng vai một hàm chấm điểm cố định.}
+\kn{ma trận Gram}{ma trận tích trong giữa các kênh của một bản đồ đặc trưng, cộng dồn trên mọi vị trí không gian; nó mô tả ``kênh nào hay bật cùng kênh nào'' mà bỏ hẳn thông tin vị trí.}
+\kn{mẫu đối kháng (adversarial example)}{ảnh bị thêm một nhiễu rất nhỏ, mắt người không thấy, nhưng đủ để mạng phân loại sai hoàn toàn.}
+\kn{hàm mục tiêu (objective function)}{toàn bộ đại lượng được tối ưu, gồm phần đo sai lệch (\vn{hàm mất mát}{loss function}) cộng các số hạng chính quy hoá. Mục này dùng đúng từ ``hàm mục tiêu'' vì phần chính quy hoá ở đây quyết định kết quả không kém phần đo sai lệch.}
+\kn{chính quy hoá (regularization)}{phần cộng thêm vào hàm mục tiêu để loại bỏ các nghiệm ``đúng về số nhưng vô lý về mặt ảnh'', ví dụ phạt biến thiên toàn phần để ép ảnh mượt.}
+\kn{feed-forward (tiến thẳng)}{chạy dữ liệu qua mạng đúng một lần từ đầu tới cuối, không lặp --- đối lập với một vòng tối ưu nhiều trăm bước.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Trong huấn luyện thông thường, dữ liệu là hằng số và trọng số là ẩn số: ta cố định ảnh, tính gradient của hàm mất mát theo trọng số, rồi cập nhật trọng số. Nhưng \vn{lan truyền ngược}{backpropagation} không quan tâm ta gọi cái gì là ẩn số --- nó tính đạo hàm dọc theo một đồ thị khả vi, và đồ thị đó có đầu vào cũng là một nút. Vậy hoàn toàn có thể làm ngược lại: cố định trọng số, tính gradient theo \emph{pixel đầu vào}, rồi cập nhật ảnh.
+
+Câu hỏi thú vị không phải ``làm được không'' mà ``để làm gì''. Câu trả lời: một mạng đã huấn luyện là một hàm chấm điểm ngầm định của thế giới thị giác --- nó đã học được cái gì là mèo, cái gì là hoa văn, cái gì là biên. Tối ưu trên pixel là cách ép hàm chấm điểm đó \emph{nói ra} thứ nó biết, dưới dạng một bức ảnh. Hình~\ref{fig:gradient-di-dau} là toàn bộ sự khác biệt, vẽ trong một hình.
+
+\textbf{Học mục này thì làm được gì mà trước đó không làm được?} Bốn việc: cài chuyển phong cách, DeepDream, trực quan hoá lớp và tấn công đối kháng bằng cùng một đoạn code; giải thích được vì sao ma trận Gram bắt được ``phong cách''; nhận ra mẫu hình dời chi phí sang lúc huấn luyện khi gặp lại nó ở \vn{chưng cất tri thức}{knowledge distillation}; và có một công cụ chẩn đoán mạnh --- muốn biết mạng của bạn thật sự nhìn cái gì, hãy tối ưu một ảnh làm nó phát điên rồi nhìn ảnh đó.
+
+\begin{figure}[H]\centering
+\resizebox{0.93\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  n/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\scriptsize,minimum height=8mm},
+  fz/.style={draw=tiercol,fill=white,rounded corners=2pt,inner sep=4pt,align=center,font=\scriptsize,minimum height=8mm},
+  vr/.style={draw=reddark,fill=redbg,rounded corners=2pt,inner sep=4pt,align=center,font=\scriptsize,minimum height=8mm},
+  fw/.style={-{Stealth[length=4pt]},steel,thick},
+  bw/.style={-{Stealth[length=4pt]},reddark,thick,dashed}]
+% panel a
+\node[font=\scriptsize\bfseries,inkblue] at (2.4,1.5) {(a) Huấn luyện thông thường};
+\node[fz] (x1) at (0,0.5) {ảnh\\ \emph{cố định}};
+\node[vr] (w1) at (2.4,0.5) {mạng\\ \textbf{trọng số là ẩn}};
+\node[n] (l1) at (4.8,0.5) {hàm\\ mất mát};
+\draw[fw] (x1) -- (w1); \draw[fw] (w1) -- (l1);
+\draw[bw] (l1) to[bend right=32] node[below,font=\scriptsize,reddark]{gradient dừng ở trọng số} (w1);
+% panel b
+\node[font=\scriptsize\bfseries,inkblue] at (10.4,1.5) {(b) Tối ưu trên pixel};
+\node[vr] (x2) at (8.0,0.5) {ảnh\\ \textbf{là ẩn}};
+\node[fz] (w2) at (10.4,0.5) {mạng\\ \emph{đóng băng}};
+\node[n] (l2) at (12.8,0.5) {hàm\\ mục tiêu};
+\draw[fw] (x2) -- (w2); \draw[fw] (w2) -- (l2);
+\draw[bw] (l2) to[bend right=28] (w2);
+\draw[bw] (w2) to[bend right=28] node[below,font=\scriptsize,reddark]{gradient chảy tiếp về tận pixel} (x2);
+\end{tikzpicture}}
+\caption{Cùng một đồ thị khả vi, hai cách dùng. Lan truyền ngược không phân biệt ``dữ liệu'' với ``tham số'' --- nó chỉ tính đạo hàm dọc đồ thị; việc chọn nút nào là biến tối ưu hoàn toàn nằm ở người viết. Đây là lý do năm kỹ thuật ở Bảng~\ref{tab:nam-ung-dung} dùng chung một đoạn code.}
+\lk{C/12/01}{trường hợp riêng của}{tối ưu trên pixel chỉ là lan truyền ngược chạy tới tận nút đầu vào thay vì dừng ở nút tham số.}
+\label{fig:gradient-di-dau}
+\end{figure}
+
+\begin{trucgiac}
+Hãy hình dung mạng đã huấn luyện là một giám khảo hội hoạ rất nhất quán nhưng không biết nói --- ông ta chỉ chấm điểm, không giải thích. Tối ưu trên pixel là điêu khắc một bức tượng bằng cách liên tục hỏi ``sửa chỗ nào thì điểm tăng'' rồi sửa đúng chỗ đó. Bức tượng cuối cùng phản ánh chính xác thứ mà giám khảo quan tâm --- kể cả những thứ vô lý mà ông ta quan tâm nhưng con người thì không. Khi những thứ đó trùng với thẩm mỹ của ta, ta gọi kết quả là chuyển phong cách; khi chúng lệch hẳn, ta gọi kết quả là mẫu đối kháng.
+\end{trucgiac}
+
+\subsection{B. Một vòng lặp, năm kỹ thuật}
+Vòng lặp chung ngắn tới mức viết ra được trọn vẹn:
+
+\begin{lstlisting}[style=py]
+# Dong bang mang; bien toi uu la anh, khong phai net.parameters()
+for p in net.parameters():
+    p.requires_grad_(False)
+x = init_image.clone().requires_grad_(True)
+opt = torch.optim.LBFGS([x])
+def step():
+    opt.zero_grad()
+    loss = objective(net, x)   # doi objective -> doi ky thuat
+    loss.backward()            # gradient chay ve tan x
+    return loss
+for _ in range(300):
+    opt.step(step)
+\end{lstlisting}
+
+Chỉ dòng \code{objective} thay đổi giữa năm kỹ thuật ở Bảng~\ref{tab:nam-ung-dung}. Đây không phải một sự trùng hợp thú vị mà là một bài học về cách đọc tài liệu: khi năm phương pháp chia chung một khung, học khung rẻ hơn học năm phương pháp gấp nhiều lần.
+
+\begin{table}[H]\centering\small
+\caption{Năm kỹ thuật cùng một vòng lặp, khác nhau đúng ở hàm mục tiêu.}
+\label{tab:nam-ung-dung}
+\begin{tabularx}{\linewidth}{@{}L{2.5cm}YY@{}}
+\toprule
+\textbf{Kỹ thuật} & \textbf{Hàm mục tiêu} & \textbf{Nó tiết lộ điều gì / hỏng khi nào}\\
+\midrule
+Đảo ngược đặc trưng & Khớp bản đồ đặc trưng của một ảnh mục tiêu ở một tầng & Tầng càng sâu càng mất thông tin vị trí; ảnh khôi phục ngày càng ``đúng nội dung, sai bố cục''\\
+DeepDream & Cực đại hoá chuẩn của activation ở một tầng & Cho thấy tầng đó thích hoa văn gì; kết quả lặp lại một mô-típ tới mức bệnh hoạn\\
+Trực quan hoá lớp & Cực đại hoá điểm số của một lớp \(+\) phạt chính quy hoá & Không có phạt thì ra nhiễu có điểm số cao --- bằng chứng trực tiếp rằng mạng không nhìn như người\\
+Mẫu đối kháng & Giảm điểm số lớp đúng với ràng buộc \(\lVert\delta\rVert\) nhỏ & Tồn tại nhiễu vô hình đổi hẳn dự đoán; đây là chế độ hỏng của \emph{mọi} mạng, không phải của một mạng kém\\
+Chuyển phong cách & Nội dung ở tầng sâu \(+\) thống kê phong cách ở nhiều tầng nông & Phong cách nắm được là \emph{kết cấu}, không phải bố cục hay ngữ nghĩa\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{C. Neural Style Transfer: vì sao ma trận Gram lại là ``phong cách''}
+Bài toán của Gatys: giữ \emph{nội dung} của ảnh A và \emph{phong cách} của ảnh B \cite{gatys2016style}. Nội dung dễ định nghĩa --- bản đồ đặc trưng ở một tầng sâu, vì tầng sâu giữ ``có gì ở đâu'' mà bỏ bớt chi tiết bề mặt. Phong cách mới là chỗ khó: nó phải là thứ mô tả ``chất'' của bức tranh mà không mô tả nội dung, tức là phải \emph{độc lập với vị trí}.
+
+Lời giải là \vn{ma trận Gram}{Gram matrix}. Gọi \(F \in \mathbb{R}^{C\times N}\) là bản đồ đặc trưng của một tầng, với \(C\) kênh và \(N\) vị trí không gian; đặt \(G = FF^{\!\top}\), tức \(G_{ij} = \sum_{p} F_{ip}F_{jp}\). \emph{Công thức này nói gì:} \(G_{ij}\) đo mức độ hai kênh \(i\) và \(j\) cùng bật lên tại cùng một vị trí, cộng dồn trên toàn ảnh --- nó là thống kê \emph{đồng xuất hiện} của các đặc trưng, và phép cộng dồn trên \(p\) đã vứt bỏ hoàn toàn thông tin vị trí.
+
+\textbf{Tính tay trên ma trận \(2\times 2\).} Hai kênh, hai vị trí:
+\[
+F=\begin{pmatrix}1&0\\0&2\end{pmatrix}
+\;\Rightarrow\;
+G=FF^{\!\top}=\begin{pmatrix}1&0\\0&4\end{pmatrix},
+\qquad
+F'=\begin{pmatrix}0&1\\2&0\end{pmatrix}
+\;\Rightarrow\;
+G'=\begin{pmatrix}1&0\\0&4\end{pmatrix}.
+\]
+Đổi chỗ hai vị trí không gian mà \(G\) không đổi. Đó vừa là sức mạnh --- ``phong cách'' đúng là thứ không phụ thuộc chỗ đặt --- vừa là giới hạn: \emph{Gram không phân biệt được bố cục}. Nó nắm được kết cấu nét cọ, bảng màu, độ thô của hạt; nó không nắm được ``chân dung thì mắt ở trên miệng''. Mọi thất bại quen thuộc của chuyển phong cách đều suy ra từ đây: khuôn mặt bị loang màu, bầu trời mọc nét cọ ở giữa mặt người, cấu trúc lớn của tranh gốc biến mất.
+
+Hình~\ref{fig:gram-bat-bien} vẽ đúng phép tính đó.
+
+\begin{figure}[H]\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  cell/.style={draw=tiercol,minimum size=0.62cm,inner sep=0pt,font=\scriptsize},
+  ar/.style={-{Stealth[length=4pt]},steel,thick}]
+% F goc
+\node[font=\scriptsize\bfseries,inkblue] at (0.62,1.35) {\(F\) (2 kênh \(\times\) 2 vị trí)};
+\node[cell,fill=bluebg] at (0.31,0.62) {1};
+\node[cell,fill=white]  at (0.93,0.62) {0};
+\node[cell,fill=white]  at (0.31,0.00) {0};
+\node[cell,fill=bluebg] at (0.93,0.00) {2};
+\node[font=\tiny,tiercol,anchor=east] at (-0.06,0.62) {kênh 1};
+\node[font=\tiny,tiercol,anchor=east] at (-0.06,0.00) {kênh 2};
+\node[font=\tiny,tiercol] at (0.31,-0.48) {vị trí \(a\)};
+\node[font=\tiny,tiercol] at (0.93,-0.48) {vị trí \(b\)};
+% mui ten
+\draw[ar] (1.45,0.31) -- (2.55,0.31);
+\node[font=\scriptsize,steel,align=center,anchor=south] at (2.0,0.42) {\(G=FF^{\!\top}\)};
+\node[font=\tiny,tiercol,align=center,anchor=north] at (2.0,0.22) {cộng dồn\\ trên vị trí};
+% G
+\node[font=\scriptsize\bfseries,inkblue] at (3.6,1.35) {\(G\)};
+\node[cell,fill=violetbg] at (3.29,0.62) {1};
+\node[cell,fill=white]    at (3.91,0.62) {0};
+\node[cell,fill=white]    at (3.29,0.00) {0};
+\node[cell,fill=violetbg] at (3.91,0.00) {4};
+% F hoan vi
+\node[font=\scriptsize\bfseries,inkblue] at (6.4,1.35) {\(F'\): đổi chỗ \(a \leftrightarrow b\)};
+\node[cell,fill=white]  at (6.09,0.62) {0};
+\node[cell,fill=bluebg] at (6.71,0.62) {1};
+\node[cell,fill=bluebg] at (6.09,0.00) {2};
+\node[cell,fill=white]  at (6.71,0.00) {0};
+\draw[ar] (7.25,0.31) -- (8.35,0.31);
+\node[font=\scriptsize,steel,anchor=south] at (7.8,0.42) {\(G'=F'F'^{\!\top}\)};
+\node[font=\scriptsize\bfseries,inkblue] at (9.4,1.35) {\(G'\)};
+\node[cell,fill=violetbg] at (9.09,0.62) {1};
+\node[cell,fill=white]    at (9.71,0.62) {0};
+\node[cell,fill=white]    at (9.09,0.00) {0};
+\node[cell,fill=violetbg] at (9.71,0.00) {4};
+\draw[reddark,very thick,{Stealth[length=4pt]}-{Stealth[length=4pt]}] (4.25,-0.75) -- (9.05,-0.75);
+\node[font=\scriptsize,reddark,anchor=north,align=center] at (6.65,-0.85)
+  {\(G=G'\): mọi hoán vị vị trí cho cùng một ma trận Gram};
+\end{tikzpicture}}
+\caption{Vì sao ma trận Gram bắt được ``phong cách'' --- và vì sao nó không bao giờ bắt được bố cục. Phép cộng dồn trên các vị trí không gian biến \(F\) thành một thống kê \emph{đồng xuất hiện giữa các kênh}, và phép cộng thì không quan tâm thứ tự. Hai bản đồ đặc trưng khác hẳn nhau về chỗ đặt cho ra cùng một \(G\). Đó vừa là định nghĩa vừa là giới hạn của ``phong cách'': nét cọ và bảng màu thì giữ được, ``mắt nằm trên miệng'' thì không.}
+\label{fig:gram-bat-bien}
+\end{figure}
+
+Đáng dừng lại một nhịp ở chỗ này, vì đây là lần thứ hai ta gặp cùng một mẹo: \(G\) là một \emph{tổng} trên các vị trí, tức một hàm đối xứng --- đúng cấu trúc mà PointNet dùng khi lấy max trên các điểm (\ptr{C/16-thi-giac-3d/02-bieu-dien-3d-va-depth}). Hai lĩnh vực không liên quan, một nguyên lý: muốn bất biến với thứ tự hay vị trí thì gộp bằng một phép toán đối xứng, và cái giá luôn luôn là mất chính cái thông tin thứ tự đó.
+\lk{C/16/02}{cùng nguyên lý với}{PointNet lấy max trên tập điểm, Gram lấy tổng trên vị trí: cùng một hàm đối xứng, cùng một cái giá.}
+
+\subsection{D. Dời chi phí từ lúc chạy sang lúc huấn luyện}
+Bản gốc của Gatys phải chạy vài trăm bước tối ưu cho \emph{mỗi} ảnh, mất từ vài chục giây tới vài phút trên GPU --- không dùng được cho video hay cho ứng dụng tương tác. Cách gỡ là một mẫu hình tổng quát, không riêng gì chuyển phong cách.
+
+\begin{mach}[Mạch 2 --- ba nấc của cùng một bài toán]
+\item \vd{mỗi ảnh cần một vòng tối ưu riêng.} \gp huấn luyện một mạng \vn{tiến thẳng}{feed-forward} để làm đúng việc mà vòng tối ưu làm, dùng chính hàm mất mát của Gatys làm tín hiệu giám sát --- tức là \vn{mất mát tri giác}{perceptual loss} \cite{johnson2016perceptual}. \hq lúc chạy chỉ còn một lượt xuôi, nhanh hơn ba bậc độ lớn. \gia phải huấn luyện một mạng cho \emph{mỗi} phong cách, và mất khả năng tinh chỉnh trọng số nội dung/phong cách sau khi huấn luyện.
+\item \vd{một mạng cho một phong cách là không mở rộng được.} \gp \en{AdaIN}: chuẩn hoá đặc trưng của ảnh nội dung về trung bình--độ lệch chuẩn 0--1 theo từng kênh, rồi \emph{gán lại} trung bình và độ lệch chuẩn theo từng kênh của ảnh phong cách \cite{huang2017adain}. \gd điều đáng nói nằm ở giả định ngầm: nếu chỉ cần khớp thống kê bậc nhất theo kênh đã ra phong cách, thì phần lớn nội dung của ma trận Gram (thống kê bậc hai) là dư thừa --- một phát hiện thực nghiệm khá bất ngờ. \hq một mạng duy nhất làm được phong cách tuỳ ý, thời gian thực. \gia chất lượng thấp hơn bản tối ưu; các phong cách có cấu trúc lớn (tranh có hình khối rõ) bị mất nhiều nhất.
+\item \vd{ta vẫn chỉ có một đánh đổi chứ chưa có bữa trưa miễn phí.} \hq mẫu hình chung: \emph{độ khó không biến mất, nó chuyển từ lúc chạy sang lúc huấn luyện} --- và cùng mẫu hình đó sẽ xuất hiện ở chưng cất tri thức (\ptr{D/20-toi-uu-va-nen-mo-hinh}) và ở việc chưng cất bộ lấy mẫu diffusion (\ptr{C/17-mo-hinh-sinh/03-diffusion}).
+\lk{D/20}{cùng nguyên lý với}{chưng cất tri thức là chính mẫu hình này ở tầng mô hình: trả một lần lúc huấn luyện để khỏi trả mãi lúc suy luận.}
+\lk{C/16/03}{cùng nguyên lý với}{neural rendering làm đúng việc này trên một cảnh 3D thay vì trên một ảnh.}
+\end{mach}
+
+\begin{table}[H]\centering\small
+\caption{Ba nấc của chuyển phong cách, đọc theo chỗ chi phí nằm ở đâu.}
+\label{tab:ba-nac-nst}
+\begin{tabularx}{\linewidth}{@{}L{2.6cm}L{2.5cm}L{2.5cm}Y@{}}
+\toprule
+\textbf{Cách làm} & \textbf{Chi phí mỗi ảnh} & \textbf{Chi phí huấn luyện} & \textbf{Hỏng khi nào}\\
+\midrule
+Gatys (tối ưu trên pixel) & Vài chục giây tới vài phút & Không có & Không dùng được cho video hay tương tác\\
+Tiến thẳng một phong cách & Một lượt xuôi & Một lần huấn luyện \emph{cho mỗi phong cách} & Số phong cách lớn; muốn đổi trọng số sau khi huấn luyện\\
+AdaIN (phong cách tuỳ ý) & Một lượt xuôi & Một lần huấn luyện duy nhất & Phong cách có cấu trúc lớn; chất lượng dưới bản tối ưu\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Hình~\ref{fig:doi-chi-phi} đặt ba nấc lên một mặt phẳng để thấy chi phí đã đi đâu.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[font=\footnotesize]
+\draw[-{Stealth[length=5pt]},steel,thick] (0,0) -- (8.4,0)
+  node[anchor=north east,font=\scriptsize,inkblue,align=right] {chi phí \textbf{huấn luyện}\\ (trả một lần)};
+\draw[-{Stealth[length=5pt]},steel,thick] (0,0) -- (0,4.3)
+  node[anchor=north west,rotate=90,font=\scriptsize,inkblue,align=center,xshift=-2.6cm,yshift=0.15cm]
+  {chi phí \textbf{mỗi ảnh} lúc chạy (trả mãi mãi)};
+\node[draw=reddark,fill=redbg,rounded corners=2pt,inner sep=3pt,font=\scriptsize,align=center] (g) at (1.5,3.5)
+  {Gatys\\ \emph{vài chục giây/ảnh}};
+\node[draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=3pt,font=\scriptsize,align=center] (j) at (4.6,1.6)
+  {feed-forward\\ một phong cách};
+\node[draw=steel,fill=bluebg,rounded corners=2pt,inner sep=3pt,font=\scriptsize,align=center] (a) at (7.0,0.75)
+  {AdaIN\\ \emph{phong cách tuỳ ý}};
+\draw[-{Stealth[length=4pt]},tiercol,very thick,dashed] (g) to[bend left=14] (j);
+\draw[-{Stealth[length=4pt]},tiercol,very thick,dashed] (j) to[bend left=14] (a);
+\node[font=\scriptsize\itshape,tiercol,align=center] at (5.1,3.4)
+  {mẫu hình lặp lại khắp cây:\\ dời chi phí từ lúc chạy sang lúc huấn luyện};
+\node[font=\scriptsize,reddark,align=center,text width=4.6cm] at (5.3,2.55)
+  {cái phải trả: mỗi bước sang phải, chất lượng tụt một chút và mô hình mất tính tổng quát};
+\end{tikzpicture}
+\caption{Ba nấc của chuyển phong cách, vẽ trên mặt phẳng ``ai trả chi phí''. Không nấc nào rẻ hơn nấc trước một cách miễn phí: cái được lấy đi ở trục dọc bị trả lại ở trục ngang, và một phần nhỏ nữa bị trả bằng chất lượng. Đây là cùng một hình sẽ đúng cho chưng cất tri thức và cho chưng cất bộ lấy mẫu diffusion --- chỉ cần đổi nhãn ba hộp.}
+\label{fig:doi-chi-phi}
+\end{figure}
+
+\subsection{E. Giới hạn và trường hợp hỏng}
+Giới hạn nền tảng của cả mục này là ta đang tin vào một hàm chấm điểm mà chính ta không kiểm soát. Mạng đã huấn luyện có vô số hướng trong không gian ảnh mà nó nhạy còn mắt người thì không --- tối ưu trên pixel đi thẳng vào những hướng đó, vì gradient bao giờ cũng chỉ về hướng dốc nhất. Đó là lý do trực quan hoá lớp không có phạt chính quy hoá cho ra nhiễu, và là lý do mẫu đối kháng tồn tại ở mọi mạng.
+
+Hai chế độ hỏng cụ thể đáng nhớ:
+\begin{itemize}
+\item \textbf{Kết quả phụ thuộc mạnh vào khởi tạo và bộ tối ưu.} Bài toán không lồi trên hàng trăm nghìn biến; khởi tạo từ ảnh nội dung, từ nhiễu, hay từ ảnh trắng cho ba kết quả khác nhau. Đây là tính chất của bài toán chứ không phải lỗi cài đặt --- báo cáo kết quả mà không nói khởi tạo là báo cáo thiếu.
+\item \textbf{Chuyển phong cách mất tính nhất quán theo thời gian.} Áp cho từng khung hình video thì ảnh nhấp nháy, vì hai khung hình gần nhau rơi vào hai cực tiểu địa phương khác nhau. Cách chữa là thêm ràng buộc thời gian dựa trên dòng quang --- và ta lại quay về đúng chủ đề của \ptr{C/15-thi-giac-khong-thoi-gian}.
+\end{itemize}
+
+\begin{cambay}
+Đừng đọc một ảnh trực quan hoá lớp như bằng chứng ``mạng hiểu khái niệm này''. Ảnh đó là nghiệm của một bài tối ưu \emph{có phạt chính quy hoá do bạn chọn}, và phần lớn cấu trúc đẹp mắt trong đó đến từ chính phần phạt (biến thiên toàn phần, jitter, làm mượt) chứ không từ mạng. Bằng chứng: bỏ phạt đi thì ra nhiễu, dù điểm số của lớp còn cao hơn. Muốn dùng công cụ này để chẩn đoán, hãy luôn báo cáo phần phạt cùng với ảnh --- xem thêm \ptr{E/25-do-tin-cay-va-van-hanh} về các phép kiểm tra tính đúng đắn của phương pháp giải thích \cite{adebayo2018sanity}.
+\end{cambay}
+
+\begin{cannho}
+Lan truyền ngược không phân biệt tham số với dữ liệu; chọn nút nào làm biến tối ưu là quyền của bạn. Đóng băng mạng và tối ưu trên pixel cho ra năm kỹ thuật khác nhau chỉ bằng cách đổi hàm mục tiêu --- và bất cứ khi nào một vòng tối ưu lúc chạy quá đắt, hãy hỏi liệu có huấn luyện được một mạng làm thay nó hay không. Đó là mẫu hình dời chi phí sang lúc huấn luyện, gặp lại ở distillation. \T{1}
+\end{cannho}
+
+\subsection{F. Kết nối}
+Ý tưởng của mục này là bản sao chính xác của điều đã gặp ở \ptr{C/16-thi-giac-3d/03-nerf-3dgs-va-hop-nhat}: đặt thứ ta muốn vào hàm mất mát rồi hạ gradient trên chính đối tượng cần tạo ra --- ở đó đối tượng là một cảnh 3D, ở đây là một ảnh. Ma trận Gram dùng chung nguyên lý hàm đối xứng với PointNet ở \ptr{C/16-thi-giac-3d/02-bieu-dien-3d-va-depth}. Mẫu đối kháng và trực quan hoá được nói kỹ ở \ptr{E/25-do-tin-cay-va-van-hanh}; mẫu hình dời chi phí sang lúc huấn luyện quay lại ở \ptr{D/20-toi-uu-va-nen-mo-hinh} \cite{hinton2015distilling} và ở phần chưng cất bộ lấy mẫu của \ptr{C/17-mo-hinh-sinh/03-diffusion}. Perceptual loss cũng chính là cầu nối sang \ptr{C/17-mo-hinh-sinh/04-low-level-vision}.
+
+\begin{tukiem}
+\item Vì sao cùng một đoạn code cho ra được cả một tác phẩm nghệ thuật lẫn một mẫu đối kháng --- điều gì thực sự khác nhau giữa hai trường hợp?
+\item Ma trận Gram bất biến với vị trí; hai thất bại nào của chuyển phong cách suy ra trực tiếp từ tính chất đó?
+\item AdaIN chỉ khớp trung bình và độ lệch chuẩn theo kênh mà vẫn ra phong cách. Điều đó gợi ý gì về lượng thông tin thực sự cần thiết trong ma trận Gram?
+\item Bạn thấy một ảnh trực quan hoá lớp rất đẹp trong một bài báo. Ba câu hỏi bạn phải hỏi trước khi tin nó là gì?
+\item Mẫu hình ``dời chi phí sang lúc huấn luyện'' được mua bằng cái gì, và trong trường hợp cụ thể nào thì cái giá đó là không chấp nhận được?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

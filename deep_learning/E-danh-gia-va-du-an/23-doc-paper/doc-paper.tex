@@ -1,0 +1,233 @@
+% Tạo: 2026-09; sửa gần nhất: 2026-09; ôn gần nhất: —
+% Dependency: B/03, B/07, E/24. Mức độ: cốt lõi (vòng 2).
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Đọc paper và theo dõi một lĩnh vực (Reading Papers, Following a Field)}
+\ptrtarget{E/23}\ptrtarget{E/23-doc-paper}
+\dependency{\ptr{B/03-giai-phau-he-thong} (ba tầng bài toán \ra nguyên lý \ra cài đặt); \ptr{B/07-chia-du-lieu-va-danh-gia} (giao thức đánh giá — cần để đọc được phần dữ liệu của paper). Đọc song song với \ptr{E/24-thi-nghiem-va-ablation}: chương này dạy \emph{đọc} bằng chứng, chương 24 dạy \emph{tạo ra} bằng chứng, và hai kỹ năng đó là hai mặt của cùng một tấm giấy.}
+
+\begin{tomtat}
+Chương này là về cách phân bổ sự chú ý khi số paper vượt xa thời gian đọc, và về cách tách đóng góp thật khỏi cách kể chuyện. Đọc xong bạn định vị được một paper lạ trong bốn mươi phút. Bạn phát biểu được đóng góp thật nằm ở đâu, bằng chứng nào chưa đủ, và thí nghiệm nào sẽ khiến bạn đổi ý. Chừng đó đủ để quyết định có bỏ hai tuần tái hiện nó hay không. Hai thao tác đổi nhiều nhất là đọc limitations và phần dữ liệu \emph{trước} bảng kết quả, và ghi lại mục ``chỗ tôi không tin'' kèm thí nghiệm sẽ thuyết phục được mình. Nếu chỉ nhớ một điều: paper là văn bản thuyết phục chứ không phải biên bản thí nghiệm, nên câu hỏi trung tâm luôn là \emph{bỏ đóng góp chính đi nhưng giữ nguyên công thức huấn luyện thì còn lại bao nhiêu}.
+\end{tomtat}
+
+\begin{nentang}
+\kn{paper}{một bài báo khoa học, thường 8--10 trang, có cấu trúc cố định: abstract, mở đầu, phương pháp, thí nghiệm, kết luận. ``Preprint'' là bản tự đăng (thường trên arXiv) chưa qua bình duyệt.}
+\kn{baseline}{phương pháp đối chứng mà kết quả mới phải vượt qua. Một baseline chưa được tinh chỉnh tử tế làm mọi so sánh sau đó vô nghĩa, nên chất lượng baseline quan trọng ngang chất lượng phương pháp mới.}
+\kn{ablation}{thí nghiệm bỏ đi hoặc thay thế đúng \emph{một} thành phần của hệ thống rồi đo lại, để biết thành phần đó đóng góp bao nhiêu. Đây là bằng chứng chính cho câu ``vì sao nó hoạt động''.}
+\kn{công thức huấn luyện (recipe)}{toàn bộ các lựa chọn quanh việc huấn luyện mà không phải kiến trúc: số epoch, learning rate và lịch của nó, augmentation, cách khởi tạo, EMA trọng số. Đổi recipe một mình đã đủ tạo ra khác biệt lớn về kết quả.}
+\kn{seed}{số khởi tạo cho bộ sinh số ngẫu nhiên. Đổi seed thì khởi tạo trọng số và thứ tự dữ liệu đổi theo, nên cùng một cấu hình chạy hai seed vẫn ra hai con số khác nhau.}
+\kn{tập validation và tập test}{validation là tập dùng để \emph{chọn} cấu hình; test là tập chỉ được dùng một lần để \emph{báo cáo}. Trộn hai vai này là dạng rò rỉ phổ biến nhất trong các bảng kết quả.}
+\kn{mAP}{\emph{mean average precision} --- metric tổng hợp thông dụng cho phát hiện vật thể, gộp cả độ chính xác lẫn độ bao phủ qua nhiều ngưỡng. Ở đây bạn chỉ cần biết nó là ``điểm số càng cao càng tốt'', đơn vị thường tính theo điểm phần trăm.}
+\kn{benchmark}{một tập dữ liệu cộng giao thức đánh giá cố định (ví dụ COCO, ADE20K) để nhiều nhóm so được với nhau. Con số chỉ có nghĩa khi kèm tên benchmark và phiên bản giao thức.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao đọc phần giới hạn của một paper \emph{trước} bảng kết quả lại tiết kiệm thời gian hơn, dù lượng chữ bạn nạp vào là y hệt?}
+\h{Hai paper cùng báo cáo \(+1{,}0\) điểm trên cùng benchmark; một cái đáng tin, một cái không. Chi tiết nào trong phần thiết lập tách được chúng, và vì sao nó không nằm trong bảng kết quả?}
+\h{Nếu phần lớn ``tiến bộ'' của một mảng biến mất khi baseline được tinh chỉnh bằng cùng ngân sách, thì suốt cả thập kỷ các paper đó đã thật sự đo cái gì?}
+\h{Ghi chú tóm tắt một paper gần như vô dụng sau sáu tháng. Mục nào trong ghi chú thì không, và vì sao đúng mục đó lại làm kỹ năng đọc của bạn lên tay?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+Một mảng hẹp của thị giác máy tính hiện xuất bản nhiều hơn số paper mà một người đọc kỹ được trong cả năm. Bài toán vì thế không phải là ``đọc thế nào cho hiểu'' — điều đó bạn làm được với bất kỳ paper đơn lẻ nào nếu có đủ thời gian — mà là ``phân bổ sự chú ý thế nào để không phá sản''. Phần lớn người tự học giải bài toán này sai theo cùng một cách: đọc tuần tự từ đầu đến cuối mọi paper thấy thú vị, đọc chậm dần, rồi bỏ cuộc và chuyển sang chỉ đọc abstract trên mạng xã hội. Cả hai cực đều không cho ra hiểu biết dùng được.
+
+Có một lý do sâu hơn khiến việc đọc phải có kỹ thuật riêng. Paper là \textbf{một văn bản thuyết phục, không phải một biên bản thí nghiệm}. Tác giả đã biết kết quả trước khi viết câu đầu tiên của phần mở đầu, nên toàn bộ trật tự trình bày được tối ưu ngược từ bảng kết quả trở lên: đóng góp được đặt tên sao cho nghe như một nguyên lý, các lựa chọn không hiệu quả biến mất, và những lần chạy hỏng không xuất hiện ở đâu cả. Điều này không đòi hỏi ai phải gian dối; nó là hệ quả tự nhiên của việc một cộng đồng thưởng cho câu chuyện gọn gàng. Do đó câu hỏi trung tâm khi đọc không phải ``họ làm gì'' mà là \textbf{bằng chứng có tương xứng với tuyên bố không} — và cùng với nó là hai câu hỏi nữa, hỏi trước: bài toán thật sự là gì (đầu vào, đầu ra, tín hiệu giám sát), và họ giả định gì mà không nói ra.
+
+\emph{Học xong chương này bạn làm được gì mà trước đó không làm được?} Bạn đọc một paper lạ trong bốn mươi phút và phát biểu được ba câu: đóng góp thật nằm ở đâu, bằng chứng nào chưa đủ để kết luận, và thí nghiệm nào sẽ khiến bạn đổi ý. Đó là điều kiện đủ để ra quyết định đắt nhất mà một kỹ sư tự học phải ra thường xuyên --- có nên bỏ hai tuần tái hiện một phương pháp hay không.
+
+\begin{trucgiac}
+Đọc một paper giống nhận một \en{pull request} mà tác giả vừa viết code, vừa viết test, vừa được quyền chọn công khai lần chạy CI nào. Không ai phải nói dối để bạn hiểu sai: chỉ cần những lần chạy đỏ không nằm trong diff là đủ. Việc của người đọc, giống việc của người review, là đoán ra \emph{hình dạng của những lần chạy không được đưa vào} — và biết cần yêu cầu thêm test nào thì mới đủ tin.
+\end{trucgiac}
+
+\section{Ba lượt đọc và thứ tự bên trong một lượt (Three-Pass Reading)}
+\subsection{A. Ba lượt và điểm dừng của mỗi lượt}
+Khung ba lượt của Keshav là điểm khởi đầu tốt vì nó cho phép bỏ dở một cách có kỷ luật \cite{keshav2007paper}. Lượt một mất năm đến mười phút — tiêu đề, abstract, hình, kết luận — và kết thúc bằng đúng một quyết định nhị phân: vứt hay đọc tiếp. Lượt hai mất khoảng một giờ, đọc phương pháp và thiết lập thí nghiệm nhưng bỏ mọi chứng minh, kết thúc bằng khả năng tóm tắt paper cho người khác kèm những chỗ mình chưa nắm. Lượt ba là đọc để tái dựng: tự đặt mình vào vị trí tác giả và dựng lại từng bước, mỗi chỗ mình chọn khác đi là một chỗ đáng ghi. Chỉ vài paper mỗi năm xứng đáng với lượt ba.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Ba lượt đọc: mỗi lượt có một sản phẩm khác nhau, và điều kiện dừng của lượt trước quyết định có bước vào lượt sau hay không.}
+\label{tab:ba-luot}
+\begin{tabularx}{\linewidth}{@{}L{1.9cm}L{1.9cm}YY@{}}
+\toprule
+\textbf{Lượt} & \textbf{Chi phí} & \textbf{Sản phẩm} & \textbf{Dừng lại nếu}\\
+\midrule
+1 --- định vị & 5--10 phút & Một quyết định nhị phân: vứt hay đọc tiếp & Bài toán không phải bài toán của bạn, hoặc giả định gốc đã sai với bối cảnh của bạn\\
+2 --- hiểu & \(\approx\) 1 giờ & Tóm tắt được cho người khác, kèm danh sách chỗ chưa nắm & Bằng chứng không tương xứng với tuyên bố; ghi lại lý do rồi dừng\\
+3 --- tái dựng & Nửa ngày trở lên & Dựng lại được thiết kế và biết mình sẽ chọn khác ở đâu & Chỉ dành cho paper bạn định cài lại hoặc xây tiếp lên\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{B. Thứ tự đọc bên trong một lượt}
+Điều mà khung này không nói, và là chỗ dễ sai nhất trong thị giác máy tính, là \textbf{thứ tự đọc bên trong một lượt}. Bản năng dẫn ta tới bảng kết quả trước, vì đó là chỗ có con số. Nên làm ngược lại, theo đúng trình tự sau. Trước hết đọc phần \en{limitations} và các trường hợp hỏng — thường nằm cuối, thường ngắn, thường là phần được đầu tư ít công sức nhất, và chính vì thế nó rò rỉ nhiều sự thật nhất. Nó cho bạn biết tác giả \emph{tự biết} mình yếu ở đâu, và nếu bạn đọc nó trước thì mọi con số sau đó được đọc trong đúng bối cảnh của chúng. Nếu một paper không có phần này, đó là tín hiệu cảnh báo chứ không phải dấu hiệu hệ thống hoàn hảo. Tiếp theo mới là phần dữ liệu: dữ liệu nào, chia thế nào, nhãn từ đâu, có trùng lặp giữa train và test không. Cách chia dữ liệu quyết định con số có nghĩa hay không, và một bảng kết quả đọc trước phần dữ liệu là một bảng kết quả chưa được diễn giải. Bảng kết quả đọc sau cùng, và khi đó nó chỉ còn là xác nhận hay bác bỏ những gì bạn đã dự đoán từ hai phần trước.
+\lk{B/07}{tiền đề}{một con số chỉ mang nghĩa bên trong giao thức chia dữ liệu đã sinh ra nó; đọc bảng trước phần dữ liệu là đọc một đại lượng chưa được định nghĩa}
+
+Hình~\ref{fig:thu-tu-doc} đặt cạnh nhau hai đường đi qua cùng một paper: đường theo bản năng và đường nên đi.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  sec/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\small,minimum height=1.0cm,text width=2.0cm},
+  na/.style={-{Latex[length=2.0mm]},draw=tiercol,thick,densely dotted},
+  ok/.style={-{Latex[length=2.4mm]},draw=violetdark,very thick},
+  num/.style={font=\scriptsize\bfseries,color=violetdark}]
+\node[sec] (ab) {Abstract\\+ hình};
+\node[sec,right=0.55cm of ab] (in) {Mở đầu};
+\node[sec,right=0.55cm of in] (me) {Phương pháp};
+\node[sec,right=0.55cm of me] (da) {Dữ liệu\\+ thiết lập};
+\node[sec,right=0.55cm of da] (re) {Bảng\\kết quả};
+\node[sec,right=0.55cm of re] (li) {Limitations\\+ failure case};
+\draw[na] (ab) -- (in); \draw[na] (in) -- (me); \draw[na] (me) -- (da);
+\draw[na] (da) -- (re); \draw[na] (re) -- (li);
+\node[font=\scriptsize\itshape,color=tiercol,above=0.12cm of me] {đường theo bản năng: đọc xuôi, tới bảng kết quả trước};
+\draw[ok] (ab.south) to[out=-70,in=-110] node[num,below]{1} (li.south);
+\draw[ok] (li.north) to[out=110,in=70] node[num,above]{2} (da.north);
+\draw[ok] (da.south) to[out=-60,in=-120] node[num,below]{3} (me.south);
+\draw[ok] (me.north) to[out=60,in=120] node[num,above]{4} (re.north);
+\end{tikzpicture}}
+\caption{Cùng một paper, hai đường đi. Đường chấm mờ là thứ tự xuất bản; đường đậm đánh số là thứ tự nên đọc: limitations trước, rồi phần dữ liệu, rồi phương pháp, và bảng kết quả sau cùng. Thứ thay đổi không phải lượng thông tin nhận được mà là \emph{bối cảnh} mà mỗi con số được đọc trong đó.}
+\label{fig:thu-tu-doc}
+\end{figure}
+
+\subsection{C. Đọc code cùng paper}
+Cuối cùng, trong thị giác máy tính, đọc paper mà không mở code là đọc một nửa. Các chi tiết thật sự quyết định con số hầu như luôn nằm trong repo, và hầu như không bao giờ nằm đủ trong bài viết. Danh sách quen thuộc gồm \vn{gán mẫu}{label assignment} cho các \en{anchor}, tập \vn{tăng cường dữ liệu}{data augmentation}, lịch \en{learning rate}, ngưỡng \vn{triệt phi cực đại}{non-maximum suppression, NMS}, và việc có dùng trung bình trượt của trọng số (\en{EMA}) hay không. Bằng chứng rõ nhất cho điều này đến từ chính một paper detection: khi tách bạch từng khác biệt giữa dòng anchor-based và anchor-free, phần lớn khoảng cách hoá ra nằm ở \emph{định nghĩa mẫu dương/âm} chứ không ở kiến trúc đầu ra \cite{zhang2020atss}. Một chi tiết vốn bị coi là tiểu tiết cài đặt lại chính là đóng góp.
+\lk{C/14}{trường hợp riêng của}{gán mẫu trong detector là ví dụ điển hình nhất của loại chi tiết quyết định kết quả mà chỉ code mới nói ra}
+
+\section{Ghi chú và mục ``chỗ tôi không tin'' (Paper Notes)}
+Ghi chú tóm tắt lại nội dung paper gần như vô dụng: sáu tháng sau bạn sẽ đọc lại chính abstract nhanh hơn là đọc ghi chú của mình. Ghi chú có giá trị là ghi chú chứa những thứ \emph{không có} trong paper. Một khuôn năm mục vừa đủ và đáng giữ nguyên qua nhiều năm:
+
+\begin{enumerate}
+\item Bài toán trong ba dòng: đầu vào, đầu ra, tín hiệu giám sát. Nếu viết không nổi ba dòng này, bạn chưa đọc xong.
+\item Ý tưởng lõi trong một câu, không dùng tên riêng của phương pháp.
+\item Bằng chứng mạnh nhất trong bài — cụ thể là thí nghiệm nào, không phải con số nào.
+\item \textbf{Chỗ tôi không tin} — và vì sao.
+\item Thí nghiệm nào sẽ khiến tôi đổi ý.
+\end{enumerate}
+
+Mục bốn là mục quan trọng nhất và cũng là mục duy nhất tạo ra một vòng phản hồi. Đọc mà không ghi lại sự hoài nghi thì sự hoài nghi tan biến, và bạn không bao giờ biết trực giác của mình đúng hay sai. Ghi lại thì sáu tháng sau, khi paper cải tiến hoặc paper phản biện xuất hiện, bạn đối chiếu được: lần này tôi nghi đúng chỗ, lần kia tôi nghi sai vì tôi không biết một ràng buộc thực tế. Đó là cách duy nhất để khả năng đọc paper của một người thật sự lên tay. Vòng này vận hành đúng như ``dự đoán trước, đối chiếu sau'' của thí nghiệm ở chương 24: cùng một cơ chế học, chỉ khác đối tượng.
+
+Mục năm tồn tại để buộc sự hoài nghi phải cụ thể. ``Tôi thấy nghi ngờ'' là một cảm giác; ``tôi sẽ tin nếu họ chạy phương pháp này với \en{baseline} được tune bằng cùng ngân sách trên ba \en{seed}'' là một mệnh đề kiểm chứng được. Không viết nổi mục năm thì mục bốn chỉ là định kiến.
+
+\section{Đóng góp thật và cách kể chuyện (Contribution vs.\ Narrative)}
+Phần lớn cải tiến được công bố trong thị giác máy tính là tổ hợp của ba nguồn: một ý tưởng mới, một \vn{công thức huấn luyện}{training recipe} tốt hơn, và nhiều dữ liệu hơn. Cách kể chuyện chuẩn của paper quy toàn bộ chênh lệch cho nguồn thứ nhất, vì hai nguồn còn lại không kể thành câu chuyện được. Đây không phải phỏng đoán mà là điều đã được đo nhiều lần. Dòng ConvNeXt lấy một ResNet rồi đưa dần từng thành phần của công thức huấn luyện và thiết kế hiện đại vào. Phần lớn khoảng cách so với Swin biến mất trước khi chạm tới bất cứ thứ gì mang bản chất \en{attention} \cite{liu2022convnext}. Trong metric learning, một đánh giá lại có kiểm soát cho thấy đường cong tiến bộ gần như phẳng suốt nhiều năm khi mọi phương án được \vn{tinh chỉnh siêu tham số}{hyperparameter tuning} bằng cùng ngân sách và đo bằng cùng giao thức \cite{musgrave2020metric}. Trong hệ khuyến nghị, kết quả tương tự: phần lớn phương pháp neural được công bố không vượt nổi baseline cổ điển được tune tử tế \cite{dacrema2019worrying}. Trong học tăng cường, phương sai giữa các seed lớn tới mức nhiều so sánh đã công bố không phân biệt được với nhiễu \cite{henderson2018deep}.
+
+Bài học rút ra không phải là hoài nghi mọi thứ, mà là một phép thử duy nhất áp cho mọi paper: \textbf{nếu bỏ đóng góp chính đi nhưng giữ nguyên toàn bộ công thức huấn luyện, con số còn lại bao nhiêu — và paper có cho bạn biết điều đó không?} Paper trả lời được câu này (bằng một \en{ablation} có kiểm soát) đáng tin hơn hẳn paper không trả lời, độc lập với việc con số cuối cùng đẹp tới đâu. Cũng nên phân biệt: một công thức huấn luyện tốt hơn \emph{là} một đóng góp thật, chỉ là một đóng góp khác loại — nó chuyển giao được sang mọi kiến trúc, trong khi một module mới thường không. Vấn đề chỉ nằm ở việc gọi tên sai.
+\lk{C/12}{cùng nguyên lý với}{cơ chế huấn luyện giải thích phần lớn chênh lệch giữa hai hệ thống --- cùng một quan sát, ở đây nhìn từ phía người đọc paper}
+
+\section{Nhận ra một so sánh không công bằng (Unfair Comparison)}
+Phần lớn so sánh lệch không đến từ ý đồ xấu. Nó đến từ bất đối xứng công sức: tác giả dành sáu tháng cho phương pháp của mình và một buổi chiều cho baseline. Cơ chế toán học phía sau đơn giản và đã được mô tả rõ trong bối cảnh tìm siêu tham số: hiệu năng tốt nhất quan sát được là một hàm tăng theo số lần thử, nên hai phương án được thử với ngân sách khác nhau thì không so được, kể cả khi mọi thứ khác giống hệt \cite{bergstra2012random}. Bảng~\ref{tab:so-sanh-lech} liệt kê các dấu hiệu thường gặp cùng cách kiểm tra nhanh và — quan trọng không kém — trường hợp mà dấu hiệu đó vô hại.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Các dạng so sánh không công bằng hay gặp trong paper thị giác máy tính. Cột cuối tồn tại để bạn không biến sự hoài nghi thành phản xạ bác bỏ mọi thứ.}
+\label{tab:so-sanh-lech}
+\begin{tabularx}{\linewidth}{@{}L{2.5cm}YYL{3.2cm}@{}}
+\toprule
+\textbf{Dấu hiệu} & \textbf{Cơ chế gây lệch} & \textbf{Kiểm tra nhanh} & \textbf{Khi nào vô hại}\\
+\midrule
+Số baseline chép từ paper cũ & Khác thế hệ recipe: epoch, augmentation, độ phân giải & Đối chiếu số epoch và tập augmentation của cả hai & Baseline được chạy lại trong cùng codebase và ghi rõ điều đó\\
+So ở cùng số epoch & Phương pháp mới đắt hơn mỗi bước nên được nhiều tính toán hơn & Tìm chi phí mỗi bước hoặc tổng GPU-giờ & Chi phí bước gần bằng nhau và có báo cáo\\
+Không ghi số seed & Chênh lệch có thể nằm dưới sàn nhiễu & Tìm dấu \(\pm\) và số lần chạy trong chú thích bảng & Benchmark có phương sai rất nhỏ và điều đó được chứng minh\\
+Ablation chạy trên tập test & Cấu hình được chọn trên chính tập dùng để báo cáo & Đọc chú thích bảng ablation, không đọc bảng chính & Ghi rõ chọn trên val, báo cáo trên test một lần\\
+Ngân sách tune bất đối xứng & Tối ưu nhiều lần cho mình, ít lần cho đối thủ & Tìm số cấu hình đã thử cho mỗi phương án & Cả hai dùng chung không gian tìm kiếm và cùng số lần thử\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{cambay}
+Cạm bẫy tinh vi nhất không nằm ở bảng kết quả mà ở việc \emph{đọc bảng trước phần dữ liệu}. Khi đã nhìn thấy con số, bạn sẽ vô thức đi tìm lý do để tin nó, và phần dữ liệu đọc sau đó trở thành thủ tục. Đảo thứ tự lại thì cùng một bảng đó bỗng đọc ra khác hẳn — đây là hiệu ứng neo, không phải vấn đề kiến thức, nên biết về nó không đủ để tránh; phải đổi thứ tự thao tác.
+\end{cambay}
+
+\section{Theo dõi một lĩnh vực mà không bị ngập (Field Tracking)}
+Đọc theo dòng thời gian là cách chắc chắn để bị ngập, vì luồng paper mới không có cấu trúc. Cách bền hơn là \textbf{đọc theo cụm}: một paper gốc, các paper cải tiến trực tiếp lên nó, và ít nhất một paper phản biện hoặc đánh giá lại. Ba loại bổ khuyết cho nhau — paper gốc cho ý tưởng ở dạng thuần khiết nhất, paper cải tiến cho biết chỗ nào của ý tưởng đó thật sự chịu lực, paper phản biện cho biết phần nào của con số đến từ chỗ khác. Thiếu loại thứ ba là lý do phổ biến nhất khiến một người nắm rất nhiều tên phương pháp mà không có phán đoán nào.
+
+Sản phẩm nên có của việc theo dõi là một \textbf{cây phả hệ} (\emph{genealogy of a field}), không phải một danh sách. Mỗi node đúng một dòng, và dòng đó phải có dạng ``giải quyết vấn đề X mà node cha không giải được''. Ràng buộc một dòng ấy chính là bộ lọc: nếu bạn không viết nổi câu đó cho một paper, thì hoặc bạn chưa hiểu nó, hoặc nó chưa cần thiết với bạn — và cả hai kết luận đều hữu ích. Mười lăm node cho một mảng hẹp thường đủ để bạn định vị bất kỳ paper mới nào trong vài phút, vì paper mới gần như luôn là con của một node đã có.
+
+Cuối cùng, nên duy trì \emph{hai} danh sách paper nền chứ không phải một:
+
+\begin{itemize}
+\item \textbf{Nhánh nguyên lý mô hình} --- kiến trúc, cơ chế huấn luyện, các dòng phương pháp. Đây là nhánh ai cũng có, và cũng là nhánh bán rã nhanh nhất: một nửa số tên trong đó sẽ hết quan trọng sau vài năm.
+\item \textbf{Nhánh dữ liệu, đo lường và đánh giá} --- cách xây benchmark, lỗi nhãn, dịch chuyển phân phối, giao thức so sánh. Nhánh này gần như luôn bị bỏ qua, bán rã chậm hơn nhiều, và quyết định phần lớn khả năng phán đoán. Với một kỹ sư đã quen đo đạc hệ thống thật, đây là chỗ lợi thế sẵn có lớn nhất --- bạn đã có bản năng đúng, chỉ thiếu tên gọi và tài liệu tham chiếu.
+\end{itemize}
+\lk{E/24}{hệ quả của}{mọi câu hỏi bạn dùng để nghi ngờ bảng của người khác đều bắt nguồn từ cách bằng chứng được sinh ra ở chương 24}
+
+\section{Giới hạn và trường hợp hỏng}
+Quy trình trên giả định ba điều: paper có phần ablation chạy nghiêm túc, có code công khai, và lĩnh vực đã đủ chín để có paper phản biện. Cả ba giả định đều sai trong hai năm đầu của một hướng mới, và đó chính là lúc bạn cần phán đoán nhất. Trong giai đoạn ấy, thứ thay thế được là đọc chéo giữa các nhóm độc lập: nếu ba nhóm không liên quan báo cáo cùng một hiện tượng với ba thiết lập khác nhau, hiện tượng đó đáng tin hơn một paper duy nhất có bảng đẹp.
+
+Chế độ hỏng thứ hai nằm ở phía người đọc: hoài nghi có chi phí. Áp dụng đủ mạnh, bạn sẽ không tin gì cả và không quyết định được gì — trạng thái này tệ ngang với cả tin. Sự hoài nghi hữu ích luôn kèm một mệnh đề cụ thể có thể kiểm chứng, tức là mục năm trong khuôn ghi chú ở trên; sự hoài nghi không kèm mệnh đề đó chỉ là sự trì hoãn được nguỵ trang. Chế độ hỏng thứ ba tinh vi hơn: một cây phả hệ đẹp tạo cảm giác đã hiểu lĩnh vực, trong khi thứ bạn có mới chỉ là bản đồ tên gọi. Phép thử là thử dự đoán kết quả của một thí nghiệm chưa đọc — nếu không dự đoán nổi thì bản đồ vẫn còn rỗng.
+
+\begin{cannho}
+Nếu chỉ mang theo một câu: \emph{bỏ đóng góp chính đi nhưng giữ nguyên công thức huấn luyện thì còn lại bao nhiêu?} Câu hỏi đó tách đóng góp thật khỏi cách kể chuyện nhanh hơn mọi thứ khác, và nó áp được cho cả paper của người khác lẫn công việc của chính bạn. \T{2}
+\end{cannho}
+
+\section{Thực hành}
+\begin{description}
+\item[Công cụ và tài nguyên.] \repo{alphaXiv} và \repo{arxiv-sanity} để lọc luồng paper mới; Semantic Scholar và Connected Papers để dựng cây trích dẫn; \repo{huggingface.co/papers} cho thảo luận hằng ngày. Các bảng xếp hạng kiểu \repo{paperswithcode} nay đã phân tán, nên bám \en{benchmark} chính thức của từng mảng (COCO, ADE20K, RF100-VL, WILDS, VBench) thay vì một bảng tổng. Danh sách công cụ này chốt tại tháng 9/2026 và sẽ cũ trong sáu đến mười hai tháng; riêng thói quen dựng cây phả hệ và đọc theo cụm thì không.
+\item[Câu hỏi kiểm tra hiểu.] Trong paper bạn vừa đọc: nếu bỏ đóng góp chính nhưng giữ nguyên recipe huấn luyện thì còn lại bao nhiêu, và paper có cho bạn biết điều đó không? Baseline của họ được tune bằng bao nhiêu ngân sách so với phương pháp mới? Phần dữ liệu có cho phép bạn tự dựng lại cách chia train/val/test không?
+\item[Mini project.] Dựng cây phả hệ mười lăm node cho một mảng hẹp bạn quan tâm, mỗi node đúng một dòng theo mẫu ``giải quyết vấn đề X mà node cha không giải được''. Node nào viết không nổi thì bỏ ra khỏi cây và ghi lại vì sao.
+\end{description}
+
+\begin{onbai}
+\ar[3]{Ba lượt đọc}{Khung đọc có ba mức đầu tư: 5--10 phút để quyết vứt hay đọc tiếp, khoảng một giờ để tóm tắt được cho người khác, và nửa ngày trở lên để dựng lại thiết kế. Lượt ba chỉ dành cho paper bạn định cài lại.}
+\ar[3]{Limitations}{Phần cuối bài, nơi tác giả tự nêu chỗ yếu. Nó được đầu tư ít công nhất nên rò rỉ nhiều sự thật nhất; đọc nó trước sẽ đặt bối cảnh cho mọi con số phía sau.}
+\ar[2]{Vì sao đọc limitations trước bảng kết quả?}{Vì thứ tự đọc quyết định cái neo. Đọc bảng trước thì bạn dành phần còn lại để đi tìm lý do tin nó; đọc limitations trước thì cùng những con số ấy được đọc trong bối cảnh tác giả đã tự thừa nhận.}
+\ar[2]{Gán mẫu (label assignment)}{Quy tắc quyết định anchor hay điểm nào là mẫu dương, mẫu nào là âm, khi huấn luyện detector. Nó hầu như chỉ có trong code, và có lần nó chính là toàn bộ khoảng cách giữa hai dòng phương pháp.}
+\ar[2]{Vì sao phải mở code cùng paper?}{Vì trong thị giác máy tính, các chi tiết quyết định con số nằm trong repo chứ không trong bài viết: gán mẫu, augmentation, lịch learning rate, ngưỡng NMS, có dùng EMA hay không.}
+\ar[3]{Công thức huấn luyện}{Toàn bộ lựa chọn quanh việc huấn luyện mà không phải kiến trúc: số epoch, lịch learning rate, augmentation, khởi tạo, EMA. Đổi riêng nó đã đủ tạo ra phần lớn chênh lệch giữa hai hệ thống.}
+\ar[3]{``Chỗ tôi không tin''}{Mục thứ tư trong ghi chú năm mục, ghi lại sự hoài nghi kèm thí nghiệm sẽ khiến bạn đổi ý. Nó là thứ duy nhất kiểm chứng được về sau, nên là vòng phản hồi duy nhất trong việc đọc paper.}
+\ar[3]{Ngân sách tinh chỉnh}{Số cấu hình đã thử cho mỗi phương án. Kết quả tốt nhất quan sát được là cực đại của một mẫu, nên hai phương án thử với ngân sách khác nhau thì không so được, kể cả khi mọi thứ khác giống hệt.}
+\ar[2]{Vì sao ``baseline yếu'' là lỗi phổ biến nhất?}{Vì nó rẻ: tác giả dành sáu tháng cho phương pháp của mình và một buổi chiều cho baseline. Bất đối xứng công sức đó tạo ra chênh lệch mà không cần ai gian dối.}
+\ar[2]{Ablation trên tập test}{Chọn cấu hình trên chính tập dùng để báo cáo, tức là một dạng rò rỉ. Tìm dấu hiệu này ở chú thích bảng ablation, không phải ở bảng chính.}
+\ar[3]{Paper báo cải tiến 1,0 mAP nhưng không ghi số seed --- đọc thế nào?}{Chưa kết luận được gì: chênh lệch có thể nằm dưới sàn nhiễu giữa các seed. Tìm dấu \(\pm\) và số lần chạy; không có thì hạ mức tin cậy chứ đừng suy đoán bù.}
+\ar[2]{Paper không có phần limitations --- suy ra gì?}{Đó là tín hiệu cảnh báo, không phải dấu hiệu hệ thống hoàn hảo. Mọi hệ thống đều trả giá ở đâu đó; không tìm ra nghĩa là bạn chưa hiểu nó, hoặc tác giả không muốn bạn hiểu.}
+\ar[3]{Bạn tái hiện một repo và thấp hơn số công bố 2 điểm --- kiểm tra gì trước?}{Theo thứ tự: phiên bản dữ liệu và tiền xử lý, rồi công thức huấn luyện (epoch, augmentation, độ phân giải), rồi phần cứng và cách tính metric. Nghi phương pháp là bước cuối, không phải bước đầu.}
+\ar[2]{Vì sao công thức huấn luyện vẫn là đóng góp thật?}{Vì nó chuyển giao được sang mọi kiến trúc, trong khi một module mới thường không. Nó chỉ là đóng góp \emph{khác loại}; vấn đề nằm ở việc gọi tên sai, không ở giá trị.}
+\ar{Đọc theo cụm}{Đọc một paper gốc, các paper cải tiến trực tiếp lên nó, và ít nhất một paper phản biện. Thiếu loại thứ ba là lý do phổ biến nhất khiến một người nhớ rất nhiều tên mà không có phán đoán nào.}
+\ar[1]{Cây phả hệ}{Danh sách node, mỗi node đúng một dòng: ``giải quyết vấn đề X mà node cha không giải được''. Ràng buộc một dòng ấy chính là bộ lọc; viết không nổi thì node đó chưa cần với bạn.}
+\ar[1]{Hai danh sách nền}{Một nhánh về nguyên lý mô hình, một nhánh về dữ liệu và đánh giá. Nhánh thứ hai bán rã chậm hơn nhiều, hay bị bỏ qua, và là lợi thế sẵn có của người làm hệ thống.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{Quy trình bình duyệt CVPR / NeurIPS}{Biểu mẫu review yêu cầu đúng bộ câu hỏi của chương: điểm mạnh, điểm yếu, thí nghiệm còn thiếu, câu hỏi cho tác giả}{Đây là nơi kỹ năng này được hành nghề hằng ngày; mẫu review công khai}
+\ud{Reproducibility checklist (NeurIPS, ICLR)}{Ép khai báo số seed, độ lệch chuẩn, ngân sách tính toán --- chính bốn dấu hiệu ở bảng so sánh lệch}{Thành thông lệ từ khoảng 2019, nay gần như bắt buộc}
+\ud{Semantic Scholar, Connected Papers}{Dựng cây trích dẫn tự động, tức cây phả hệ ở dạng công cụ}{Hạ tầng; bền hơn mọi tên mô hình}
+\ud{Dòng ConvNeXt \cite{liu2022convnext}}{Cả paper là một ablation recipe-so-với-kiến trúc có kiểm soát, đúng phép thử ``bỏ đóng góp chính, giữ recipe''}{Ví dụ mẫu mực để đọc trước khi tự viết ablation}
+\ud{Đánh giá lại metric learning \cite{musgrave2020metric}}{Hiện thực hoá phép thử ``cùng ngân sách tinh chỉnh, cùng giao thức'' trên cả một mảng}{Kết quả đã công bố, không phải phỏng đoán}
+\end{ungdung}
+
+\begin{duan}{Đọc ba lượt một paper frontend học được, và viết ghi chú có mục ``chỗ tôi không tin''}{nửa ngày}
+\dmt biến quy trình ba lượt của chương thành một thói quen đo được. Đối tượng là đúng loại paper bạn phải quyết định có tái hiện hay không: một paper về frontend học được cho visual SLAM, tức đặc trưng học được, so khớp học được, hoặc odometry học được.
+\ddl một paper bạn chưa đọc, kèm repo của nó nếu có. Chọn paper báo cáo kết quả trên EuRoC hoặc TUM-VI để bạn đối chiếu được với số bạn đã tự đo.
+\dbc lượt một năm phút (abstract, hình, kết luận) rồi quyết vứt hay đọc tiếp; lượt hai theo đúng thứ tự limitations \(\rightarrow\) dữ liệu \(\rightarrow\) phương pháp \(\rightarrow\) bảng kết quả; mở repo tìm ba chi tiết không có trong bài viết (ngưỡng so khớp, augmentation, lịch huấn luyện); viết ghi chú năm mục theo khuôn ở mục ``Ghi chú''.
+\dxk bạn nêu được \emph{một chi tiết cụ thể trong phần thí nghiệm mà nếu đổi đi thì kết luận của paper có thể sụp}. Ví dụ: chuỗi EuRoC nào bị loại khỏi bảng, hay baseline chạy ở độ phân giải nào. Và bạn viết được mục ``thí nghiệm sẽ khiến tôi đổi ý'' dưới dạng một cấu hình chạy được.
+\dnv \ptr{E/24} cho cách kiểm tra chính chi tiết đó bằng số; \ptr{B/07} cho phần giao thức đánh giá mà bạn dùng để đọc phần dữ liệu.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì thứ tự đọc quyết định cái neo. Đọc limitations trước thì mọi con số sau đó được diễn giải trong bối cảnh tác giả tự thừa nhận; đọc bảng trước thì bạn dành phần còn lại để đi tìm lý do tin nó. Cùng lượng thông tin, khác kết luận.}
+\tl{Số seed kèm độ lệch chuẩn, ngân sách tinh chỉnh của từng phương án, và việc ablation chạy trên val hay test --- xem Bảng~\ref{tab:so-sanh-lech}. Chúng không nằm trong bảng kết quả vì bảng kết quả được thiết kế để thuyết phục, còn ba chi tiết đó chỉ làm yếu đi câu chuyện.}
+\tl{Phần lớn là ngân sách tinh chỉnh và công thức huấn luyện, tức cỡ mẫu của một cuộc tìm kiếm, chứ không phải ý tưởng. Điều đó không có nghĩa recipe vô giá trị --- nó là đóng góp thật, chỉ khác loại và chuyển giao được rộng hơn một module mới.}
+\tl{Mục ``chỗ tôi không tin'' cộng mục ``thí nghiệm sẽ khiến tôi đổi ý''. Chúng kiểm chứng được về sau, nên tạo ra vòng phản hồi duy nhất trong việc đọc paper: sáu tháng sau bạn biết mình đã nghi đúng chỗ hay nghi sai vì thiếu một ràng buộc thực tế.}
+\end{traloi}
+
+\begin{dongian}
+Bạn đang tìm mua nhà, và mỗi ngày có ba mươi tin rao mới. Mỗi tin đều do người bán viết: ảnh chụp góc rộng lúc trời nắng, phòng nào chật thì không có ảnh, và không tin nào nhắc tới cái cống trước cửa. Không ai nói dối cả; họ chỉ được quyền chọn tấm ảnh nào đăng lên. Khó khăn của bạn không phải là đọc không hiểu --- tin nào bạn cũng hiểu --- mà là không đủ thời gian đi xem hết, nên phải đoán từ trang giấy xem căn nào đáng đi.
+
+Mẹo gồm ba việc. Một, đảo thứ tự đọc: xem phần người bán tự nhận là điểm yếu trước, rồi tới giấy tờ và diện tích thật, và để giá cùng ảnh đẹp xuống sau cùng. Hai, hỏi xem họ đã sửa sang bao nhiêu trước khi chụp, vì một căn vừa sơn lại toàn bộ và một căn để nguyên thì không đặt cạnh nhau được. Ba, ghi lại đúng một dòng ``chỗ tôi thấy nghi'' cho mỗi tin, để sáu tháng sau quay lại bạn biết lần nào mình nghi đúng và lần nào nghi sai.
+
+Cái giá phải trả: đọc một tin lâu hơn hẳn, và nếu quen nghi ngờ quá tay thì bạn không bao giờ dám đi xem căn nào. Nghi ngờ chỉ có ích khi kèm một câu hỏi cụ thể bạn định hỏi người bán.
+
+\motcau{Người viết được quyền chọn ảnh nào đăng lên, nên việc của bạn là đoán ra những tấm không được đăng trông như thế nào.}
+\end{dongian}
+
+\section{Kết nối}
+Chương này là mặt đọc của cùng một kỹ năng mà \ptr{E/24-thi-nghiem-va-ablation} dạy ở mặt viết: mọi tiêu chí bạn dùng để nghi ngờ ablation của người khác đều là tiêu chí bạn phải tự thoả khi làm ablation của mình, nên hai chương nên đọc gần nhau. \ptr{B/07-chia-du-lieu-va-danh-gia} là tiền đề: không đọc được phần dữ liệu thì không đọc được bảng kết quả. \ptr{B/03-giai-phau-he-thong} cho bạn khung ba tầng để phân loại một đóng góp là ý tưởng hay chi tiết cài đặt. \ptr{D/22-tai-lap-va-mlops} là mặt đối lập hữu ích: nó cho thấy vì sao ngay cả tác giả trung thực cũng không tái lập được số của chính mình sau sáu tháng, nên khoảng cách giữa paper và thực tế không phải lúc nào cũng là dấu hiệu của sự thiếu trung thực.
+
+\begin{tukiem}
+\item Vì sao đọc phần limitations trước bảng kết quả lại đổi được cách bạn diễn giải cùng một con số, dù thông tin nhận được là như nhau?
+\item Một paper báo cáo cải tiến 1,0 mAP nhưng không ghi số seed: ba cách giải thích khác nhau cho con số đó là gì, và với mỗi cách thì chi tiết nào trong paper sẽ giúp bạn loại trừ nó?
+\item Vì sao ``công thức huấn luyện tốt hơn'' là một đóng góp thật nhưng lại là loại đóng góp khác với ``một module mới''? Sự khác nhau nằm ở đâu về mặt khả năng chuyển giao?
+\item Mục ``chỗ tôi không tin'' vô dụng nếu thiếu mục nào đi kèm, và vì sao?
+\item Khi nào việc đọc theo cụm hỏng, và bạn thay bằng gì trong giai đoạn đó?
+\item Cây phả hệ có thể tạo ảo giác hiểu biết. Phép thử nào phát hiện được ảo giác đó?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

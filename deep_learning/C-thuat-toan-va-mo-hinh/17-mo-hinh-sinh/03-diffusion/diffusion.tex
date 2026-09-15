@@ -1,0 +1,196 @@
+% ---------------------------------------------------------------------------
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: C/17-mo-hinh-sinh/01; B/09-thiet-ke-ham-mat-mat
+%  Mức độ: cốt lõi
+% ---------------------------------------------------------------------------
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Diffusion và các bước làm cho nó khả thi (Diffusion Models)}
+\ptrtarget{C/17-mo-hinh-sinh/03}\ptrtarget{C/17-mo-hinh-sinh/03-diffusion}\ptrtarget{C/17/03}\ptrtarget{C/17/03-diffusion}
+\dependency{\ptr{C/17-mo-hinh-sinh/01-bon-ho-mo-hinh-sinh} (vì sao diffusion ổn định hơn GAN); \ptr{B/09-thiet-ke-ham-mat-mat} (hồi quy trên nhiễu là bình phương trung bình); \ptr{C/13-kien-truc-backbone} (U-Net và transformer); \ptr{C/12-co-che-huan-luyen} (huấn luyện quy mô lớn).}
+
+\begin{tomtat}
+Diffusion biến một bài toán sinh rất khó thành một chuỗi bài toán khử nhiễu rất dễ, và đó là toàn bộ lý do nó thắng: hàm mất mát của nó là bình phương trung bình trên nhiễu, ổn định như mọi bài hồi quy. Mục này đi từ nguyên lý (quá trình thuận cố định, quá trình ngược học được, liên hệ với score function) tới bốn bước biến nó thành sản phẩm dùng được: bộ lấy mẫu ít bước, dẫn hướng không cần bộ phân lớp, khuếch tán trong không gian ẩn, và cơ chế điều khiển đầu ra. Đọc xong bạn biết mỗi tham số trong một pipeline sinh ảnh đang mua gì bằng gì --- số bước, hệ số dẫn hướng, độ mạnh ảnh sang ảnh --- và biết \en{latent diffusion} phá hỏng cái gì khi nó tiết kiệm tính toán. Nếu chỉ nhớ một điều: mọi cơ chế điều khiển trong diffusion đều mua độ trung thành bằng \emph{độ đa dạng}, nên một pipeline chỉnh tới mức đẹp nhất cũng là pipeline có phân phối hẹp nhất --- điều nguy hiểm nếu bạn định dùng đầu ra làm dữ liệu huấn luyện.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mô hình sinh (generative model)}{mô hình học phân phối của dữ liệu chứ không học một ánh xạ đầu vào \ra nhãn; dùng nó là lấy mẫu ra dữ liệu mới, không phải dự đoán.}
+\kn{nhiễu Gauss (Gaussian noise)}{nhiễu cộng lấy từ phân phối chuẩn; ``pha nhiễu'' nghĩa là cộng thêm một lượng nhiễu như vậy vào ảnh, làm ảnh mờ dần thành hạt.}
+\kn{khử nhiễu (denoising)}{việc ước lượng lại ảnh sạch (hoặc lượng nhiễu đã cộng vào) từ ảnh đã bị pha nhiễu. Diffusion chỉ làm đúng việc này, lặp lại nhiều lần.}
+\kn{bộ lấy mẫu (sampler)}{đoạn mã quyết định đi từ nhiễu về ảnh theo mấy bước và mỗi bước dài bao nhiêu. Nó tách rời khỏi mô hình: cùng một mô hình đổi sampler cho ra ảnh khác nhau.}
+\kn{không gian ẩn (latent space)}{không gian chiều thấp mà một autoencoder nén ảnh vào; một ảnh \(512\times512\) thành một tensor \(64\times64\), nên mọi phép tính sau đó rẻ đi hàng chục lần.}
+\kn{dẫn hướng (guidance)}{kỹ thuật kéo mẫu sinh ra về phía thoả mãn điều kiện (câu mô tả, ảnh cạnh...) mạnh hơn mức tự nhiên, đổi lại phân phối hẹp hơn.}
+\kn{score function (score function)}{gradient của log mật độ xác suất theo dữ liệu, \(\nabla_x\log p(x)\); nó là một trường vectơ chỉ về hướng ``đi đâu thì hợp lý hơn'' tại mỗi điểm trong không gian ảnh.}
+\kn{SNR (signal-to-noise ratio)}{tỉ số giữa phần tín hiệu gốc còn lại và phần nhiễu ở một bước; SNR cao nghĩa là ảnh còn gần như nguyên vẹn.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Sau mục 17.1 ta có một yêu cầu rõ ràng: cần chất lượng của GAN mà không có sự bất ổn của một bài toán trò chơi. Ý tưởng của diffusion đơn giản một cách bất ngờ --- \emph{nếu bài toán ``sinh một ảnh từ hư không'' quá khó, hãy chẻ nó thành một nghìn bài toán ``làm ảnh này bớt nhiễu đi một chút''}, mỗi bài dễ tới mức một mạng hồi quy bình thường giải được. Cộng đủ nhiều bước dễ thì ra một bước khó.
+
+Cái phải trả cho sự chẻ nhỏ đó là thời gian: sinh một ảnh cần chạy mạng hàng chục tới hàng nghìn lần. Toàn bộ lịch sử kỹ thuật của mảng này, từ 2020 tới nay, là chuỗi các nỗ lực trả bớt cái giá đó mà không mất chất lượng --- và đó cũng là cấu trúc của mục này.
+
+\textbf{Học mục này thì làm được gì mà trước đó không làm được?} Đọc một tệp cấu hình \repo{diffusers} và biết mỗi tham số đang đánh đổi gì; chẩn đoán được ảnh ra xấu là do bộ lấy mẫu, do hệ số dẫn hướng, hay do bộ mã hoá ẩn; và biết khi nào một mô hình sinh ảnh \emph{không} nên được dùng để tạo dữ liệu huấn luyện.
+
+\begin{trucgiac}
+Hãy nghĩ tới một bức ảnh bị nhoè dần trong một chuỗi bản sao chép: bản 1 gần như nguyên vẹn, bản 500 lem nhem, bản 1000 chỉ còn là hạt. Việc đoán bản 1000 từ hư không là bất khả. Nhưng việc đoán bản 499 khi đã có bản 500 thì gần như tầm thường --- chỉ phải lùi một nấc. Diffusion là phép nhận ra rằng nếu bạn làm được cái tầm thường đó một nghìn lần, bạn đã làm được cái bất khả. Và điều tinh tế: mấy nấc \emph{cuối} (nhiễu nhiều) là nơi mô hình quyết định bức ảnh sẽ vẽ \emph{cái gì}, còn mấy nấc \emph{đầu} (nhiễu ít) chỉ tô nốt chi tiết.
+\end{trucgiac}
+
+\subsection{B. Quá trình thuận, quá trình ngược}
+Quá trình thuận không có gì để học: nó chỉ là công thức pha nhiễu Gauss dần dần, và nhờ tính chất cộng của Gauss, ta nhảy thẳng từ ảnh gốc tới bước bất kỳ mà không cần lặp:
+\[
+q(x_t \mid x_0) \;=\; \mathcal{N}\!\bigl(\sqrt{\bar\alpha_t}\,x_0,\;(1-\bar\alpha_t)\,I\bigr),
+\qquad \bar\alpha_t=\prod_{s\le t}(1-\beta_s).
+\]
+\emph{Công thức này nói gì:} ở bước \(t\), ảnh còn lại đúng một phần \(\sqrt{\bar\alpha_t}\) tín hiệu gốc, phần còn lại là nhiễu trắng --- và vì có dạng đóng, ta lấy mẫu một \(t\) ngẫu nhiên rồi huấn luyện ngay, không phải chạy chuỗi. Đây là lý do kỹ thuật khiến diffusion huấn luyện được ở quy mô lớn.
+
+\textbf{Tính tay để thấy \(T=1000\) từ đâu ra.} Với lịch \(\beta\) tuyến tính từ \(10^{-4}\) tới \(0{,}02\), trung bình \(\beta \approx 0{,}0101\), nên \(\bar\alpha_T \approx \exp(-\sum_t \beta_t) = \exp(-10{,}1)\approx 4\times 10^{-5}\), tức \(\sqrt{\bar\alpha_T}\approx 0{,}006\). Nói cách khác, sau một nghìn bước thì chưa tới 1\,\% biên độ tín hiệu gốc còn sót lại --- vừa đủ để coi \(x_T\) là nhiễu trắng thuần tuý và bắt đầu quá trình ngược từ đó.
+
+Quá trình ngược mới là phần học. Mạng nhận \(x_t\) và \(t\), dự đoán \emph{nhiễu} đã thêm vào, và hàm mất mát là bình phương trung bình \(\lVert \varepsilon - \varepsilon_\theta(x_t,t)\rVert^{2}\) \cite{ho2020ddpm}. Đây là điểm mấu chốt của cả họ mô hình: mục tiêu là một bài hồi quy tầm thường, không phải một trò chơi hai người, nên không có bất ổn, không có \en{mode collapse}, và tăng quy mô thì tốt lên đều đặn.
+\lk{B/09}{hệ quả của}{ổn định của diffusion đến thẳng từ dạng của hàm mất mát --- bình phương trung bình trên nhiễu --- chứ không từ kiến trúc nào.}
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  nb/.style={draw=steel,fill=bluebg,circle,inner sep=3pt,font=\scriptsize,minimum size=8mm},
+  d/.style={font=\scriptsize,color=tiercol}]
+\node[nb] (x0) at (0,0) {\(x_0\)};
+\node[nb] (x1) at (2.4,0) {\(x_1\)};
+\node[d]  (dd) at (4.6,0) {\(\cdots\)};
+\node[nb] (xt) at (6.8,0) {\(x_t\)};
+\node[d]  (de) at (9.0,0) {\(\cdots\)};
+\node[nb] (xT) at (11.4,0) {\(x_T\)};
+\node[font=\scriptsize,align=center,below=3pt] at (x0) {ảnh thật};
+\node[font=\scriptsize,align=center,below=3pt] at (xT) {nhiễu trắng};
+\foreach \a/\b in {x0/x1,x1/dd,dd/xt,xt/de,de/xT}
+  \draw[-{Stealth[length=4pt]},steel,thick] (\a) to[bend left=32] (\b);
+\foreach \a/\b in {xT/de,de/xt,xt/dd,dd/x1,x1/x0}
+  \draw[-{Stealth[length=4pt]},reddark,thick,dashed] (\a) to[bend left=32] (\b);
+\node[font=\scriptsize,steel,align=center] at (5.7,1.35)
+  {\textbf{thuận} \(q\): thêm nhiễu Gauss --- \emph{cố định, có dạng đóng, không học}};
+\node[font=\scriptsize,reddark,align=center] at (5.7,-1.35)
+  {\textbf{ngược} \(p_\theta\): khử nhiễu một nấc --- \emph{học bằng hồi quy trên nhiễu}};
+\draw[{Stealth[length=4pt]}-{Stealth[length=4pt]},tiercol,thick] (0,-2.2) -- (11.4,-2.2);
+\node[font=\scriptsize,tiercol,align=center] at (1.6,-2.6) {SNR cao:\\ tô chi tiết};
+\node[font=\scriptsize,tiercol,align=center] at (9.8,-2.6) {SNR thấp:\\ quyết định bố cục và ngữ nghĩa};
+\end{tikzpicture}}
+\caption{Hai chiều của cùng một chuỗi. Chiều thuận không có tham số nào, nên toàn bộ khả năng của mô hình dồn vào chiều ngược. Trục dưới giải thích một điều thực hành quan trọng: các bước ở phía nhiễu nhiều quyết định \emph{nội dung} ảnh, nên cắt bớt bước ở phía đó thay đổi ảnh nhiều hơn hẳn cắt bớt ở phía nhiễu ít --- đó là lý do các lịch lấy mẫu ít bước không chia đều khoảng cách.}
+\label{fig:diffusion-chain}
+\end{figure}
+
+\subsection{C. Vì sao gọi là ``khớp score function'', và vì sao cần nhiều bước}
+Có một cách nhìn thứ hai cho cùng một mô hình, và nó giải thích được nhiều thứ hơn. Với phân phối \(p_t\) của dữ liệu đã pha nhiễu ở mức \(t\), \en{score function} là \(\nabla_x \log p_t(x)\) --- vectơ chỉ về hướng ``đi đâu thì hợp lý hơn''. Có thể chứng minh rằng mạng dự đoán nhiễu ở trên chính là ước lượng của score function sai khác một hệ số: \(\varepsilon_\theta(x_t,t)\approx -\sqrt{1-\bar\alpha_t}\,\nabla_x\log p_t(x_t)\) \cite{song2021score}. \emph{Nói gọn thì:} mô hình học một trường vectơ phủ khắp không gian ảnh, và lấy mẫu là thả một điểm nhiễu vào trường đó rồi để nó trôi về vùng có mật độ cao.
+
+Cách nhìn này trả lời ngay câu hỏi ``vì sao cần nhiều bước'': trôi theo một trường vectơ là giải một phương trình vi phân, và mỗi bước rời rạc là một xấp xỉ tuyến tính chỉ đúng trong lân cận nhỏ. Bước dài thì sai số rời rạc hoá lớn, ảnh ra méo. Từ đó suy ra hai hướng cải thiện, và cả hai đều đã thành chuẩn:
+\begin{itemize}
+\item \textbf{Đổi bộ giải.} DDIM biến quá trình lấy mẫu ngẫu nhiên thành một phương trình vi phân thường tất định, cho phép nhảy bước dài hơn với cùng mô hình đã huấn luyện \cite{song2021ddim}. Không huấn luyện lại gì cả --- đây thuần tuý là giải số tốt hơn.
+\item \textbf{Làm thẳng quỹ đạo.} \en{Flow matching} huấn luyện thẳng một trường vận tốc nối nhiễu với dữ liệu theo đường càng gần đường thẳng càng tốt \cite{lipman2023flow}; quỹ đạo thẳng thì bộ giải cần ít bước hơn. Đây là hướng thiết kế thống trị các mô hình sinh lớn hiện nay.
+\end{itemize}
+
+\subsection{D. Điều khiển đầu ra: dẫn hướng, không gian ẩn, ràng buộc cấu trúc}
+
+\begin{mach}[Mạch 3 --- bốn bước biến diffusion thành sản phẩm]
+\item \vd{mô hình sinh ra ảnh hợp lý nhưng không theo ý ta.} \gp \en{classifier-free guidance}: trong lúc huấn luyện, thỉnh thoảng bỏ điều kiện đi để một mạng duy nhất học cả bản có điều kiện lẫn bản không; lúc lấy mẫu, ngoại suy \(\tilde\varepsilon = \varepsilon_{\text{vô đk}} + w\,(\varepsilon_{\text{có đk}}-\varepsilon_{\text{vô đk}})\) \cite{ho2022classifier}. \emph{Công thức này nói gì:} lấy hiệu giữa ``có điều kiện'' và ``không điều kiện'' làm hướng của điều kiện, rồi đi quá lên \(w\) lần theo hướng đó. \gia \(w>1\) không phải là ``làm đúng hơn'' mà là \emph{làm phân phối hẹp lại}: bám prompt tốt hơn, đa dạng kém đi, và ở \(w\) lớn thì màu bị cháy.
+\item \vd{chạy khuếch tán trên không gian pixel quá đắt.} \gp nén ảnh bằng một autoencoder rồi khuếch tán trong không gian ẩn \cite{rombach2022latent}. Với hệ số nén 8, ảnh \(512\times512\) còn \(64\times64\) vị trí --- ít hơn 64 lần, và vì chi phí \en{attention} tăng theo bình phương số vị trí, phần đó rẻ đi hàng nghìn lần. \hq đây chính là bước biến diffusion từ nghiên cứu thành sản phẩm chạy được trên GPU tiêu dùng.
+\lk{B/11}{ràng buộc bởi}{lợi ích của không gian ẩn tính trực tiếp từ ngân sách bộ nhớ và chi phí attention theo số vị trí.} \gia chất lượng bị chặn trên bởi chất lượng autoencoder; chi tiết rất nhỏ --- chữ nhỏ, mắt người ở xa, hoa văn mịn --- bị phá ngay ở khâu nén và không mô hình khuếch tán nào cứu lại được.
+\item \vd{U-Net khó mở rộng quy mô một cách có quy luật.} \gp thay bằng \en{transformer} thao tác trên các \en{token} của không gian ẩn --- \en{diffusion transformer} \cite{peebles2023dit}. \hq quy luật mở rộng quy mô trở nên dự đoán được, giống như ở mô hình ngôn ngữ.
+\item \vd{prompt bằng chữ không đủ để ràng buộc cấu trúc hình học.} \gp \en{ControlNet}: nhân bản phần mã hoá của mô hình gốc, cho nhánh sao chép nhận điều kiện cấu trúc (cạnh, tư thế người, bản đồ độ sâu), và nối nó vào mô hình gốc qua các tầng tích chập \emph{khởi tạo bằng 0} \cite{zhang2023controlnet}. \emph{Chi tiết khởi tạo 0 mới là chỗ hay:} ở bước huấn luyện đầu tiên nhánh mới đóng góp đúng bằng không, nên mô hình gốc không bị phá; huấn luyện chỉ \emph{thêm} khả năng chứ không làm hỏng prior đã có. \gia càng nhiều ràng buộc thì càng ít đa dạng --- cùng một quy luật với dẫn hướng ở bước 1.
+\end{mach}
+
+\begin{table}[H]\centering\small
+\caption{Ba cách điều khiển đầu ra. Cả ba mua độ trung thành bằng cùng một đồng tiền là độ đa dạng.}
+\label{tab:dieu-khien-diffusion}
+\begin{tabularx}{\linewidth}{@{}L{2.4cm}YYL{2.6cm}@{}}
+\toprule
+\textbf{Cách} & \textbf{Cơ chế} & \textbf{Ràng buộc được gì} & \textbf{Mất gì}\\
+\midrule
+Dẫn hướng (CFG) & Ngoại suy giữa nhánh có và không điều kiện & Ngữ nghĩa, độ bám prompt & Đa dạng; \(w\) lớn gây cháy màu\\
+ControlNet & Nhánh sao chép, nối bằng tầng khởi tạo 0 & Cấu trúc hình học: cạnh, tư thế, độ sâu & Tự do bố cục; thêm chi phí tính toán\\
+Ảnh sang ảnh / inpainting & Bắt đầu từ ảnh đã pha nhiễu tới mức \(t<T\) & Bố cục và màu của ảnh gốc & Mức thay đổi bị chặn bởi \(t\) đã chọn\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Riêng dòng cuối bảng đáng một câu giải thích, vì nó là hệ quả trực tiếp của Hình~\ref{fig:diffusion-chain}: tham số ``độ mạnh'' trong ảnh sang ảnh thực chất chỉ là \emph{chọn bắt đầu từ nấc nào}. Bắt đầu ở nấc nhiễu ít thì ảnh gốc còn nguyên và mô hình chỉ tô lại bề mặt; bắt đầu ở nấc nhiễu nhiều thì bố cục cũng bị viết lại. Không có gì bí ẩn ở đây --- chỉ là một chỉ số trên trục thời gian.
+
+Hình~\ref{fig:latent-diffusion} và Hình~\ref{fig:cfg-ngoai-suy} vẽ hai bước quan trọng nhất trong mạch trên.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  b/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,font=\scriptsize,align=center,minimum height=8mm},
+  bb/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=4pt,font=\scriptsize,align=center,minimum height=8mm},
+  ar/.style={-{Stealth[length=4pt]},steel,thick}]
+\node[b] (x) at (0,0) {ảnh\\ \(512\times512\times3\)};
+\node[bb] (e) at (2.7,0) {bộ mã hoá\\ \(\div 8\)};
+\node[b,fill=amberbg,draw=accent] (z) at (5.5,0) {ẩn\\ \(64\times64\times4\)};
+\node[b,fill=amberbg,draw=accent] (d) at (8.6,0) {khuếch tán\\ \emph{toàn bộ ở đây}};
+\node[bb] (dec) at (11.6,0) {bộ giải mã};
+\node[b] (o) at (14.1,0) {ảnh ra};
+\foreach \a/\b in {x/e,e/z,z/d,d/dec,dec/o} \draw[ar] (\a) -- (\b);
+\draw[decorate,decoration={brace,mirror,amplitude=4pt},accent]
+  (4.4,-0.75) -- (10.0,-0.75) node[midway,below=5pt,font=\scriptsize,align=center,text=inkblue]
+  {\(262\,144 \rightarrow 4\,096\) vị trí không gian: \textbf{ít hơn 64 lần}\\ và chi phí attention giảm theo bình phương số vị trí};
+\draw[reddark,-{Stealth[length=4pt]},thick] (2.7,1.25) -- (2.7,0.5);
+\node[font=\scriptsize,reddark,anchor=south,align=center] at (2.7,1.28)
+  {trần chất lượng nằm ở \emph{đây}:\\ chữ nhỏ và hoa văn mịn chết ngay khâu này};
+\end{tikzpicture}}
+\caption{Latent diffusion, và chỗ nó lấy tiền về cũng như chỗ nó trả tiền ra. Toàn bộ phần đắt --- hàng chục tới hàng trăm lượt chạy mạng --- được dời vào không gian ẩn nhỏ hơn 64 lần về số vị trí, và đó là lý do một mô hình sinh ảnh chạy được trên GPU tiêu dùng. Cái giá nằm ở mũi tên đỏ: mọi chi tiết mà bộ mã hoá không giữ được thì không mô hình khuếch tán nào ở phía sau dựng lại được. Vì vậy phép chẩn đoán đầu tiên khi ảnh mất chi tiết là mã hoá rồi giải mã ngay ảnh gốc, bỏ qua khuếch tán.}
+\label{fig:latent-diffusion}
+\end{figure}
+
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[font=\footnotesize]
+\draw[tiercol,very thin,-{Stealth[length=3pt]}] (-0.4,0) -- (9.2,0);
+\coordinate (u) at (0.9,0);
+\coordinate (c) at (3.9,0);
+\coordinate (w2) at (6.9,0);
+\fill[steel] (u) circle (2.4pt);
+\fill[violetdark] (c) circle (2.4pt);
+\fill[reddark] (w2) circle (2.4pt);
+\node[font=\scriptsize,steel,anchor=north,align=center] at (u) {\(\varepsilon_{\text{vô đk}}\)\\ \emph{ảnh bất kỳ}};
+\node[font=\scriptsize,violetdark,anchor=north,align=center] at (c) {\(\varepsilon_{\text{có đk}}\)\\ \(w=1\)};
+\node[font=\scriptsize,reddark,anchor=north,align=center] at (w2) {\(\tilde\varepsilon\) với \(w=3\)\\ \emph{ngoại suy quá lên}};
+\draw[-{Stealth[length=4pt]},steel,very thick] (u) -- (c);
+\node[font=\scriptsize,steel,anchor=south] at (2.4,0.12) {hướng mà điều kiện chỉ ra};
+\draw[-{Stealth[length=4pt]},reddark,very thick,dashed] (c) -- (w2);
+\node[font=\scriptsize,reddark,anchor=south] at (5.4,0.12) {đi tiếp \((w-1)\) lần nữa};
+\draw[decorate,decoration={brace,amplitude=4pt},accent] (0.9,1.35) -- (6.9,1.35)
+  node[midway,above=5pt,font=\scriptsize,align=center,text=inkblue]
+  {càng sang phải: bám prompt càng chặt, phân phối càng \textbf{hẹp}, màu càng dễ cháy};
+\end{tikzpicture}
+\caption{Dẫn hướng không cần bộ phân lớp, nhìn như một phép ngoại suy trên đường thẳng. Hiệu giữa dự đoán có điều kiện và dự đoán không điều kiện chính là ``hướng của điều kiện''; hệ số \(w\) quyết định đi bao xa theo hướng đó. \(w=1\) là dùng đúng dự đoán có điều kiện; \(w>1\) là đi \emph{quá} lên. Điều quan trọng cần đọc ra từ hình: không có chỗ nào trong phép này làm mô hình ``đúng hơn'' --- nó chỉ đẩy mẫu về vùng điển hình và cắt bớt đuôi, nên ảnh riêng lẻ đẹp hơn còn tập ảnh thì nghèo đi.}
+\label{fig:cfg-ngoai-suy}
+\end{figure}
+
+\subsection{E. Giới hạn và trường hợp hỏng}
+\begin{itemize}
+\item \textbf{Chậm là tính chất, không phải lỗi.} Mọi cách tăng tốc --- ít bước, chưng cất bộ lấy mẫu, quỹ đạo thẳng --- đều đang xấp xỉ cùng một quỹ đạo, và ở số bước rất nhỏ thì chất lượng và đa dạng đều tụt. Chưng cất bộ lấy mẫu là đúng mẫu hình ``dời chi phí sang lúc huấn luyện'' của mục 17.2.
+\lk{D/20}{cùng nguyên lý với}{cùng phép đổi chi phí suy luận lấy chi phí huấn luyện đã gặp ở chưng cất mô hình.}
+\item \textbf{Trần chất lượng nằm ở autoencoder.} Nếu ảnh ra mất chữ nhỏ hoặc chi tiết mịn, đừng đổ cho mô hình khuếch tán trước khi kiểm tra: mã hoá rồi giải mã ngay ảnh gốc, không chạy khuếch tán, và xem chi tiết đó có sống sót không. Phép thử này mất ba mươi giây và loại bỏ được một nửa số giả thuyết.
+\item \textbf{Đếm, chữ, và quan hệ không gian vẫn yếu.} Đây là hệ quả của việc điều kiện đi vào mô hình qua \en{cross-attention} trên biểu diễn văn bản, chứ không qua một cơ chế suy luận rời rạc nào.
+\item \textbf{Lệch giữa mô hình và bộ lấy mẫu.} Một mô hình huấn luyện với lịch nhiễu này, chạy bằng bộ lấy mẫu giả định lịch khác, cho ra ảnh xấu mà không có thông báo lỗi nào. Đây là lỗi cấu hình phổ biến nhất trong thực hành.
+\end{itemize}
+
+\begin{cambay}
+Tăng hệ số dẫn hướng cho tới khi ảnh ``đẹp nhất'' là một cái bẫy có hậu quả xa. Dẫn hướng mạnh không làm mô hình đúng hơn --- nó \emph{cắt bớt đuôi phân phối}, giữ lại phần lõi điển hình nhất. Ảnh riêng lẻ đẹp hơn, nhưng tập ảnh sinh ra nghèo hơn hẳn tập ảnh thật. Nếu bạn định dùng đầu ra làm dữ liệu huấn luyện, đây chính là cơ chế gây thu hẹp phân phối qua từng vòng lặp: mỗi thế hệ học từ đuôi đã bị cắt của thế hệ trước. Xem \ptr{C/17-mo-hinh-sinh/04-low-level-vision}.
+\lk{C/17/04}{tiền đề}{muốn hiểu vì sao dữ liệu sinh có thể đầu độc mô hình sau, phải hiểu trước rằng mọi núm điều khiển ở đây đều cắt đuôi phân phối.}
+\end{cambay}
+
+\begin{cannho}
+Diffusion thắng không phải vì ý tưởng đẹp hơn GAN mà vì nó biến bài toán sinh thành một bài \emph{hồi quy}, và hồi quy thì mở rộng quy mô được. Ba con số đáng nhớ khi chỉnh một pipeline: số bước quyết định sai số rời rạc hoá, hệ số dẫn hướng quyết định đánh đổi trung thành \(\leftrightarrow\) đa dạng, và hệ số nén của autoencoder quyết định trần chi tiết. Ba tham số đó độc lập nhau, và chẩn đoán sai lầm hay gặp nhất là đổ lỗi cho tham số thứ nhất khi thủ phạm là tham số thứ ba. \T{2}
+\end{cannho}
+
+\subsection{F. Kết nối}
+Mục này là phần chi tiết của họ thứ tư trong \ptr{C/17-mo-hinh-sinh/01-bon-ho-mo-hinh-sinh}; ``chưng cất bộ lấy mẫu'' là bản sao của mẫu hình ở \ptr{C/17-mo-hinh-sinh/02-toi-uu-tren-pixel} và ở \ptr{D/20-toi-uu-va-nen-mo-hinh}. Việc dùng đầu ra làm dữ liệu huấn luyện và hậu quả thu hẹp phân phối nằm ở \ptr{C/17-mo-hinh-sinh/04-low-level-vision}; phần kiến trúc transformer thay U-Net nối về \ptr{C/13-kien-truc-backbone/03-vit-va-inductive-bias}; chi phí bộ nhớ và tính toán của attention theo số vị trí nằm ở \ptr{B/11-gioi-han-tinh-toan}.
+
+\begin{tukiem}
+\item Vì sao quá trình thuận \emph{không có tham số nào} lại là điều kiện kỹ thuật khiến diffusion huấn luyện được ở quy mô lớn?
+\item Cách nhìn ``score function'' giải thích được điều gì mà cách nhìn ``khử nhiễu từng nấc'' không giải thích được?
+\item Latent diffusion tiết kiệm tính toán bằng cách nào, và bạn thiết kế phép thử ba mươi giây nào để biết chi tiết bị mất là do khâu nén hay do khâu khuếch tán?
+\item Vì sao tăng hệ số dẫn hướng làm ảnh đẹp hơn nhưng làm tập ảnh nghèo hơn --- và khi nào điều đó là nguy hiểm chứ không chỉ là đáng tiếc?
+\item Tầng tích chập nối của ControlNet được khởi tạo bằng 0. Bỏ chi tiết đó đi thì hỏng ở đâu, trong bước huấn luyện thứ mấy?
+\item Theo Hình~\ref{fig:diffusion-chain}, nếu chỉ được giữ 10 trong 1000 bước, bạn đặt chúng ở đâu và vì sao?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,21 @@
+\documentclass[../vslam.tex]{subfiles}
+\begin{document}
+\part{HỆ THỐNG SLAM ĐẦY ĐỦ}
+\begin{tomtat}
+Phần B cho các mảnh rời. Phần C là chỗ chúng trở thành một \emph{hệ thống} chạy được lâu dài. Sáu chương xử lý sáu câu hỏi mà không chương nào ở Phần B trả lời được: bản đồ được quản lý thế nào khi nó lớn lên vô hạn và thế giới thì thay đổi (chương 13); hiệu chuẩn --- vốn được coi là hằng số suốt Phần A và B --- thực ra là một nhánh của chính SLAM (chương 14); thêm cảm biến vào thế nào cho đúng (chương 15); làm sao có một bản đồ dày chứ không chỉ một đám mây điểm thưa (chương 16); học máy đóng góp ở đâu và ở đâu thì không (chương 17); và làm sao biết hệ thống của mình có thật sự tốt hơn không (chương 18). Nếu chỉ nhớ một điều: \emph{chương 14 là chỗ luận đề trung tâm của cây được chứng minh bằng tay} --- ta đi từ ô ``hiệu chuẩn'' sang ô ``SLAM'' trong bảng ở \ptr{00-map} bằng cách thả dần các biến ra, và không có gì trong bộ giải phải thay đổi.
+\end{tomtat}
+
+Phần này khác Phần B ở một điểm về bản chất. Phần B trả lời các câu hỏi có lời giải \emph{đúng hoặc sai}: thuật toán này khớp điểm tốt hơn thuật toán kia, kiến trúc này chi phí thấp hơn kiến trúc kia. Phần C trả lời các câu hỏi có lời giải \emph{phù hợp hoặc không phù hợp}: giữ bao nhiêu keyframe là đủ, cập nhật bản đồ theo chu kỳ nào, thêm cảm biến nào cho ứng dụng nào. Đó là các câu hỏi kỹ thuật hệ thống, và chúng phụ thuộc vào ràng buộc sản phẩm chứ không chỉ vào toán học.
+
+Đây cũng là lý do phần này ít tài liệu học thuật hơn hẳn. Một bài báo có thể chứng minh thuật toán khớp điểm mới tốt hơn; rất khó chứng minh một chính sách quản lý bản đồ tốt hơn, vì ``tốt hơn'' phụ thuộc vào việc robot chạy bao lâu, trong không gian nào, và ai trả tiền cho bộ nhớ. Hệ quả thực tế là kiến thức trong phần này chủ yếu nằm trong mã nguồn của vài hệ thống trưởng thành chứ không nằm trong bài báo --- và đó là lý do \ptr{E/23} khuyến nghị đọc mã ORB-SLAM3 và maplab chứ không chỉ đọc bài của họ.
+
+Sáu chương có vai trò rất khác nhau. Chương 13 là chương bị coi nhẹ nhất trong toàn lĩnh vực và có ảnh hưởng lớn nhất tới sản phẩm; nó nên được đọc kỹ ngay cả khi bạn chưa thấy vì sao. Chương 14 là chương hợp nhất của cả cây --- nếu chỉ đọc một chương của Phần C thì đọc nó. Chương 15 là chương ngắn nhất vì phần lớn nội dung nằm ở các cây khác, nhưng nó chứa một nguyên tắc quan trọng về cách thêm nguồn thông tin. Chương 16 và 17 là hai chương nóng nhất về mặt nghiên cứu và cũng là hai chương hết hạn nhanh nhất. Chương 18 khép phần lại bằng câu hỏi ``làm sao biết mình đúng'', và nó là chương mà mọi chương trước đều nợ.
+\subfile{00-map}
+\subfile{13-quan-ly-ban-do/quan-ly-ban-do}
+\subfile{14-hieu-chuan-nhu-mot-nhanh-cua-slam/hieu-chuan-nhu-mot-nhanh-cua-slam}
+\subfile{15-hop-nhat-da-cam-bien/hop-nhat-da-cam-bien}
+\subfile{16-dense-mapping-va-bieu-dien/dense-mapping-va-bieu-dien}
+\subfile{17-hoc-may-trong-slam/hoc-may-trong-slam}
+\subfile{18-danh-gia-va-phuong-phap-luan/danh-gia-va-phuong-phap-luan}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,506 @@
+% ============================================================================
+%  preamble/common.tex — style dùng chung cho toàn cây marker.
+%  Dẫn xuất nguyên vẹn từ preamble của cây IMU_Fusion (cùng tác giả, cùng quy ước);
+%  chỉ đổi bảng repo ở dưới sang hệ sinh thái fiducial marker, và nhãn mini project.
+%  Biên dịch: XeLaTeX + biber. Mọi macro, hộp, font định nghĩa ở đây.
+%  KHÔNG định nghĩa lại bất cứ thứ gì ở file con.
+% ============================================================================
+\usepackage[a4paper,top=2.3cm,bottom=2.4cm,left=2.4cm,right=2.4cm,headsep=0.6cm]{geometry}
+
+% ---------- font, ngôn ngữ ----------
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Pagella}
+\setsansfont{Lato}[Scale=MatchLowercase, BoldFont={Lato Semibold}]
+\setmonofont{Noto Sans Mono}[Scale=0.86]
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage[vietnamese]{babel}
+
+% ---------- màu ----------
+\usepackage[table]{xcolor}
+\definecolor{inkblue}{HTML}{12395B}     % xanh navy sâu — tiêu đề
+\definecolor{steel}{HTML}{2E7290}       % xanh teal — tiêu đề phụ, nhãn
+\definecolor{accent}{HTML}{C0651C}      % hổ phách — số chương, chữ phần, điểm nhấn
+\definecolor{rulecol}{HTML}{CBD7E1}
+\definecolor{violetdark}{HTML}{5A3E8C}
+\definecolor{violetbg}{HTML}{F4F1FA}
+\definecolor{reddark}{HTML}{A63030}
+\definecolor{redbg}{HTML}{FDF1F0}
+\definecolor{bluebg}{HTML}{EDF4F9}
+\definecolor{codebg}{HTML}{F7F7F4}
+\definecolor{tiercol}{HTML}{6E7C89}
+\definecolor{panelbg}{HTML}{F4F7FA}     % nền khối tóm tắt
+\definecolor{amberbg}{HTML}{FDF5EC}     % nền khối kiến thức nền
+\definecolor{tblhead}{HTML}{E7EEF4}     % nền hàng tiêu đề bảng
+\definecolor{tblalt}{HTML}{F7FAFC}      % sọc bảng
+\definecolor{tblrule}{HTML}{8FA6B8}     % đường kẻ bảng
+\definecolor{greendark}{HTML}{2F6B4F}   % khối nói lại thật đơn giản
+\definecolor{greenbg}{HTML}{EFF6F1}
+
+% ---------- bảng, danh sách, hình ----------
+\usepackage{array,longtable,tabularx,booktabs,multirow,makecell}
+\usepackage{etoolbox}
+% bảng: sọc nhẹ từ hàng thứ hai, đường kẻ màu xanh xám thay vì đen
+\arrayrulecolor{tblrule}
+\BeforeBeginEnvironment{tabularx}{\rowcolors{2}{white}{tblalt}}
+\BeforeBeginEnvironment{tabular}{\rowcolors{2}{white}{tblalt}}
+\BeforeBeginEnvironment{longtable}{\rowcolors{2}{white}{tblalt}}
+\setlength{\heavyrulewidth}{1.1pt}
+\setlength{\lightrulewidth}{0.5pt}
+\usepackage{enumitem}
+\setlist{leftmargin=1.5em,itemsep=0.22em,topsep=0.4em,parsep=0pt}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds,decorations.pathreplacing,shapes.geometric,patterns}
+\usepackage{pgfplots}\pgfplotsset{compat=1.18}
+\usepackage[most]{tcolorbox}
+\usepackage{emptypage}
+\usepackage{listings}
+\usepackage{colortbl}
+\usepackage[font=small,labelfont={bf,sf},labelsep=period,skip=6pt]{caption}
+\usepackage{titletoc}
+\usepackage[all]{nowidow}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\renewcommand{\arraystretch}{1.18}
+\setlength{\tabcolsep}{5pt}
+
+% tiếng Việt không có mẫu ngắt từ; cho TeX chỗ co giãn
+\tolerance=3000 \emergencystretch=3.5em \hbadness=7000
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
+
+% ---------- tiêu đề ----------
+\usepackage{titlesec}
+
+% PHẦN: trang phân cách có chữ cái lớn mờ làm nền
+\titleformat{\part}[display]
+  {\normalfont\sffamily\bfseries\color{inkblue}\raggedright}
+  {\hfill\begin{tikzpicture}[remember picture,overlay]
+     \node[anchor=north east,inner sep=0pt] at ($(current page.north east)+(-2.2cm,-4.2cm)$)
+       {\fontsize{140}{140}\selectfont\sffamily\bfseries\color{accent!16}\thepart};
+   \end{tikzpicture}%
+   {\large\sffamily\bfseries\color{accent}PHẦN \thepart}}
+  {0.4em}{\fontsize{30}{34}\selectfont\raggedright}
+  [\vspace{0.7em}{\color{accent}\rule{5cm}{2pt}}]
+\titlespacing*{\part}{0pt}{3.2cm}{2.2em}
+
+% CHƯƠNG: số lớn màu hổ phách bên phải, tiêu đề lớn, gạch mảnh
+\titleformat{\chapter}[display]
+  {\normalfont\sffamily\bfseries\color{inkblue}}
+  {\hfill{\fontsize{46}{46}\selectfont\color{accent!75}\thechapter}}
+  {-0.15em}
+  {\raggedright\fontsize{21}{25}\selectfont}
+  [\vspace{0.45em}{\color{rulecol}\titlerule[1.2pt]}]
+\titlespacing*{\chapter}{0pt}{0.4em}{1.7em}
+
+% MỤC: thanh nhấn nhỏ trước số mục
+\titleformat{\section}
+  {\normalfont\sffamily\large\bfseries\color{inkblue}}
+  {\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}\thesection}
+  {0.55em}{}
+  [\vspace{-0.42em}{\color{rulecol}\rule{\linewidth}{0.7pt}}]
+\titlespacing*{\section}{0pt}{1.7em}{0.65em}
+
+\titleformat{\subsection}{\normalfont\sffamily\bfseries\color{steel}}{\thesubsection}{0.5em}{}
+\titlespacing*{\subsection}{0pt}{1.15em}{0.3em}
+\titleformat{\subsubsection}{\normalfont\sffamily\bfseries\itshape\color{steel}}{}{0pt}{}
+\titlespacing*{\subsubsection}{0pt}{0.9em}{0.2em}
+\setcounter{secnumdepth}{1}   % chỉ đánh số tới \section; subsection là tiêu đề không số
+\setcounter{tocdepth}{1}
+\renewcommand{\thepart}{\Alph{part}}
+% khi compile riêng một file con, chapter=0 nên bỏ tiền tố chương
+\renewcommand{\thesection}{\ifnum\value{chapter}>0 \thechapter.\fi\arabic{section}}
+
+% mục lục: giãn cách rõ ràng hơn
+\titlecontents{chapter}[2.6em]{\vspace{0.5em}\sffamily\bfseries\color{inkblue}}
+  {\contentslabel[\thecontentslabel]{2.4em}}{\hspace*{-2.4em}}
+  {\hfill\normalfont\color{tiercol}\contentspage}
+\titlecontents{section}[5.0em]{\smallskip\small}
+  {\contentslabel[\thecontentslabel]{2.6em}}{}
+  {\titlerule*[0.6pc]{\color{rulecol}.}\small\color{tiercol}\contentspage}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyhead[L]{\footnotesize\sffamily\color{tiercol}\nouppercase{\leftmark}}
+\fancyhead[R]{\small\sffamily\bfseries\color{white}%
+  \colorbox{inkblue}{\makebox[1.5em][c]{\vphantom{Ag}\thepage}}}
+\fancypagestyle{plain}{\fancyhf{}\renewcommand{\headrulewidth}{0pt}%
+  \fancyfoot[C]{\small\sffamily\bfseries\color{white}%
+    \colorbox{inkblue}{\makebox[1.5em][c]{\vphantom{Ag}\thepage}}}}
+
+% caption: nhãn đậm màu accent
+\captionsetup{labelfont={bf,sf,color=accent},textfont={small}}
+
+% ---------- BA loại hộp, không thêm loại thứ tư ----------
+\tcbset{hopbase/.style={
+  enhanced, breakable, sharp corners=downhill, arc=3pt,
+  boxrule=0pt, leftrule=3pt, toprule=0pt, bottomrule=0pt, rightrule=0pt,
+  left=1.0em, right=1.0em, top=0.65em, bottom=0.65em,
+  before skip=1.1em, after skip=1.1em,
+  fonttitle=\sffamily\bfseries\small, coltitle=white,
+  attach boxed title to top left={xshift=0.9em, yshift=-\tcboxedtitleheight/2},
+  boxed title style={sharp corners=downhill, arc=2pt, boxrule=0pt, left=0.55em, right=0.55em,
+                     top=0.15em, bottom=0.15em},
+  top=1.15em}}
+\newtcolorbox{trucgiac}{hopbase, colback=violetbg, colframe=violetdark,
+  colbacktitle=violetdark, title={TRỰC GIÁC}, before upper={\bmblock{Trực giác}}}
+\newtcolorbox{cambay}{hopbase, colback=redbg, colframe=reddark,
+  colbacktitle=reddark, title={CẠM BẪY}}
+\newtcolorbox{cannho}{hopbase, colback=bluebg, colframe=steel,
+  colbacktitle=steel, title={CẦN NHỚ}, before upper={\bmblock{Cần nhớ}}}
+
+% ---------- tóm tắt đầu tài liệu ----------
+% Đặt ngay sau tiêu đề và sau \dependency. 3-6 câu: tài liệu này về gì, đọc xong làm được gì,
+% và điều quan trọng nhất nếu chỉ đọc mỗi khối này. KHÔNG phải hộp callout thứ tư.
+\newtcolorbox{tomtat}{
+  enhanced, breakable, sharp corners=downhill, arc=3pt,
+  colback=panelbg, colframe=inkblue,
+  boxrule=0pt, leftrule=3pt, toprule=0pt, bottomrule=0pt, rightrule=0pt,
+  left=1.0em, right=1.0em, top=1.15em, bottom=0.7em,
+  before skip=0.9em, after skip=1.0em,
+  fontupper=\small,
+  fonttitle=\sffamily\bfseries\small, coltitle=white, colbacktitle=inkblue,
+  attach boxed title to top left={xshift=0.9em, yshift=-\tcboxedtitleheight/2},
+  boxed title style={sharp corners=downhill, arc=2pt, boxrule=0pt, left=0.55em, right=0.55em,
+                     top=0.15em, bottom=0.15em},
+  title={TÓM TẮT}, before upper={\bmblock{Tóm tắt}}}
+
+% ---------- mạch vấn đề -> giải pháp ----------
+% Mỗi bước là một khối có gạch dọc bên trái, số thứ tự nằm TRONG cột nhãn cùng dòng "Vấn đề",
+% các thành phần còn lại (Giải pháp, Giả định, Giá phải trả, Vấn đề mới, Hệ quả) mỗi cái một dòng,
+% nhãn thẳng cột, thân thẳng hàng kể cả khi gấp dòng.
+\newcounter{machctr}
+\newlength{\machlabw}\setlength{\machlabw}{6.6em}
+\newlength{\machbase}
+\newenvironment{mach}[1][Mạch vấn đề \(\rightarrow\) giải pháp]
+  {\par\medskip\noindent
+   {\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+    \sffamily\bfseries\color{inkblue}#1}\par\nopagebreak\vspace{0.35em}
+   \setcounter{machctr}{0}%
+   \begin{list}{}%
+     {\setlength{\leftmargin}{1.0em}\setlength{\labelwidth}{0pt}\setlength{\labelsep}{0pt}%
+      \setlength{\itemsep}{0.95em}\setlength{\topsep}{0.2em}\setlength{\parsep}{0pt}%
+      \setlength{\listparindent}{0pt}}%
+   \setlength{\machbase}{\leftskip}}
+  {\end{list}\medskip}
+% một dòng của mạch: #1 = màu nhãn, #2 = nhãn, #3 = 1 nếu ngắt dòng trước
+\newcommand{\machrow}[3]{%
+  \ifnum#3=1\par\vspace{0.14em}\fi
+  \leftskip=\machbase \advance\leftskip by \machlabw
+  \noindent\hspace*{-\machlabw}%
+  \makebox[\machlabw][l]{\footnotesize\sffamily\bfseries\color{#1}#2}\ignorespaces}
+% badge số thứ tự + nhãn "Vấn đề" trên cùng một dòng, không để số lạc giữa hai cột
+\newcommand{\machnum}{%
+  \tikz[baseline=(n.base)]{\node[circle,fill=inkblue,text=white,inner sep=0pt,minimum size=1.15em,
+    font=\scriptsize\sffamily\bfseries] (n) {\arabic{machctr}};}}
+\newcommand{\vd}[1]{\stepcounter{machctr}%
+  \par\vspace{0.1em}%
+  \leftskip=\machbase \advance\leftskip by \machlabw
+  \noindent\hspace*{-\machlabw}%
+  \makebox[\machlabw][l]{\machnum\hspace{0.4em}\footnotesize\sffamily\bfseries\color{reddark}Vấn đề}%
+  \ignorespaces#1\unskip}
+\newcommand{\gp}{\machrow{steel}{Giải pháp}{1}}
+\newcommand{\gd}{\machrow{tiercol}{Giả định}{1}}
+\newcommand{\gia}{\machrow{reddark}{Giá phải trả}{1}}
+\newcommand{\vdm}{\machrow{reddark}{Vấn đề mới}{1}}
+\newcommand{\hq}{\machrow{tiercol}{Hệ quả}{1}}
+\newcommand{\ra}{\ \(\rightarrow\)\ }
+
+% ---------- kiến thức nền cần có trước ----------
+% Đặt ngay sau khối tomtat. Định nghĩa NGẮN các khái niệm sơ cấp mà phần thân sẽ dùng,
+% để người đọc chưa có nền vẫn theo được. Không phải danh sách link — phải có định nghĩa thật.
+% Dùng: \begin{nentang} \kn{learning rate}{độ dài bước ...} \kn{...}{...} \end{nentang}
+\newtcolorbox{nentang}{
+  enhanced, breakable, sharp corners=downhill, arc=3pt,
+  colback=amberbg, colframe=accent,
+  boxrule=0pt, leftrule=3pt, toprule=0pt, bottomrule=0pt, rightrule=0pt,
+  left=1.0em, right=1.0em, top=1.15em, bottom=0.55em,
+  before skip=0.9em, after skip=1.1em,
+  fontupper=\small,
+  fonttitle=\sffamily\bfseries\small, coltitle=white, colbacktitle=accent,
+  attach boxed title to top left={xshift=0.9em, yshift=-\tcboxedtitleheight/2},
+  boxed title style={sharp corners=downhill, arc=2pt, boxrule=0pt, left=0.55em, right=0.55em,
+                     top=0.15em, bottom=0.15em},
+  title={KIẾN THỨC CẦN CÓ TRƯỚC}, before upper={\bmblock{Kiến thức cần có trước}}}
+% \kn{thuật ngữ}{định nghĩa một câu}
+\newcommand{\kn}[2]{\par\vspace{0.24em}\hangindent=1.15em\hangafter=1\noindent
+  {\color{accent}\rule[0.22em]{0.42em}{0.42em}}\hspace{0.45em}\textbf{#1} --- #2\par}
+
+% ---------- macro nội dung ----------
+\newcommand{\term}[1]{\textbf{#1}}                 % thuật ngữ lần đầu (đã có tiếng Anh kèm)
+\newcommand{\eng}[1]{\emph{#1}}                    % tên tiếng Anh đứng một mình
+% \vn{tiếng Việt}{English} — DẠNG CHUẨN cho thuật ngữ ở lần xuất hiện ĐẦU TIÊN trong mỗi file:
+%   \vn{hàm mất mát}{loss function}  ->  **hàm mất mát** (*loss function*)
+\newcommand{\vn}[2]{\textbf{#1} (\emph{#2})}
+% \en{English} — thuật ngữ không nên dịch, giữ nguyên tiếng Anh và in đậm ở lần đầu
+\newcommand{\en}[1]{\textbf{\emph{#1}}}
+\newcommand{\code}[1]{\texttt{#1}}
+% \repo{owner/name} -> link GitHub; \repo{tên trần} -> tra bảng dưới; không có thì để chữ thường.
+% \repo[url]{chữ hiện} để chỉ định URL tuỳ ý.
+\usepackage{xstring}
+% --- hệ sinh thái fiducial marker / hiệu chuẩn / visual servoing ---
+\expandafter\def\csname repourl@AprilTag-imgs\endcsname{https://github.com/AprilRobotics/apriltag-imgs}
+\expandafter\def\csname repourl@CCTag\endcsname{https://github.com/alicevision/CCTag}
+\expandafter\def\csname repourl@COLMAP\endcsname{https://github.com/colmap/colmap}
+\expandafter\def\csname repourl@Ceres\endcsname{https://github.com/ceres-solver/ceres-solver}
+\expandafter\def\csname repourl@ChromaTag\endcsname{https://github.com/CogChameleon/ChromaTag}
+\expandafter\def\csname repourl@DeepArUco\endcsname{https://github.com/AVAuco/deeparuco}
+\expandafter\def\csname repourl@DeepTag\endcsname{https://github.com/herohuyongtao/deeptag-pytorch}
+\expandafter\def\csname repourl@GTSAM\endcsname{https://github.com/borglab/gtsam}
+\expandafter\def\csname repourl@Kalibr\endcsname{https://github.com/ethz-asl/kalibr}
+\expandafter\def\csname repourl@OpenCV\endcsname{https://github.com/opencv/opencv}
+\expandafter\def\csname repourl@STag\endcsname{https://github.com/bbenligiray/stag}
+\expandafter\def\csname repourl@Sophus\endcsname{https://github.com/strasdat/Sophus}
+\expandafter\def\csname repourl@TopoTag\endcsname{https://github.com/herohuyongtao/topotag}
+\expandafter\def\csname repourl@ViSP\endcsname{https://github.com/lagadic/visp}
+\expandafter\def\csname repourl@WhyCon\endcsname{https://github.com/gestom/whycon}
+\expandafter\def\csname repourl@apriltag\endcsname{https://github.com/AprilRobotics/apriltag}
+\expandafter\def\csname repourl@apriltag-generation\endcsname{https://github.com/AprilRobotics/apriltag-generation}
+\expandafter\def\csname repourl@apriltag_ros\endcsname{https://github.com/AprilRobotics/apriltag_ros}
+\expandafter\def\csname repourl@aruco_ros\endcsname{https://github.com/pal-robotics/aruco_ros}
+\expandafter\def\csname repourl@deltille\endcsname{https://github.com/facebookincubator/deltille}
+\expandafter\def\csname repourl@easy_handeye\endcsname{https://github.com/IFL-CAMP/easy_handeye}
+\expandafter\def\csname repourl@evo\endcsname{https://github.com/MichaelGrupp/evo}
+\expandafter\def\csname repourl@fiducials\endcsname{https://github.com/UbiquityRobotics/fiducials}
+\expandafter\def\csname repourl@manif\endcsname{https://github.com/artivis/manif}
+\expandafter\def\csname repourl@tagslam\endcsname{https://github.com/berndpfrommer/tagslam}
+\makeatletter
+\newcommand{\repo}[2][]{%
+  \IfSubStr{#2}{/}%
+    {\href{https://github.com/#2}{\texttt{\color{steel}#2}}}%
+    {\ifx\relax#1\relax
+       \StrSubstitute{#2}{\_}{_}[\reponame]%
+       \@ifundefined{repourl@\reponame}%
+         {\texttt{#2}}%
+         {\href{\csname repourl@\reponame\endcsname}{\texttt{\color{steel}#2}}}%
+     \else \href{#1}{\texttt{\color{steel}#2}}\fi}}
+\makeatother
+% nhãn tầng bán rã T1..T4
+\newcommand{\T}[1]{{\footnotesize\sffamily\color{tiercol}[T#1]}}
+% dòng phụ thuộc ở đầu mỗi tài liệu
+\newcommand{\dependency}[1]{%
+  \par\vspace{0.15em}\noindent
+  \hangindent=1.0em\hangafter=1
+  {\footnotesize\sffamily\bfseries\color{white}\colorbox{tiercol}{\vphantom{Ag}PHỤ THUỘC}}\hspace{0.5em}%
+  {\footnotesize\sffamily\color{tiercol}#1}\par\vspace{0.7em}}
+% câu hỏi tự kiểm ở cuối mỗi tài liệu
+\newenvironment{tukiem}{\par\medskip\bmblock{Câu hỏi tự kiểm}%
+  {\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+   \sffamily\bfseries\color{inkblue}Câu hỏi tự kiểm}%
+  {\sffamily\small\color{tiercol}\ \ (trả lời không nhìn bài)}%
+  \begin{enumerate}[label=\arabic*.,leftmargin=1.7em]}{\end{enumerate}}
+
+% ---------- hệ thống hoá & ôn tập ----------
+% Mức quan trọng: \muc{3} = phải thuộc, \muc{2} = nên nắm, \muc{1} = biết là có, tra khi cần.
+\newcommand{\muc}[1]{{\color{accent}\ifcase#1\or\(\bullet\)\or\(\bullet\bullet\)\or\(\bullet\bullet\bullet\)\fi}}
+
+% ACTIVE RECALL cuối mỗi chương — thay cho sơ đồ ôn tập và mạng liên kết khái niệm.
+% Hai cột: trái là thuật ngữ / khái niệm / câu hỏi, phải là câu trả lời.
+% Che cột phải, tự trả lời, rồi mở ra đối chiếu. r[mức]{hỏi}{đáp}, mức 1..3, mặc định 2.
+\newenvironment{onbai}[1][Active recall]
+ {\par\medskip\bmblock{Active recall}%
+  \noindent{\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+   \sffamily\bfseries\color{inkblue}#1}%
+  {\sffamily\small\color{tiercol}\ \ (che cột phải, tự trả lời, rồi mở ra đối chiếu)}\par
+  \vspace{0.5em}\footnotesize
+  \rowcolors{2}{white}{tblalt}%
+  \longtable{@{}p{1.75em}L{4.9cm}!{\color{rulecol}\vrule width 0.8pt}L{8.8cm}@{}}
+  \toprule
+  & \textbf{Thuật ngữ / câu hỏi} & \textbf{Trả lời}\\
+  \midrule
+  \endfirsthead
+  \toprule
+  & \textbf{Thuật ngữ / câu hỏi} & \textbf{Trả lời (tiếp)}\\
+  \midrule
+  \endhead}
+ {\bottomrule\endlongtable\par\vspace{0.25em}
+  \noindent{\footnotesize\sffamily\color{tiercol}%
+  {\color{accent}\(\bullet\bullet\bullet\)} phải thuộc \quad
+  {\color{accent}\(\bullet\bullet\)} nên nắm \quad
+  {\color{accent}\(\bullet\)} biết là có}\par\medskip}
+\newcommand{\ar}[3][2]{{\color{accent}\scriptsize\ifcase#1\or\(\bullet\)\or\(\bullet\bullet\)\or\(\bullet\bullet\bullet\)\fi} & \textbf{#2} & #3\\}
+% giữ \y để file chưa kịp chuyển vẫn build được; nó chỉ in một dòng gọn thay vì hàng bảng
+\newcommand{\y}[4]{\par\noindent\hangindent=1.2em\hangafter=1
+  {\color{accent}\rule[0.22em]{0.42em}{0.42em}}\ \textbf{#2} --- #3\ \ {\color{reddark}\emph{Hỏng khi:}} #4\par}
+
+% ---------- câu hỏi mở đầu & lời giải cuối chương ----------
+% khoigoi: đặt ở ĐẦU file chương, sau nentang. 3-5 câu hỏi khiêu khích, mỗi câu phải được
+% trả lời trong chương và nhắc lại ở khối traloi cuối chương. Đánh số để đối chiếu.
+\newcounter{hoictr}
+\newtcolorbox{khoigoi}[1][CÂU HỎI MỞ ĐẦU]{
+  enhanced, breakable, sharp corners=downhill, arc=3pt,
+  colback=violetbg, colframe=violetdark,
+  boxrule=0pt, leftrule=3pt, toprule=0pt, bottomrule=0pt, rightrule=0pt,
+  left=1.0em, right=1.0em, top=1.15em, bottom=0.6em,
+  before skip=1.0em, after skip=1.1em, fontupper=\small,
+  fonttitle=\sffamily\bfseries\small, coltitle=white, colbacktitle=violetdark,
+  attach boxed title to top left={xshift=0.9em, yshift=-\tcboxedtitleheight/2},
+  boxed title style={sharp corners=downhill, arc=2pt, boxrule=0pt, left=0.55em, right=0.55em,
+                     top=0.15em, bottom=0.15em},
+  title={#1}, before upper={\setcounter{hoictr}{0}\bmblock{#1}}}
+\newcommand{\h}[1]{\par\vspace{0.22em}\stepcounter{hoictr}%
+  \hangindent=1.7em\hangafter=1\noindent
+  {\sffamily\bfseries\color{violetdark}Q\thehoictr.}\hspace{0.5em}#1\par}
+\newtcolorbox{traloi}[1][TRẢ LỜI CÂU HỎI MỞ ĐẦU]{
+  enhanced, breakable, sharp corners=downhill, arc=3pt,
+  colback=violetbg, colframe=violetdark,
+  boxrule=0pt, leftrule=3pt, toprule=0pt, bottomrule=0pt, rightrule=0pt,
+  left=1.0em, right=1.0em, top=1.15em, bottom=0.6em,
+  before skip=1.0em, after skip=1.1em, fontupper=\small,
+  fonttitle=\sffamily\bfseries\small, coltitle=white, colbacktitle=violetdark,
+  attach boxed title to top left={xshift=0.9em, yshift=-\tcboxedtitleheight/2},
+  boxed title style={sharp corners=downhill, arc=2pt, boxrule=0pt, left=0.55em, right=0.55em,
+                     top=0.15em, bottom=0.15em},
+  title={#1}, before upper={\setcounter{hoictr}{0}\bmblock{#1}}}
+\newcommand{\tl}[1]{\par\vspace{0.22em}\stepcounter{hoictr}%
+  \hangindent=1.7em\hangafter=1\noindent
+  {\sffamily\bfseries\color{violetdark}A\thehoictr.}\hspace{0.5em}#1\par}
+
+% ---------- kiến thức này đang sống ở đâu (ứng dụng trong công trình SOTA) ----------
+\newenvironment{ungdung}[1][Kiến thức này đang sống ở đâu]
+ {\par\medskip\bmblock{#1}%
+  \noindent{\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+   \sffamily\bfseries\color{inkblue}#1}%
+  {\sffamily\small\color{tiercol}\ \ (công trình đang dùng chính ý tưởng của chương; chốt 9/2026)}\par
+  \vspace{0.45em}\footnotesize
+  \rowcolors{2}{white}{tblalt}%
+  \longtable{@{}L{3.6cm} L{6.4cm} L{4.6cm}@{}}
+  \toprule
+  \textbf{Công trình / hệ thống} & \textbf{Dùng ý tưởng nào của chương} & \textbf{Ghi chú}\\
+  \midrule
+  \endfirsthead
+  \toprule
+  \textbf{Công trình / hệ thống} & \textbf{Dùng ý tưởng nào của chương} & \textbf{Ghi chú}\\
+  \midrule
+  \endhead}
+ {\bottomrule\endlongtable\par\medskip}
+\newcommand{\ud}[3]{#1 & #2 & #3\\}
+
+% ---------- nói lại thật đơn giản (kỹ thuật Feynman) ----------
+% Đặt CUỐI mỗi chương, sau traloi. Giải thích lại toàn chương bằng ngôn ngữ thường,
+% như đang nói với người chưa học gì, cho tới khi không còn chỗ nào phải nói "cái này phức tạp lắm".
+\newtcolorbox{dongian}[1][NÓI LẠI THẬT ĐƠN GIẢN]{
+  enhanced, breakable, sharp corners=downhill, arc=3pt,
+  colback=greenbg, colframe=greendark,
+  boxrule=0pt, leftrule=3pt, toprule=0pt, bottomrule=0pt, rightrule=0pt,
+  left=1.0em, right=1.0em, top=1.15em, bottom=0.65em,
+  before skip=1.1em, after skip=1.1em, fontupper=\small,
+  fonttitle=\sffamily\bfseries\small, coltitle=white, colbacktitle=greendark,
+  attach boxed title to top left={xshift=0.9em, yshift=-\tcboxedtitleheight/2},
+  boxed title style={sharp corners=downhill, arc=2pt, boxrule=0pt, left=0.55em, right=0.55em,
+                     top=0.15em, bottom=0.15em},
+  title={#1}, before upper={\bmblock{Nói lại thật đơn giản}}}
+% \motcau{...} — câu chốt một dòng, đặt cuối khối dongian
+\newcommand{\motcau}[1]{\par\vspace{0.4em}\noindent
+  {\sffamily\bfseries\footnotesize\color{greendark}Một câu:}\ \emph{#1}\par}
+% \chuadongian{...} — chỗ thật sự không đơn giản hoá được, nói thẳng thay vì giả vờ
+\newcommand{\chuadongian}[1]{\par\vspace{0.3em}\noindent
+  {\sffamily\bfseries\footnotesize\color{reddark}Chỗ không rút gọn được:}\ #1\par}
+
+% ---------- mini project cuối chương ----------
+% Mỗi chương kết thúc bằng một mini project chạy được (mô phỏng hoặc trên bàn thật), nối chuỗi qua cả cây.
+% Dùng: \begin{duan}{Tên dự án}{thời lượng}  \dmt{...} \ddl{...} \dbc{...} \dxk{...} \dnv{...}  \end{duan}
+\newtcolorbox{duan}[2]{
+  enhanced, breakable, sharp corners=downhill, arc=3pt,
+  colback=amberbg, colframe=accent,
+  boxrule=0pt, leftrule=3pt, toprule=0pt, bottomrule=0pt, rightrule=0pt,
+  left=1.0em, right=1.0em, top=1.15em, bottom=0.6em,
+  before skip=1.1em, after skip=1.1em, fontupper=\small,
+  fonttitle=\sffamily\bfseries\small, coltitle=white, colbacktitle=accent,
+  attach boxed title to top left={xshift=0.9em, yshift=-\tcboxedtitleheight/2},
+  boxed title style={sharp corners=downhill, arc=2pt, boxrule=0pt, left=0.55em, right=0.55em,
+                     top=0.15em, bottom=0.15em},
+  title={MINI PROJECT\quad\textperiodcentered\quad #1\quad\textperiodcentered\quad #2},
+  before upper={\bmblock{Mini project}\setlength{\machbase}{\leftskip}}}
+\newcommand{\duanrow}[2]{%
+  \par\vspace{0.16em}%
+  \leftskip=\machbase \advance\leftskip by 5.4em
+  \noindent\hspace*{-5.4em}%
+  \makebox[5.4em][l]{\footnotesize\sffamily\bfseries\color{#1}#2}\ignorespaces}
+\newcommand{\dmt}{\duanrow{inkblue}{Mục tiêu}}
+\newcommand{\ddl}{\duanrow{tiercol}{Dữ liệu}}
+\newcommand{\dbc}{\duanrow{steel}{Các bước}}
+\newcommand{\dxk}{\duanrow{reddark}{Xong khi}}
+\newcommand{\dnv}{\duanrow{tiercol}{Nối với}}
+
+% ---------- đường dẫn chéo bấm được ----------
+% \ptr{B/03-giai-phau-he-thong} -> hiện như mã, bấm vào nhảy tới chương/mục đó.
+% Đích được gieo tự động bởi scratchpad/link_paths.py dưới dạng \ptrtarget{<alias>}.
+\makeatletter
+% \ptrtarget đặt ngay sau \chapter/\section nên \label bắt đúng neo của tiêu đề;
+% nhờ vậy cửa sổ xem trước của trình đọc PDF hiện cả tên chương, không bị cắt mất.
+\newcommand{\ptrtarget}[1]{\label{tp:#1}}
+\newcommand{\ptr}[1]{%
+  \@ifundefined{r@tp:#1}{\code{#1}}{\hyperref[tp:#1]{\code{\color{steel}#1}}}}
+\makeatother
+
+% ---------- liên kết khái niệm ----------
+% \lk{đích}{quan hệ}{giải thích} — liên kết TẠI CHỖ, đặt ngay chỗ khái niệm được nhắc.
+%   đích: đường dẫn dạng C/12/03 hoặc B/09.  quan hệ: một trong sáu nhãn dưới đây.
+\newcommand{\lk}[3]{%
+  \par\vspace{0.2em}\noindent\hangindent=1.6em\hangafter=1
+  {\footnotesize\sffamily\bfseries\color{steel}\(\hookrightarrow\)\ #2}%
+  {\footnotesize\sffamily\color{tiercol}\ \ \ptr{#1} --- #3}\par\vspace{0.2em}}
+
+
+% ---------- code ----------
+\lstset{
+  basicstyle=\ttfamily\footnotesize, breaklines=true, breakatwhitespace=true,
+  backgroundcolor=\color{codebg}, frame=leftline, framerule=1.6pt, rulecolor=\color{rulecol},
+  xleftmargin=0.9em, framexleftmargin=0.9em, aboveskip=1em, belowskip=1em,
+  keywordstyle=\color{inkblue}\bfseries, commentstyle=\color{steel}\itshape,
+  stringstyle=\color{reddark}, showstringspaces=false, columns=fullflexible,
+  extendedchars=true, literate={á}{{\'a}}1 {à}{{\`a}}1 {ả}{{\h a}}1 {ô}{{\^o}}1 {ế}{{\'\^e}}1
+}
+\lstdefinestyle{py}{language=Python}
+
+% ---------- thư mục và liên kết ----------
+\usepackage[backend=biber,style=ieee,sorting=none,maxbibnames=3,url=false,doi=false,isbn=false]{biblatex}
+\usepackage[unicode,colorlinks=true,linkcolor=steel,citecolor=steel,urlcolor=steel,
+  bookmarks=true,bookmarksnumbered=true,bookmarksopen=true,bookmarksopenlevel=1,
+  bookmarksdepth=4]{hyperref}
+\usepackage{bookmark}
+% Bookmark đi sâu hơn mục lục in ra: mục lục chỉ tới \section cho gọn,
+% còn cây bookmark hiện cả \subsection (các tiểu mục A., B., C.) để nhảy nhanh.
+\setcounter{tocdepth}{1}
+\bookmarksetup{depth=4, numbered=true, open=true, openlevel=1}
+
+% ---------- bản địa hoá thư mục tài liệu ----------
+% biblatex không có vietnamese.lbx nên nó in ra chính tên chuỗi (andothers, jourvol).
+% Ánh xạ sang english.lbx rồi ghi đè những chuỗi thật sự xuất hiện sang tiếng Việt.
+\DeclareLanguageMapping{vietnamese}{english}
+\DefineBibliographyStrings{english}{%
+  andothers   = {và cộng sự},
+  andmore     = {và nhiều tác giả khác},
+  in          = {trong},
+  jourvol     = {tập},
+  number      = {số},
+  volume      = {tập},
+  edition     = {ấn bản},
+  page        = {tr\adddot},
+  pages       = {tr\adddot},
+  editor      = {chủ biên},
+  editors     = {chủ biên},
+  techreport  = {báo cáo kỹ thuật},
+  phdthesis   = {luận án tiến sĩ},
+  mathesis    = {luận văn thạc sĩ},
+  urlseen     = {truy cập},
+  version     = {phiên bản},
+  july        = {tháng 7},
+}
+
+% ---------- bookmark cho các khối cấu trúc ----------
+% Mỗi khối (Tóm tắt, Kiến thức cần có trước, Câu hỏi mở đầu, Bảng ôn tập, ...) tự sinh một
+% mục bookmark riêng, để nhảy thẳng tới đúng phần cần mà không cuộn trang.
+\newcounter{bmblk}
+\newcommand{\bmblock}[1]{%
+  \stepcounter{bmblk}%
+  \bookmark[level=2, dest=bmblk.\thebmblk]{#1}%
+  \hypertarget{bmblk.\thebmblk}{}}
+\addto\captionsvietnamese{%
+  \renewcommand{\partname}{Phần}\renewcommand{\chaptername}{Chương}%
+  \renewcommand{\contentsname}{MỤC LỤC}\renewcommand{\tablename}{Bảng}\renewcommand{\figurename}{Hình}}

@@ -1,0 +1,19 @@
+\documentclass[../vslam.tex]{subfiles}
+\begin{document}
+\part{THỰC TẾ VÀ SẢN XUẤT}
+\begin{tomtat}
+Đây là phần ít tài liệu học thuật nhất và tạo ra giá trị thật nhiều nhất. Ba phần trước dựng một hệ thống chạy tốt trên EuRoC; phần này trả lời câu hỏi vì sao cùng hệ thống ấy chết ở nhà khách hàng, và phải làm gì. Bốn chương: thế giới thực và những gì nó ném vào hệ thống (chương 19); ràng buộc tính toán, bộ nhớ và thời gian trên phần cứng thật (chương 20); con đường từ một nguyên mẫu tới hàng nghìn máy xuất xưởng (chương 21); và cuối cùng, tám chỗ mà tôi cho là còn khoảng trống thật nếu mục tiêu là đóng góp mới (chương 22). Nếu chỉ nhớ một điều: \emph{biết mình đang sai quan trọng hơn không bao giờ sai} --- một hệ có tỉ lệ lỗi \(2\%\) mà phát hiện được \(90\%\) số lần lỗi thì dùng được trong sản phẩm; một hệ có tỉ lệ lỗi \(1\%\) mà im lặng khi lỗi thì không.
+\end{tomtat}
+
+Phần này khác ba phần trước ở một điểm căn bản: \emph{nó không có tài liệu chuẩn}. Không có sách giáo khoa nào về việc đưa SLAM lên dây chuyền, và số bài báo về chủ đề này ít hơn số bài về một biến thể detector đặc trưng vài bậc độ lớn. Lý do có cấu trúc: kiến thức ở đây thuộc về các công ty, nó không tổng quát hoá sạch sẽ thành định lý, và nó khó công bố vì mỗi ràng buộc là riêng của một sản phẩm.
+
+Hệ quả cho cách đọc: nội dung ở đây được viết ở mức \emph{nguyên tắc và danh mục kiểm} chứ không ở mức công thức. Nó cũng là phần mà tôi phải cẩn thận nhất về nguồn --- rất nhiều điều ``ai cũng biết'' trong công nghiệp không có nguồn nào kiểm được, và theo \code{learning-rules.md} mục 5 thì tôi phải nói rõ chỗ nào là suy luận của tôi. Tôi làm điều đó nhất quán trong cả bốn chương.
+
+Chương 19 và 21 là hai chương xương sống. Chương 19 vì nó liệt kê những gì thế giới thật ném vào hệ thống, và mỗi mục trong danh sách ấy là một chế độ hỏng mà ba phần trước hoặc bỏ qua hoặc chỉ nhắc thoáng. Chương 21 vì nó là chương duy nhất trong cây viết cho mục tiêu mass production, và vì các quyết định nó bàn --- dung sai cơ khí, quy trình hiệu chuẩn, giám sát fleet --- là những quyết định khó đảo ngược nhất. Chương 20 là chương kỹ thuật thuần tuý và có thể đọc lướt nếu bạn chưa chạm vào phần cứng nhúng. Chương 22 khép cây lại bằng một danh sách tám hướng, và nó là chương duy nhất chạm vào địa hạt nghiên cứu --- với một cảnh báo rõ ràng rằng nó chưa đạt chuẩn của \code{research-rules.md} và cần được nâng lên thành một dự án khảo sát riêng trước khi dùng để chọn đề tài thật.
+\subfile{00-map}
+\subfile{19-ben-vung-trong-the-gioi-thuc/ben-vung-trong-the-gioi-thuc}
+\subfile{20-toi-uu-hieu-nang-va-he-thong/toi-uu-hieu-nang-va-he-thong}
+\subfile{21-tu-prototype-len-mass-production/tu-prototype-len-mass-production}
+\subfile{22-huong-nghien-cuu-con-trong/huong-nghien-cuu-con-trong}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

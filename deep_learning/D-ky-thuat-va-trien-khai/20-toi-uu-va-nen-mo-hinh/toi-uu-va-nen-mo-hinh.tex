@@ -1,0 +1,303 @@
+% ============================================================================
+%  Chương 20 — Tối ưu và nén mô hình
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: B/11-gioi-han-tinh-toan, C/18/02, D/19 | Mức độ: cốt lõi
+% ============================================================================
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Tối ưu và nén mô hình (Model Optimization and Compression)}
+\ptrtarget{D/20}\ptrtarget{D/20-toi-uu-va-nen-mo-hinh}
+\dependency{\ptr{B/11-gioi-han-tinh-toan} (bắt buộc --- \en{roofline}, memory-bound so với compute-bound; không có nó thì chương này chỉ là danh sách mẹo); \ptr{B/09-thiet-ke-ham-mat-mat} (phân phối mềm dùng trong chưng cất); \ptr{C/18/02-kinh-te-hoc-pretraining} (cùng logic ngân sách, đổi cột chi); \ptr{D/19-numpy-toi-pytorch} (AMP, \code{channels\_last}, profiler).}
+
+\begin{tomtat}
+Mô hình tốt nhất của bạn không vừa ràng buộc triển khai. Chương này trình bày năm đòn bẩy để ép nó vừa --- giảm độ phân giải, đổi kiến trúc, lượng tử hoá, chưng cất, tỉa --- và lập luận rằng \emph{thứ tự} dùng chúng quan trọng hơn kỹ thuật của từng cái. Đọc xong bạn lập được đường Pareto độ chính xác--độ trễ cho bài toán của mình và chọn một điểm có lý do, thay vì thử ngẫu nhiên rồi giữ cái nào trông ổn. Nếu chỉ nhớ một điều: FLOPs là đại diện tồi cho độ trễ, nên mỗi kỹ thuật nén phải kèm phép đo trên \emph{đúng phần cứng đích}, và sai lệch giữa FLOPs và thời gian thật đi theo hướng khó đoán.
+\end{tomtat}
+
+\begin{nentang}
+\kn{độ trễ (latency) và thông lượng (throughput)}{độ trễ là thời gian một yêu cầu đi từ vào tới ra; thông lượng là số yêu cầu xử lý được mỗi giây. Gộp batch làm thông lượng tăng và độ trễ tăng --- hai đại lượng này thường xung đột.}
+\kn{FLOPs}{số phép tính dấu phẩy động của một \vn{lượt xuôi}{forward pass}. Nó dễ tính trên giấy nhưng chỉ tương quan lỏng lẻo với thời gian thật, vì phần lớn mạng bị chặn bởi băng thông bộ nhớ chứ không bởi năng lực tính toán.}
+\kn{lượng tử hoá (quantization)}{biểu diễn trọng số và kích hoạt bằng số nguyên ít bit (thường INT8) thay vì dấu phẩy động 32 bit, để giảm số byte phải nạp và tăng thông lượng; cái giá là sai số làm tròn tích luỹ qua các tầng.}
+\kn{calibration set}{một tập ảnh nhỏ (thường vài trăm) chạy qua mô hình để đo dải giá trị thực tế của kích hoạt, từ đó chọn hệ số tỉ lệ cho lượng tử hoá. Nó phải \emph{đại diện} cho dữ liệu triển khai, nếu không dải đo được sẽ sai.}
+\kn{tỉa (pruning) và sparsity}{đặt một phần trọng số về không. \en{Sparsity} là tỉ lệ trọng số bằng không. Tỉa \emph{không cấu trúc} rải các số không khắp nơi; tỉa \emph{có cấu trúc} bỏ nguyên kênh hoặc nguyên khối.}
+\kn{chưng cất tri thức (knowledge distillation)}{huấn luyện một mô hình nhỏ (student) bắt chước đầu ra của một mô hình lớn (teacher), thay vì chỉ học từ nhãn cứng. Phân phối xác suất mềm của teacher mang nhiều thông tin hơn một nhãn đúng/sai.}
+\kn{độ phân giải đầu vào}{kích thước ảnh đưa vào mạng, ví dụ $640\times640$. Chi phí tính toán của phần lớn mạng thị giác tỉ lệ với số điểm ảnh, tức tỉ lệ với \emph{bình phương} cạnh.}
+\kn{phần cứng đích}{đúng con chip và đúng cấu hình mà mô hình sẽ chạy khi triển khai --- Jetson Orin ở chế độ 30 W không phải cùng một cỗ máy với chính nó ở chế độ 15 W, và cả hai đều không phải là chiếc RTX trên bàn bạn.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Bạn tỉa bỏ 90\% trọng số, mô hình giữ nguyên độ chính xác, và nó không chạy nhanh hơn một mili-giây nào --- phần cứng đã từ chối món quà đó ở chỗ nào?}
+\h{Vì sao kỹ thuật thô nhất trong cả chương --- hạ độ phân giải đầu vào --- lại được xếp đứng trước mọi kỹ thuật nén tinh vi?}
+\h{Một tầng có đúng \emph{một} kênh trọng số bất thường; vì sao chừng đó đủ để đẩy phần còn lại của tầng xuống dưới ba bit hiệu dụng sau khi lượng tử hoá?}
+\h{Mô hình A ít FLOPs hơn mô hình B nhưng chạy chậm hơn trên cùng một Jetson --- FLOPs đã nói dối theo bao nhiêu cách khác nhau?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+Câu hỏi dẫn dắt của chương rất cụ thể: \emph{mô hình tốt nhất của bạn không vừa ràng buộc triển khai --- làm gì tiếp?} Bạn có năm đòn bẩy, chúng không tương đương nhau, và thứ tự dùng chúng quan trọng hơn kỹ thuật của từng cái.
+
+Điều làm chương này khác một danh sách mẹo là chỗ nó xuất phát từ một sự thật vật lý đã có ở \ptr{B/11-gioi-han-tinh-toan}: phần lớn mạng thị giác không bị chặn bởi năng lực tính toán mà bởi \emph{băng thông bộ nhớ}. Từ sự thật đó suy ra gần như mọi thứ còn lại. Lượng tử hoá có tác dụng vì nó giảm số byte phải nạp chứ không phải vì nó giảm số phép nhân. Tỉa không cấu trúc thất bại vì nó giảm số phép nhân mà không giảm số byte phải nạp. Hợp nhất kernel có tác dụng vì nó cắt bớt các lượt đi về bộ nhớ. Ai chưa nắm trục này sẽ học chương này như học một danh sách; ai nắm rồi thì tự suy ra được phần lớn nội dung.
+
+\lk{B/11}{ràng buộc bởi}{phần lớn mạng thị giác bị chặn bởi băng thông bộ nhớ chứ không bởi năng lực tính, và chính sự thật đó quyết định kỹ thuật nén nào có tác dụng.}
+
+\textbf{Học xong chương này thì làm được gì mà trước đó không làm được?} Bạn cầm một ngân sách mili-giây và một mô hình quá chậm. Trong một buổi bạn vạch được đường Pareto độ chính xác--độ trễ, chọn một điểm, và giải thích được vì sao chọn nó. Cách cũ là thử ba kỹ thuật ngẫu nhiên rồi giữ lại cái nào trông ổn.
+
+\begin{trucgiac}
+Lượng tử hoá \emph{theo tensor} giống việc chọn một khẩu độ và một tốc độ màn trập duy nhất cho cả khung hình có một bóng đèn sáng chói trong đó. Bóng đèn ép bạn phải khép sáng lại, và mọi vùng còn lại chìm xuống sát sàn nhiễu --- không phải vì máy ảnh kém, mà vì bạn chỉ có một dải động và đã tiêu nó cho một điểm.
+
+Lượng tử hoá \emph{theo kênh} là chụp mỗi vùng bằng một thiết lập riêng rồi ghép lại. Cùng số bit, nhưng dải động được phân bổ theo nhu cầu thật của từng vùng. Đây không phải ẩn dụ lỏng lẻo. Cả hai trường hợp đều là bài toán ánh xạ một dải giá trị liên tục vào một số mức rời rạc cố định. Và ở cả hai, \emph{một giá trị ngoại lai duy nhất cũng đủ phá hỏng độ phân giải của tất cả những giá trị còn lại}.
+\end{trucgiac}
+
+\section{Thứ tự thử nghiệm, và lý do của thứ tự đó}
+
+\subsection{A. Bảng thứ tự}
+Bảng~\ref{tab:thu-tu-don-bay} là kết luận thực dụng của cả chương, đặt lên trước để bạn dùng được ngay; phần còn lại giải thích từng dòng.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Năm đòn bẩy nén, theo thứ tự nên thử. Cột ``vì sao trước'' mới là nội dung; cột ``cái giá'' là thứ bạn phải chấp nhận.}
+\label{tab:thu-tu-don-bay}
+\begin{tabularx}{\linewidth}{@{}L{0.5cm}L{3.0cm}YY@{}}
+\toprule
+\textbf{\#} & \textbf{Đòn bẩy} & \textbf{Vì sao đứng trước} & \textbf{Cái giá}\\
+\midrule
+1 & Giảm độ phân giải hoặc độ dài đầu vào & Rẻ nhất, hiệu quả gần như bậc hai theo cạnh ảnh, đảo ngược được ngay trong một dòng config & Mất vật nhỏ và chi tiết mảnh --- đúng thứ bạn có thể không đo được trên tập test hiện có\\
+2 & Đổi sang kiến trúc hiệu quả & Tối ưu từ thiết kế luôn tốt hơn nén sau; cùng độ chính xác nhưng ít byte hơn ngay từ đầu & Phải huấn luyện lại từ đầu\\
+3 & Lượng tử hoá & Tỉ lệ lợi ích trên công sức cao nhất trong nhóm nén; gỡ đúng nút thắt băng thông & Mất độ chính xác nhỏ, và phụ thuộc mạnh vào calibration đúng\\
+4 & Chưng cất & Giữ được nhiều chất lượng nhất trên mỗi đơn vị kích thước & Cần teacher và một chu kỳ huấn luyện đầy đủ\\
+5 & Tỉa & Thường \emph{không} cho tốc độ thật trên phần cứng phổ thông & Công sức lớn, lợi ích không chắc\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{B. Vì sao thứ tự này chứ không phải thứ tự khác}
+Ba nguyên tắc sắp xếp, và cả ba đều là nguyên tắc kỹ thuật chứ không phải sở thích:
+
+\begin{itemize}
+\item \textbf{Đảo ngược được thì thử trước.} Giảm độ phân giải là một dòng config; nếu hỏng, bạn biết trong nửa giờ. Chưng cất là một tuần; nếu hỏng, bạn mất một tuần. Xếp theo chi phí của việc \emph{sai} chứ không theo chi phí của việc đúng.
+\item \textbf{Thiết kế thắng nén.} Một mạng được thiết kế để có ít byte đi qua luôn tốt hơn một mạng to bị ép nhỏ lại, vì nén sau chỉ bỏ bớt thứ đã có chứ không đổi được cấu trúc luồng dữ liệu.
+\item \textbf{Ưu tiên đòn bẩy gỡ đúng nút thắt.} Nếu bạn memory-bound thì lượng tử hoá gỡ đúng chỗ; tỉa không cấu trúc thì không, dù nó nghe hứa hẹn hơn.
+\end{itemize}
+
+Hình~\ref{fig:cay-nen} chuyển ba nguyên tắc đó thành một cây quyết định theo \emph{ràng buộc} bạn đang bị chặn, vì trong thực tế bạn hiếm khi bị chặn bởi cả ba thứ cùng lúc.
+
+\begin{figure}[H]\centering
+\resizebox{0.97\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  q/.style={draw=inkblue, fill=bluebg, rounded corners=3pt, align=center, inner sep=5pt, text width=3.7cm},
+  a/.style={draw=violetdark, fill=violetbg, rounded corners=3pt, align=center, inner sep=5pt, text width=4.0cm, font=\footnotesize},
+  ar/.style={-{Latex[length=2mm]}, draw=steel, thick, font=\scriptsize}]
+\node[q] (r)  at (0,0)      {Ràng buộc thật của bạn là gì?};
+\node[a] (a1) at (6.2,3.4)  {\textbf{Bộ nhớ mô hình} (không nạp nổi)\ra lượng tử hoá trọng số trước; rồi chưng cất xuống student nhỏ};
+\node[q] (q2) at (6.2,0.6)  {\textbf{Độ trễ}: profiler nói bị chặn bởi gì?};
+\node[a] (a2) at (6.2,-3.0) {\textbf{Năng lượng / nhiệt}\ra giảm độ phân giải và tần suất chạy trước mọi thứ khác};
+\node[a] (a3) at (12.8,2.2) {\textbf{Băng thông}\ra INT8 (PTQ trước, QAT nếu tụt), \code{channels\_last}, hợp nhất kernel};
+\node[a] (a4) at (12.8,-0.2){\textbf{Năng lực tính}\ra giảm độ phân giải, đổi kiến trúc hiệu quả, tỉa \emph{có cấu trúc}};
+\node[a] (a5) at (12.8,-2.4){\textbf{Chi phí điều phối} (nhiều op nhỏ)\ra hợp nhất kernel, CUDA graphs --- nén mô hình không giúp gì};
+\draw[ar] (r) -- node[above,sloped]{bộ nhớ} (a1);
+\draw[ar] (r) -- node[above]{độ trễ} (q2);
+\draw[ar] (r) -- node[below,sloped]{năng lượng} (a2);
+\draw[ar] (q2) -- node[above,sloped]{băng thông} (a3);
+\draw[ar] (q2) -- node[above,sloped]{tính toán} (a4);
+\draw[ar] (q2) -- node[below,sloped]{overhead} (a5);
+\end{tikzpicture}}
+\caption{Chọn đòn bẩy theo ràng buộc đang chặn bạn, không theo danh sách. Nhánh dưới cùng bên phải là nhánh hay bị bỏ sót nhất: khi thời gian bị nuốt bởi chi phí điều phối kernel, mọi kỹ thuật \emph{nén} đều vô ích và việc phải làm là hợp nhất.}
+\label{fig:cay-nen}
+\end{figure}
+
+\subsubsection{Ví dụ nhỏ nhất: đòn bẩy số 1 rẻ tới mức nào}
+Chi phí tính của phần lớn mạng tích chập tỉ lệ với số điểm ảnh. Hạ độ phân giải từ $640\times640$ xuống $512\times512$ cho tỉ lệ $(512/640)^2 = 0{,}64$. Tức là cắt $36\%$ chi phí bằng một dòng config, không huấn luyện lại, và hoàn tác được tức thì. Không kỹ thuật nào khác trong chương có tỉ lệ lợi ích trên công sức gần bằng. Cái giá cũng cụ thể như vậy: một vật cao 20 điểm ảnh ở $640$ chỉ còn 16 điểm ảnh ở $512$, và nếu tập test của bạn không có vật nhỏ thì bạn sẽ \emph{không đo được} thiệt hại --- một trường hợp điển hình của việc đánh giá che giấu chế độ hỏng, đúng chủ đề của \ptr{B/07-chia-du-lieu-va-danh-gia}.
+
+\lk{B/07}{ràng buộc bởi}{thiệt hại của việc giảm độ phân giải tập trung ở nhóm vật nhỏ, nên nó vô hình nếu tập đánh giá không được phân tách theo nhóm.}
+
+\section{Mạch vấn đề \(\rightarrow\) giải pháp}
+
+\begin{mach}[Sáu nút thắt của việc đưa một mô hình vào ngân sách]
+\item \vd{fp32 lãng phí băng thông.} \gp lượng tử hoá: giảm số bit thì giảm luôn lượng byte phải nạp, và trên phần cứng có đơn vị số nguyên chuyên dụng thì giảm cả thời gian tính. \gd phân bố giá trị đủ ``gọn'' để một hệ số tỉ lệ mô tả được. \gia sai số làm tròn tích luỹ, và độ nhạy rất cao với việc chọn hệ số tỉ lệ.
+\item \vd{nhiều trọng số vô dụng.} \gp tỉa. \vdm phần cứng phổ thông không tận dụng được các số không rải rác, nên tiết kiệm trên giấy không thành tốc độ thật. Chỉ tỉa có cấu trúc, hoặc mẫu 2:4 trên phần cứng hỗ trợ, mới cho lợi ích đo được.
+\item \vd{mô hình nhỏ huấn luyện từ đầu thì yếu.} \gp chưng cất: dùng phân phối mềm của teacher làm mục tiêu, giàu thông tin hơn nhãn cứng nhiều lần \cite{hinton2015distilling}. \gia cần teacher và một chu kỳ huấn luyện đầy đủ.
+\item \vd{nén sau luôn thua thiết kế tốt.} \gp kiến trúc hiệu quả --- tích chập tách theo chiều sâu, khối \en{inverted residual}, và tái tham số hoá kiểu RepVGG. \hq đây lại là mẫu hình ``đẩy chi phí sang training-time'' đã gặp ở chương 17 và sẽ gặp lại ở chương 21.
+\item \vd{chọn kiến trúc bằng tay là thủ công và thiên lệch.} \gp NAS --- tự động tìm kiến trúc. \gia chi phí tìm kiếm thường lớn hơn lợi ích, và kết quả gắn chặt với phần cứng dùng để tìm, nên hết giá trị khi bạn đổi chip.
+\item \vd{cùng FLOPs nhưng khác tốc độ.} \gp hợp nhất kernel để cắt số lượt đi về bộ nhớ, và bố cục bộ nhớ đúng (\code{channels\_last}, căn lề, tận dụng cache). \hq đây là \ptr{B/11-gioi-han-tinh-toan} áp dụng trực tiếp, và là lý do hai mô hình cùng FLOPs có thể chênh nhau hai lần về thời gian thật.
+\end{mach}
+
+\subsection{A. Lượng tử hoá --- chi tiết quyết định là hệ số tỉ lệ}
+Lượng tử hoá đối xứng INT8 ánh xạ một số thực $w$ thành số nguyên $q = \mathrm{round}(w/s)$ với $s = \max|w|/127$, và khôi phục bằng $\hat{w} = s\,q$. \emph{Công thức này nói điều gì?} Rằng bạn có đúng 255 mức để phủ toàn bộ dải giá trị, và $\max|w|$ --- giá trị lớn nhất, tức giá trị ngoại lai nếu có --- quyết định độ mịn của tất cả các mức còn lại.
+
+\textbf{Ví dụ nhỏ nhất tính tay được.} Một tầng có trọng số nằm trong $[-0{,}1;\ 0{,}1]$ ở mọi kênh, trừ một kênh duy nhất có trọng số lên tới $2{,}0$.
+
+\begin{itemize}
+\item \textbf{Per-tensor:} $s = 2{,}0/127 = 0{,}01575$. Một trọng số $0{,}1$ được ánh xạ thành $\mathrm{round}(0{,}1/0{,}01575) = 6$. Vậy toàn bộ dải $[0;\ 0{,}1]$ chỉ còn \emph{sáu} mức --- tức chưa tới 3 bit hiệu dụng cho phần lớn mạng.
+\item \textbf{Per-channel:} mỗi kênh có $s$ riêng, nên kênh bình thường dùng $s = 0{,}1/127$ và trọng số $0{,}1$ được ánh xạ thành $127$ --- đủ 8 bit.
+\end{itemize}
+
+Cùng số bit, khác nhau hơn một bậc độ lớn về độ phân giải hiệu dụng. Đó là lý do per-channel gần như luôn là lựa chọn đúng cho trọng số của conv và linear, và là lý do một tầng duy nhất có phân bố lệch cũng đủ làm hỏng cả mô hình sau khi lượng tử hoá \cite{nagel2021whitepaper,jacob2018quantization}.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Ba chế độ lượng tử hoá thường gặp.}
+\label{tab:ptq-qat}
+\begin{tabularx}{\linewidth}{@{}L{2.5cm}YYY@{}}
+\toprule
+\textbf{Chế độ} & \textbf{Cơ chế} & \textbf{Chi phí} & \textbf{Hỏng khi nào}\\
+\midrule
+Weight-only & Chỉ nén trọng số, kích hoạt vẫn fp16 & Gần bằng không & Không giúp gì nếu nút thắt là kích hoạt chứ không phải trọng số\\
+PTQ (post-training) & Chạy calibration set để đo dải kích hoạt, rồi chốt hệ số tỉ lệ & Vài phút & Calibration set không đại diện; mô hình có kích hoạt ngoại lai mạnh\\
+QAT (quantization-aware) & Mô phỏng làm tròn ngay trong lúc huấn luyện để mạng học cách chịu đựng & Một chu kỳ huấn luyện & Không có dữ liệu huấn luyện; hoặc bạn dùng nó khi PTQ vốn đã đủ tốt\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Kinh nghiệm thực hành đáng tin: thử PTQ trước, đo, và chỉ chuyển sang QAT khi PTQ tụt quá ngưỡng chấp nhận. Và nguyên nhân số một của việc tụt bất thường không phải thuật toán mà là \emph{calibration set chọn sai}. Vài trăm ảnh lấy toàn từ một điều kiện chiếu sáng cho dải kích hoạt hẹp hơn thực tế. Mọi giá trị nằm ngoài dải đó bị cắt cụt khi triển khai.
+
+\subsection{B. Tỉa --- vì sao 90\% sparsity không nhanh hơn}
+Đây là chỗ trực giác đánh lừa mạnh nhất, nên đáng nói thẳng là bức tranh phức tạp chứ không đơn giản hoá được. Tỉa không cấu trúc đạt được sparsity rất cao mà gần như không mất độ chính xác \cite{han2016deep,frankle2019lottery}, nhưng \emph{không} nhanh hơn trên GPU thông thường, vì ba lý do cộng lại: các số không rải rác không cho phép bỏ qua việc nạp dữ liệu (bạn vẫn phải đọc chỉ số để biết chỗ nào là không); kernel dense đã được tối ưu nhiều năm còn kernel thưa thì chưa; và lưu chỉ số của các phần tử khác không tự nó đã tốn băng thông.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Ba mức cấu trúc của tỉa. Chỉ hai dòng dưới cho tốc độ thật.}
+\label{tab:pruning}
+\begin{tabularx}{\linewidth}{@{}L{2.5cm}YYY@{}}
+\toprule
+\textbf{Kiểu} & \textbf{Cơ chế} & \textbf{Tốc độ thật} & \textbf{Hỏng / hạn chế}\\
+\midrule
+Không cấu trúc & Đặt từng trọng số nhỏ về không & Gần như không đổi trên GPU phổ thông & Chỉ có ích khi bạn cần giảm \emph{dung lượng lưu trữ}, không phải thời gian\\
+2:4 (bán cấu trúc) & Trong mỗi nhóm 4 trọng số, đúng 2 bằng không & Có, nhưng chỉ trên phần cứng có đơn vị sparse tensor & Ràng buộc cứng làm mất nhiều độ chính xác hơn tỉa tự do cùng tỉ lệ\\
+Có cấu trúc & Bỏ nguyên kênh, nguyên đầu attention, nguyên khối & Có, trên mọi phần cứng --- vì mạng thật sự nhỏ đi & Mất nhiều độ chính xác hơn; cần fine-tune lại sau khi tỉa\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{C. Chưng cất --- vì sao phân phối mềm đáng giá}
+Nhãn cứng nói ``đây là chó''. Phân phối mềm của teacher nói ``$0{,}7$ chó, $0{,}2$ sói, $0{,}08$ cáo, $0{,}02$ mèo'' --- và ba con số cuối chính là thông tin về \emph{cấu trúc lớp} mà nhãn cứng vứt đi. Student học được rằng sói gần chó hơn mèo, một quan hệ mà nó sẽ phải tự phát hiện lại nếu chỉ có nhãn cứng. Đó là lý do một student nhỏ được chưng cất thường thắng chính student đó huấn luyện từ nhãn cứng, dù cả hai có cùng số tham số.
+
+\lk{B/09}{cùng nguyên lý với}{phân phối mềm mang thông tin về cấu trúc lớp mà nhãn cứng vứt đi --- cùng lý do khiến làm mượt nhãn có tác dụng.}
+
+Ba biến thể, theo mức mạnh tăng dần cho thị giác: chưng cất \en{logit} (đơn giản nhất), chưng cất đặc trưng trung gian (thường mạnh hơn cho thị giác vì nó ép cả biểu diễn chứ không chỉ đầu ra), và chưng cất \en{attention} cho \en{transformer} \cite{touvron2021deit}. Xu hướng tại thời điểm viết là chưng cất một mô hình nền tảng lớn xuống student cỡ 20--40M cho thiết bị biên; đây là cách phổ biến nhất để đưa các mô hình lớp SAM hoặc DINO lên thiết bị --- ghi nhận này là quan sát thực hành, không phải một kết quả đo mà tôi kiểm chứng được.
+
+\subsection{D. Kiến trúc hiệu quả, tái tham số hoá, và NAS}
+Nén sau luôn thua thiết kế tốt, vì thiết kế đổi được cấu trúc luồng dữ liệu còn nén thì không. Dòng MobileNet/ShuffleNet/EfficientNet \cite{howard2017mobilenets,tan2019efficientnet} là các cách khác nhau để giảm số byte đi qua trên mỗi đơn vị sức chứa.
+
+Đáng chú ý riêng là \vn{tái tham số hoá}{re-parameterization} kiểu RepVGG: huấn luyện với một khối nhiều nhánh (dễ tối ưu), rồi \emph{gộp toán học} các nhánh thành một tích chập đơn khi triển khai. Vì phép gộp là chính xác chứ không xấp xỉ, bạn được cả hai: động lực học huấn luyện tốt và đồ thị suy luận gọn. Đây đúng là mẫu hình ``đẩy độ khó sang lúc huấn luyện'' của \ptr{B/03-giai-phau-he-thong}, ở dạng thuần khiết nhất.
+
+\lk{B/03}{cùng nguyên lý với}{độ khó không biến mất mà bị đẩy đi chỗ khác --- ở đây là đẩy từ lúc suy luận sang lúc huấn luyện, dạng thuần khiết nhất của nguyên lý đó.}
+
+Về NAS thì phát biểu trung thực nhất là: nó hoạt động, nhưng phần lớn dự án không nên dùng. Chi phí tìm kiếm thường lớn hơn lợi ích. Điểm quan trọng hơn: kết quả gắn chặt với phần cứng dùng để tìm. Một kiến trúc NAS tối ưu cho GPU máy chủ có thể không tối ưu chút nào trên NPU của điện thoại.
+
+\subsection{E. Nguyên tắc bao trùm: đo trên phần cứng đích}
+Mỗi kỹ thuật trong chương phải kèm phép đo độ trễ thật trên đúng phần cứng sẽ chạy. FLOPs là đại diện tồi, và điều tệ hơn là nó sai \emph{theo hướng khó đoán}: một mô hình ít FLOPs hơn có thể chậm hơn vì nó có nhiều op nhỏ hơn, vì bố cục bộ nhớ của nó không hợp với kernel sẵn có, hoặc vì nó dùng một toán tử mà runtime phải chạy trên CPU.
+
+Sản phẩm cuối của một chu kỳ nén không phải một mô hình mà là một \emph{đường Pareto} như Hình~\ref{fig:pareto}: tập các điểm mà không điểm nào bị điểm khác trội hơn ở cả hai trục. Chỉ khi có đường này bạn mới chọn được một cách có lý do. Câu hỏi lúc đó không còn là ``mô hình nào tốt nhất'', mà là ``đổi bao nhiêu độ chính xác lấy bao nhiêu mili-giây''. Câu hỏi thứ hai có câu trả lời.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.80\linewidth, height=5.9cm,
+  xlabel={Độ trễ p99 trên phần cứng đích (ms)}, ylabel={Độ chính xác (mAP)},
+  xmin=4, xmax=42, ymin=28, ymax=52,
+  grid=both, grid style={rulecol!60}, tick label style={font=\footnotesize},
+  label style={font=\footnotesize},
+  legend style={font=\footnotesize, at={(0.98,0.03)}, anchor=south east, draw=rulecol}]
+\addplot[only marks, mark=*, mark size=2.2pt, color=steel] coordinates {(38,49.5)(24,48.2)(15,46.0)(9,41.5)(6,35.0)};
+\addlegendentry{đường Pareto}
+\addplot[thick, color=steel, dashed, forget plot] coordinates {(38,49.5)(24,48.2)(15,46.0)(9,41.5)(6,35.0)};
+\addplot[only marks, mark=x, mark size=3pt, color=reddark] coordinates {(28,44.0)(19,39.5)(33,45.5)};
+\addlegendentry{cấu hình bị trội (loại bỏ)}
+\draw[draw=violetdark, thick, -{Latex[length=2mm]}] (axis cs:15,32) -- (axis cs:15,44.6);
+\node[font=\footnotesize, color=violetdark, anchor=north] at (axis cs:15,31.8) {ngân sách 15 ms};
+\end{axis}
+\end{tikzpicture}
+\caption{Sản phẩm của một chu kỳ nén (\emph{số liệu minh hoạ}). Các dấu chéo là những cấu hình bị trội --- vừa chậm hơn vừa kém hơn một cấu hình khác --- và chúng bị loại bỏ ngay, không cần thảo luận. Quyết định chỉ còn là chọn một điểm trên đường, và ngân sách mili-giây quyết định điểm nào.}
+\label{fig:pareto}
+\end{figure}
+
+\section{Thực hành}
+\begin{description}
+\item[Repo và tài nguyên.] \emph{Lượng tử hoá và sparsity:} \repo{pytorch/ao} (torchao), \repo{NVIDIA/TensorRT-Model-Optimizer}, \repo{openvinotoolkit/nncf}, \repo{intel/neural-compressor}, \repo{bitsandbytes}. \emph{Tỉa:} \repo{VainF/Torch-Pruning}. \emph{Chưng cất cho thị giác:} công thức có sẵn trong \repo{timm}; ngoài ra nên đọc các bài chưng cất gần đây trong chính lĩnh vực của bạn, vì chi tiết phụ thuộc bài toán nhiều hơn người ta tưởng. Danh sách này chốt tại tháng 9/2026 và tên các bộ công cụ dẫn đầu sẽ đổi trong 6--12 tháng; các repo hạ tầng (torchao, TensorRT, OpenVINO) bền hơn hẳn tên của thuật toán thời thượng.
+
+\item[Câu hỏi kiểm tra hiểu.] Vì sao tỉa không cấu trúc đạt sparsity 90\% mà không nhanh hơn trên GPU? Một calibration set 100 ảnh chọn sai thì hỏng theo cơ chế nào, và triệu chứng nhìn thấy được là gì? Khi nào chưng cất thắng lượng tử hoá, và ngược lại?
+
+\item[Mini project (vài giờ đến hai ngày).] Lấy một classifier và áp lần lượt bốn bước: giảm độ phân giải 20\%, đổi sang backbone hiệu quả, PTQ INT8, rồi QAT. Sau \emph{mỗi} bước đo cả độ chính xác lẫn độ trễ thật trên phần cứng đích. Vẽ đường Pareto và chọn một điểm, kèm một đoạn giải thích vì sao chọn nó. Phần đáng giá nhất của bài này là phát hiện ra bước nào không cho lợi ích như bảng hứa hẹn --- và tìm ra lý do.
+
+\end{description}
+
+\section{Giới hạn và trường hợp hỏng}
+\begin{itemize}
+\item \textbf{Mọi con số trong chương phụ thuộc phần cứng, và phụ thuộc mạnh.} Một kết quả đo trên GPU máy chủ không dự báo được gì về NPU điện thoại hay về DLA của Jetson. Chuyển chip thì phải đo lại từ đầu, không phải điều chỉnh.
+\item \textbf{Độ chính xác trung bình che giấu thiệt hại tập trung.} Lượng tử hoá và giảm độ phân giải thường lấy đi hiệu năng ở đúng những nhóm hiếm --- vật nhỏ, lớp ít mẫu, điều kiện chiếu sáng bất thường. Nếu bạn chỉ theo dõi một con số tổng, bạn sẽ không thấy.
+\item \textbf{Nén nhiều bước không cộng tuyến tính.} Lượng tử hoá một mô hình đã tỉa thường tệ hơn dự đoán, vì tỉa làm phân bố trọng số lệch hơn và do đó khó lượng tử hoá hơn. Thứ tự áp dụng cũng là một siêu tham số.
+\item \textbf{Chưng cất thừa hưởng cả lỗi của teacher.} Student học cả những chỗ teacher sai một cách tự tin, và vì nó nhỏ hơn nên nó không có đủ năng lực để tự sửa.
+\item \textbf{Benchmark ngắn nói dối trên thiết bị bị giới hạn nhiệt.} Đây là chủ đề của chương 21, nhưng nó ảnh hưởng ngược lại mọi phép đo trong chương này.
+\end{itemize}
+
+\begin{cambay}
+FLOPs không phải độ trễ, và tin vào FLOPs là lỗi tốn thời gian nhất trong chương. Ba tình huống nó sai theo hướng ngược nhau: một mô hình ít FLOPs với hàng trăm op nhỏ có thể chậm hơn một mô hình nhiều FLOPs với vài op lớn, vì chi phí điều phối trội hơn chi phí tính; một tích chập tách theo chiều sâu có FLOPs rất thấp nhưng tỉ lệ tính trên byte cũng rất thấp, nên nó memory-bound và không nhanh như bảng hứa; và một toán tử mà runtime không hỗ trợ sẽ bị đẩy về CPU, nuốt trọn mọi lợi ích mà chẳng xuất hiện trong bất kỳ phép đếm FLOPs nào.
+\end{cambay}
+
+\begin{cannho}
+Thứ tự đúng là: giảm độ phân giải \ra đổi kiến trúc \ra lượng tử hoá \ra chưng cất \ra tỉa; và mỗi bước phải kèm một phép đo độ trễ thật trên phần cứng đích, ở chế độ nguồn và nhiệt mà bạn sẽ thực sự chạy. Sản phẩm cuối không phải một mô hình mà là một đường Pareto --- chỉ khi có nó bạn mới đang \emph{chọn} thay vì \emph{đoán}. \T{2}
+\end{cannho}
+
+
+\begin{onbai}
+\ar[3]{Độ phân giải}{Kích thước ảnh đưa vào mạng; chi phí tỉ lệ với số điểm ảnh. Hạ từ \(640\) xuống \(512\) cắt 36\% chi phí bằng một dòng config, đổi lại mất vật nhỏ.}
+\ar[3]{Memory-bound so với compute-bound}{Memory-bound là bị chặn bởi băng thông, compute-bound là bị chặn bởi năng lực tính. Phần lớn mạng thị giác memory-bound, và đó là lý do lượng tử hoá có tác dụng.}
+\ar[3]{Lượng tử hoá}{Biểu diễn trọng số và kích hoạt bằng số nguyên ít bit, thường INT8. Giảm số byte phải nạp; cái giá là sai số làm tròn tích luỹ qua các tầng.}
+\ar[3]{Vì sao calibration set sai làm tụt độ chính xác?}{Nó quyết định dải giá trị mà hệ số tỉ lệ phủ. Lấy toàn một điều kiện chiếu sáng thì dải hẹp hơn thực tế, nên mọi giá trị ngoài dải bị cắt cụt khi triển khai.}
+\ar[2]{PTQ}{Lượng tử hoá sau huấn luyện, chỉ cần calibration set và vài phút. Luôn thử trước; chỉ chuyển sang QAT khi nó tụt quá ngưỡng bạn đặt trước.}
+\ar[2]{QAT}{Mô phỏng làm tròn ngay trong lúc huấn luyện để mạng học cách chịu đựng. Giữ độ chính xác tốt hơn ở bit thấp; cái giá là một chu kỳ huấn luyện đầy đủ.}
+\ar[3]{Per-tensor so với per-channel}{Per-tensor dùng một hệ số tỉ lệ cho cả tầng, per-channel dùng một hệ số cho mỗi kênh. Per-channel gần như luôn đúng cho trọng số conv và linear.}
+\ar[2]{Vì sao một kênh ngoại lai đủ phá per-tensor?}{Hệ số tỉ lệ đặt theo \(\max|w|\). Với ngoại lai \(2{,}0\), một trọng số \(0{,}1\) chỉ còn sáu mức --- chưa tới ba bit hiệu dụng cho phần lớn tầng.}
+\ar[3]{Vì sao tỉa không cấu trúc không cho tốc độ thật?}{Số không rải rác không giảm số byte phải nạp; bạn còn phải nạp thêm chỉ số để biết chỗ nào là không. Ngoài ra kernel dense đã được tối ưu nhiều năm còn kernel thưa thì chưa.}
+\ar[2]{2:4 sparsity}{Trong mỗi nhóm bốn trọng số, đúng hai bằng không. Cho tốc độ thật, nhưng chỉ trên phần cứng có đơn vị sparse tensor.}
+\ar[3]{Chưng cất}{Huấn luyện student nhỏ bắt chước phân phối mềm của teacher thay vì học nhãn cứng. Giữ được nhiều chất lượng nhất trên mỗi MB; student thừa hưởng cả chỗ teacher sai.}
+\ar[2]{Vì sao phân phối mềm giàu thông tin hơn nhãn cứng?}{Nó mang quan hệ giữa các lớp: sói gần chó hơn mèo. Nhãn cứng vứt đúng phần thông tin đó đi.}
+\ar[2]{Tái tham số hoá}{Huấn luyện với khối nhiều nhánh rồi gộp chính xác thành một tích chập đơn khi triển khai. Được cả động lực học tốt lẫn đồ thị suy luận gọn.}
+\ar[1]{NAS}{Tự động tìm kiến trúc. Phần lớn dự án không nên dùng: chi phí tìm thường lớn hơn lợi ích, và kết quả gắn chặt với phần cứng dùng để tìm.}
+\ar[3]{Đường Pareto}{Tập các cấu hình mà không cấu hình nào trội hơn ở cả độ chính xác lẫn độ trễ. Đây mới là sản phẩm của một chu kỳ nén, không phải một mô hình đơn lẻ.}
+\ar[2]{Tỉa 90\% mà độ trễ không đổi?}{Bạn đã tỉa không cấu trúc. Số không rải rác không giảm số byte phải nạp; chỉ tỉa cả kênh hoặc mẫu 2:4 mới cho tốc độ.}
+\ar[2]{Mô hình ít FLOPs hơn nhưng chậm hơn trên Jetson?}{Ba nghi phạm: quá nhiều op nhỏ nên chi phí điều phối trội; tích chập tách theo chiều sâu memory-bound; hoặc một op không được runtime hỗ trợ nên rơi về CPU.}
+\ar[2]{Lượng tử hoá xong, độ chính xác trung bình không đổi mà hệ thống vẫn tệ đi?}{Thiệt hại tập trung ở nhóm hiếm: vật nhỏ, lớp ít mẫu, điều kiện chiếu sáng bất thường. Phải đánh giá theo nhóm mới nhìn thấy.}
+\end{onbai}
+
+
+\begin{ungdung}
+\ud{TensorRT, \repo{pytorch/ao}}{Lượng tử hoá per-channel, hợp nhất kernel, chọn bố cục bộ nhớ --- gần như toàn bộ mạch của chương}{Hạ tầng; API đổi nhưng ý tưởng bên dưới ổn định}
+\ud{Sparsity 2:4 trên Tensor Core}{Tỉa bán cấu trúc: ràng buộc mẫu đủ đều để phần cứng khai thác được}{Ví dụ rõ nhất cho luận điểm ``tốc độ đến từ cấu trúc, không từ tỉ lệ số không''}
+\ud{Dòng MobileNet, EfficientNet, RepVGG}{Kiến trúc hiệu quả và tái tham số hoá --- đẩy chi phí sang lúc huấn luyện}{RepVGG là minh hoạ sạch nhất; ý tưởng gộp nhánh nay xuất hiện lại trong nhiều detector thời gian thực}
+\ud{Chưng cất mô hình nền tảng xuống student nhỏ}{Dùng teacher đóng băng làm nguồn phân phối mềm để đưa mô hình lớp SAM hoặc DINO lên thiết bị}{Quan sát thực hành phổ biến 2025--2026; tôi không kiểm chứng được con số cụ thể}
+\ud{\repo{bitsandbytes}, weight-only INT4}{Chỉ nén trọng số khi nút thắt là băng thông đọc trọng số chứ không phải kích hoạt}{Là chuẩn mực khi phục vụ LLM trên GPU đơn}
+\end{ungdung}
+
+\begin{duan}{INT8 hoá tầng mô tả và đo đủ ba trục}{1 ngày}
+\dmt biến ``lượng tử hoá thì nhanh hơn'' thành ba con số cụ thể trên phần cứng của bạn. Rồi tự quyết định cuộc đánh đổi có đáng ở ngân sách mili-giây của bạn hay không.
+\ddl mô hình mô tả từ mini project chương 19 (hoặc một mô hình mô tả có sẵn nếu bạn bỏ qua bước đó). Calibration set lấy từ một chuỗi \emph{khác} với chuỗi đánh giá, để không tự lừa mình.
+\dbc đo \en{baseline} fp32 trên đủ ba trục: độ chính xác ghép cặp, độ trễ p50 và p99 trên Orin ở đúng chế độ \code{nvpmodel} sẽ triển khai, và dung lượng tệp trọng số. Rồi lần lượt PTQ per-tensor, PTQ per-channel, và QAT nếu PTQ tụt quá ngưỡng bạn đặt trước. Sau \emph{mỗi} bước đo lại đủ ba trục, không suy đoán từ bước trước.
+\dxk một bảng bốn dòng --- fp32, PTQ per-tensor, PTQ per-channel, QAT --- nhân ba cột: độ chính xác ghép cặp, p99, dung lượng. Kèm một câu kết luận \emph{có số}: ``đổi $x$ điểm ghép cặp lấy $y$ ms và $z$ MB, đáng hoặc không đáng ở ngân sách của tôi''. Nếu per-tensor tụt mạnh hơn per-channel, chỉ ra được kênh ngoại lai nào gây ra điều đó.
+\dnv \ptr{D/20} cho bảng thứ tự đòn bẩy và ví dụ per-tensor so với per-channel; \ptr{D/21} cho kỷ luật đo (warm-up, phân vị, tải nhiệt) mà mọi con số ở đây phải tuân theo.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì phần cứng không tiết kiệm được gì từ các số không rải rác: bạn vẫn phải nạp dữ liệu và nạp thêm chỉ số để biết chỗ nào là không, kernel dense đã được tối ưu nhiều năm còn kernel thưa thì chưa, và bản thân chỉ số cũng ăn băng thông. Tốc độ chỉ đến khi cấu trúc đủ đều --- 2:4 hoặc tỉa cả kênh.}
+\tl{Vì nó đảo ngược được trong một dòng config và cho lợi ích gần như bậc hai theo cạnh ảnh: $640 \rightarrow 512$ cắt $36\%$ chi phí ngay. Nguyên tắc xếp thứ tự là chi phí của việc \emph{sai}, không phải độ tinh vi: sai ở đây tốn nửa giờ, sai ở chưng cất tốn một tuần.}
+\tl{Vì một hệ số tỉ lệ per-tensor được đặt bởi $\max|w|$. Với ngoại lai $2{,}0$ thì $s = 2{,}0/127$, nên một trọng số $0{,}1$ chỉ được ánh xạ thành mức $6$: toàn bộ dải bình thường còn sáu mức, chưa tới ba bit. Per-channel cho mỗi kênh một $s$ riêng và trả lại đủ 8 bit.}
+\tl{Ít nhất ba cách. Một: nhiều op nhỏ làm chi phí điều phối trội hơn chi phí tính. Hai: tích chập tách theo chiều sâu có FLOPs thấp nhưng tỉ lệ tính trên byte cũng thấp, nên nó memory-bound. Ba: một toán tử runtime không hỗ trợ bị đẩy về CPU, nuốt trọn lợi ích mà không xuất hiện trong bất kỳ phép đếm FLOPs nào.}
+\end{traloi}
+
+\begin{dongian}
+Bạn phải nhét một tủ sách vào một chiếc vali có hạn cân. Đó là toàn bộ chương này: mô hình tốt nhất của bạn không vừa cái máy mà nó phải chạy trên.
+
+Có năm cách giảm cân, và thứ tự quan trọng hơn kỹ thuật của từng cách. Rẻ nhất là bỏ bớt những cuốn bạn không đọc --- tương đương với việc đưa ảnh nhỏ hơn vào máy; làm trong một phút, hối hận thì làm lại ngay. Kế đó là mua bản bìa mềm thay bìa cứng: cùng nội dung, ít giấy hơn. Rồi mới đến in chữ nhỏ lại một chút, tức ghi mỗi con số bằng ít chữ số hơn. Cách này rất hiệu quả. Nhưng chỉ cần một trang có cỡ chữ khổng lồ là cả cuốn phải in nhỏ theo, và mọi trang khác thành khó đọc. Sau nữa là nhờ người đọc hộ rồi viết bản tóm tắt. Cuối cùng, cách nghe hay nhất mà thường vô ích nhất: xé bớt chữ trên trang. Bạn xoá được chín phần mười chữ, nhưng vẫn phải mang đủ số tờ giấy, nên vali chẳng nhẹ đi.
+
+Cái giá thì luôn có, và nó không rơi đều: thứ mất đi trước tiên là những cuốn hiếm, những chi tiết nhỏ, những trường hợp bạn ít gặp nhưng lại quan tâm nhất. Và con số duy nhất đáng tin là cái cân ở sân bay, không phải con số bạn tự ước ở nhà.
+
+\motcau{Nén mô hình là xếp vali: làm theo thứ tự rẻ tiền trước, và chỉ tin cái cân ở sân bay chứ đừng tin con số bạn ước ở nhà.}
+\end{dongian}
+
+\section{Kết nối}
+Chương này là ứng dụng trực tiếp của \ptr{B/11-gioi-han-tinh-toan}: mọi kỹ thuật ở đây chỉ là cách di chuyển trên biểu đồ \en{roofline}, và biết mình đang ở nhánh nào của biểu đồ đó quyết định kỹ thuật nào có tác dụng. Nó song song với \ptr{C/18/02-kinh-te-hoc-pretraining}: cùng một logic ngân sách, chỉ khác là cột chi đổi từ compute huấn luyện sang compute \vn{suy luận}{inference} --- và tái tham số hoá cùng chưng cất chính là hai cách chuyển tiền giữa hai cột đó. Nó là tiền đề bắt buộc của \ptr{D/21-inference-va-trien-khai}, nơi mô hình đã nén được đem đi \en{export} và đo thật, và nơi bạn sẽ phát hiện rằng phần lớn thời gian không nằm ở mô hình. Cuối cùng nó phụ thuộc \ptr{B/07-chia-du-lieu-va-danh-gia}: không có tập đánh giá phân tách theo nhóm hiếm thì bạn không nhìn thấy cái giá thật của việc nén.
+
+\begin{tukiem}
+\item Vì sao tỉa không cấu trúc cho sparsity 90\% mà không nhanh hơn trên GPU phổ thông, và ba lý do đó lý do nào là lý do phần cứng thật sự?
+\item Trong ví dụ per-tensor với một kênh ngoại lai, phần lớn trọng số còn lại bao nhiêu bit hiệu dụng, và per-channel sửa điều đó bằng cách nào?
+\item Vì sao giảm độ phân giải đứng đầu danh sách dù nó là kỹ thuật ``thô'' nhất, và cái giá của nó thường bị bỏ sót ở đâu trong quy trình đánh giá?
+\item Khi nào chưng cất thắng lượng tử hoá, và khi nào ngược lại --- lập luận qua ràng buộc nào đang chặn bạn?
+\item Một mô hình có ít FLOPs hơn nhưng chạy chậm hơn trên Jetson: ba nguyên nhân khả dĩ nhất là gì?
+\item Vì sao lượng tử hoá một mô hình đã tỉa thường tệ hơn dự đoán, và điều đó nói gì về việc coi các kỹ thuật nén là độc lập với nhau?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

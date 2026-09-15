@@ -1,0 +1,1055 @@
+% ---------------------------------------------------------------------------
+% Chương 34 — IMU, bất định học được và đưa lên phần cứng
+% Tạo: 2026-09-03  |  Sửa gần nhất: 2026-09-03  |  Ôn gần nhất: —
+% Phụ thuộc: F/27 (khung bốn cổng), F/28 (ghép cặp), F/31 (backend khả vi),
+%            D/20 và D/21 (nén và triển khai), E/24 (thiết kế thí nghiệm), E/26 (lộ trình)
+% Mức độ: CỐT LÕI cho hai nỗi đau còn lại — trọng số IMU và ảnh mờ.
+% Ghi chú trung thực: chương này KHÔNG chứa một con số độ trễ nào cho Orin. Mọi phát biểu về
+%   chi phí là định tính và có hướng; chỗ nào trước đây dựa vào số thì nay là một phép đo
+%   mà người đọc tự chạy trên phần cứng của mình. Con số duy nhất được giữ là ký hiệu toán,
+%   thông số công khai của cảm biến, số đếm cấu trúc, và các ví dụ số học có dẫn ``giả sử''.
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{IMU, bất định học được và đưa lên phần cứng (IMU, Learned Uncertainty and Deployment)}
+\ptrtarget{F/34}\ptrtarget{F/34-imu-bat-dinh-va-trien-khai}
+\dependency{\ptr{F/27-dat-hoc-sau-vao-dau} (khung bốn cổng — chương này giả định bạn đã có bộ lọc đó); \ptr{F/28-dac-trung-va-ghep-cap} (ghép cặp học được, nguồn của bất định theo từng điểm khớp); \ptr{D/21-inference-va-trien-khai} và \ptr{D/20-toi-uu-va-nen-mo-hinh} (TensorRT, lượng tử hoá — chương này \emph{không} nhắc lại); \ptr{E/24-thi-nghiem-va-ablation} (sàn nhiễu, cỡ mẫu).}
+
+\begin{tomtat}
+Chương này gom hai nỗi đau còn lại của một hệ stereo-inertial đã tinh chỉnh kỹ: đặt trọng số cho IMU, và ảnh mờ do chuyển động. Cả hai thật ra là một bệnh, nhìn từ hai phía. Hệ cổ điển ước lượng \emph{trạng thái} rất tốt và ước lượng \emph{độ tin cậy của chính nó} rất tệ. Đọc xong bạn kiểm được bằng số ma trận thông tin hiện tại của mình có trung thực không, biết mỗi công trình đóng góp cái gì thật, và biết vì sao khử mờ trước khi trích đặc trưng thường không giúp. Nếu chỉ nhớ một điều: cái mà học sâu mang lại ở đây không phải một ước lượng tư thế tốt hơn, mà là một ước lượng \emph{độ tin cậy} tốt hơn --- và đó đúng là thứ hệ cổ điển đang thiếu.
+\end{tomtat}
+
+\begin{nentang}
+\kn{ma trận thông tin (information matrix)}{nghịch đảo của ma trận hiệp phương sai, ký hiệu \(\Omega = \Sigma^{-1}\). Trong một đồ thị nhân tử, nó chính là \emph{trọng số} của một ràng buộc: càng tin phép đo thì \(\Omega\) càng lớn và ràng buộc kéo nghiệm càng mạnh.}
+\kn{độ lệch cảm biến (sensor bias)}{sai số cộng thêm, thay đổi chậm, của con quay hồi chuyển và gia tốc kế. Trong tài liệu này ``độ lệch'' luôn mang nghĩa đó. Nó khác hẳn hai nghĩa còn lại của \emph{bias}: độ lệch hệ thống của một bộ ước lượng thống kê, và tham số cộng \(b\) trong một tầng tuyến tính.}
+\kn{tiền tích phân IMU (IMU preintegration)}{cách gộp hàng trăm mẫu IMU giữa hai khung hình thành một ràng buộc duy nhất về xoay, vận tốc và vị trí, sao cho khi tư thế đổi thì không phải tích phân lại từ đầu \cite{forster2017preintegration}. Nó đi kèm một ma trận hiệp phương sai, và ma trận đó chính là ``trọng số IMU'' mà cả chương bàn tới.}
+\kn{phương sai Allan (Allan variance)}{một cách đo đặc tính nhiễu của cảm biến quán tính: ghi dữ liệu lúc đứng yên trong nhiều giờ rồi vẽ độ lệch chuẩn của trung bình theo độ dài cửa sổ trung bình. Nó tách được nhiễu trắng, độ trôi của độ lệch, và bước đi ngẫu nhiên \cite{elsheimy2008allan}.}
+\kn{NEES}{viết tắt của \eng{normalized estimation error squared}. Với phần dư \(r\) và hiệp phương sai \(\Sigma\) mà bạn khai báo, đại lượng \(r^{\top}\Sigma^{-1}r\) phải có trung bình đúng bằng số bậc tự do nếu \(\Sigma\) trung thực. Đây là phép thử chính của cả chương.}
+\kn{bất định thay đổi theo đầu vào}{tiếng Anh gọi là \en{heteroscedastic}. Nghĩa là mức nhiễu không phải một hằng số mà phụ thuộc chính đầu vào: một điểm ảnh trên vùng mờ có sai số lớn hơn hẳn một điểm trên vùng sắc nét, dù cùng một camera.}
+\kn{thời gian phơi sáng (exposure time)}{khoảng thời gian cảm biến ảnh gom ánh sáng cho một khung hình, ký hiệu \(\tau\). Ảnh ghi được là trung bình của cảnh trong suốt khoảng đó, nên mọi chuyển động trong \(\tau\) đều biến thành vệt mờ.}
+\kn{độ trễ đuôi (tail latency)}{phân vị cao của phân bố độ trễ, thường là p99. Nó khác trung bình ở chỗ nó mô tả những lần chậm nhất --- và trong hệ thời gian thực thì chính những lần đó phá hạn chót.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Tin IMU quá mức và tin ảnh quá mức đều làm hỏng quỹ đạo. Vì sao hai kiểu hỏng đó nhìn hoàn toàn khác nhau trên đồ thị lỗi, và bạn tách chúng bằng phép đo nào?}
+\h{Con số nhiễu con quay trên datasheet là một phép đo thật, do nhà sản xuất làm. Vậy vì sao đặt đúng con số đó vào đồ thị nhân tử lại gần như luôn sai?}
+\h{Nếu một mạng nơ-ron không cho tư thế tốt hơn hình học, nó còn cho được cái gì đáng để bạn trả một phần ngân sách khung hình trên Orin?}
+\h{Khử mờ bằng một mạng rồi mới trích ORB nghe hiển nhiên là đúng. Vì sao nó thường \emph{không} làm tăng số điểm khớp đúng?}
+\h{Bạn đo riêng mạng mới và thấy nó chỉ chiếm một phần nhỏ chu kỳ khung hình. Vì sao phép đo đó vẫn chưa cho phép kết luận là nó vừa ngân sách?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{F/34/01}
+
+Bảy chương trước của Phần F đi theo các khối của hệ thống: đặc trưng, đóng vòng, độ sâu, backend, bản đồ, ngữ nghĩa. Chương này đi theo hai \emph{triệu chứng} còn lại. Cả hai đều không nằm gọn trong một khối nào.
+
+Triệu chứng thứ nhất: bạn không biết đặt trọng số IMU bằng bao nhiêu. Nới ra thì hệ rung khi ảnh xấu. Siết vào thì hệ trôi theo độ lệch con quay. Bạn đã thử vài giá trị, thấy mỗi giá trị thắng ở một chuỗi khác nhau, và không có lý do nguyên tắc nào để chọn. Triệu chứng thứ hai: những đoạn ảnh mờ làm mất bám, và mọi cách chữa nghĩ ra đều có mùi vá víu.
+
+Hai triệu chứng này trông không liên quan. Chúng là một bệnh. Trong cả hai, hệ thống đang dùng một con số về độ tin cậy mà nó không hề đo. Trọng số IMU là hằng số lấy từ datasheet. Trọng số của một điểm ảnh là \(\sigma^2\) nhân theo tầng kim tự tháp của điểm đó, tức một hàm của \emph{độ phân giải}, không phải của \emph{chất lượng}. Không con số nào trong hai con số ấy biết ảnh có mờ không, robot có rung không, hay camera vừa quay nhanh cỡ nào.
+
+\textbf{Học xong chương này thì làm được gì mà trước đó không làm được?} Bạn đo được ma trận thông tin hiện tại của mình sai bao nhiêu lần. Phép thử có sẵn trong lý thuyết ước lượng và chạy được trong một buổi chiều. Từ con số đó bạn mới quyết định có cần một mạng hay không. Và phần lớn trường hợp, câu trả lời trung thực là chưa cần: cần sửa lại hằng số theo một mô hình. Đó là lý do chương này đặt phép đo trước phương pháp.
+
+\begin{trucgiac}
+Một đồ thị nhân tử là một mô hình lò xo. Mỗi ràng buộc là một lò xo nối hai nút, và ma trận thông tin \(\Omega\) chính là \emph{độ cứng} của lò xo đó. Nghiệm tối ưu là vị trí cân bằng của cả hệ lò xo.
+
+Hình ảnh này giải thích ngay ba chuyện. Một, chỉ \emph{tỉ lệ} độ cứng mới quan trọng: nhân đôi mọi lò xo thì cân bằng không đổi. Hai, một lò xo khai quá cứng sẽ kéo cả hệ về phía nó, kể cả khi nó gắn sai chỗ. Đó chính là một phép đo mờ được tin tưởng quá mức. Ba, độ cứng là một \emph{ma trận} chứ không phải một số: một lò xo có thể rất cứng theo phương ngang và rất mềm theo phương dọc. Chúng ta sẽ thấy vệt mờ tạo ra đúng loại lò xo dị hướng đó.
+\end{trucgiac}
+
+\section{Trọng số chính là ma trận thông tin (Weights Are the Information Matrix)}
+\ptrtarget{F/34/02}
+
+\subsection{A. Trọng số không phải siêu tham số, nó là đại lượng vật lý}
+
+Trong ước lượng bình phương tối thiểu phi tuyến, mỗi ràng buộc đóng góp một số hạng \(r^{\top}\Sigma^{-1} r\) vào hàm mục tiêu. Ma trận \(\Omega = \Sigma^{-1}\) không phải một núm vặn tuỳ ý. Nó là hiệp phương sai nghịch đảo của phép đo, và nó có nghĩa xác suất: bạn đang khai báo phép đo này sai cỡ bao nhiêu \cite{barfoot2017}.
+
+Đây là chỗ phân biệt quan trọng nhất của cả chương. Nó cũng khớp với nguyên tắc bạn đã tự đặt ra là từ chối các phương pháp kiểu tinh chỉnh. Đổi \(\Sigma\) bằng tay cho tới khi APE đẹp là tinh chỉnh. Suy \(\Sigma\) từ một mô hình sai số rồi kiểm lại bằng số là ước lượng. Hai việc có thể cho cùng một con số, nhưng chúng khác nhau hoàn toàn về chỗ sẽ hỏng. Con số tinh chỉnh chỉ đúng trên tập bạn đã tinh chỉnh. Con số suy từ mô hình đúng ở mọi chỗ mô hình còn đúng, và bạn biết mô hình đó giả định gì.
+
+Hình~\ref{fig:f34-do-thi-nhan-tu} cho thấy chỗ mỗi ma trận thông tin nằm trong đồ thị, và vì sao chỉ tỉ lệ giữa chúng mới có tác dụng.
+
+\begin{figure}[H]\centering
+\resizebox{0.96\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  pose/.style={circle,draw=inkblue,fill=bluebg,minimum size=0.95cm,inner sep=0pt},
+  lm/.style={rectangle,draw=steel,fill=white,rounded corners=2pt,minimum size=0.7cm,inner sep=2pt},
+  fim/.style={draw=reddark,fill=redbg,rounded corners=2pt,inner sep=2.5pt,font=\scriptsize},
+  fvi/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=2.5pt,font=\scriptsize}]
+\node[pose] (x1) at (0,0)   {\(x_{k-1}\)};
+\node[pose] (x2) at (4.2,0) {\(x_{k}\)};
+\node[pose] (x3) at (8.4,0) {\(x_{k+1}\)};
+\node[lm] (L1) at (2.1,2.5) {\(L_a\)};
+\node[lm] (L2) at (6.3,2.5) {\(L_b\)};
+\node[fim] (f1) at (2.1,0) {IMU\ \(\Omega_{\text{imu}}\)};
+\node[fim] (f2) at (6.3,0) {IMU\ \(\Omega_{\text{imu}}\)};
+\draw[very thick,draw=reddark] (x1) -- (f1); \draw[very thick,draw=reddark] (f1) -- (x2);
+\draw[very thick,draw=reddark] (x2) -- (f2); \draw[very thick,draw=reddark] (f2) -- (x3);
+\node[fvi] (g1) at (0.8,1.5) {\(\Omega_{\text{ảnh}}\)};
+\node[fvi] (g2) at (3.4,1.5) {\(\Omega_{\text{ảnh}}\)};
+\node[fvi] (g3) at (5.0,1.5) {\(\Omega_{\text{ảnh}}\)};
+\node[fvi] (g4) at (7.6,1.5) {\(\Omega_{\text{ảnh}}\)};
+\draw[draw=steel] (x1) -- (g1); \draw[draw=steel] (g1) -- (L1);
+\draw[draw=steel] (x2) -- (g2); \draw[draw=steel] (g2) -- (L1);
+\draw[draw=steel] (x2) -- (g3); \draw[draw=steel] (g3) -- (L2);
+\draw[draw=steel] (x3) -- (g4); \draw[draw=steel] (g4) -- (L2);
+\node[anchor=west,font=\footnotesize,color=reddark] at (9.2,0.15)  {nét đậm: ràng buộc cứng};
+\node[anchor=west,font=\footnotesize,color=steel]   at (9.2,1.5)   {nét mảnh: ràng buộc mềm};
+\node[anchor=north west,font=\footnotesize,align=left,color=tiercol] at (9.2,-0.55)
+  {\(\Omega=\Sigma^{-1}\) là độ cứng.\\Nhân đôi \emph{mọi} \(\Omega\): nghiệm không đổi.\\
+   Nhân đôi \emph{một} nhóm: nghiệm dịch\\về phía nhóm đó.};
+\draw[decorate,decoration={brace,amplitude=5pt},draw=tiercol]
+  (-0.6,-0.75) -- (8.9,-0.75) node[midway,below=6pt,font=\footnotesize,color=tiercol]
+  {chuỗi tư thế --- IMU nối liên tiếp, ảnh nối qua điểm bản đồ};
+\end{tikzpicture}}
+\caption{Ma trận thông tin nằm ở đâu trong một đồ thị nhân tử stereo-inertial. Mỗi cạnh IMU mang \(\Omega_{\text{imu}}\), mỗi phép chiếu mang \(\Omega_{\text{ảnh}}\). Vì nghiệm là cân bằng của cả hệ, chỉ \emph{tỉ số} giữa hai nhóm độ cứng mới đổi kết quả. Hệ quả thực dụng: ``siết trọng số IMU'' và ``nới trọng số ảnh'' là cùng một thao tác, nên không sửa được cái này mà không nghĩ về cái kia.}
+\label{fig:f34-do-thi-nhan-tu}
+\end{figure}
+
+\subsection{B. Ví dụ nhỏ nhất tính tay được}
+
+Lấy bài toán một chiều. Hai phép đo cùng một đại lượng \(x\). IMU nói \(x = 1{,}0\) với \(\sigma_{\text{imu}} = 0{,}1\). Ảnh nói \(x = 0{,}0\) với \(\sigma_{\text{ảnh}} = 1{,}0\). Nghiệm hợp nhất là trung bình có trọng số theo nghịch đảo phương sai:
+\[
+\hat{x} \;=\; \frac{\Omega_{\text{imu}}\cdot 1{,}0 + \Omega_{\text{ảnh}}\cdot 0{,}0}{\Omega_{\text{imu}}+\Omega_{\text{ảnh}}}
+\;=\; \frac{100 \cdot 1 + 1 \cdot 0}{100 + 1} \;=\; 0{,}990 .
+\]
+Ảnh chỉ kéo được nghiệm đi \(1\%\). Bây giờ giả sử \(\sigma_{\text{imu}}\) thật là \(1{,}0\) chứ không phải \(0{,}1\); datasheet đã lạc quan mười lần. Nghiệm đúng khi đó là \(0{,}5\). Sai số do khai nhầm trọng số là \(0{,}49\), tức gần bằng toàn bộ khoảng cách giữa hai phép đo.
+
+Đây là con số đáng nhớ nhất của mục này. Sai một bậc về \(\sigma\) không làm nghiệm lệch một chút. Nó làm nghiệm bỏ gần hết một trong hai nguồn thông tin. Vì \(\Omega\) đi với bình phương của \(\sigma\), sai mười lần về độ lệch chuẩn là sai một trăm lần về trọng số.
+
+\subsection{C. Hai kiểu hỏng đối xứng}
+
+Đặt sai trọng số hỏng theo đúng hai kiểu, và chúng đối xứng nhau.
+
+\textbf{Quá tin IMU} nghĩa là \(\Sigma_{\text{imu}}\) khai quá nhỏ. Bộ tối ưu không còn được phép sửa phép đo quán tính. Nó hấp thụ mọi mâu thuẫn vào chỗ khác: vào vị trí điểm bản đồ, vào tỉ lệ, vào độ lệch cảm biến. Cơ chế trôi thì thuần vật lý. Một độ lệch con quay \(\epsilon\) tạo sai số góc \(\epsilon t\). Sai số góc làm véctơ trọng lực bị nghiêng, nên một phần của \(g\) rò vào gia tốc ngang, cỡ \(g\epsilon t\). Tích phân hai lần cho sai số vị trí
+\[
+\Delta p(t) \;\approx\; \tfrac{1}{6}\,g\,\epsilon\,t^{3}.
+\]
+Giả sử \(\epsilon = 0{,}01\) rad/s và \(t = 10\) s --- một phép tính giả định để thấy \emph{bậc} của công thức, không phải số đo của hệ nào: \(\tfrac{1}{6}\cdot 9{,}81 \cdot 0{,}01\cdot 1000 \approx 16\) m. Trong một hệ có ảnh, thị giác chặn phần lớn mức trôi đó. Nhưng \emph{hình dạng} vẫn giữ nguyên: mượt, đơn điệu, tăng theo luỹ thừa của thời gian.
+
+\textbf{Quá tin ảnh} nghĩa là \(\Sigma_{\text{ảnh}}\) khai quá nhỏ. Mỗi khung hình xấu có toàn quyền kéo nghiệm. Trên khung mờ, phần dư phép chiếu không phải nhiễu trắng mà là một \emph{độ lệch có hệ thống}, vì đỉnh cực trị của điểm đặc trưng dịch dọc theo vệt mờ. Nghiệm giật theo. Rồi phần giật đó chảy ngược vào ước lượng độ lệch cảm biến qua nhân tử tiền tích phân, làm hỏng độ lệch, làm dự đoán khung sau tệ hơn. Đó là một vòng phản hồi dương. Nó là cơ chế đứng sau phần lớn các lần mất bám ở đoạn quay nhanh.
+
+Hình~\ref{fig:f34-hai-kieu-hong} cho thấy hai chữ ký khác nhau. Quan trọng hơn, nó cho thấy phép đo tách được chúng.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[name=ax1,width=0.51\linewidth,height=4.6cm,
+  xlabel={thời gian \(\longrightarrow\)}, ylabel={sai số vị trí tuyệt đối \(\longrightarrow\)},
+  label style={font=\footnotesize}, xtick=\empty, ytick=\empty,
+  title={\footnotesize\sffamily Sai số tuyệt đối (APE)},
+  legend style={font=\scriptsize,draw=none,fill=none,at={(0.03,0.97)},anchor=north west},
+  axis lines=left, ymin=0, ymax=4.4, xmin=0, xmax=10]
+\addplot[thick,reddark] coordinates
+  {(0,0)(1,0.01)(2,0.05)(3,0.14)(4,0.30)(5,0.55)(6,0.92)(7,1.42)(8,2.05)(9,2.85)(10,3.85)};
+\addlegendentry{quá tin IMU}
+\addplot[thick,steel] coordinates
+  {(0,0.05)(0.5,0.42)(1,0.12)(1.5,0.88)(2,0.20)(2.5,0.36)(3,1.55)(3.5,0.30)(4,0.52)
+   (4.5,0.24)(5,1.18)(5.5,0.31)(6,0.46)(6.5,0.21)(7,1.86)(7.5,0.34)(8,0.41)(8.5,0.62)
+   (9,0.29)(9.5,0.75)(10,0.48)};
+\addlegendentry{quá tin ảnh}
+\end{axis}
+\begin{axis}[name=ax2,at={($(ax1.east)+(1.7cm,0)$)},anchor=west,
+  width=0.51\linewidth,height=4.6cm,
+  xlabel={thời gian \(\longrightarrow\)}, ylabel={sai số tương đối trên cửa sổ ngắn \(\longrightarrow\)},
+  label style={font=\footnotesize}, xtick=\empty, ytick=\empty,
+  title={\footnotesize\sffamily Sai số tương đối (RPE)},
+  axis lines=left, ymin=0, ymax=0.62, xmin=0, xmax=10]
+\addplot[thick,reddark] coordinates
+  {(1,0.012)(2,0.018)(3,0.024)(4,0.030)(5,0.036)(6,0.042)(7,0.048)(8,0.054)(9,0.060)(10,0.066)};
+\addplot[thick,steel] coordinates
+  {(1,0.28)(2,0.19)(3,0.52)(4,0.22)(5,0.44)(6,0.17)(7,0.55)(8,0.21)(9,0.33)(10,0.26)};
+\end{axis}
+\end{tikzpicture}
+\caption{Hai kiểu hỏng đối xứng khi đặt sai trọng số. Trục cố ý không có nhãn số: hình này nói về \emph{hình dạng} của hai đường, không về độ lớn của sai số, và độ lớn thì bạn phải tự đo. Quá tin IMU cho một đường trôi mượt và đơn điệu: APE xấu dần trong khi RPE trên cửa sổ ngắn vẫn rất đẹp. Quá tin ảnh cho một đường răng cưa bị chặn: APE có thể trông chấp nhận được trong khi RPE ngắn hạn xấu ở mọi chỗ. Vì thế \emph{tỉ số giữa RPE ngắn hạn và APE} tách được hai kiểu hỏng này, còn con số APE tổng thì không.}
+\label{fig:f34-hai-kieu-hong}
+\end{figure}
+
+Kết luận chẩn đoán rút ra từ hình này đáng ghi lại. Báo APE một mình không phân biệt được hai bệnh ngược nhau. Báo thêm RPE ở vài độ dài cửa sổ thì phân biệt được ngay, và đó là lý do các hướng dẫn đánh giá quỹ đạo đòi cả hai \cite{zhang2018trajeval}.
+
+\subsection{D. Vì sao hằng số lấy từ datasheet gần như luôn sai}
+
+Datasheet không nói dối. Nó trả lời một câu hỏi khác với câu hỏi bạn đang hỏi. Có năm lý do, và chúng cộng dồn.
+
+\begin{itemize}
+\item \textbf{Con số datasheet là của con chip, không phải của thiết bị.} Nó đo trên đế thử nghiệm, nhiệt độ ổn định, không rung, và thường là giá trị điển hình chứ không phải chặn trên. Thiết bị của bạn có bo mạch, giá đỡ, động cơ và một vỏ máy.
+\item \textbf{Cái đồ thị nhân tử cần là một \(\sigma\) \emph{hiệu dụng}.} Nó không phải nhiễu trắng của cảm biến. Nó phải nuốt hết mọi thứ mô hình không tả: sai lệch thời gian \(t_d\) giữa camera và IMU, sai số hiệu chỉnh ngoại, sai số hệ số tỉ lệ và lệch trục, sai số rời rạc hoá của chính phép tiền tích phân. Vì vậy giá trị đúng luôn \emph{lớn hơn} datasheet, thường là vài lần. Đây là lý do các hệ thực dụng như VINS-Mono khuyến nghị nhân hệ số nhiễu lên so với giá trị đo được \cite{qin2018vinsmono}.
+\item \textbf{Nhiệt độ.} Độ lệch và hệ số tỉ lệ của con quay MEMS phụ thuộc nhiệt độ khá mạnh. Thiết bị nóng dần trong lúc chạy, nên độ lệch \emph{trôi có hướng}. Mô hình bước đi ngẫu nhiên trong tiền tích phân giả định trôi không hướng, nên nó mô tả sai đúng cái đang xảy ra.
+\item \textbf{Rung.} Động cơ và cánh quạt bơm năng lượng vào dải tần cao. Mọi thành phần trên tần số Nyquist của bộ lấy mẫu bị gập xuống dải đo. Nó trông như nhiễu trắng nhưng không phải. Cùng một IMU trên bàn và trên drone đang bay có hai mức nhiễu hiệu dụng khác hẳn nhau.
+\item \textbf{Tốc độ chuyển động.} Ở tốc độ góc thấp, nhiễu trắng chi phối. Ở tốc độ góc cao, sai số hệ số tỉ lệ chi phối, và sai số đó tỉ lệ với \(\omega\) chứ không phải hằng số. Nói cách khác, \(\sigma\) đúng cho lúc đứng yên và \(\sigma\) đúng cho lúc quay 200 độ mỗi giây không thể là cùng một số.
+\end{itemize}
+
+Điểm cuối giết chết ý tưởng ``tìm một hằng số tốt''. Không tồn tại một hằng số đúng cho cả hai chế độ. Đó cũng là lý do vì sao khi bạn thử vài giá trị, mỗi giá trị lại thắng ở một chuỗi khác nhau: bạn đang tìm một hằng số cho một đại lượng không hằng.
+
+\begin{cambay}
+Phương sai Allan là công cụ đúng và bị dùng sai thường xuyên. Nó đo lúc cảm biến \emph{đứng yên}, trong nhiều giờ, ở nhiệt độ ổn định. Đó chính xác là chế độ bạn không vận hành. Số Allan cho bạn một \emph{sàn}: hệ thống không thể tốt hơn thế. Nó không cho bạn giá trị hiệu dụng lúc bay. Dùng thẳng số Allan làm \(\Sigma\) trong đồ thị nhân tử là khai quá tự tin một cách có hệ thống, và luôn theo cùng một hướng. Nên chạy thêm chuỗi không phát hiện ra nó.
+\end{cambay}
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.80\linewidth,height=5.4cm,xmode=log,ymode=log,
+  domain=0.01:2000, samples=180,
+  xlabel={độ dài cửa sổ trung bình \(\tau\) \(\longrightarrow\) (thang log)},
+  ylabel={độ lệch Allan \(\sigma(\tau)\) (thang log)},
+  label style={font=\footnotesize}, xtick=\empty, ytick=\empty,
+  ymin=0.00028, axis lines=left]
+\addplot[thick,inkblue] {sqrt(0.0025^2/x + 0.0004^2 + 0.00004^2*x/3)};
+\node[font=\scriptsize,color=steel,anchor=south west] at (axis cs:0.02,0.011)
+  {nhiễu trắng, dốc \(-1/2\)};
+\node[font=\scriptsize,color=reddark,anchor=north] at (axis cs:108,0.00048)
+  {sàn: độ trôi của độ lệch};
+\node[font=\scriptsize,color=steel,anchor=south east] at (axis cs:1700,0.0040)
+  {bước đi ngẫu nhiên, dốc \(+1/2\)};
+\end{axis}
+\end{tikzpicture}
+\caption{Hình dạng của một đường Allan cho con quay MEMS. Trục không có nhãn số vì hình này nói về \emph{ba đoạn dốc}, không về giá trị của một cảm biến cụ thể --- giá trị thì bạn đo trên chính con quay của mình. Ba đoạn ứng với ba tham số mà tiền tích phân cần: mật độ nhiễu trắng ở dốc trái, độ trôi của độ lệch ở đáy, bước đi ngẫu nhiên của độ lệch ở dốc phải. Cả ba đo lúc \emph{đứng yên}, nên chúng là sàn chứ không phải giá trị vận hành.}
+\label{fig:f34-allan}
+\end{figure}
+
+\subsection{E. Phép thử biến câu hỏi thành con số}
+
+Trước khi nghĩ tới một mạng, hãy đo xem \(\Sigma\) hiện tại sai bao nhiêu. Phép thử là NEES, và nó rẻ.
+
+Nếu \(\Sigma\) trung thực thì đại lượng \(r^{\top}\Sigma^{-1}r\) có kỳ vọng đúng bằng số bậc tự do \(d\) của phần dư. Với phần dư phép chiếu hai chiều, \(d = 2\). Cách làm: ghi lại mọi phần dư ở cuối một lần tối ưu, tính trung bình của \(r^{\top}\Sigma^{-1}r\) theo từng loại nhân tử, rồi so với \(d\).
+
+Đọc kết quả thì gọn nhất là viết ra công thức chứ không thay số. Đặt
+\[
+k \;=\; \frac{\overline{r^{\top}\Sigma^{-1}r}}{d},
+\]
+thì \(k\) chính là hệ số mà \(\Sigma\) bạn khai đang sai, tính theo \emph{phương sai}; sai theo \emph{độ lệch chuẩn} là \(\sqrt{k}\). Ba trường hợp và chỉ ba: \(k \approx 1\) là trung thực; \(k > 1\) nghĩa là bạn tự tin hơn mức được phép đúng \(\sqrt{k}\) lần; \(k < 1\) nghĩa là bạn quá dè dặt và đang vứt đi thông tin. Không cần một con số cụ thể nào để phát biểu điều đó, và đó chính là lý do phép thử này chuyển được từ hệ này sang hệ khác. Với nhân tử tiền tích phân, \(d\) là \(9\) cho phần xoay, vận tốc và vị trí, hoặc \(15\) nếu tính cả hai độ lệch.
+
+Ba lý do khiến phép thử này quan trọng hơn vẻ ngoài của nó. Thứ nhất, nó là \emph{phép đo}, không phải tinh chỉnh: bạn không dò tìm giá trị làm APE đẹp, bạn kiểm một mệnh đề thống kê. Thứ hai, nó tách được theo nhóm: NEES của nhân tử ảnh, của con quay, của gia tốc kế là ba con số riêng, nên bạn biết chỗ nào sai. Thứ ba, nó chạy được trên chính chuỗi bạn đang thất bại, và không cần chân trị.
+
+Một tinh tế phải nói rõ. Sau khi tối ưu, phần dư đã bị co lại vì chính nó tham gia định ra nghiệm. Nên NEES tính trên phần dư sau tối ưu thiên về phía \emph{nhỏ hơn} \(d\). Cách sạch hơn là tính trên phần dư \emph{dự đoán}: đánh giá nhân tử của khung mới bằng trạng thái ước lượng từ các khung trước, trước khi khung mới tham gia tối ưu. Nếu bạn chỉ làm được cách thứ nhất, hãy nhớ rằng con số bạn thấy đã là bản lạc quan. Một NEES lớn hơn \(d\) khi đó là bằng chứng còn mạnh hơn.
+
+Để thấy một bảng NEES đọc như thế nào, Bảng~\ref{tab:f34-nees-mau} viết ra bốn tình huống theo hệ số \(k\). Giá trị của bảng nằm ở chỗ bốn dòng dẫn tới bốn kết luận khác nhau, và không dòng nào cần một con số cụ thể mới đọc được.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Bốn cách một bảng NEES đọc ra, viết theo hệ số \(k = \overline{r^{\top}\Sigma^{-1}r}/d\) chứ không theo con số cụ thể. Bảng cố ý không có số: con số phải đến từ chính lần chạy của bạn, còn cái chuyển được từ hệ này sang hệ khác là bốn dòng dưới đây. Không dòng nào đọc được nếu thiếu bậc tự do \(d\).}
+\label{tab:f34-nees-mau}
+\begin{tabularx}{\linewidth}{@{}L{3.6cm}L{3.0cm}Y@{}}
+\toprule
+\textbf{Điều bạn thấy} & \textbf{Nghĩa là} & \textbf{Làm gì tiếp}\\
+\midrule
+\(k \approx 1\) cho một nhóm nhân tử & \(\Sigma\) của nhóm đó trung thực & Không đụng tới. Ghi lại làm mốc để so khi đổi cấu hình\\
+\(k > 1\), và lớn dần theo tầng kim tự tháp & Hệ số trọng số theo tầng đang quá lạc quan ở tầng cao & Sửa \emph{hình dạng} của hàm phụ thuộc tầng, đừng nhân một hằng số chung cho mọi tầng\\
+\(k > 1\) trên nhân tử con quay & Hoặc \(\sigma\) khai quá nhỏ, hoặc phần dư có một thành phần \emph{hệ thống} & Loại trừ sai lệch thời gian \(t_d\) và sai số hiệu chỉnh ngoại trước; chỉ khi hết cả hai mới được kết luận là nhiễu\\
+\(k < 1\) trên nhân tử gia tốc kế & Quá dè dặt: bạn đang vứt đi thông tin gia tốc & Siết lại theo đúng hệ số \(\sqrt{k}\); hệ quả quan sát được là tỉ lệ đơn ảnh hội tụ nhanh hơn\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Chú ý dòng cuối. Quá dè dặt ít khi làm hệ sập, nên nó gần như không bao giờ bị phát hiện bằng cách nhìn quỹ đạo. Nó chỉ hiện ra khi bạn tính \(k\) cho từng nhóm. Đó là lý do phép thử đáng chạy cả khi hệ đang chạy tốt.
+
+\begin{mach}[Năm nấc của việc đặt trọng số IMU]
+\item \vd{Không có số nào cả.} \gp lấy hằng số từ datasheet. \gd cảm biến hoạt động như trong phòng thí nghiệm. \gia mọi sai lệch chưa mô hình hoá bị dồn vào chỗ khác, và luôn theo hướng quá tự tin.
+\item \vd{Datasheet không khớp thiết bị thật.} \gp đo phương sai Allan trên chính thiết bị, nhiều giờ, đứng yên. \hq bạn có ba tham số đúng cho một chế độ. \vdm chế độ đó là chế độ đứng yên, không phải chế độ bay.
+\item \vd{Độ lệch trôi theo nhiệt và theo thời gian.} \gp đưa độ lệch vào véctơ trạng thái và ước lượng nó trực tuyến, đúng như ORB-SLAM3 và VINS-Mono làm \cite{campos2021orbslam3,qin2018vinsmono}. \gd trôi là bước đi ngẫu nhiên không hướng. \gia bạn phải chọn một tham số bước đi ngẫu nhiên, và nó lại là một hằng số nữa.
+\item \vd{Nhiễu hiệu dụng đổi theo chuyển động và theo rung.} \gp luật thích nghi: nới \(\Sigma\) khi phát hiện tốc độ góc cao hoặc rung. \gd bạn viết đúng được hàm phụ thuộc đó bằng tay. \gia đây là tinh chỉnh trá hình nếu hàm được chọn theo kết quả; kinh nghiệm thực hành trên EuRoC cho thấy một hằng số chặt, hiệu chỉnh đúng, thường không thua các luật thích nghi viết tay.
+\item \vd{Không viết được hàm phụ thuộc đó bằng tay.} \gp học nó: một mạng nhận cửa sổ IMU thô và trả về cả phép đo lẫn hiệp phương sai của phép đo. \gd phân phối chuyển động lúc chạy giống lúc huấn luyện. \gia mất tính chẩn đoán, thêm một tạo tác phải bảo trì, và một chế độ hỏng mới là tự tin sai khi ra ngoài phân phối.
+\end{mach}
+
+\begin{table}[H]\centering\footnotesize
+\caption{Năm cách đặt trọng số IMU. Cột cuối là cột đáng giá nhất: nó nói khi nào con số bạn khai không còn nghĩa.}
+\label{tab:f34-trong-so}
+\begin{tabularx}{\linewidth}{@{}L{2.5cm}L{3.3cm}YL{3.5cm}@{}}
+\toprule
+\textbf{Cách} & \textbf{Cơ chế} & \textbf{Mạnh khi nào} & \textbf{Hỏng khi nào}\\
+\midrule
+Hằng số datasheet & Đọc mật độ nhiễu từ tài liệu chip & Bản dựng đầu tiên, cần một con số để chạy được & Gần như luôn quá tự tin; sai theo cùng một hướng nên lặp lại nhiều lần không lộ\\
+Hiệu chỉnh Allan & Đo nhiều giờ lúc đứng yên, tách ba tham số & Thiết bị cố định, ít rung, nhiệt ổn định & Chế độ vận hành có rung hoặc quay nhanh; số Allan là sàn chứ không phải giá trị lúc chạy\\
+Ước lượng độ lệch trực tuyến & Đưa độ lệch vào trạng thái, ràng buộc bằng bước đi ngẫu nhiên & Mọi hệ thị giác-quán tính hiện đại; bắt được trôi chậm & Trôi có hướng theo nhiệt; giai đoạn khởi tạo khi chưa đủ quan sát để tách độ lệch khỏi trọng lực\\
+Luật thích nghi viết tay & Nới \(\Sigma\) theo một chỉ báo như tốc độ góc hay mức rung & Khi bạn có mô hình vật lý thật cho phần phụ thuộc đó & Khi hàm được chọn theo kết quả: đó là tinh chỉnh và nó không chuyển sang tập khác\\
+Hiệp phương sai học được & Mạng xuất cả phép đo lẫn \(\Sigma\), huấn luyện bằng độ hợp lý & Có dữ liệu đúng nền tảng và đúng phân phối chuyển động & Ra ngoài phân phối: mạng vẫn khai \(\Sigma\) nhỏ, tức tự tin sai --- chế độ hỏng tệ nhất cho một trọng số\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\lk{E/24}{cùng nguyên lý với}{NEES cũng là một phép ``đo sàn trước, kết luận sau'': trước khi so hai cấu hình trọng số, hãy kiểm xem trọng số hiện tại có trung thực không}
+
+\subsection{F. Hàm mất mát bền vững là một trọng số thích nghi trá hình}
+
+Còn một chỗ mà trọng số đã bị thay đổi trong hệ của bạn mà ít ai gọi tên như vậy: hàm mất mát bền vững. Huber và Cauchy được dùng ở khắp nơi trong SLAM để chống điểm ngoại lai, và cơ chế của chúng đúng là đổi trọng số.
+
+Cách nhìn gọn nhất là bình phương tối thiểu có trọng số lặp lại. Một hàm mất mát bền vững \(\rho(r)\) tương đương với bình phương tối thiểu thường, nhưng mỗi phần dư mang thêm một hệ số
+\[
+w(r) \;=\; \frac{\rho'(r)}{r} .
+\]
+Với chuẩn bình phương thì \(w \equiv 1\). Với Huber ngưỡng \(\delta\), \(w = 1\) khi \(|r| \le \delta\), và \(w = \delta/|r|\) khi ra ngoài. Tính tay một trường hợp: phần dư bằng \(3\delta\) thì trọng số hiệu dụng chỉ còn một phần ba, tức ma trận thông tin của ràng buộc đó bị chia ba. Với Cauchy tham số \(c\), \(w = 1/(1+(r/c)^2)\), nên cùng phần dư \(3c\) chỉ còn một phần mười.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.74\linewidth,height=4.6cm,domain=0.02:5,samples=250,
+  xlabel={phần dư chuẩn hoá \(|r|/\sigma\)},
+  ylabel={trọng số hiệu dụng \(w(r)\)},
+  label style={font=\footnotesize}, tick label style={font=\footnotesize},
+  legend style={font=\scriptsize,draw=rulecol,fill=white,at={(0.98,0.98)},anchor=north east},
+  axis lines=left, ymin=0, ymax=1.18, grid=major, grid style={rulecol!55}]
+\addplot[thick,steel] {1};
+\addlegendentry{bình phương (không bền vững)}
+\addplot[thick,inkblue] {min(1, 1/x)};
+\addlegendentry{Huber, \(\delta=\sigma\)}
+\addplot[thick,reddark,dashed] {1/(1+x^2)};
+\addlegendentry{Cauchy, \(c=\sigma\)}
+\end{axis}
+\end{tikzpicture}
+\caption{Hàm mất mát bền vững nhìn dưới dạng trọng số. Đường cong là \(w(r)=\rho'(r)/r\), tức hệ số nhân vào ma trận thông tin của một ràng buộc khi phần dư của nó lớn. Đây là \emph{công thức}, không phải số đo. Điểm cần thấy: một hàm bền vững cũng là cách đặt trọng số thích nghi, nhưng nó thích nghi theo \emph{phần dư} chứ không theo \emph{đầu vào}.}
+\label{fig:f34-ham-ben-vung}
+\end{figure}
+
+Hình~\ref{fig:f34-ham-ben-vung} cho thấy điểm phân biệt quan trọng nhất của mục này. Hàm bền vững phản ứng \emph{sau khi} đã thấy phần dư. Một hiệp phương sai học được, hay một \(\Sigma\) suy từ vệt mờ, dự đoán \emph{trước khi} thấy phần dư. Hai thứ không thay thế nhau, và lý do rất cụ thể. Phần dư lớn có thể do phép đo tồi, mà cũng có thể do trạng thái hiện tại đang sai. Hàm bền vững không phân biệt được hai nguyên nhân đó; nó hạ trọng số trong cả hai trường hợp.
+
+Hệ quả rơi thẳng ra là một cạm bẫy hay gặp. Đặt hàm bền vững lên cạnh IMU thường sai, và sai theo hướng nguy hiểm. Phần dư IMU lớn hiếm khi có nghĩa là phép đo quán tính bị ngoại lai. Nó thường có nghĩa là tư thế hoặc độ lệch đang sai, tức đúng lúc bạn cần ràng buộc IMU kéo mạnh nhất. Hạ trọng số ở đúng lúc đó là giấu triệu chứng đi. Với cạnh ảnh thì ngược lại: sai ghép là chuyện thường ngày, nên hàm bền vững ở đó là công cụ đúng.
+
+Tóm lại, ba tầng nên tách bạch. Tầng một là \(\Sigma\) trung thực, suy từ mô hình và kiểm bằng NEES. Tầng hai là hàm bền vững, dành cho các loại ràng buộc thật sự có ngoại lai. Tầng ba là loại bỏ hẳn bằng kiểm chứng hình học. Trộn ba tầng --- ví dụ nới \(\Sigma\) để bù cho việc thiếu bước loại bỏ --- là cách phổ biến nhất để một hệ trở nên không chẩn đoán được.
+
+\section{Học nhiễu và bất định IMU (Learned Noise and Learned Uncertainty)}
+\ptrtarget{F/34/03}
+
+\subsection{A. Ý trung tâm của cả chương}
+
+Đọc các công trình trong mục này rất dễ rút ra kết luận sai. Kết luận sai là: mạng nơ-ron ước lượng tư thế tốt hơn hình học. Nó không tốt hơn. Trên dữ liệu có ảnh tốt và hiệu chỉnh tốt, một bộ ước lượng hình học viết cẩn thận vẫn thắng, và thắng với chi phí thấp hơn nhiều.
+
+Kết luận đúng là: mạng ước lượng \emph{độ tin cậy} tốt hơn. Nó đọc được từ đầu vào những thứ mà một hằng số không đọc được. Ảnh này có mờ không, đoạn IMU này có rung không, điểm khớp này nằm trên cạnh hay trên góc. Và ước lượng độ tin cậy chính là ô trống trong hệ cổ điển, vì hệ cổ điển lấy nó từ datasheet và từ tầng kim tự tháp.
+
+Cơ chế làm được điều đó gọn tới bất ngờ, và đáng suy dẫn ra vì nó nói rõ mạng thực sự học cái gì. Cho mạng xuất ra cả giá trị dự đoán \(\mu\) lẫn phương sai \(\sigma^2\), rồi huấn luyện bằng độ hợp lý âm của phân phối chuẩn \cite{nix1994estimating}:
+\[
+\mathcal{L} \;=\; \frac{1}{2}\left(\frac{(y-\mu)^2}{\sigma^2} \;+\; \log \sigma^2\right).
+\]
+Số hạng thứ nhất phạt việc tự tin mà sai. Số hạng thứ hai phạt việc khai bất định lớn để né. Đặt \(e = y-\mu\) rồi lấy đạo hàm theo \(\sigma^2\), cực tiểu nằm ở
+\[
+\sigma^{2\ast} \;=\; e^{2}.
+\]
+Nói bằng lời: đầu ra tối ưu của nhánh phương sai là \emph{bình phương sai số kỳ vọng, có điều kiện theo đầu vào}. Một hiệp phương sai học được không phải phép màu. Nó là một bài hồi quy bình phương sai số lên chính đầu vào. Hình~\ref{fig:f34-nll} cho thấy hình dạng của hàm mất mát đó và vì sao nó có đúng một cực tiểu.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.74\linewidth,height=5.0cm,domain=0.35:4.2,samples=200,
+  xlabel={\(\sigma\) mà mạng khai},
+  ylabel={hàm mất mát \(\mathcal{L}\)},
+  label style={font=\footnotesize}, tick label style={font=\footnotesize},
+  legend style={font=\scriptsize,draw=none,fill=none,at={(0.98,0.97)},anchor=north east},
+  axis lines=left, ymin=0, ymax=4.2, grid=major, grid style={rulecol!55}]
+\addplot[thick,steel] {0.5*(1/(x^2)) + ln(x)};
+\addlegendentry{sai số thật \(|e|=1\)}
+\addplot[thick,reddark,dashed] {0.5*(4/(x^2)) + ln(x)};
+\addlegendentry{sai số thật \(|e|=2\)}
+\addplot[only marks,mark=*,mark size=1.7pt,color=steel] coordinates {(1,0.5)};
+\addplot[only marks,mark=*,mark size=1.7pt,color=reddark] coordinates {(2,1.193)};
+\node[font=\scriptsize,color=steel,anchor=north west]   at (axis cs:1.05,0.66) {\(\sigma^{\ast}=1\)};
+\node[font=\scriptsize,color=reddark,anchor=north west] at (axis cs:2.05,1.36) {\(\sigma^{\ast}=2\)};
+\end{axis}
+\end{tikzpicture}
+\caption{Vì sao độ hợp lý âm ép mạng nói thật. Nhánh trái dốc đứng: khai \(\sigma\) quá nhỏ bị phạt bởi số hạng bình phương. Nhánh phải đi lên chậm: khai \(\sigma\) quá lớn bị phạt bởi \(\log \sigma^2\). Cực tiểu nằm đúng tại \(\sigma = |e|\), nên nhánh phương sai của mạng chỉ đang hồi quy sai số kỳ vọng theo đầu vào --- không hơn, và cũng không kém.}
+\label{fig:f34-nll}
+\end{figure}
+
+Hai hệ quả rơi thẳng ra từ suy dẫn này, và cả hai đều là giới hạn.
+
+\begin{itemize}
+\item \textbf{Mạng chỉ biết loại sai số nó đã thấy.} Bất định học được theo cách này là bất định \emph{của dữ liệu}, tức phần nhiễu vốn có trong đầu vào. Nó không phải bất định \emph{của mô hình}. Gặp một đầu vào lạ, mạng vẫn nội suy và vẫn khai một \(\sigma\) nhỏ. Đó là tự tin sai, và với một trọng số thì đây là chế độ hỏng tệ nhất có thể \cite{kendall2017uncertainties}.
+\item \textbf{Muốn bắt phần bất định của mô hình thì phải trả thêm.} Cách rẻ nhất là hợp nhiều mô hình rồi lấy độ tản mát giữa chúng làm bất định \cite{lakshminarayanan2017simple}, hoặc lấy mẫu bằng dropout lúc suy luận \cite{gal2016dropout}. Cả hai nhân chi phí suy luận lên vài lần, nên với một hệ thời gian thực trên Orin, chúng gần như luôn ngoài ngân sách.
+\end{itemize}
+
+\subsection{B. Bốn công trình về phía IMU}
+
+Bốn công trình dưới đây được xếp theo mức độ can thiệp vào hệ của bạn, từ nhẹ tới nặng. Với mỗi cái, câu hỏi đúng không phải ``nó chính xác bao nhiêu'' mà là bốn câu của Phần F: nó chữa thất bại nào, cơ chế gì, có đáng không, và học được gì kể cả khi không dùng.
+
+\subsubsection{Khử nhiễu con quay bằng mạng tích chập giãn}
+
+Đây là can thiệp nhẹ nhất \cite{brossard2020denoising}. Thất bại được chữa: tư thế góc ước lượng vòng hở từ con quay MEMS trôi rất nhanh, vì độ lệch, sai số hệ số tỉ lệ và lệch trục cộng dồn.
+
+Cơ chế: một mạng tích chập giãn nhận cửa sổ dữ liệu IMU thô và xuất ra một \emph{lượng hiệu chỉnh} cộng vào phép đo con quay. Hàm mất mát không đặt trên từng mẫu. Nó đặt trên số gia xoay tích luỹ qua nhiều độ dài cửa sổ, tính trên nhóm xoay.
+
+Hai chi tiết thiết kế đáng lấy dù bạn không dùng phương pháp. Thứ nhất, mạng sửa \emph{phép đo} chứ không sửa \emph{trạng thái}, nên toàn bộ phần tiền tích phân phía sau không phải đụng tới. Thứ hai, hàm mất mát đặt trên đúng đại lượng mà đồ thị nhân tử tiêu thụ, chứ không phải trên đại lượng dễ đo nhất. Tích chập giãn cho trường tiếp nhận dài với ít phép tính, và điều đó quan trọng khi tần số mẫu là 200 Hz.
+
+Chi phí: đây là mạng nhỏ nhất trong cả chương --- một chồng tích chập một chiều trên một cửa sổ tín hiệu, không phải một mô hình ảnh --- nên nó là ứng viên duy nhất trong mục này có cửa ngay trên luồng theo vết. Nhưng ``có cửa'' không phải ``vừa''; đại lượng duy nhất đáng tin là mức thay đổi phân vị cao của chu kỳ luồng theo vết khi bạn bật nó lên trong hệ đầy đủ. Hỏng khi nào: nó được hiệu chỉnh cho một đơn vị IMU cụ thể và một phân phối chuyển động cụ thể. Đổi thiết bị thì lượng hiệu chỉnh sai, và sai một cách im lặng.
+
+\subsubsection{TLIO}
+
+TLIO can thiệp ở mức vừa \cite{liu2020tlio}. Thất bại được chữa: định vị chỉ bằng quán tính trên thiết bị đeo trôi trong vài giây, nên không dùng được khi mất ảnh.
+
+Cơ chế: một mạng nhận cửa sổ IMU đã căn theo trọng lực và hồi quy một véctơ dịch chuyển ba chiều \emph{cùng với hiệp phương sai của nó}. Cặp giá trị đó được đưa vào một bộ lọc như một phép đo giả.
+
+Đây là bài học thiết kế quan trọng nhất của cả mục: \emph{mạng không phải bộ ước lượng, bộ lọc mới là}. Mạng chỉ cung cấp một phép đo kèm mức tin cậy đã khai báo. Trạng thái --- độ lệch, vận tốc, hướng trọng lực --- vẫn do bộ lọc giữ. Vì thế nó cắm được vào một đồ thị nhân tử có sẵn dưới dạng một nhân tử mới, không đụng gì tới phần còn lại.
+
+Có đáng không, với trường hợp của bạn: nó chữa một nỗi đau bạn không có, vì bạn luôn có stereo. Nhưng \emph{khuôn} của nó là thứ đáng bắt chước nhất trong toàn chương.
+
+\subsubsection{RoNIN}
+
+RoNIN đi xa hơn về phía dữ liệu \cite{herath2020ronin}. Nó hồi quy vận tốc trong một hệ quy chiếu không phụ thuộc hướng thiết bị, chỉ từ IMU, và đi kèm một bộ dữ liệu chuẩn để so sánh.
+
+Điều đáng học không phải con số mà là nguồn gốc của độ chính xác. Nó đến từ một \emph{tiên nghiệm chuyển động} rất mạnh: dáng đi của người có cấu trúc lặp lại, và mạng học chính cấu trúc đó. Đây vừa là lý do nó chạy được vừa là lý do nó không chuyển sang nền tảng khác. Một drone hay một xe không có tiên nghiệm tương đương. Nếu chuyển động của robot bạn không bị ràng buộc, đây là hướng sai.
+
+\subsubsection{IDOL}
+
+IDOL tách bài toán làm hai tầng \cite{sun2021idol}: học hướng trước, rồi học vị trí trong hệ quy chiếu đó. Bài học thiết kế khớp thẳng với phép tính \(\tfrac{1}{6}g\epsilon t^3\) ở mục trước. Sai số xoay là thứ đầu độc sai số tịnh tiến, nên giải nó trước và giải riêng là hợp lý về mặt cấu trúc. Mức tin cậy của tôi về chi tiết hiện thực của công trình này chỉ ở mức vừa, nên tôi nêu ý tưởng và không mô tả kết quả số.
+
+Ngoài bốn cái trên, có một mảnh bằng chứng đáng để ý cho người làm chuyển động mạnh. Hướng học đo quán tính cho đua drone cho thấy khuôn ``phép đo học được cộng hiệp phương sai, đưa vào bộ ước lượng cổ điển'' vẫn hoạt động ở chế độ chuyển động rất hung hãn \cite{cioffi2023dronelio}. Điều kiện là phân phối chuyển động lúc huấn luyện khớp lúc chạy. Điều kiện đó không phải chi tiết nhỏ; nó là toàn bộ vấn đề.
+
+\subsection{C. MAC-VO: bất định theo từng điểm khớp}
+
+Phía ảnh có một ô trống lớn hơn phía IMU, và ít người nói ra. Trong ORB-SLAM3, trọng số của một phần dư phép chiếu là một hằng số nhân theo hệ số tỉ lệ của tầng kim tự tháp mà điểm đặc trưng được phát hiện \cite{campos2021orbslam3}. Đó là một đại diện cho \emph{độ phân giải}. Nó không biết gì về mờ, về vùng ít vân, về hoa văn lặp lại, về vật thể đang chuyển động, hay về việc điểm khớp thứ hai gần bằng điểm khớp thứ nhất tới mức nào.
+
+MAC-VO lấp đúng ô đó \cite{qiu2025macvo}. Thất bại được chữa: mọi điểm khớp bị đối xử như nhau, nên một nhóm nhỏ điểm khớp tồi có thể kéo lệch cả tư thế.
+
+Cơ chế: bộ ghép cặp học được xuất ra bất định của chính nó cho từng điểm khớp. Bất định trong mặt phẳng ảnh được đưa qua hình học phép chiếu để thành một hiệp phương sai ba chiều đúng nghĩa, dẹt và dài dọc theo tia nhìn với điểm ở xa. Hiệp phương sai đó trực tiếp làm trọng số cho từng ràng buộc ảnh. Đây là ý ``bất định phải mang đơn vị đo đúng''. Một sai số hai điểm ảnh tương ứng với sai số độ sâu rất khác nhau tuỳ điểm gần hay xa, và một trọng số vô hướng trong mặt phẳng ảnh không tài nào biểu diễn được điều đó.
+
+Có đáng làm không, xét theo bốn cổng của \ptr{F/27}. Chi phí: đây là cả một frontend học được, không phải một mô-đun cắm thêm. Nó chiếm GPU, và GPU của bạn đang bận trích ORB và chạy hiệu chỉnh chùm tia cục bộ. Dữ liệu: nó cần dữ liệu có chân trị độ sâu hoặc mô phỏng. Hỏng khi ra ngoài phân phối: giống mọi bất định học được, mạng vẫn khai bất định nhỏ trên cảnh lạ. Kết luận trung thực tính tới tháng 9/2026 là chưa nên thay frontend.
+
+Nhưng bài học thiết kế thì rút được ngay và gần như miễn phí: \textbf{hãy làm cho ma trận thông tin của ảnh phụ thuộc vào một đại lượng đo được của từng điểm khớp}. Bạn không cần một mạng để làm điều đó. Ba đại diện rẻ, tính được ngay trong lúc trích đặc trưng, đều tốt hơn tầng kim tự tháp:
+
+\begin{itemize}
+\item \textbf{Khoảng cách tới điểm khớp tốt thứ hai.} Tỉ số giữa khoảng cách mô tả tốt nhất và tốt nhì đã là một đo lường mơ hồ, và nó có sẵn trong mọi bộ ghép cặp.
+\item \textbf{Năng lượng gradient cục bộ và tính dị hướng của nó.} Ma trận cấu trúc \(2\times2\) quanh điểm đặc trưng cho ngay hai trị riêng. Tỉ số giữa chúng nói điểm đó bị ràng buộc theo một phương hay hai phương. Đây đúng là thứ dùng để dựng một \(\Sigma\) dị hướng.
+\item \textbf{Vệt mờ dự đoán từ con quay.} Mục sau tính con số này; nó cho cả hướng lẫn độ dài của trục dài trong ellipse bất định.
+\end{itemize}
+
+Và ba lựa chọn ấy kiểm chứng được bằng NEES, theo đúng cách ở mục trước. Chia điểm khớp thành các nhóm theo tỉ số khoảng cách mô tả rồi tính NEES riêng từng nhóm, bạn sẽ thấy ngay nhóm nào đang bị khai quá tự tin. Đó là bằng chứng, không phải tinh chỉnh.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  cls/.style={draw=steel,fill=bluebg,rounded corners=2pt,align=center,inner sep=4pt,
+              text width=2.6cm,minimum height=0.95cm},
+  net/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,align=center,inner sep=4pt,
+              text width=2.9cm,minimum height=0.95cm},
+  opt/.style={draw=inkblue,fill=white,rounded corners=2pt,align=center,inner sep=5pt,
+              text width=3.0cm,minimum height=1.9cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=tiercol,thick},
+  lb/.style={font=\scriptsize,color=tiercol}]
+\node[cls] (imu)  at (0,2.6)   {IMU thô\\200 Hz};
+\node[net] (den)  at (3.7,2.6) {khử nhiễu con quay\\(tích chập giãn)};
+\node[cls] (pre)  at (7.5,2.6) {tiền tích phân};
+\node[cls] (win)  at (0,0.6)   {cửa sổ IMU\\1 giây};
+\node[net] (tlio) at (3.7,0.6) {mạng kiểu TLIO\\\(\Delta p\) và \(\Sigma\)};
+\node[cls] (pseu) at (7.5,0.6) {nhân tử giả-đo};
+\node[cls] (img)  at (0,-1.4)  {ảnh trái/phải};
+\node[net] (mat)  at (3.7,-1.4) {ghép cặp có bất định\\\(\Sigma\) theo từng khớp};
+\node[cls] (vis)  at (7.5,-1.4) {nhân tử ảnh};
+\node[opt] (ba)   at (11.4,0.6) {Bộ tối ưu\\đồ thị nhân tử\\(giữ nguyên)};
+\draw[ar] (imu) -- (den); \draw[ar] (den) -- (pre); \draw[ar] (pre) -- (ba);
+\draw[ar] (win) -- (tlio); \draw[ar] (tlio) -- (pseu); \draw[ar] (pseu) -- (ba);
+\draw[ar] (img) -- (mat); \draw[ar] (mat) -- (vis); \draw[ar] (vis) -- (ba);
+\draw[ar] (ba.south) -- ++(0,-0.55);
+\node[anchor=north,lb,align=center] at (11.4,-1.1) {tư thế, bản đồ,\\độ lệch cảm biến};
+\node[anchor=north west,align=left,font=\footnotesize] at (-0.9,-2.6)
+  {{\color{violetdark}\rule{0.7em}{0.7em}}\ mạng \qquad
+   {\color{steel}\rule{0.7em}{0.7em}}\ khối cổ điển giữ nguyên};
+\node[anchor=north west,align=left,lb] at (5.2,-2.6)
+  {Cả ba chỗ cắm đều \emph{cung cấp phép đo kèm \(\Sigma\)}, không thay bộ ước lượng.\\
+   Đó là lý do chúng thử được từng cái một, và bỏ ra được khi không đáng.};
+\end{tikzpicture}}
+\caption{Ba chỗ mà một mạng cắm được vào một hệ thị giác-quán tính cổ điển mà không đụng bộ tối ưu. Trên: sửa phép đo con quay trước khi tiền tích phân. Giữa: thêm một nhân tử giả-đo dịch chuyển kèm hiệp phương sai, theo khuôn TLIO. Dưới: thay trọng số vô hướng của ảnh bằng hiệp phương sai theo từng điểm khớp, theo khuôn MAC-VO. Điểm chung là bộ ước lượng vẫn là bộ ước lượng cổ điển, nên mỗi chỗ cắm là một ablation độc lập.}
+\label{fig:f34-ba-cho-cam}
+\end{figure}
+
+\begin{table}[H]\centering\footnotesize
+\caption{Năm công trình, đọc theo bốn câu hỏi của Phần F. Cột cuối là phần giữ được giá trị kể cả khi bạn kết luận là chưa đáng dùng.}
+\label{tab:f34-bon-cau}
+\begin{tabularx}{\linewidth}{@{}L{2.1cm}L{3.5cm}YL{3.6cm}@{}}
+\toprule
+\textbf{Công trình} & \textbf{Chữa thất bại nào} & \textbf{Có đáng với hệ của bạn không} & \textbf{Bài học thiết kế giữ lại}\\
+\midrule
+Khử nhiễu con quay & Tư thế góc vòng hở trôi vì độ lệch và sai số tỉ lệ & Có thể: mạng rất nhỏ, không đụng backend; nhưng phải hiệu chỉnh lại cho từng đơn vị IMU & Sửa \emph{phép đo}, không sửa trạng thái; đặt hàm mất mát trên đúng đại lượng backend tiêu thụ\\
+TLIO & Định vị chỉ bằng quán tính trôi trong vài giây & Không trực tiếp: bạn luôn có stereo & Mạng cấp phép đo kèm \(\Sigma\); bộ lọc vẫn là bộ ước lượng và vẫn giữ mọi trạng thái\\
+RoNIN & Không có tư thế khi thiếu ảnh, trên thiết bị đeo & Không: tiên nghiệm dáng đi không tồn tại cho drone hay xe & Độ chính xác đến từ tiên nghiệm chuyển động; đó cũng là chỗ nó không chuyển được\\
+IDOL & Sai số hướng đầu độc sai số vị trí & Không trực tiếp & Tách hướng khỏi vị trí; xử lý xoay trước vì lỗi xoay khuếch đại theo \(t^3\)\\
+MAC-VO & Mọi điểm khớp bị đối xử như nhau dù chất lượng rất khác & Chưa, tính tới 9/2026: cả một frontend, tranh GPU với ORB và hiệu chỉnh chùm tia & Cho \(\Omega_{\text{ảnh}}\) phụ thuộc đại lượng đo được của từng khớp, và cho nó dị hướng\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\lk{F/28}{tiền đề}{bất định theo từng điểm khớp chỉ có nghĩa khi bộ ghép cặp xuất được một điểm số hiệu chỉnh tốt; chương 28 là nơi bàn các bộ ghép cặp đó}
+
+\subsection{D. Kiểm một bất định có trung thực không, kể cả khi nó do mạng sinh ra}
+
+Mục 2 đã giới thiệu NEES cho hằng số cổ điển. Phép thử đó áp nguyên vào một hiệp phương sai học được, và đây là điều kiện nghiệm thu bắt buộc trước khi cắm bất kỳ mạng nào vào bộ ước lượng.
+
+Hình dạng của phép thử rất sạch về mặt lý thuyết. Nếu \(\Sigma\) khai đúng thì \(r^{\top}\Sigma^{-1}r\) theo phân phối \(\chi^2\) với \(d\) bậc tự do. Nếu \(\Sigma\) thật lớn hơn \(k\) lần thì đại lượng đo được theo phân phối \(k\,\chi^2_d\). Nói cách khác, cả phân bố dịch sang phải đúng \(k\) lần, và trung bình đi từ \(d\) lên \(k\,d\). Vì vậy bạn không chỉ đọc được ``sai hay đúng'' mà đọc được luôn hệ số sai.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.78\linewidth,height=4.8cm,domain=0.02:16,samples=250,
+  xlabel={\(r^{\top}\Sigma^{-1}r\) đo được, với \(d=2\) bậc tự do},
+  ylabel={mật độ}, ymin=0, ymax=0.55,
+  label style={font=\footnotesize}, tick label style={font=\footnotesize},
+  legend style={font=\scriptsize,draw=none,fill=none,at={(0.97,0.97)},anchor=north east},
+  axis lines=left, grid=major, grid style={rulecol!55}]
+\addplot[thick,reddark,dashed] {2*exp(-2*x)};
+\addlegendentry{quá dè dặt: \(\Sigma\) lớn gấp 4}
+\addplot[thick,steel] {0.5*exp(-x/2)};
+\addlegendentry{trung thực: \(\chi^2_2\)}
+\addplot[thick,violetdark] {0.125*exp(-x/8)};
+\addlegendentry{quá tự tin: \(\Sigma\) nhỏ đi 4 lần}
+\draw[dotted,draw=tiercol,thick] (axis cs:2,0) -- (axis cs:2,0.33);
+\node[font=\scriptsize,color=tiercol,anchor=south west] at (axis cs:4.4,0.12) {trung bình phải bằng \(d=2\)};
+\draw[draw=tiercol,densely dotted] (axis cs:4.35,0.135) -- (axis cs:2.05,0.30);
+\end{axis}
+\end{tikzpicture}
+\caption{Đọc một biểu đồ NEES. Ba đường là mật độ \emph{chính xác} của \(k\,\chi^2_2\) với \(k = 1/4,\,1,\,4\), không phải số minh hoạ. Trung bình đo được chia cho \(d\) chính là hệ số sai \(k\) về phương sai, tức \(\sqrt{k}\) về độ lệch chuẩn. Đuôi phải dày bất thường mà trung bình vẫn gần \(d\) thì lại là chuyện khác: đó là dấu hiệu ngoại lai, và cách chữa là loại bỏ chứ không phải nới \(\Sigma\).}
+\label{fig:f34-nees}
+\end{figure}
+
+Với một mạng, phép thử này còn cho thêm một thứ mà hằng số không có: bạn kiểm được \emph{tính hiệu chỉnh theo từng mức}. Cách làm là chia các phép đo thành nhóm theo chính \(\sigma\) mà mạng khai, rồi tính NEES riêng cho từng nhóm. Một mạng trung thực cho NEES gần \(d\) ở \emph{mọi} nhóm. Một mạng chỉ đúng trung bình thì sẽ lộ ra ngay: nó thường quá tự tin ở nhóm \(\sigma\) nhỏ và quá dè dặt ở nhóm \(\sigma\) lớn, tức nó đã học đúng thứ tự nhưng sai thang đo.
+
+Phân biệt đó quan trọng vì hai bệnh có hai cách chữa khác nhau. Sai thang đo sửa được bằng một hệ số duy nhất tính từ dữ liệu kiểm định, và đó là hiệu chỉnh chứ không phải tinh chỉnh. Sai thứ tự thì không sửa được bằng bất kỳ hệ số nào; nó nghĩa là mạng không đọc được dấu hiệu cần đọc, và bạn phải quay lại phần dữ liệu hoặc đầu vào.
+
+Cuối cùng, một phép thử rẻ mà nên chạy trước cả hai phép trên: cho mạng ăn dữ liệu ngoài phân phối một cách cố ý. Che một phần ảnh, tăng nhiễu, đảo tương phản, hoặc lấy một chuỗi từ thiết bị khác. Nếu \(\sigma\) mạng khai \emph{không} tăng lên trong các trường hợp đó, bạn đã có bằng chứng trực tiếp cho chế độ hỏng tệ nhất, và bạn có nó trước khi đưa mạng vào hệ thống.
+
+\section{Ảnh mờ do chuyển động và chuyển động nhanh (Motion Blur and Fast Motion)}
+\ptrtarget{F/34/04}
+
+\subsection{A. Trước khi bàn tới mạng: hãy tính vệt mờ ra pixel}
+
+Ảnh mờ hay được nói tới như một điều kiện xấu mơ hồ. Nó là một đại lượng tính được, và tính nó ra trước là bước rẻ nhất trong cả mục.
+
+Trong thời gian phơi sáng \(\tau\), camera quay một góc \(\omega\tau\). Với tiêu cự \(f\) tính bằng pixel, độ dài vệt mờ do xoay xấp xỉ
+\[
+s \;\approx\; f\,\omega\,\tau \quad\text{(pixel)} .
+\]
+Thay số vào để thấy bậc của quan hệ. Đây là phép tính \emph{giả định} trên một camera giả định, không phải số đo: giả sử \(f = 400\) pixel và \(\tau = 10\) ms. Quay 30 độ mỗi giây cho \(s \approx 2{,}1\) pixel, gần như vô hại. Quay 200 độ mỗi giây cho \(s \approx 14\) pixel, trong khi ô mô tả của ORB rộng 31 pixel --- một vệt cỡ đó phá gần hết cấu trúc bên trong ô. Điều đáng mang đi không phải hai con số mà là \emph{quan hệ}: \(s\) tuyến tính theo cả \(\omega\) lẫn \(\tau\), nên tốc độ quay tăng vài lần là đủ đưa vệt mờ từ vô hại sang phá huỷ. Với camera của bạn, thay \(f\) và \(\tau\) thật vào rồi vẽ phân bố của \(s\) trên chuỗi thật --- đó mới là con số dùng được.
+
+Vệt do tịnh tiến thì phụ thuộc độ sâu: cùng một vận tốc, điểm gần trượt nhiều pixel hơn điểm xa. Chi tiết này sẽ quay lại ở mục sau, vì nó là lý do một nhân chập duy nhất cho cả ảnh là mô hình sai.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.80\linewidth,height=5.2cm,domain=0:300,samples=2,
+  xlabel={tốc độ góc \(\omega\) (độ/giây)},
+  ylabel={độ dài vệt mờ \(s\) (pixel)},
+  label style={font=\footnotesize}, tick label style={font=\footnotesize},
+  legend style={font=\scriptsize,draw=none,fill=none,at={(0.03,0.97)},anchor=north west},
+  axis lines=left, ymin=0, ymax=32, xmin=0, xmax=300, grid=major, grid style={rulecol!55}]
+\addplot[thick,steel]      {0.01396*x};
+\addlegendentry{\(\tau = 2\) ms}
+\addplot[thick,inkblue]    {0.03491*x};
+\addlegendentry{\(\tau = 5\) ms}
+\addplot[thick,violetdark] {0.06981*x};
+\addlegendentry{\(\tau = 10\) ms}
+\addplot[thick,reddark]    {0.13963*x};
+\addlegendentry{\(\tau = 20\) ms}
+\draw[dashed,draw=tiercol] (axis cs:0,3)  -- (axis cs:300,3);
+\draw[dashed,draw=reddark] (axis cs:0,15) -- (axis cs:300,15);
+\node[font=\scriptsize,color=tiercol,anchor=north east] at (axis cs:298,2.6)
+  {3 px --- ghép cặp gần như nguyên vẹn};
+\node[font=\scriptsize,color=reddark,anchor=south east] at (axis cs:298,15.3)
+  {15 px --- gần nửa ô mô tả 31 px};
+\end{axis}
+\end{tikzpicture}
+\caption{Vệt mờ do xoay, tính bằng \(s \approx f\omega\tau\) với một tiêu cự \emph{giả định} \(f=400\) pixel. Đây là đồ thị của một \emph{công thức}, không phải số đo: bốn đường chính xác theo mô hình, và chúng đổi chỗ ngay khi bạn thay \(f\) của camera mình vào. Đọc hình này ngược lại cho đòn bẩy rẻ nhất: \(s\) tuyến tính theo \(\tau\), nên hạ thời gian phơi sáng đi bốn lần thì chia độ dài vệt cho bốn, và cái giá chỉ là phải tăng độ khuếch đại.}
+\label{fig:f34-mo-theo-toc-do}
+\end{figure}
+
+Từ hình này rơi ra một kết luận cần nói trước mọi thứ khác. \textbf{Bộ điều khiển phơi sáng tự động là một phần của hệ SLAM của bạn, và hầu như không ai đối xử với nó như vậy.} Nó được chỉnh cho ảnh đẹp mắt, tức ưu tiên đủ sáng hơn là đủ ngắn. Đặt trần cho \(\tau\) và bù bằng độ khuếch đại là một thay đổi vài dòng, không tốn thêm một phép tính nào, và nó tấn công thẳng nguyên nhân. Nhiễu cảm biến tăng lên là cái giá. Nhưng nhiễu trắng làm giảm chất lượng mô tả ít hơn nhiều so với một vệt mờ dài gần bằng nửa ô mô tả --- và tỉ lệ đánh đổi đó thì đo được bằng số điểm khớp đúng, trên chính chuỗi của bạn.
+
+\subsection{B. Vì sao khử mờ rồi mới trích đặc trưng thường không giúp}
+
+Thứ tự ``chạy mạng khử mờ, rồi trích ORB trên ảnh đã khử'' nghe hợp lý tới mức ít ai kiểm. Nó thường không tăng số điểm khớp đúng, và có ba lý do độc lập.
+
+\textbf{Lý do thứ nhất, mục tiêu bị lệch.} Mạng khử mờ được huấn luyện và đánh giá cho mắt người: PSNR, SSIM, LPIPS, và ngày càng nhiều hàm mất mát đối kháng hoặc tri giác. Có một đánh đổi đã được chứng minh giữa độ trung thực và mức ``trông thật''. Vượt qua một ngưỡng, muốn ảnh trông sắc hơn thì buộc phải hy sinh độ trung thực với ảnh gốc \cite{blau2018perception}. Ảnh khử mờ nhìn sắc có thể chứa cạnh do mô hình bịa ra.
+
+Điều đó giết tính lặp lại vì một lý do tinh tế. Ghép cặp đòi hỏi cùng một cấu trúc vật lý phải sinh ra cùng một cực trị cục bộ trong \emph{cả hai} ảnh. Sai số của mạng khử mờ không độc lập giữa hai ảnh. Nó phụ thuộc nhân mờ của từng ảnh, mà hai ảnh có hai nhân mờ khác nhau vì camera chuyển động khác nhau. Vậy mạng sinh ra sai số \emph{tương quan với chuyển động}, tức đúng loại sai số mà bộ ước lượng tư thế không chịu nổi. Nó không phải nhiễu; nó là độ lệch.
+
+\textbf{Lý do thứ hai, mô hình mờ sai.} Phần lớn mạng khử mờ giả định một nhân mờ chung cho cả ảnh, hoặc học từ dữ liệu tổng hợp mờ đều. Mờ do xoay thì gần như đều thật, nhưng mờ do tịnh tiến phụ thuộc độ sâu. Trong một cảnh có cả vật gần và vật xa, không tồn tại một nhân chung nào đúng.
+
+\textbf{Lý do thứ ba, độ trễ.} Một mạng khử mờ là mô hình ảnh-sang-ảnh ở độ phân giải đầy đủ, tức hình dạng đắt nhất trong các hình dạng mạng --- và bạn vẫn phải trích đặc trưng \emph{sau} nó. So với việc hạ thời gian phơi sáng, một thay đổi vài dòng không tốn phép tính nào, đây là một cuộc đổi chác rất xấu. Nếu vẫn muốn kiểm, đại lượng phải đo không phải độ trễ riêng của mạng mà là mức thay đổi phân vị cao của chu kỳ luồng theo vết khi bật nó lên trong hệ đầy đủ.
+
+Một ngoại lệ trung thực phải nêu. Với tầng \emph{lấy ứng viên đóng vòng}, phép tính đổi khác. Ở đó bạn dùng một mô tả toàn ảnh, chạy thưa thớt, không nằm trên đường tới hạn của luồng theo vết. Tiêu chí cũng không phải cực trị cục bộ mà là sự giống nhau toàn cục. Khử mờ trước khi tính mô tả toàn ảnh có thể có ích, và chi phí thì chịu được. Chi tiết về tầng đó nằm ở \ptr{F/29-dinh-vi-lai-va-dong-vong}.
+
+\subsection{C. Hướng đúng thứ nhất: coi vệt mờ là quỹ đạo trong thời gian phơi sáng}
+
+Đây là chỗ đảo ngược cách nghĩ, và là ý hay nhất trong mục này.
+
+Ảnh mờ không phải ảnh sắc nét bị hỏng. Nó là \emph{tích phân} của một chuỗi ảnh sắc nét, chụp từ các tư thế camera nằm dọc một đoạn quỹ đạo trong khoảng \([t_0, t_0+\tau]\). Viết ra thì gọn: giá trị một pixel là trung bình theo thời gian của ảnh sắc nét được dựng từ tư thế \(T(t)\).
+
+Dòng BAD-NeRF và BAD-Gaussians dùng đúng phát biểu đó \cite{wang2023badnerf,zhao2024badgaussians}, tiếp nối Deblur-NeRF \cite{ma2022deblurnerf}. Thay vì khử mờ ảnh, chúng mô hình hoá quá trình tạo ảnh. Chúng dựng vài ảnh ảo từ các tư thế nội suy giữa tư thế đầu và tư thế cuối của khoảng phơi sáng, lấy trung bình, rồi so với ảnh mờ đã ghi. Cảnh và cặp tư thế đầu-cuối được tối ưu đồng thời.
+
+Hệ quả khái niệm là phần quan trọng nhất. \textbf{Vệt mờ trở thành thông tin về chuyển động, thay vì một phiền toái.} Chiều dài và hướng của vệt là một phép đo vận tốc. Một khung mờ không còn là khung phải bỏ; nó là khung mang một loại ràng buộc khác.
+
+Bạn không cần chạy NeRF để lấy ý này. Phiên bản cổ điển của nó là: thay vì đánh giá phần dư phép chiếu tại một thời điểm duy nhất, hãy tích phân phép chiếu trên khoảng phơi sáng. Khi đó điểm đặc trưng mờ không còn là điểm ngoại lai; nó là một ràng buộc lên vận tốc. Cái giá là mô hình phép đo phức tạp hơn và Jacobian đắt hơn.
+
+Có đáng làm không, tính tới tháng 9/2026: dòng BAD chạy \emph{ngoại tuyến}, tối ưu riêng cho từng cảnh, mất từ vài phút tới vài giờ. Đó là NO-GO rõ ràng cho vòng thời gian thực. Giá trị của nó với bạn là mô hình phép đo, không phải phần mềm.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\small]
+\draw[draw=tiercol,thick,-{Latex[length=2mm]}] (-0.4,-2.5) -- (5.6,-2.5);
+\node[font=\scriptsize,color=tiercol,anchor=north west] at (5.0,-2.62) {thời gian};
+\draw[draw=reddark,thick] (0.6,-2.65) -- (0.6,-2.35);
+\draw[draw=reddark,thick] (4.2,-2.65) -- (4.2,-2.35);
+\draw[decorate,decoration={brace,amplitude=4pt,mirror},draw=reddark]
+  (0.6,-2.82) -- (4.2,-2.82)
+  node[midway,below=4pt,font=\scriptsize,color=reddark] {thời gian phơi sáng \(\tau\)};
+\draw[draw=inkblue,thick] plot[smooth] coordinates {(0.6,0.2)(1.8,0.62)(3.0,0.86)(4.2,0.9)};
+\foreach \x/\y in {0.6/0.2, 1.8/0.62, 3.0/0.86, 4.2/0.9}{
+  \draw[fill=bluebg,draw=inkblue] (\x,\y) -- ++(0.42,0.22) -- ++(0,-0.44) -- cycle;}
+\node[font=\scriptsize,color=inkblue,anchor=south] at (2.4,1.08) {tư thế camera \(T(t)\) trong \(\tau\)};
+\node[font=\scriptsize,color=inkblue,anchor=east] at (0.5,0.2) {\(T(t_0)\)};
+\node[font=\scriptsize,color=inkblue,anchor=west] at (4.75,0.9) {\(T(t_0{+}\tau)\)};
+\node[circle,fill=reddark,inner sep=1.6pt] (P) at (2.4,2.6) {};
+\node[font=\scriptsize,color=reddark,anchor=south] at (2.4,2.75) {điểm cảnh \(P\)};
+\foreach \x/\y in {0.6/0.2, 1.8/0.62, 3.0/0.86, 4.2/0.9}{
+  \draw[draw=reddark!45,densely dotted] (\x,\y) -- (P);}
+\draw[draw=steel,fill=white] (0.2,-2.10) rectangle (4.6,-0.75);
+\node[font=\scriptsize,color=steel,anchor=north west] at (0.32,-0.80) {mặt phẳng ảnh};
+\draw[line width=3.2pt,draw=reddark!35] (1.5,-1.50) -- (3.4,-1.50);
+\foreach \x in {1.5,2.13,2.77,3.4}{\node[circle,fill=reddark,inner sep=1.1pt] at (\x,-1.50) {};}
+\node[font=\scriptsize,color=reddark,anchor=north] at (2.40,-1.62) {vệt mờ = ảnh của \(P\) quét dọc \(\tau\)};
+\begin{scope}[xshift=9.0cm,yshift=0.2cm]
+\draw[draw=steel,fill=white] (-2.0,-2.0) rectangle (2.0,2.0);
+\node[font=\scriptsize,color=steel,anchor=north west] at (-1.95,1.95) {ô mô tả 31\(\times\)31 px};
+\draw[line width=6pt,draw=reddark!30] (-1.05,-0.55) -- (1.05,0.55);
+\draw[dashed,draw=tiercol,thick] (0,0) circle (0.52);
+\begin{scope}[rotate=27.5]
+\draw[draw=reddark,very thick] (0,0) ellipse (1.35 and 0.34);
+\draw[-{Latex[length=1.8mm]},draw=reddark] (0,0) -- (1.35,0);
+\draw[-{Latex[length=1.8mm]},draw=reddark] (0,0) -- (0,0.34);
+\end{scope}
+\node[font=\scriptsize,color=tiercol,anchor=north west] at (0.30,-0.62) {\(\Sigma\) cổ điển: tròn};
+\node[font=\scriptsize,color=reddark,anchor=north west,align=left] at (-2.0,-2.15)
+  {\(\Sigma\) đúng: dẹt ngang vệt, dài dọc vệt\\trục dài lấy từ \(\omega\) và \(\tau\), không cần mạng};
+\end{scope}
+\end{tikzpicture}}
+\caption{Trái: vệt mờ là quỹ đạo camera chiếu xuống mặt phẳng ảnh trong thời gian phơi sáng, chứ không phải một ảnh sắc nét bị hỏng. Đây là mô hình mà dòng BAD-NeRF và BAD-Gaussians tối ưu trực tiếp. Phải: hệ quả tức thời cho một hệ cổ điển. Điểm đặc trưng mờ vẫn được định vị tốt \emph{ngang} vệt và rất tệ \emph{dọc} vệt, nên hiệp phương sai đúng là một ellipse dẹt xoay theo hướng vệt --- và hướng đó tính được từ con quay, miễn phí.}
+\label{fig:f34-vet-mo}
+\end{figure}
+
+\subsection{D. Hướng đúng thứ hai: dùng IMU để dự đoán vệt mờ}
+
+Bạn đã có tốc độ góc ở 200 Hz. Bạn cũng có thời gian phơi sáng, hoặc đọc được nó từ trình điều khiển camera. Vậy vệt mờ do xoay dự đoán được ở dạng đóng, trước khi nhìn vào một pixel nào. Ba cách dùng, xếp theo tỉ lệ lợi ích trên công sức.
+
+\begin{enumerate}
+\item \textbf{Đặt trọng số.} Với mỗi khung, tính \(s = f\omega\tau\). Với mỗi điểm khớp, dựng \(\Sigma\) dị hướng: trục dài cỡ \(s/2\) theo hướng vệt, trục ngắn giữ nguyên giá trị cũ. Đây không phải tinh chỉnh, vì cả hướng lẫn độ lớn đều suy từ mô hình chứ không dò theo kết quả. Và nó kiểm được bằng NEES: nhóm khung có \(s\) lớn phải hết bị khai quá tự tin sau khi sửa. Đây là thay đổi rẻ nhất trong cả chương có cơ hội thắng thật.
+\item \textbf{Ghép cặp.} Làm mờ ô mô tả mẫu theo đúng vệt dự đoán trước khi so, hoặc trải rộng cửa sổ tìm kiếm dọc hướng vệt. Ý là đưa hai ảnh về cùng một mức mờ thay vì cố làm cả hai sắc nét.
+\item \textbf{Điều khiển.} Đưa \(s\) dự đoán ngược về bộ điều khiển phơi sáng, đúng như mục A đã nói. Đây là vòng phản hồi mà rất ít hệ SLAM đóng lại.
+\end{enumerate}
+
+Chỗ hỏng của cả ba: chúng chỉ tính phần mờ do xoay. Phần mờ do tịnh tiến cần độ sâu, mà độ sâu thì bạn chỉ có cho các điểm đã tam giác hoá. Với cảnh gần, phần bỏ sót này không nhỏ. Nói thẳng ra là mô hình chỉ đúng khi chuyển động chủ yếu là xoay. May thay, đó cũng chính là chế độ gây mờ nhiều nhất trên thiết bị cầm tay và trên drone.
+
+\subsection{E. Hướng đúng thứ ba: camera sự kiện, một lối thoát về phía cảm biến}
+
+Ba hướng trên đều cố sống chung với thời gian phơi sáng. Camera sự kiện xoá bỏ nó.
+
+Cơ chế: mỗi điểm ảnh báo cáo bất đồng bộ khi độ sáng log của nó đổi quá một ngưỡng. Không có khung hình, không có phơi sáng, nên không có mờ do chuyển động. Độ trễ thấp hơn nhiều bậc so với một cảm biến khung hình, và dải động rộng hơn hẳn \cite{gallego2022eventsurvey}. Đây là một câu trả lời khác về chất cho cả chuyển động nhanh lẫn cảnh chênh sáng.
+
+Bằng chứng gần nhất với bài toán của bạn là hướng kết hợp sự kiện với khung hình và IMU. Lợi ích tập trung đúng vào các tình huống dải động cao và tốc độ cao, chứ không trải đều \cite{vidal2018ultimate}. Và có một kết quả đẹp về mặt vật lý: dòng sự kiện trong khoảng phơi sáng liên hệ với ảnh mờ qua một tích phân kép, nên từ một khung mờ cộng dòng sự kiện có thể dựng lại chuỗi ảnh sắc nét \cite{pan2019edi}. Đó là khử mờ có căn cứ vật lý, không phải tiên nghiệm học được, và nó không bịa ra cạnh.
+
+Cổng đánh giá thì khắt khe. Đây là quyết định \emph{phần cứng}, không phải quyết định thuật toán: thêm cảm biến, thêm hiệu chỉnh, thêm đồng bộ thời gian, và một chuỗi công cụ mỏng hơn hẳn. Có một lỗ hổng cần biết trước: camera sự kiện gần như không thấy gì khi cảnh và camera đều đứng yên. Với robot có lúc dừng, đó là một chế độ vận hành thật. Kết luận thực dụng: chỉ dựng thử nghiệm nếu bạn đã \emph{đo} được rằng phần lớn thất bại của mình tập trung ở tốc độ cao hoặc chênh sáng. Mục A cho bạn cách đo đúng điều đó bằng phân bố của \(s\).
+
+\begin{table}[H]\centering\footnotesize
+\caption{Bốn cách đối phó với ảnh mờ. Cột cuối cho biết cách nào hỏng ở đâu, và vì sao thứ tự thử nên đi từ rẻ tới đắt.}
+\label{tab:f34-mo}
+\begin{tabularx}{\linewidth}{@{}L{2.7cm}L{3.4cm}YL{3.4cm}@{}}
+\toprule
+\textbf{Cách} & \textbf{Cơ chế} & \textbf{Chi phí và giả định} & \textbf{Hỏng khi nào}\\
+\midrule
+Hạ thời gian phơi sáng & Đặt trần \(\tau\), bù bằng độ khuếch đại & Gần như miễn phí; giả định cảnh đủ sáng để bù & Thiếu sáng nặng: nhiễu cảm biến vượt mức mô tả chịu được\\
+Khử mờ rồi trích đặc trưng & Mạng ảnh-sang-ảnh chạy trước frontend & Nặng nhất trong bốn cách: một mạng ảnh-sang-ảnh toàn độ phân giải đặt trước frontend; giả định một nhân mờ chung & Cạnh bịa ra không lặp lại giữa hai ảnh; mờ do tịnh tiến phụ thuộc độ sâu\\
+Mô hình hoá vệt như quỹ đạo & Tích phân phép chiếu trên \(\tau\); dựng \(\Sigma\) dị hướng từ \(\omega\) và \(\tau\) & Rẻ nếu chỉ dùng phần trọng số; đắt nếu tích phân đầy đủ & Chuyển động chủ yếu là tịnh tiến với cảnh gần; \(\tau\) không đọc được\\
+Camera sự kiện & Báo cáo bất đồng bộ theo thay đổi độ sáng; không có phơi sáng & Thêm phần cứng, hiệu chỉnh, đồng bộ; chuỗi công cụ mỏng & Cảnh và camera cùng đứng yên: gần như không có dữ liệu\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{mach}[Năm nấc đối phó với ảnh mờ, đúng thứ tự nên thử]
+\item \vd{Ảnh mờ làm mất bám ở các đoạn quay nhanh.} \gp tính \(s = f\omega\tau\) rồi đặt trần cho thời gian phơi sáng. \gd cảnh đủ sáng để bù bằng độ khuếch đại. \gia nhiễu cảm biến tăng, và trong bóng tối thì cách này hết đường.
+\item \vd{Trần phơi sáng không đủ, vẫn còn khung mờ.} \gp đừng bỏ khung mờ, hãy hạ trọng số của nó theo \(s\). \gd bạn đọc được \(\tau\) và có con quay đồng bộ. \hq đây là thay đổi rẻ nhất còn lại, và nó kiểm được bằng NEES.
+\item \vd{Trọng số vô hướng không tả được kiểu sai số của điểm mờ.} \gp dựng \(\Sigma\) dị hướng, trục dài dọc hướng vệt. \gd mờ chủ yếu do xoay. \vdm phần mờ do tịnh tiến vẫn bị bỏ sót, và nó phụ thuộc độ sâu.
+\item \vd{Ngay cả trọng số đúng cũng không lấy lại được thông tin đã mất.} \gp mô hình hoá phép đo như tích phân trên khoảng phơi sáng, theo cách dòng BAD làm. \gia mô hình phép đo phức tạp hơn, Jacobian đắt hơn, và các hiện thực hiện có đều ngoại tuyến.
+\item \vd{Bản thân cảm biến khung hình là nguyên nhân gốc.} \gp đổi sang hoặc thêm camera sự kiện. \gd bạn đã đo được rằng thất bại tập trung ở tốc độ cao và chênh sáng. \gia thêm phần cứng, thêm hiệu chỉnh, chuỗi công cụ mỏng, và một lỗ hổng khi mọi thứ đứng yên.
+\end{mach}
+
+\subsection{F. Chuyển động nhanh và ảnh mờ là một bài toán nhìn từ hai phía}
+
+Khép mục này bằng một phát biểu gộp. Chuyển động nhanh phá \emph{sự liên kết}: cửa sổ tìm kiếm quanh vị trí dự đoán đặt sai chỗ, và diện mạo của ô ảnh đã đổi. Ảnh mờ phá \emph{phép đo}: vị trí điểm đặc trưng bị lệch có hệ thống, và bất định của nó trở thành dị hướng.
+
+Phía liên kết cũng tính tay được, bằng đúng kiểu phép tính giả định vừa dùng. Với nhịp khung \(\Delta t\) và tốc độ góc \(\omega\), tâm của một ô ảnh dịch khoảng \(f\,\omega\,\Delta t\) pixel giữa hai khung. Giữ nguyên giả định \(f=400\) pixel ở trên, một camera 20 Hz và một cú quay 200 độ mỗi giây cho quãng dịch cỡ 70 pixel --- lớn hơn nhiều lần cửa sổ tìm kiếm mặc định của một bộ theo vết thưa. Nghĩa là ở tốc độ đó, việc mất bám không phải do mô tả kém mà do \emph{tìm sai chỗ}, và cách chữa đúng là dùng con quay để dịch tâm cửa sổ tìm kiếm chứ không phải đổi bộ mô tả.
+
+Hai đại lượng \(f\omega\Delta t\) và \(f\omega\tau\) đến từ cùng một tình huống nhưng chỉ vào hai chỗ sửa khác nhau, và cái thứ nhất lớn hơn cái thứ hai đúng bằng tỉ số \(\Delta t/\tau\). Đó là lý do phải đo cả hai phân bố trên dữ liệu của mình trước khi chọn hướng đi.
+
+Vì thế hai nỗi đau này có hai cách chữa khác nhau, và trộn chúng là lỗi hay gặp. Liên kết được chữa bằng dự đoán tốt hơn và mô tả bền hơn, tức địa hạt của \ptr{F/28-dac-trung-va-ghep-cap} và của dòng quang ở \ptr{F/30-do-sau-dong-quang-va-mo-hinh-nen}. Phép đo được chữa bằng một ma trận thông tin trung thực hơn, tức địa hạt của chính chương này. Chẩn đoán đúng bệnh trước khi mua thuốc là toàn bộ giá trị của việc tách chúng ra.
+
+\begin{cannho}
+Ma trận thông tin là chỗ mà mọi hiểu biết về chất lượng phép đo phải chảy vào. Nếu bạn biết một điều gì đó về một phép đo --- ảnh mờ cỡ này, con quay đang quay nhanh, điểm khớp này mơ hồ --- mà điều đó không xuất hiện trong \(\Sigma\), thì bộ ước lượng không biết. Và trước khi thay \(\Sigma\) bằng một mạng, hãy đo NEES: rất nhiều hệ thống đang khai sai vài lần, và sửa hằng số theo phép đo rẻ hơn huấn luyện hai bậc độ lớn. \T{1}
+\end{cannho}
+
+\section{Đưa lên Jetson Orin: phần đặc thù SLAM (Deploying on Orin)}
+\ptrtarget{F/34/05}
+
+Mục này cố ý không nhắc lại TensorRT, các họ runtime, sai lệch số học sau export, lượng tử hoá, hay chuyện tụt xung vì nhiệt. Tất cả nằm ở \ptr{D/21-inference-va-trien-khai} và \ptr{D/20-toi-uu-va-nen-mo-hinh}, và chúng đúng nguyên vẹn ở đây. Mục này chỉ nói bốn thứ mà một hệ SLAM có, còn một dịch vụ suy luận thì không.
+
+\subsection{A. Ngân sách không phải một con số, nó chia theo luồng}
+
+Một hệ kiểu ORB-SLAM3 có ba luồng với ba loại hạn chót rất khác nhau \cite{campos2021orbslam3}. Luồng theo vết chạy mỗi khung hình và có hạn chót cứng bằng chu kỳ khung. Luồng lập bản đồ cục bộ chạy mỗi khung khoá, hạn chót mềm hơn nhiều bậc. Luồng đóng vòng chạy hiếm, nhưng khi nó chạy hiệu chỉnh chùm tia toàn cục thì nó khoá bản đồ.
+
+Hệ quả thiết kế đến trước mọi phép đo. \textbf{Câu hỏi đầu tiên không phải mạng chạy hết bao nhiêu mili-giây, mà mạng sống ở luồng nào.} Cùng một mạng có thể là bất khả thi trên luồng theo vết và hoàn toàn thoải mái trên luồng đóng vòng. Khoảng cách giữa hai hạn chót ấy rộng hơn nhiều so với mọi mức tăng tốc bạn có thể mua bằng lượng tử hoá hay bằng một kiến trúc gọn hơn. Nên chọn luồng là biến thiết kế mạnh nhất bạn có, và nó phải được chọn \emph{trước} khi đo bất cứ thứ gì.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Ngân sách chia theo luồng cho một hệ stereo-inertial trên Orin. Bảng cố ý \emph{không có một con số nào}: hạn chót của mỗi luồng suy ra từ nhịp của chính luồng đó, và phần còn trống thì chỉ máy của bạn trả lời được. Cái chuyển được từ hệ này sang hệ khác là thứ tự chặt-lỏng giữa ba dòng; cột cuối nói loại mạng nào có cửa ở mỗi dòng, và phép đo xác nhận nằm ở mục D.}
+\label{tab:f34-ngan-sach}
+\begin{tabularx}{\linewidth}{@{}L{2.6cm}L{2.6cm}L{2.8cm}Y@{}}
+\toprule
+\textbf{Luồng} & \textbf{Nhịp} & \textbf{Hạn chót} & \textbf{Chỗ một mạng vừa được, và loại mạng nào}\\
+\midrule
+Theo vết & mỗi khung hình & Cứng: đúng bằng chu kỳ khung, không co giãn & Phần trống là chu kỳ khung trừ đi trích đặc trưng, ghép cặp và tối ưu tư thế --- hãy đo phần đó trước tiên. Chỉ vừa cho mạng rất nhỏ: khử nhiễu con quay, hoặc một đầu ra bất định gắn vào bộ trích sẵn có\\
+Lập bản đồ cục bộ & mỗi khung khoá, tức thưa hơn nhịp khung nhiều lần & Mềm: dài hơn chu kỳ khung nhiều bậc, và trễ một nhịp không làm rớt khung & Vừa cho mạng cỡ trung: hiệp phương sai theo từng điểm khớp cho hiệu chỉnh chùm tia cục bộ, hoặc ước lượng độ sâu cho khung khoá\\
+Đóng vòng & hiếm, và không đều & Rất mềm: cả hệ chịu được một quãng dừng khi vòng đóng & Vừa cho mạng lớn: mô tả toàn ảnh, ghép cặp dày, kiểm chứng hình học học được\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{B. GPU không rảnh: mạng tranh chấp với chính bạn}
+
+Trong một dịch vụ suy luận, mạng là thứ duy nhất trên GPU. Trong hệ của bạn thì không. Nếu bạn đã đưa trích ORB và hiệu chỉnh chùm tia cục bộ lên GPU, thì một mạng mới không cộng vào một GPU rảnh. Nó xếp hàng sau các nhân của chính bạn. Ba hệ quả:
+
+\begin{itemize}
+\item \textbf{Độ trễ không cộng được.} Thêm một mạng có thể làm luồng theo vết chậm đi \emph{nhiều hơn} đúng phần thời gian mà mạng chiếm khi chạy một mình, vì các nhân xếp hàng và vì cả hai tranh băng thông bộ nhớ. Trên Orin, CPU và GPU dùng chung bộ nhớ, nên tranh chấp xảy ra cả với phần chạy trên CPU.
+\item \textbf{Phép đo cô lập gần như vô dụng.} Độ trễ của mạng đo khi nó chạy một mình không nói gì. Đại lượng đúng là \emph{mức thay đổi p99 của chu kỳ luồng theo vết} khi bật mạng lên, đo trong hệ đầy đủ. Chỉ có hiệu số đó mới trả lời được câu hỏi ``có vừa không''.
+\item \textbf{Có ba đòn bẩy để giảm tranh chấp}, và cả ba là quyết định kiến trúc chứ không phải tối ưu: đặt mạng lên DLA để chừa GPU cho phần khác, kèm cảnh báo ở \ptr{D/21} rằng toán tử không hỗ trợ sẽ rơi ngược về GPU; dùng dòng CUDA có mức ưu tiên để nhân của luồng theo vết chen lên trước; hoặc chạy mạng ở tần suất thấp hơn tốc độ khung.
+\end{itemize}
+
+Đòn bẩy thứ ba có một điều kiện hay bị bỏ qua. Chạy thưa là \emph{hợp lệ với một hiệp phương sai} và \emph{không hợp lệ với một tư thế}. Một ước lượng bất định thay đổi chậm và giữ giá trị cũ vài khung không sai nhiều. Một tư thế thì không.
+
+Hình~\ref{fig:f34-luong-gpu} vẽ ra cùng một cảnh trên trục thời gian, và nó cho thấy điều mà bảng không cho thấy: chỗ tranh chấp không nằm trong luồng nào cả, nó nằm ở hàng đợi GPU dùng chung.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  glane/.style={anchor=east,font=\scriptsize,color=inkblue},
+  gtick/.style={font=\scriptsize,color=tiercol},
+  glbl/.style={font=\scriptsize,anchor=center}]
+% truc thoi gian: khong ghi so, chi ghi thu tu
+\draw[draw=tiercol,-{Latex[length=2mm]}] (0,-0.55) -- (15.6,-0.55);
+\node[gtick,anchor=north west] at (13.0,-0.68) {thời gian \(\longrightarrow\)};
+\draw[dashed,draw=violetdark,thick] (7.5,-0.45) -- (7.5,4.05);
+\node[font=\scriptsize,color=violetdark,anchor=south] at (7.5,4.05)
+  {hạn chót của khung \(k\) = chu kỳ khung};
+\node[glane] at (-0.2,3.35) {Luồng theo vết};
+\node[glane] at (-0.2,2.45) {Luồng lập bản đồ};
+\node[glane] at (-0.2,1.55) {Hàng đợi GPU};
+\node[glane,align=right] at (-0.2,0.4) {Cùng cấu hình,\\có thêm mạng};
+% hang 1: luong theo vet, khong co mang
+\draw[draw=steel,fill=bluebg,rounded corners=1pt] (0,3.1) rectangle (1.8,3.6);
+\node[glbl] at (0.9,3.35) {trích ORB};
+\draw[draw=steel,fill=bluebg,rounded corners=1pt] (1.9,3.1) rectangle (3.1,3.6);
+\node[glbl] at (2.5,3.35) {ghép cặp};
+\draw[draw=steel,fill=bluebg,rounded corners=1pt] (3.2,3.1) rectangle (5.1,3.6);
+\node[glbl] at (4.15,3.35) {tối ưu tư thế};
+\draw[draw=tiercol,fill=white,rounded corners=1pt] (5.2,3.1) rectangle (7.5,3.6);
+\node[glbl,color=tiercol] at (6.35,3.35) {còn dư};
+% hang 2: lap ban do cuc bo
+\draw[draw=inkblue,fill=white,rounded corners=1pt] (1.2,2.2) rectangle (6.8,2.7);
+\node[glbl] at (4.0,2.45) {hiệu chỉnh chùm tia cục bộ (chạy cho khung khoá)};
+% hang 3: hang doi GPU
+\draw[draw=steel,fill=bluebg,rounded corners=1pt] (0,1.3) rectangle (1.8,1.8);
+\node[glbl] at (0.9,1.55) {nhân ORB};
+\draw[draw=inkblue,fill=white,rounded corners=1pt] (2.0,1.3) rectangle (5.2,1.8);
+\node[glbl] at (3.6,1.55) {nhân hiệu chỉnh chùm tia};
+% hang 4: co mang
+\draw[draw=steel,fill=bluebg,rounded corners=1pt] (0,0.15) rectangle (1.8,0.65);
+\node[glbl] at (0.9,0.4) {trích ORB};
+\draw[draw=violetdark,fill=violetbg,rounded corners=1pt] (1.9,0.15) rectangle (2.5,0.65);
+\draw[draw=steel,fill=bluebg,rounded corners=1pt] (2.6,0.15) rectangle (3.8,0.65);
+\node[glbl] at (3.2,0.4) {ghép cặp};
+\draw[draw=steel,fill=bluebg,rounded corners=1pt] (3.9,0.15) rectangle (7.5,0.65);
+\node[glbl] at (5.7,0.4) {tối ưu tư thế, bị đẩy lùi};
+\draw[draw=reddark,fill=redbg,rounded corners=1pt] (7.5,0.15) rectangle (8.9,0.65);
+\node[glbl,color=reddark] at (8.2,0.4) {tràn};
+\draw[-{Latex[length=2mm]},draw=reddark,thick] (9.05,0.4) -- (9.75,0.4);
+\node[anchor=west,font=\scriptsize,color=reddark,align=left] at (9.85,0.4)
+  {vượt hạn chót: khung \(k{+}1\) bắt đầu muộn,\\cửa sổ tìm kiếm nở ra, khung sau khó hơn};
+\draw[decorate,decoration={brace,amplitude=4pt},draw=violetdark] (1.9,0.72) -- (2.5,0.72);
+\node[anchor=south west,font=\scriptsize,color=violetdark] at (1.95,0.78) {mạng};
+\draw[decorate,decoration={brace,amplitude=4pt,mirror},draw=reddark] (5.1,0.05) -- (8.9,0.05);
+\node[anchor=north,font=\scriptsize,color=reddark] at (7.0,-0.12)
+  {phần chậm thêm lớn hơn hẳn phần mạng thật sự chiếm};
+\end{tikzpicture}}
+\caption{Vì sao độ trễ không cộng được. Trục thời gian cố ý không có nhãn số: hình này nói về \emph{thứ tự} và về chỗ tranh chấp, không về độ dài. Hàng thứ ba là hàng đợi GPU dùng chung: nhân của mạng chen vào giữa nhân trích ORB và nhân hiệu chỉnh chùm tia, nên phần tối ưu tư thế ở hàng dưới cùng bị đẩy lùi nhiều hơn hẳn phần thời gian mà mạng thật sự chiếm. Đó là lý do phải đo mức thay đổi p99 của cả chu kỳ, chứ không đo riêng mạng.}
+\label{fig:f34-luong-gpu}
+\end{figure}
+
+\subsection{C. Độ trễ đuôi quan trọng hơn độ trễ trung bình}
+
+Chương 21 đã nói phải báo phân vị thay vì trung bình. Với SLAM, lý do mạnh hơn một bậc, và có ba tầng.
+
+\textbf{Một khung trễ không phải một khung mất.} Nó đổi trạng thái của bộ ước lượng. Luồng theo vết thiếu một quan sát, cửa sổ tìm kiếm cho khung sau nở ra, nên khung sau khó hơn. Hàm chi phí của việc vượt hạn chót vì thế có trí nhớ và lồi lên: hai lần trễ liên tiếp đắt hơn nhiều hai lần trễ rời rạc.
+
+\textbf{Đuôi lan qua khoá.} Ba luồng dùng chung bản đồ sau một mutex. Một đỉnh trễ ở luồng lập bản đồ cục bộ, hoặc một lần hiệu chỉnh chùm tia toàn cục ở luồng đóng vòng, sẽ chặn luồng theo vết truy cập bản đồ. Nghĩa là một sự kiện đuôi ở luồng \emph{mềm} biến thành một lần lỡ hạn chót ở luồng \emph{cứng}. Đây là lớp lỗi mà đo từng luồng riêng không bao giờ thấy. Bất kỳ ai từng gỡ một lần kẹt giữa lập bản đồ và hiệu chỉnh toàn cục đều nhận ra nó.
+
+\textbf{Mạng làm đuôi béo thêm.} Thời gian chạy của một mạng phụ thuộc dữ liệu nhiều hơn mã C++ thuần: số hộp trước bước hậu xử lý, hình dạng động, lần đầu gặp một kích thước mới làm bộ cấp phát chạy lại. Nên đuôi của hệ có mạng dày hơn đuôi của hệ không có mạng, kể cả khi trung bình bằng nhau.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.82\linewidth,height=5.0cm,domain=8:95,samples=250,
+  xlabel={độ trễ một chu kỳ luồng theo vết \(\longrightarrow\)},
+  ylabel={mật độ}, ymin=0,
+  label style={font=\footnotesize}, xtick=\empty, ytick=\empty,
+  legend style={font=\scriptsize,draw=none,fill=none,at={(0.97,0.97)},anchor=north east},
+  axis lines=left, enlarge y limits={upper,value=0.14}]
+\addplot[thick,steel,smooth] {exp(-(ln(x/22))^2/(2*0.20^2))/(x*0.20*2.5066)};
+\addlegendentry{không có mạng}
+\addplot[thick,reddark,smooth,dashed] {exp(-(ln(x/26))^2/(2*0.42^2))/(x*0.42*2.5066)};
+\addlegendentry{có mạng trên luồng theo vết}
+\draw[draw=violetdark,thick] (axis cs:50,0) -- (axis cs:50,0.070);
+\node[font=\scriptsize,color=violetdark,anchor=south west,align=left] at (axis cs:50.5,0.040)
+  {hạn chót\\(bằng chu kỳ khung)};
+\node[font=\scriptsize,color=reddark,anchor=south west,align=left] at (axis cs:57,0.006)
+  {phần đuôi vượt hạn chót:\\mỗi lần là một trạng thái xấu đi,\\không phải một mẫu bị bỏ};
+\end{axis}
+\end{tikzpicture}
+\caption{Vì sao trung bình nói dối trong hệ thời gian thực. Trục không có nhãn số vì hình này nói về \emph{hình dạng đuôi}, không về độ trễ của một hệ cụ thể --- độ trễ thì bạn đo bằng harness của mình. Hai phân bố có trung vị gần nhau, nhưng phân bố có mạng dày đuôi hơn hẳn, nên phần diện tích vượt hạn chót lớn hơn nhiều lần. Trong SLAM, mỗi lần vượt hạn chót không độc lập với lần sau: nó làm khung kế tiếp khó hơn, nên chi phí tích luỹ chứ không cộng.}
+\label{fig:f34-duoi-tre}
+\end{figure}
+
+\subsection{D. Đo lại cho trung thực bằng chính harness lặp nhiều lần của bạn}
+
+Bạn đã có công cụ đúng: một harness chạy lặp, và thói quen đo sàn nhiễu trước khi so sánh. Mục này chỉ nói năm điều chỉnh cần thêm khi vật được đo là một mạng trong một hệ thời gian thực.
+
+\begin{enumerate}
+\item \textbf{Coi ``bật/tắt mạng'' là đúng một yếu tố ablation, và đo sàn nhiễu trước.} Toàn bộ kỷ luật ở \ptr{E/24-thi-nghiem-va-ablation} áp nguyên vào đây. Một lần chạy không nói gì, và sàn nhiễu của một hệ có mạng thường rộng hơn sàn nhiễu của hệ cũ.
+\item \textbf{Đừng chạy lockstep khi đo độ trễ.} Chế độ nạp khung theo nhịp hệ thống tiêu thụ là công cụ đúng để cô lập tính phi tất định, và là công cụ sai để đánh giá thời gian thực. Nó biến một lần lỡ hạn chót thành một lần chạy chậm, tức xoá đúng thứ bạn đang muốn đo. Phát lại bag theo thời gian thật, và đếm số khung bị bỏ.
+\item \textbf{Ghi thời gian theo luồng, không chỉ ghi APE.} Tối thiểu: p50 và p99 của chu kỳ luồng theo vết, tần suất khung khoá, thời gian hiệu chỉnh chùm tia cục bộ, số lần mất bám. Một mạng có thể làm APE đẹp lên trong khi bóp tần suất khung khoá, và con số APE tổng che kín điều đó.
+\item \textbf{Báo tỉ lệ hoàn thành chuỗi cùng với APE.} Một hệ mất bám giữa chừng rồi khởi tạo lại có thể cho APE rất đẹp trên phần nó còn bám được. Đây là cái bẫy đọc số đã nêu ở \ptr{B/07-chia-du-lieu-va-danh-gia}, và nó xuất hiện nhiều nhất đúng ở các cấu hình có mạng.
+\item \textbf{Chạy đủ dài, ở đúng chế độ nguồn.} Quy trình mười phút liên tục của \ptr{D/21} áp nguyên, với một điều chỉnh: tải của SLAM phụ thuộc dữ liệu, nên phải phát lại một bag thật lặp vòng, không phải một vòng lặp suy luận tổng hợp.
+\end{enumerate}
+
+\lk{D/21}{tiền đề}{mọi kỹ thuật export, chọn runtime và đo dưới tải nhiệt nằm ở chương 21; mục này chỉ thêm phần mà kiến trúc đa luồng của SLAM sinh ra}
+
+\subsection{E. Bốn câu hỏi trước khi bật một mạng trong vòng thời gian thực}
+
+Gộp bốn mục trên thành một cây quyết định chạy được trong đầu. Bốn câu hỏi dưới đây phải trả lời theo đúng thứ tự, vì một câu trả lời ``không'' ở câu trước làm ba câu sau vô nghĩa.
+
+\begin{figure}[H]\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,node distance=0.6cm,
+  q/.style={draw=inkblue,fill=bluebg,rounded corners=2pt,align=center,inner sep=5pt,
+            text width=3.3cm,font=\scriptsize},
+  no/.style={draw=reddark,fill=redbg,rounded corners=2pt,align=center,inner sep=5pt,
+             text width=3.2cm,font=\scriptsize},
+  ok/.style={draw=greendark,fill=greenbg,rounded corners=2pt,align=center,inner sep=5pt,
+             text width=3.2cm,font=\scriptsize},
+  ar/.style={-{Latex[length=2mm]},draw=tiercol,thick},
+  lb/.style={font=\scriptsize,color=tiercol}]
+\node[q] (q1) at (0,0)    {1. Mạng sống ở luồng nào, và hạn chót của luồng đó là bao nhiêu?};
+\node[q] (q2) at (4.3,0)  {2. Bật mạng lên thì p99 của chu kỳ luồng theo vết đổi bao nhiêu?};
+\node[q] (q3) at (8.6,0)  {3. Tỉ lệ hoàn thành chuỗi và tần suất khung khoá có giữ nguyên không?};
+\node[q] (q4) at (12.9,0) {4. Cải thiện có vượt sàn nhiễu đã đo trước không?};
+\node[no] (n1) at (0,-2.4)    {Chưa trả lời được nghĩa là chưa có kiến trúc. Dừng lại và chọn luồng trước};
+\node[no] (n2) at (4.3,-2.4)  {Đo cô lập không tính. Phải đo trong hệ đầy đủ, phát lại theo thời gian thật};
+\node[no] (n3) at (8.6,-2.4)  {APE đẹp mà tỉ lệ hoàn thành giảm là một kết quả âm, không phải một cải thiện};
+\node[ok] (n4) at (12.9,-2.4) {Qua cả bốn: ghi lại điều kiện thí nghiệm rồi mới nói tới triển khai};
+\draw[ar] (q1) -- (q2); \draw[ar] (q2) -- (q3); \draw[ar] (q3) -- (q4);
+\draw[ar] (q1) -- (n1); \draw[ar] (q2) -- (n2); \draw[ar] (q3) -- (n3); \draw[ar] (q4) -- (n4);
+\node[lb,anchor=south] at (2.15,0.35) {qua};
+\node[lb,anchor=south] at (6.45,0.35) {qua};
+\node[lb,anchor=south] at (10.75,0.35) {qua};
+\end{tikzpicture}}
+\caption{Bốn cổng cho một mạng trong vòng thời gian thực, theo đúng thứ tự phải hỏi. Ba cổng đầu là câu hỏi kỹ thuật hệ thống và không liên quan gì tới chất lượng của mạng; chỉ cổng thứ tư mới hỏi mạng có tốt không. Thứ tự này rẻ hơn thứ tự ngược lại, vì phần lớn ứng viên chết ở cổng một hoặc cổng hai, nơi chi phí kiểm tra gần bằng không.}
+\label{fig:f34-bon-cong}
+\end{figure}
+
+Điểm đáng chú ý ở Hình~\ref{fig:f34-bon-cong} là ba cổng đầu không hỏi gì về chất lượng của mạng. Chúng là câu hỏi kỹ thuật hệ thống thuần tuý. Trả lời chúng trước tiết kiệm được rất nhiều thời gian, vì phần lớn ứng viên chết ở cổng một hoặc hai, và hai cổng đó rẻ hơn cổng bốn hàng chục lần.
+
+\section{Lộ trình học cho riêng hướng này (A Learning Path for This Direction)}
+\ptrtarget{F/34/06}
+
+Chương \ptr{E/26-lo-trinh-hoc} đã cho sáu lộ trình theo mục tiêu, và lộ trình D là ``áp dụng vào SLAM production''. Mục này nối tiếp lộ trình đó ở chỗ nó dừng lại: bạn đã học xong nền, giờ đọc tám chương của Phần F theo thứ tự nào.
+
+\subsection{A. Tuần 0: đo trước khi đọc}
+
+Điều bất thường của lộ trình này là nó bắt đầu bằng ba phép đo chứ không bằng một chương. Lý do đơn giản: bảy chương còn lại của Phần F cùng hứa chữa những nỗi đau khác nhau, và bạn chỉ có ngân sách cho một. Ba phép đo dưới đây, tất cả gói trong hai tới ba ngày, quyết định bạn đọc gì.
+
+\begin{itemize}
+\item \textbf{NEES theo từng loại nhân tử}, trên một chuỗi dễ và một chuỗi khó. Nó nói trọng số hiện tại sai bao nhiêu lần và sai ở đâu.
+\item \textbf{Phân bố vệt mờ dự đoán \(s = f\omega\tau\)}, và tương quan của nó với tỉ lệ điểm khớp đúng. Nó nói ảnh mờ có thật là nút thắt hay không.
+\item \textbf{Hồ sơ độ trễ theo luồng}, p50 và p99 cho từng luồng, trên phần cứng thật. Nó nói bạn còn bao nhiêu ngân sách và ở luồng nào.
+\end{itemize}
+
+Nếu ba phép đo này nói trọng số của bạn đã trung thực, ảnh mờ hiếm, và không còn ngân sách, thì kết luận đúng là không đọc tiếp chương nào cả. Và đó cũng là một kết quả.
+
+\subsection{B. Thứ tự đọc tám chương theo bốn nỗi đau}
+
+\begin{table}[H]\centering\footnotesize
+\caption{Đọc Phần F theo nỗi đau đang gặp, không đọc tuần tự. Chương~27 luôn đọc trước vì nó là bộ lọc. Cột cuối nêu chương \emph{không} nên đọc cho nỗi đau đó, để tiết kiệm thời gian.}
+\label{tab:f34-lotrinh}
+\begin{tabularx}{\linewidth}{@{}L{2.7cm}L{4.4cm}YL{2.4cm}@{}}
+\toprule
+\textbf{Nỗi đau} & \textbf{Thứ tự đọc} & \textbf{Bạn tìm gì trong đó} & \textbf{Bỏ được}\\
+\midrule
+Trọng số IMU & \ptr{F/27} \ra 34 mục 2--3 \ra \ptr{F/31} & Phép thử NEES, khuôn ``phép đo kèm \(\Sigma\)'', và ``khả vi'' mua được gì ở backend & 32, 33\\
+Ảnh mờ & \ptr{F/27} \ra 34 mục 4 \ra \ptr{F/28} & Vệt mờ tính ra pixel, \(\Sigma\) dị hướng, rồi mới tới mô tả bền với mờ & 31, 32, 33\\
+Chuyển động nhanh & \ptr{F/27} \ra \ptr{F/28} \ra \ptr{F/30} \ra 34 mục 4 & Ghép cặp bền, dòng quang thay ghép cặp thưa, rồi phần bất định & 32, 33\\
+Đóng vòng & \ptr{F/27} \ra \ptr{F/29} \ra \ptr{F/28} & Bốn tầng của đóng vòng, và tầng nào thật sự giết vòng & 30, 31, 32, 34\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Hình~\ref{fig:f34-ban-do-doc} vẽ lại cùng bảng đó dưới dạng bản đồ, để thấy hai chương nào nằm ngoài mọi nhánh.
+
+\begin{figure}[H]\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  pain/.style={draw=reddark,fill=redbg,rounded corners=2pt,align=center,inner sep=4pt,
+               text width=2.9cm,font=\scriptsize,minimum height=0.85cm},
+  ch/.style={draw=steel,fill=bluebg,rounded corners=2pt,align=center,inner sep=3pt,
+             text width=2.4cm,font=\scriptsize,minimum height=0.8cm},
+  gate/.style={draw=inkblue,fill=white,rounded corners=2pt,align=center,inner sep=4pt,
+               text width=2.5cm,font=\scriptsize,minimum height=0.9cm},
+  outn/.style={ch,draw=tiercol,fill=white},
+  ar/.style={-{Latex[length=1.8mm]},draw=tiercol}]
+\node[gate] (m) at (0,0) {Tuần 0:\\ba phép đo};
+\node[gate] (c27) at (3.1,0) {\ptr{F/27}\\bộ lọc bốn cổng};
+\node[pain] (p1) at (6.6,2.7)  {trọng số IMU};
+\node[pain] (p2) at (6.6,0.9)  {ảnh mờ};
+\node[pain] (p3) at (6.6,-0.9) {chuyển động nhanh};
+\node[pain] (p4) at (6.6,-2.7) {đóng vòng};
+\node[ch] (a1) at (10.2,2.7)  {34 mục 2--3};
+\node[ch] (b1) at (13.2,2.7)  {\ptr{F/31}};
+\node[ch] (a2) at (10.2,0.9)  {34 mục 4};
+\node[ch] (b2) at (13.2,0.9)  {\ptr{F/28}};
+\node[ch] (a3) at (10.2,-0.9) {\ptr{F/28}};
+\node[ch] (b3) at (13.2,-0.9) {\ptr{F/30}};
+\node[ch] (a4) at (10.2,-2.7) {\ptr{F/29}};
+\node[ch] (b4) at (13.2,-2.7) {\ptr{F/28}};
+\draw[ar] (m) -- (c27);
+\foreach \p in {p1,p2,p3,p4}{\draw[ar] (c27) -- (\p);}
+\draw[ar] (p1) -- (a1); \draw[ar] (a1) -- (b1);
+\draw[ar] (p2) -- (a2); \draw[ar] (a2) -- (b2);
+\draw[ar] (p3) -- (a3); \draw[ar] (a3) -- (b3);
+\draw[ar] (p4) -- (a4); \draw[ar] (a4) -- (b4);
+\node[outn] (o1) at (10.2,-4.3) {\ptr{F/32}};
+\node[outn] (o2) at (13.2,-4.3) {\ptr{F/33}};
+\node[anchor=east,font=\scriptsize,color=tiercol,align=right] at (8.75,-4.3)
+  {ngoài bốn nhánh:\\đọc khi mục tiêu đổi,\\không đọc để chữa mất bám};
+\end{tikzpicture}}
+\caption{Bản đồ đọc Phần F theo nỗi đau. Ba phép đo của tuần 0 quyết định vào nhánh nào, và chương 27 lọc tiếp. Mỗi nhánh chỉ hai tới ba chương, nên không nhánh nào cần đọc quá một nửa Phần F. Hai chương ở dưới cùng nằm ngoài mọi nhánh: chúng phục vụ mục tiêu đổi biểu diễn bản đồ và thêm hiểu biết về cảnh, không phục vụ việc chống mất bám.}
+\label{fig:f34-ban-do-doc}
+\end{figure}
+
+Hai chương \ptr{F/32-ban-do-neural} và \ptr{F/33-ngu-nghia-va-do-thi-canh} không phục vụ bốn nỗi đau này. Chúng phục vụ một mục tiêu khác: đổi biểu diễn bản đồ, hoặc thêm hiểu biết về cảnh. Đọc chúng khi mục tiêu đổi, chứ không đọc để chữa mất bám.
+
+\subsection{C. Mốc thời gian thực tế, và kết cục nhiều khả năng nhất}
+
+Ước lượng dưới đây giả định mười giờ mỗi tuần và giả định bạn đã có hệ thống chạy được. Nó là phán đoán về thứ tự phụ thuộc, không phải số đo.
+
+\begin{itemize}
+\item \textbf{Tuần 0}, hai tới ba ngày: ba phép đo ở mục A.
+\item \textbf{Tuần 1--2}: \ptr{F/27} và mục 2--3 của chương này. Kết quả cụ thể phải có: một bảng NEES, và một quyết định về hằng số trọng số dựa trên bảng đó.
+\item \textbf{Tuần 3--5}: đúng \emph{một} chương theo nỗi đau đã chọn, cộng một lần dựng lại một phương pháp trong đó cho chạy ngoại tuyến trên dữ liệu của bạn. Ngoại tuyến trước, để tách câu hỏi ``nó có đúng không'' khỏi câu hỏi ``nó có kịp không''.
+\item \textbf{Tuần 6--8}: một thí nghiệm có cổng. Bật/tắt, nhiều lần chạy, sàn nhiễu đo trước, ghi cả thời gian theo luồng lẫn tỉ lệ hoàn thành.
+\item \textbf{Sau đó}: chỉ đi tiếp nếu cổng đã qua.
+\end{itemize}
+
+Hai tháng để tới một quyết định. Kết cục nhiều khả năng nhất, và cần nói thẳng, là một NO-GO kèm lý do đo được. Đó không phải hai tháng bỏ đi. Một NO-GO ghi đủ điều kiện thí nghiệm là thứ ngăn bạn thử lại cùng ý tưởng vào năm sau, và là thứ cho bạn biết điều kiện nào đổi thì đáng thử lại. Đúng như \ptr{E/24-thi-nghiem-va-ablation} lập luận.
+
+\section{Giới hạn và trường hợp hỏng}
+\ptrtarget{F/34/07}
+
+Giới hạn lớn nhất của cả chương là giả định rằng nhiễu \emph{có thể} mô tả được bằng một hiệp phương sai Gauss. Nhiều chế độ hỏng thật thì không. Một điểm khớp sai ghép sang cấu trúc lặp lại không phải một mẫu Gauss lệch xa; nó là một mẫu từ một phân phối khác hẳn. Với loại đó, cách đúng không phải nới \(\Sigma\) mà là loại bỏ, bằng kiểm chứng hình học hoặc bằng hàm mất mát bền vững. Nới \(\Sigma\) cho một điểm ngoại lai chỉ làm nó gây hại chậm hơn. Ranh giới thực dụng: nếu phần dư còn nằm trong vài lần \(\sigma\), đó là chuyện của trọng số; nếu nó ở ngoài, đó là chuyện của loại bỏ.
+
+Chế độ hỏng thứ hai thuộc về chính bất định học được. Suy dẫn ở mục 3 cho thấy nhánh phương sai chỉ hồi quy bình phương sai số kỳ vọng theo đầu vào. Ra ngoài phân phối huấn luyện, nó vẫn xuất ra một số nhỏ, và bộ ước lượng nhận số đó như một lời cam đoan. So với một hằng số dở, một mạng tự tin sai còn tệ hơn. Hằng số dở thì sai đều và bạn bù được; mạng thì sai đúng vào những cảnh lạ, tức đúng những cảnh bạn cần được cảnh báo nhất. Cách phòng rẻ duy nhất là giữ một chặn dưới cứng cho \(\Sigma\), tức không bao giờ để mạng khai bất định nhỏ hơn giá trị vật lý của cảm biến.
+
+Chế độ hỏng thứ ba nằm ở phép thử NEES chứ không ở phương pháp. NEES giả định mô hình phép đo \emph{đúng dạng} và chỉ sai về độ lớn. Nếu bạn có một sai lệch thời gian chưa hiệu chỉnh, hoặc hiệu chỉnh ngoại sai, thì phần dư mang một thành phần có hệ thống. NEES lớn hơn bậc tự do sẽ dụ bạn nới \(\Sigma\), và nới \(\Sigma\) khi đó là giấu một lỗi hiệu chỉnh vào trọng số. Cách phân biệt là nhìn phần dư có tương quan với chuyển động không: nếu phần dư ảnh tỉ lệ với tốc độ góc, bạn đang nhìn một \(t_d\) sai, không phải nhiễu.
+
+Chế độ hỏng thứ tư là chỗ chương này nói ít nhất: mờ do tịnh tiến. Toàn bộ phần dự đoán vệt mờ ở mục 4 chỉ dùng con quay, nên nó bỏ sót phần mờ phụ thuộc độ sâu. Với cảnh xa thì bỏ sót đó không đáng kể. Với cảnh gần và chuyển động tịnh tiến nhanh, mô hình sẽ đánh giá thấp vệt mờ, và nó lại sai theo hướng quá tự tin. Tôi không biết một cách rẻ nào để sửa điều này mà không cần độ sâu tin cậy trước khi ghép cặp.
+
+Cuối cùng, một giới hạn về bằng chứng. Nhiều công trình được nhắc trong chương này rất mới, và tôi mô tả cơ chế chứ không mô tả kết quả số. Với các công trình từ 2024 trở đi, hãy coi phần đánh giá ``có đáng không'' của tôi là một phán đoán dựa trên cấu trúc chi phí, không phải kết luận từ một lần dựng lại. Nếu bạn dựng lại và thấy khác, con số của bạn thắng.
+
+\section{Thực hành}
+\ptrtarget{F/34/08}
+
+\begin{description}
+\item[Repo và tài nguyên.] \repo{evo} cho APE và RPE; nhớ báo RPE ở nhiều độ dài cửa sổ chứ không chỉ APE. \repo{ethz-asl/kalibr} cho hiệu chỉnh camera-IMU và cho sai lệch thời gian \(t_d\). Một \(t_d\) chưa hiệu chỉnh trông hệt như trọng số IMU sai, nên hãy loại trừ nó trước. Công cụ tính phương sai Allan từ một bag ROS đứng yên nhiều giờ thì đơn giản tới mức tự viết cũng được. Về phía học sâu, mã nguồn của \repo{TLIO}, \repo{RoNIN} và \repo{MAC-VO} đều công khai; hãy đọc phần định nghĩa hàm mất mát trước phần kiến trúc, vì đó là chỗ chứa toàn bộ quyết định thiết kế. \repo{kornia} có sẵn các phép biến đổi ảnh khả vi nếu bạn muốn thử mô hình mờ dạng tích phân. Danh sách này chốt tại tháng 9/2026 và tên mô hình trong đó sẽ cũ trong sáu tới mười hai tháng; các công cụ hạ tầng như \repo{evo} và \repo{ethz-asl/kalibr} thì bền hơn nhiều.
+\item[Câu hỏi kiểm tra hiểu.] NEES trung bình của nhân tử ảnh trên chuỗi khó gấp \(k\) lần bậc tự do: \(\sigma\) của bạn đang sai bao nhiêu lần, và vì sao con số đó vẫn còn là bản lạc quan? Nếu tăng thời gian phơi sáng gấp đôi thì độ dài vệt mờ đổi bao nhiêu, và tỉ lệ tín hiệu trên nhiễu đổi bao nhiêu, hai đại lượng đó có cùng bậc không? Một mạng khử mờ làm PSNR tăng rõ rệt nhưng số điểm khớp đúng lại giảm: hai cơ chế nào giải thích được, và phép thử nào phân biệt chúng?
+\item[Mini project.] Hai bài ở hai khối bên dưới. Làm bài thứ nhất trước, vì bài thứ hai dùng lại đúng bộ đo mà bài thứ nhất dựng ra.
+\end{description}
+
+\begin{onbai}
+\ar[3]{Ma trận thông tin}{Nghịch đảo hiệp phương sai, \(\Omega=\Sigma^{-1}\), tức trọng số của một ràng buộc trong đồ thị nhân tử. Chỉ tỉ số giữa các \(\Omega\) mới đổi nghiệm, nên siết IMU và nới ảnh là cùng một thao tác.}
+\ar[3]{Vì sao sai một bậc về \(\sigma\) lại nghiêm trọng?}{Vì trọng số đi với \(1/\sigma^2\). Sai mười lần về độ lệch chuẩn là sai một trăm lần về trọng số, đủ để bộ ước lượng bỏ hẳn một nguồn thông tin.}
+\ar[3]{Quá tin IMU}{\(\Sigma_{\text{imu}}\) khai quá nhỏ. Độ lệch con quay không được sửa, sai số góc nghiêng trọng lực, và sai số vị trí lớn theo \(\tfrac{1}{6}g\epsilon t^3\). Chữ ký: APE trôi mượt trong khi RPE ngắn hạn vẫn đẹp.}
+\ar[3]{Quá tin ảnh}{\(\Sigma_{\text{ảnh}}\) khai quá nhỏ. Khung mờ có toàn quyền kéo nghiệm; phần giật chảy ngược vào ước lượng độ lệch và làm dự đoán khung sau tệ hơn. Chữ ký: RPE ngắn hạn xấu đều.}
+\ar[2]{Phương sai Allan}{Cách tách nhiễu trắng, độ trôi của độ lệch và bước đi ngẫu nhiên từ dữ liệu ghi lúc đứng yên nhiều giờ. Nó cho một \emph{sàn}, không cho giá trị hiệu dụng lúc vận hành.}
+\ar[3]{\(\sigma\) hiệu dụng}{Giá trị mà đồ thị nhân tử thật sự cần. Nó phải nuốt cả sai lệch thời gian, sai số hiệu chỉnh ngoại, lệch trục và sai số rời rạc hoá, nên luôn lớn hơn datasheet.}
+\ar[3]{NEES}{Trung bình của \(r^{\top}\Sigma^{-1}r\); nếu \(\Sigma\) trung thực thì nó bằng số bậc tự do. Đây là phép đo biến câu hỏi ``trọng số của tôi có đúng không'' thành một con số, và nó không cần chân trị.}
+\ar[3]{NEES trung bình gấp \(k\) lần bậc tự do --- nghĩa là gì?}{\(\sigma\) của bạn nhỏ hơn thực tế \(\sqrt{k}\) lần, tức bạn đang tự tin hơn mức được phép đúng \(\sqrt{k}\) lần. Phân biệt với lỗi hiệu chỉnh: nếu phần dư tỉ lệ với tốc độ góc thì đó là sai lệch thời gian \(t_d\), không phải nhiễu.}
+\ar[3]{Độ hợp lý âm cho hiệp phương sai}{Hàm mất mát \(\tfrac{1}{2}(e^2/\sigma^2 + \log\sigma^2)\). Số hạng đầu phạt tự tin mà sai, số hạng sau phạt né bằng cách khai bất định lớn. Cực tiểu nằm tại \(\sigma^2=e^2\).}
+\ar[3]{Bất định học được thực chất là gì?}{Một bài hồi quy bình phương sai số lên chính đầu vào. Vì thế nó chỉ đúng cho loại sai số đã thấy lúc huấn luyện, và ra ngoài phân phối nó vẫn khai bất định nhỏ.}
+\ar[2]{TLIO}{Mạng hồi quy dịch chuyển ba chiều kèm hiệp phương sai từ một cửa sổ IMU, rồi đưa cặp đó vào bộ lọc như một phép đo giả. Bài học: mạng cấp phép đo, bộ lọc vẫn là bộ ước lượng.}
+\ar[1]{RoNIN}{Hồi quy vận tốc chỉ từ IMU trong hệ quy chiếu không phụ thuộc hướng, kèm một bộ dữ liệu chuẩn. Độ chính xác của nó đến từ tiên nghiệm dáng đi, nên nó không chuyển sang drone hay xe.}
+\ar[2]{Khử nhiễu con quay bằng mạng}{Mạng tích chập giãn xuất lượng hiệu chỉnh cộng vào phép đo con quay, huấn luyện trên số gia xoay tích luỹ. Nó sửa phép đo chứ không sửa trạng thái, nên backend giữ nguyên.}
+\ar[3]{MAC-VO}{Bộ ghép cặp xuất bất định cho từng điểm khớp, đưa qua hình học phép chiếu thành hiệp phương sai ba chiều đúng đơn vị, rồi dùng nó làm trọng số cho từng ràng buộc ảnh.}
+\ar[3]{Vệt mờ}{Độ dài \(s \approx f\omega\tau\) pixel, tuyến tính theo cả tốc độ góc lẫn thời gian phơi sáng. Với các giá trị \(f\) và \(\tau\) thường gặp, một cú quay nhanh đủ đưa \(s\) lên cỡ nửa ô mô tả ORB rộng 31 px, và lúc đó cấu trúc trong ô gần như mất hết. Thay \(f\) và \(\tau\) của camera mình vào rồi vẽ phân bố của \(s\).}
+\ar[3]{Vì sao khử mờ rồi trích đặc trưng thường không giúp?}{Mạng khử mờ tối ưu cho mắt người nên bịa cạnh, và sai số của nó phụ thuộc nhân mờ nên khác nhau giữa hai ảnh. Kết quả là một độ lệch tương quan với chuyển động, chứ không phải nhiễu.}
+\ar[2]{BAD-NeRF và BAD-Gaussians}{Coi ảnh mờ là trung bình của các ảnh dựng từ tư thế dọc quỹ đạo trong thời gian phơi sáng, rồi tối ưu đồng thời cảnh và quỹ đạo đó. Ngoại tuyến, nhưng mô hình phép đo thì dùng lại được.}
+\ar[2]{\(\Sigma\) dị hướng cho điểm mờ}{Điểm đặc trưng mờ được định vị tốt ngang vệt và tệ dọc vệt, nên hiệp phương sai đúng là ellipse dẹt xoay theo hướng vệt. Hướng và độ dài suy từ con quay, không cần mạng.}
+\ar[1]{Camera sự kiện}{Cảm biến báo cáo bất đồng bộ khi độ sáng đổi; không có phơi sáng nên không có mờ, độ trễ thấp hơn nhiều bậc so với cảm biến khung hình, dải động rộng hơn hẳn. Nó không thấy gì khi cảnh và camera cùng đứng yên.}
+\ar[3]{Vì sao độ trễ đo riêng của một mạng chưa nói được nó có vừa ngân sách không?}{Vì nó tranh GPU và băng thông bộ nhớ với trích đặc trưng và hiệu chỉnh chùm tia của chính bạn, nên độ trễ không cộng được. Đại lượng đúng là mức thay đổi p99 của chu kỳ luồng theo vết khi bật mạng, đo trong hệ đầy đủ.}
+\ar[3]{Đuôi độ trễ trong SLAM}{Một khung trễ đổi trạng thái bộ ước lượng chứ không chỉ bị bỏ, nên chi phí tích luỹ. Và một đỉnh trễ ở luồng mềm chặn luồng cứng qua khoá bản đồ, điều mà đo từng luồng riêng không thấy.}
+\ar[2]{Vì sao không đo độ trễ ở chế độ lockstep?}{Vì nạp khung theo nhịp hệ thống tiêu thụ biến một lần lỡ hạn chót thành một lần chạy chậm. Lockstep đúng cho việc cô lập tính phi tất định và sai cho việc đánh giá thời gian thực.}
+\ar[3]{APE đẹp lên nhưng tỉ lệ hoàn thành giảm --- nghĩa là gì?}{Hệ mất bám giữa chừng và bạn đang đo APE trên phần dễ còn lại. Luôn báo tỉ lệ hoàn thành cùng APE, và báo RPE ở vài độ dài cửa sổ.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{ORB-SLAM3 \cite{campos2021orbslam3}}{Ước lượng độ lệch cảm biến trực tuyến, và trọng số ảnh theo tầng kim tự tháp --- đúng hai chỗ mà mục 2 chỉ ra là ô trống}{Hạ tầng; chính là hệ bạn đang bảo trì}
+\ud{VINS-Mono \cite{qin2018vinsmono}}{Khuyến nghị nhân hệ số nhiễu IMU lên so với giá trị đo, tức thừa nhận \(\sigma\) hiệu dụng lớn hơn datasheet}{Thông lệ đã thành chuẩn trong cộng đồng VIO}
+\ud{Tiền tích phân trên đa tạp \cite{forster2017preintegration}}{Sinh ra hiệp phương sai của nhân tử IMU; mọi bàn luận về trọng số trong chương đều xoay quanh ma trận đó}{Nền của gần như mọi hệ VIO hiện đại}
+\ud{\repo{TLIO} \cite{liu2020tlio}}{Mạng cấp phép đo kèm hiệp phương sai, bộ lọc vẫn giữ trạng thái --- khuôn cắm mạng vào hệ cổ điển}{Được dùng lại rộng rãi trong dòng đo quán tính học được}
+\ud{\repo{MAC-VO} \cite{qiu2025macvo}}{Hiệp phương sai theo từng điểm khớp, mang đúng đơn vị đo, làm trọng số cho từng ràng buộc ảnh}{Rất mới; mô tả cơ chế, chưa kiểm chứng số}
+\ud{BAD-Gaussians \cite{zhao2024badgaussians}}{Mô hình hoá vệt mờ như quỹ đạo trong thời gian phơi sáng, tối ưu đồng thời cảnh và tư thế}{Ngoại tuyến; giá trị với bạn là mô hình phép đo}
+\end{ungdung}
+
+\begin{duan}{Kiểm tra ma trận thông tin của bạn có trung thực không}{1--2 ngày}
+\dmt biến câu ``trọng số IMU của tôi sai'' thành một con số cho từng loại nhân tử và từng chuỗi. Đây là bài phải làm trước mọi thứ khác trong chương.
+\ddl hai chuỗi EuRoC có độ khó khác nhau, ví dụ một chuỗi dễ và V2\_03 \cite{burri2016euroc}; cấu hình mặc định; ba lần chạy mỗi chuỗi để thấy độ tản mát.
+\dbc ghi lại mọi phần dư ở cuối một lần hiệu chỉnh chùm tia cục bộ, kèm hiệp phương sai bạn khai cho nó; tính \(r^{\top}\Sigma^{-1}r\) cho từng loại nhân tử; lấy trung bình rồi chia cho số bậc tự do, tức 2 cho phép chiếu và 9 hoặc 15 cho tiền tích phân tuỳ bạn có tính hai độ lệch không; lặp lại nhưng chia điểm khớp thành nhóm theo tầng kim tự tháp và theo vệt mờ dự đoán \(s=f\omega\tau\).
+\dxk bạn có một bảng NEES với một dòng cho mỗi loại nhân tử và mỗi chuỗi, và phát biểu được câu ``trên chuỗi này, \(\sigma\) của nhân tử X đang nhỏ hơn thực tế \(k\) lần''. Kiểm tra chéo: tỉ số phải lớn hơn ở chuỗi khó. Nếu bằng nhau thì nhiều khả năng bạn đang đo phần dư sau tối ưu và cần chuyển sang phần dư dự đoán.
+\dnv \ptr{E/24} cho sàn nhiễu và số lần chạy tối thiểu; \ptr{B/07} cho cách báo con số kèm khoảng; bảng này là đầu vào của mini project thứ hai.
+\end{duan}
+
+\begin{duan}{Vệt mờ dự đoán từ IMU làm trọng số cho ảnh}{2 ngày}
+\dmt kiểm xem một \(\Sigma\) ảnh phụ thuộc vệt mờ có thắng được trọng số theo tầng kim tự tháp hay không, và làm điều đó mà không tinh chỉnh một hằng số nào.
+\ddl cùng hai chuỗi của bài trước, cộng một chuỗi TUM-VI có đoạn quay nhanh nếu bạn có \cite{schubert2018tumvi}.
+\dbc với mỗi khung, tính \(s = f\omega\tau\) từ con quay và thời gian phơi sáng; vẽ phân bố của \(s\) và vẽ tương quan giữa \(s\) với tỉ lệ điểm khớp đúng; dựng \(\Sigma\) dị hướng có trục dài \(s/2\) theo hướng vệt và trục ngắn giữ nguyên; chạy lại, so với đường \en{baseline}, mỗi cấu hình lặp theo số lần mà bài trước đã tính ra.
+\dxk bạn có đồ thị phân tán \(s\) so với tỉ lệ điểm khớp đúng, bảng NEES \emph{sau khi sửa} cho thấy nhóm khung có \(s\) lớn không còn bị khai quá tự tin, và một so sánh APE cộng RPE cộng tỉ lệ hoàn thành, đặt cạnh sàn nhiễu. Một kết luận NO-GO kèm ba con số đó cũng là hoàn thành bài.
+\dnv \ptr{F/28} nếu bước tiếp theo là đổi bộ mô tả; \ptr{D/21} nếu chi phí tính \(s\) và dựng \(\Sigma\) trở thành vấn đề độ trễ.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì hai kiểu hỏng có hai phổ tần khác nhau. Quá tin IMU cho sai số trôi mượt theo luỹ thừa của thời gian, nên APE xấu trong khi RPE trên cửa sổ ngắn vẫn đẹp. Quá tin ảnh cho sai số giật bị chặn, nên RPE ngắn hạn xấu ở mọi chỗ. Phép đo tách chúng là báo RPE ở vài độ dài cửa sổ bên cạnh APE.}
+\tl{Vì datasheet trả lời câu hỏi ``con chip này nhiễu bao nhiêu trong phòng thí nghiệm'', còn đồ thị nhân tử hỏi ``phép đo này sai bao nhiêu trên thiết bị đang chạy''. Giá trị thứ hai phải nuốt thêm sai lệch thời gian, sai số hiệu chỉnh ngoại, lệch trục, rung gập tần và sai số rời rạc hoá. Nó cũng đổi theo nhiệt độ và theo tốc độ chuyển động, nên không có hằng số nào đúng cho mọi chế độ.}
+\tl{Nó cho một ước lượng \emph{độ tin cậy} phụ thuộc đầu vào. Suy dẫn từ độ hợp lý âm cho thấy nhánh phương sai hội tụ về bình phương sai số kỳ vọng có điều kiện, tức đúng đại lượng mà một hằng số datasheet không thể biểu diễn. Đó là ô trống thật của hệ cổ điển, còn ước lượng tư thế thì không phải.}
+\tl{Vì mạng khử mờ tối ưu cho cảm nhận của mắt người, và có một đánh đổi đã chứng minh giữa ``trông sắc'' và ``trung thực''. Cạnh do mạng bịa ra không lặp lại được, và sai số của mạng phụ thuộc nhân mờ của từng ảnh nên nó tương quan với chuyển động. Kết quả là một độ lệch có hệ thống, đúng loại sai số mà bộ ước lượng tư thế không chịu được.}
+\tl{Vì đó là con số đo cô lập, còn mạng chạy trong một hệ mà GPU và băng thông bộ nhớ đã bị trích đặc trưng và hiệu chỉnh chùm tia chiếm. Đại lượng đúng là mức thay đổi p99 của chu kỳ luồng theo vết khi bật mạng, đo ở tốc độ phát lại thật chứ không phải lockstep, kèm tỉ lệ hoàn thành chuỗi.}
+\end{traloi}
+
+\begin{dongian}
+Hai người cùng chỉ đường cho bạn trong một chuyến lái xe dài. Người thứ nhất chỉ nhìn đồng hồ và cảm giác quán tính. Anh ta rất nhất quán trong từng phút, nhưng sau nửa giờ thì lệch hẳn mà không tự biết. Người thứ hai nhìn biển báo bên đường. Anh ta không lệch dần, nhưng thỉnh thoảng biển bị che hoặc nhoè và anh ta đọc bừa.
+
+Câu hỏi đúng không phải ai nói đúng. Câu hỏi là bạn nên nghe mỗi người bao nhiêu phần. Và đây là chỗ mọi người làm sai. Họ lấy con số ghi trong sách hướng dẫn của cái đồng hồ, đo trong phòng lạnh, đứng yên, để quyết định mức tin cho một cái đồng hồ đang rung trên xe nóng.
+
+Cái mà máy học thêm vào đây không phải một người chỉ đường thứ ba giỏi hơn. Nó là một người biết tự nói mình đang chắc bao nhiêu, thay vì luôn nói bằng một giọng đều. Nó nhìn vào chính dữ liệu và nói: đoạn này tôi chắc, đoạn này tôi đoán.
+
+Cái giá thì rõ và không né được. Người đó chỉ biết mình chắc bao nhiêu trên những con đường đã từng đi. Ra một con đường lạ, anh ta vẫn nói ``tôi chắc'' bằng đúng giọng cũ, và lúc đó anh ta nguy hiểm hơn cả người luôn nói bằng giọng đều. Vì vậy việc đầu tiên phải làm không phải thuê thêm người, mà là kiểm xem hai người sẵn có đang nói quá hay nói dè. Điều đó đo được: đếm xem họ sai bao nhiêu so với mức họ tự nhận.
+
+\chuadongian{chuyện mức tin cậy là một cái bảng chứ không phải một con số. Một điểm ảnh bị nhoè theo một chiều vẫn rất chính xác theo chiều vuông góc. Mọi cách nói gọn thành ``điểm này đáng tin bao nhiêu phần trăm'' đều đánh mất chính cái chiều đó, mà đó lại là phần dùng được nhiều nhất.}
+\motcau{Đừng hỏi phép đo nào đúng; hãy hỏi mỗi phép đo đáng tin bao nhiêu, rồi kiểm câu trả lời đó bằng số.}
+\end{dongian}
+
+\section{Kết nối}
+\ptrtarget{F/34/09}
+
+\ptr{F/27-dat-hoc-sau-vao-dau} là tiền đề trực tiếp: bốn cổng ở đó chính là bộ lọc mà mọi kết luận ``có đáng không'' trong chương này đi qua. \ptr{F/28-dac-trung-va-ghep-cap} là mặt bổ sung: chương 28 làm cho \emph{phép đo} bền hơn, chương này làm cho \emph{trọng số} của phép đo trung thực hơn, và hai việc đó cộng chứ không thay nhau. \ptr{F/31-backend-kha-vi-va-dau-cuoi} nối vào phần hiệp phương sai học được từ phía ngược lại: nó hỏi điều gì xảy ra khi chính bộ tối ưu trở nên khả vi, còn ở đây bộ tối ưu vẫn giữ nguyên.
+
+Ba chương ngoài Phần F cũng bị chương này gọi tới liên tục. \ptr{E/24-thi-nghiem-va-ablation} là điều kiện để mọi con số trong chương có nghĩa: không đo sàn nhiễu trước thì bảng NEES cũng chỉ là một mẫu. \ptr{D/21-inference-va-trien-khai} chứa toàn bộ phần triển khai chung mà mục 5 cố ý không lặp lại. Và \ptr{E/26-lo-trinh-hoc} là chỗ mục 6 nối vào: lộ trình D dừng ở ranh giới Phần F, còn mục 6 nói tiếp đọc tám chương này theo thứ tự nào.
+
+Cuối cùng, một liên kết ngược lên đầu cây. Ý trung tâm của chương --- rằng cái thiếu không phải ước lượng tốt hơn mà là ước lượng độ tin cậy tốt hơn --- chính là trục đánh đổi giữa giả định và dữ liệu của \ptr{B/04} xuất hiện dưới một hình dạng cụ thể. Một hằng số datasheet là một giả định rất mạnh và rất rẻ. Một hiệp phương sai học được là dữ liệu thay cho giả định, đắt hơn nhiều, và hỏng đúng ở chỗ mọi thứ dựa vào dữ liệu đều hỏng: ngoài phân phối.
+
+\begin{tukiem}
+\item Vì sao chỉ tỉ số giữa các ma trận thông tin mới đổi nghiệm, và điều đó nói gì về việc bạn có sửa được trọng số IMU mà không đụng tới trọng số ảnh không?
+\item Sai số vị trí do độ lệch con quay tăng theo \(t^3\) chứ không phải \(t^2\): chuỗi nhân quả nào tạo ra bậc ba đó?
+\item Nếu số Allan là một phép đo đúng, vì sao dùng thẳng nó làm \(\Sigma\) trong đồ thị nhân tử lại sai một cách có hệ thống, và sai theo hướng nào?
+\item NEES của nhân tử ảnh lớn hơn hẳn bậc tự do: hai cách giải thích khác nhau là gì, và phép thử nào phân biệt chúng?
+\item Trong hàm mất mát độ hợp lý âm, chuyện gì xảy ra nếu bỏ số hạng \(\log\sigma^2\), và vì sao mạng sẽ khai bất định vô hạn?
+\item Vì sao một hiệp phương sai học được chạy được ở tần suất thấp hơn tốc độ khung, trong khi một tư thế thì không?
+\item Hai kỹ sư báo cùng một con số APE trên cùng một chuỗi, nhưng một người chạy lockstep còn người kia phát lại theo thời gian thật: hai con số đó khác nhau ở chỗ nào, và bạn hỏi thêm gì để biết?
+\item Vì sao nới \(\Sigma\) là cách sai để xử lý một điểm khớp sai ghép, và ranh giới nào tách chuyện trọng số khỏi chuyện loại bỏ?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

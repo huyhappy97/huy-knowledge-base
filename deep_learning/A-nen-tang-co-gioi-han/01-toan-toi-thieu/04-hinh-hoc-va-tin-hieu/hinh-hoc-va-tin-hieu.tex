@@ -1,0 +1,140 @@
+% ============================================================================
+%  A/01-toan-toi-thieu/04-hinh-hoc-va-tin-hieu
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: A/01/01-dai-so-tuyen-tinh. Mức độ: cốt lõi (nửa sau).
+% ============================================================================
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Hình học biến đổi và xử lý tín hiệu (Transformation Geometry and Signal Processing)}
+\ptrtarget{A/01-toan-toi-thieu/04}\ptrtarget{A/01-toan-toi-thieu/04-hinh-hoc-va-tin-hieu}\ptrtarget{A/01/04}\ptrtarget{A/01/04-hinh-hoc-va-tin-hieu}
+\dependency{\ptr{A/01-toan-toi-thieu/01-dai-so-tuyen-tinh} (SVD --- dùng để chiếu một ma trận nhiễu về \(SO(3)\)). Mục này là tiền đề bắt buộc của cả chương \ptr{A/02-vat-ly-tao-anh}.}
+
+\begin{tomtat}
+Mục này gộp hai chủ đề vì chúng chia nhau một vai trò: cả hai mô tả cấu trúc mà dữ liệu ảnh \emph{đã có sẵn} trước khi mô hình nhìn thấy nó. Đọc xong bạn biết vì sao một mạng dự đoán phép quay bằng bốn số khó huấn luyện hơn bằng sáu số. Bạn biết vì sao CNN không thật sự bất biến tịnh tiến. Và bạn biết vì sao một dòng \code{resize} sai trong dataloader làm mất vài điểm độ chính xác, mà không sinh ra exception nào. Nếu chỉ nhớ một điều, hãy nhớ hai câu hỏi phòng vệ. \emph{Trước mọi lần giảm độ phân giải: đã lọc thông thấp chưa?} \emph{Trước mọi lần cho mạng xuất ra phép quay: biểu diễn này có liên tục không?} Hai câu đó bắt được phần lớn lỗi im lặng ở khâu hình học và tín hiệu.
+\end{tomtat}
+
+\begin{nentang}
+\kn{tư thế (pose) và \(SE(3)\)}{tư thế là vị trí cộng hướng của một vật cứng trong không gian; tập mọi tư thế tạo thành nhóm \(SE(3)\), còn tập mọi phép quay thuần tuý là \(SO(3)\), biểu diễn bằng ma trận \(3\times3\) trực giao có định thức bằng một.}
+\kn{đa tạp (manifold)}{một tập hợp mà quanh mỗi điểm nó ``trông giống'' một không gian phẳng nhiều chiều, nhưng toàn cục thì cong. Hệ quả thực hành: không cộng trực tiếp hai phần tử được, phải cộng ở không gian tiếp tuyến.}
+\kn{convolution và kernel}{kernel là một cửa sổ nhỏ chứa các trọng số; convolution là trượt cửa sổ đó khắp ảnh và tại mỗi vị trí lấy tổng có trọng số của vùng lân cận. Đây là phép toán nền của mạng CNN.}
+\kn{CNN}{mạng nơ-ron mà phần lớn các tầng là convolution; nó được thiết kế dựa trên giả định rằng cấu trúc ảnh mang tính cục bộ và không đổi khi dịch chuyển.}
+\kn{stride và pooling}{stride là bước nhảy khi trượt kernel --- stride 2 nghĩa là chỉ lấy một trên hai vị trí, tức giảm độ phân giải một nửa. Pooling cũng giảm độ phân giải bằng cách lấy giá trị lớn nhất hoặc trung bình của một vùng.}
+\kn{tần số không gian}{đo bằng ``chu kỳ trên pixel'': một hoa văn \(0{,}25\) chu kỳ/pixel lặp lại sau mỗi bốn pixel. Tần số cao ứng với chi tiết mảnh, tần số thấp ứng với cấu trúc lớn.}
+\kn{biến đổi Fourier}{cách viết lại một tín hiệu thành tổng các sóng sin ở nhiều tần số khác nhau, để nhìn xem tín hiệu chứa những tần số nào và mạnh yếu ra sao.}
+\kn{nội suy (interpolation)}{khi thay đổi kích thước hoặc xoay ảnh, giá trị pixel mới phải được ước lượng từ các pixel cũ lân cận; cách ước lượng đó gọi là nội suy, và mỗi lần nội suy là một lần làm mờ thêm.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Bỏ qua cấu trúc có sẵn của dữ liệu ảnh thì mạng phải học lại nó từ đầu, tốn nhãn và tốn tham số; hiểu sai cấu trúc ấy thì bạn tự tay phá dữ liệu ở khâu tiền xử lý và không bao giờ tìm ra nguyên nhân. Với người đã làm SLAM, nửa đầu mục này là ôn tập nhanh có đổi trọng tâm: câu hỏi không còn là ``\(SE(3)\) hoạt động thế nào'' mà là ``vì sao mạng khó xuất ra một phép quay''. Nửa sau thì hầu như luôn là chỗ hổng thật, kể cả với người có kinh nghiệm.
+
+\textbf{Học xong mục này thì làm được gì mà trước đó không làm được?} Chọn đúng biểu diễn đầu ra cho mọi bài toán ước lượng tư thế bằng mạng; kiểm tra một pipeline tiền xử lý và chỉ ra chỗ đang sinh hoa văn giả; và giải thích bằng ngôn ngữ tần số vì sao một mô hình huấn luyện ở \(224\times224\) sụt điểm khi đưa vào ảnh độ phân giải khác.
+
+\begin{trucgiac}
+\en{Aliasing} không phải chuyện làm ảnh xấu đi; nó là chuyện làm ảnh \emph{nói dối}. Nan hoa bánh xe quay ngược trong phim là ví dụ thuần khiết: máy quay không làm mờ bánh xe, nó tạo ra một chuyển động không hề tồn tại. Khi bạn resize ảnh bằng \en{nearest-neighbor} rồi đưa vào mạng, mạng nhận được những hoa văn cũng không hề có trên vật thật. Nó học các hoa văn ấy một cách hoàn toàn nghiêm túc. Rồi camera triển khai có độ phân giải khác, hoa văn giả đổi kiểu, và mô hình sập --- mà không ai chạm vào trọng số nào.
+\end{trucgiac}
+
+\subsection{B. Hình học: ba thao tác là đủ}
+\vn{Toạ độ đồng nhất}{homogeneous coordinates} tồn tại vì một lý do thực dụng: nó biến phép tịnh tiến, vốn là phép cộng, thành phép nhân ma trận. Nhờ đó cả chuỗi biến đổi gộp được thành một tích duy nhất. Phép chiếu phối cảnh cũng viết được ở dạng tuyến tính, rồi chia cho thành phần cuối. Toàn bộ hình học nhiều view ở \ptr{A/02/03} xây trên tiện lợi đó.
+
+Nhóm quay \(SO(3)\) và nhóm chuyển động cứng \(SE(3)\) là các \vn{đa tạp}{manifold} chứ không phải không gian vector: cộng hai ma trận quay không cho ra ma trận quay. Hệ quả thực hành --- và là toàn bộ phần \vn{đại số Lie}{Lie algebra} bạn cần --- gói trong ba thao tác:
+
+\begin{enumerate}
+\item \(\exp(\delta)\) đưa một vector ba chiều (trục nhân góc) thành một ma trận quay;
+\item \(\log(R)\) làm ngược lại, cho ra ``sai lệch quay'' ở dạng vector cộng được;
+\item cập nhật \(R \leftarrow R\exp(\delta)\) thay cho \(R \leftarrow R+\delta\), tức là \emph{cộng ở không gian tiếp tuyến rồi mới quay về đa tạp}.
+\end{enumerate}
+
+Nếu bạn đã viết một solver \vn{hiệu chỉnh chùm tia}{bundle adjustment} thì bạn đã cài đúng ba thao tác này; điều đáng nói là chúng không biến mất khi chuyển sang mạng nơ-ron, chỉ đổi chỗ. Nền lý thuyết ở mức kỹ sư: \cite{barfoot2017,solà2018}.
+
+Chỗ chúng xuất hiện lại là bài toán cho mạng \emph{xuất ra} một phép quay, và đây là một trong ít chỗ mà lý thuyết cho lời khuyên rất rõ. Không có phép tham số hoá liên tục nào của \(SO(3)\) bằng ba hoặc bốn số mà không có điểm kỳ dị hoặc điểm gián đoạn; mà một mạng liên tục theo đầu vào thì không thể khớp một hàm mục tiêu gián đoạn, nên nó cư xử tệ đúng quanh vùng gián đoạn. Bảng~\ref{tab:bieu-dien-quay} so bốn lựa chọn.
+
+\begin{table}[H]\centering\small
+\caption{Bốn cách cho mạng xuất ra một phép quay. Cột cuối quyết định lựa chọn.}
+\label{tab:bieu-dien-quay}
+\begin{tabularx}{\linewidth}{@{}L{2.2cm}L{1.1cm}YL{4.0cm}@{}}
+\toprule
+\textbf{Biểu diễn} & \textbf{Số đầu ra} & \textbf{Cơ chế đưa về \(SO(3)\)} & \textbf{Hỏng khi nào}\\
+\midrule
+Góc Euler & 3 & Nhân ba phép quay trục & \en{Gimbal lock}; gián đoạn ở biên \(\pm\pi\); trung bình vô nghĩa\\
+Quaternion & 4 & Chuẩn hoá về chuẩn 1 & Phủ hai lần (\(q\) và \(-q\) cùng một phép quay) nên hàm mục tiêu gián đoạn; phải xử lý dấu\\
+6D (hai vector) & 6 & Gram--Schmidt trực giao hoá & Không có điểm gián đoạn --- lựa chọn mặc định hiện nay; chỉ tốn thêm vài phép tính\\
+Ma trận 9 số & 9 & Chiếu về \(SO(3)\) bằng SVD & Cũng liên tục, nhưng SVD trong vòng huấn luyện đắt hơn và đạo hàm phức tạp hơn\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
+\lk{C}{trường hợp riêng của}{mọi bài ước lượng tư thế bằng mạng là một trường hợp riêng của việc chọn biểu diễn liên tục cho đầu ra trên đa tạp}
+Cách sáu số cho mạng xuất ra hai vector ba chiều rồi trực giao hoá. Nó được phát biểu rõ trong dòng công trình về ``biểu diễn quay liên tục'' của Zhou và cộng sự. Cách chín số rồi chiếu bằng SVD tương đương về tinh thần, và dùng đúng kết quả xấp xỉ hạng thấp ở \ptr{A/01/01}.
+
+Một chi tiết dễ nhầm và tốn thời gian debug: \emph{lấy trung bình các phép quay}. Trung bình cộng của các ma trận quay không phải ma trận quay; trung bình quaternion phụ thuộc dấu bạn chọn; trung bình góc Euler vô nghĩa qua chỗ chuyển \(\pm\pi\). Cách đúng là trung bình trên không gian tiếp tuyến quanh một điểm neo rồi ánh xạ về, hoặc chiếu trung bình ma trận về \(SO(3)\) bằng SVD. Sai lầm này xuất hiện lại nguyên vẹn khi người ta gộp dự đoán của nhiều mô hình hay nhiều \en{test-time augmentation}.
+
+\subsection{C. Tín hiệu: mọi lỗi im lặng đều là lỗi lấy mẫu}
+\en{Convolution} là phép toán duy nhất vừa tuyến tính vừa \vn{đẳng biến tịnh tiến}{translation equivariance}: dịch ảnh rồi lọc cũng bằng lọc rồi dịch. Đó là toàn bộ lý do CNN tồn tại. Ta \emph{cài sẵn} giả định ``một cạnh vẫn là một cạnh khi dịch sang phải mười pixel'', thay vì bắt mạng học nó từ dữ liệu. Định lý convolution nói convolution trong miền không gian là phép nhân từng điểm trong miền Fourier; nói bằng lời, \emph{mỗi kernel là một bộ lọc tần số} --- kernel làm mịn là thông thấp, kernel Sobel là thông cao. Từ đó cả kiến trúc đọc được gọn: một CNN sâu là chuỗi lọc xen kẽ các bước giảm mẫu, và mỗi bước giảm mẫu vứt bỏ một nửa dải tần.
+
+Chính chỗ vứt bỏ ấy là nơi mọi thứ hỏng. \vn{Định lý lấy mẫu}{sampling theorem} nói tần số lấy mẫu phải lớn hơn hai lần tần số cao nhất có trong tín hiệu; nếu không, thành phần tần số cao không biến mất mà \emph{gập} xuống thành tần số thấp giả.
+
+\textbf{Ví dụ tính tay.} Hoa văn \(0{,}4\) chu kỳ trên pixel, lấy mẫu cách hai pixel (stride 2): tần số lấy mẫu \(0{,}5\), tần số Nyquist \(0{,}25\); thành phần \(0{,}4\) vượt ngưỡng nên gập về \(|0{,}4-0{,}5| = 0{,}1\) chu kỳ trên pixel --- một hoa văn thô gấp bốn lần, không hề tồn tại trên vật thật. Hình~\ref{fig:aliasing} vẽ đúng phép tính đó.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.94\linewidth,height=4.4cm,domain=0:20,samples=400,
+  xlabel={pixel},ylabel={},ymin=-1.45,ymax=1.75,
+  xtick={0,4,8,12,16,20},ytick=\empty,tick label style={font=\scriptsize},
+  axis lines=left,legend style={font=\scriptsize,at={(0.5,1.24)},anchor=north,legend columns=3,draw=rulecol},
+  every axis plot/.append style={thick}]
+\addplot[rulecol,thin] {sin(deg(2*pi*0.4*x))};
+\addlegendentry{tín hiệu thật, \(0{,}4\) chu kỳ/pixel}
+\addplot[reddark,dashed] {-sin(deg(2*pi*0.1*x))};
+\addlegendentry{tín hiệu giả sinh ra, \(0{,}1\)}
+\addplot[only marks,mark=*,mark size=1.6pt,inkblue,samples at={0,2,...,20}] {sin(deg(2*pi*0.4*x))};
+\addlegendentry{mẫu lấy với stride 2}
+\end{axis}
+\end{tikzpicture}
+\caption{Aliasing không làm mất thông tin một cách trung thực, nó \emph{bịa} thông tin. Các điểm lấy mẫu cách hai pixel nằm chính xác trên một hình sin tần số thấp hơn bốn lần; mọi tầng phía sau đều không có cách nào biết hoa văn thô ấy là giả.}
+\label{fig:aliasing}
+\end{figure}
+
+
+\lk{A/02}{tiền đề}{khử khảm và giảm mẫu màu 4:2:0 trong chuỗi ISP là đúng bài toán lấy mẫu này, chỉ đổi tên}
+Từ đó rút ra quy tắc bất di bất dịch của mọi phép giảm mẫu: \textbf{lọc thông thấp trước, rồi mới lấy mẫu thưa.} Hệ quả ở hai chỗ:
+
+\begin{itemize}
+\item \textbf{Trong dataloader} --- thu nhỏ ảnh phải dùng nội suy vùng (\code{INTER\_AREA}) hoặc làm mờ Gaussian trước; \en{nearest-neighbor} gần như luôn sai khi thu nhỏ. Đây là một dòng code, và nó đáng vài điểm độ chính xác.
+\item \textbf{Trong kiến trúc} --- tầng stride-2 và \en{max-pooling} lấy mẫu thưa mà không lọc trước, nên CNN \emph{không} bất biến dịch chuyển như người ta hay nói: dịch ảnh một pixel có thể đổi hẳn dự đoán. Dòng công trình ``làm cho CNN bất biến dịch trở lại'' của Zhang chèn một bộ lọc mờ ngay trước mỗi bước giảm mẫu. Cách đó khôi phục phần lớn tính bất biến. Kết quả đã được đo và tái lập, dù mức lợi ích tuỳ bài toán.
+\end{itemize}
+
+Góc nhìn Fourier còn giải thích hai hiện tượng nữa. Thứ nhất là \en{spectral bias}. Mạng khớp thành phần tần số thấp trước, tần số cao sau, nên chi tiết mảnh xuất hiện muộn trong huấn luyện. Khi mục tiêu vốn nhiều tần số cao --- chẳng hạn hàm mật độ của một cảnh 3D trong \en{NeRF} --- người ta phải mã hoá đầu vào bằng đặc trưng Fourier để mạng học nổi \cite{mildenhall2020nerf}. 
+\lk{C}{tiền đề}{đẳng biến tịnh tiến là thiên lệch quy nạp mà cả dòng CNN dựa vào, và việc nó không đúng hoàn toàn là một trong các động cơ dẫn tới \en{attention}}
+Thứ hai là chuyện thang đo: một mô hình huấn luyện ở \(224\times224\) thấy các cạnh ở một dải tần nhất định; đưa vào ảnh 4K rồi crop, cùng vật thể xuất hiện ở dải tần khác hẳn, và mô hình sụt điểm dù ``vẫn là ảnh của cùng cái xe''.
+
+\begin{mach}[Mạch 3 --- tiền xử lý ảnh, và cái giá của mỗi bước]
+\item \vd{ảnh vào có kích thước bất kỳ, mạng cần kích thước cố định.} \gp resize. \gd nội suy giữ nguyên nội dung ngữ nghĩa. \gia đổi phổ tần số của ảnh; thu nhỏ mà không lọc trước thì sinh hoa văn giả.
+\item \vd{resize làm méo tỉ lệ khung hình.} \gp \en{letterbox} --- giữ tỉ lệ, đệm phần thiếu. \gia đưa vào vùng đệm nhân tạo mà mạng có thể học như tín hiệu, và mọi toạ độ hộp phải được biến đổi ngược đúng cách --- một chỗ sinh bug rất phổ biến.
+\item \vd{muốn dữ liệu phong phú hơn nên xoay, lật, cắt.} \gd phép biến đổi không đổi nhãn. \vdm giả định đó sai cho biển báo có chữ, cho ảnh y tế có tính trái--phải, và cho mọi bài toán phải dự đoán hướng; ngoài ra mỗi lần xoay là một lần nội suy, tức lại đổi phổ.
+\item \vd{muốn augmentation mạnh hơn nên chồng nhiều phép liên tiếp.} \gd các phép nội suy chồng nhau không tích luỹ hại. \gia sai --- mỗi lần nội suy làm mờ thêm. \gp gộp các phép biến đổi thành một ma trận rồi lấy mẫu \emph{một lần} duy nhất, đúng như cách bạn gộp chuỗi \(SE(3)\) thành một phép biến đổi trước khi warp.
+\end{mach}
+
+\subsection{D. Giới hạn và trường hợp hỏng}
+\begin{itemize}
+\item \textbf{Bức tranh Fourier giả định tuyến tính và bất biến dịch}, mà mạng thật có phi tuyến sau mỗi tầng. ``Mỗi tầng là một bộ lọc tần số'' là trực giác hướng dẫn tốt, không phải mô tả chính xác --- đừng suy diễn định lượng từ nó.
+\item \textbf{Hình học ở trên giả định phép biến đổi cứng và camera lý tưởng.} \en{Rolling shutter} phá giả định ``một ảnh ứng với một pose'' vì mỗi hàng pixel chụp ở một thời điểm khác; ống kính có méo làm phép biến đổi giữa hai ảnh không còn là homography ngay cả với mặt phẳng; vật thể không cứng thì \(SE(3)\) không mô tả nổi. Mỗi giả định vỡ ở một chỗ và đòi một cách vá khác nhau --- chủ đề của \ptr{A/02/03}.
+\end{itemize}
+
+\begin{cannho}
+Hai câu hỏi phòng vệ, hỏi mỗi lần: \emph{trước khi giảm độ phân giải --- đã lọc thông thấp chưa?} và \emph{trước khi cho mạng xuất ra phép quay --- biểu diễn này có liên tục không?} Chúng rẻ như một dòng code và bắt được phần lớn lỗi im lặng ở khâu hình học và tín hiệu. \T{1}
+\end{cannho}
+
+\subsection{E. Kết nối}
+Mục này là nền trực tiếp của cả chương \ptr{A/02-vat-ly-tao-anh}: phần lấy mẫu giải thích vì sao \vn{khử khảm}{demosaicing} là một bài toán khôi phục chứ không phải nội suy tầm thường, và phần hình học là toàn bộ ngôn ngữ của \ptr{A/02/03}. Theo chiều ngang, tính bất biến dịch chuyển là giả định thiết kế của dòng CNN ở \code{C}, và việc nó \emph{không} đúng hoàn toàn là một trong các động cơ dẫn tới \en{attention}; còn phần biểu diễn quay quay lại ở mọi bài toán ước lượng tư thế bằng mạng.
+
+\begin{tukiem}
+\item Vì sao không tồn tại cách cho mạng xuất ra phép quay bằng bốn số mà không có điểm gián đoạn, và cách sáu số sửa được gì?
+\item Hoa văn \(0{,}45\) chu kỳ/pixel bị lấy mẫu với stride 2 sẽ hiện ra ở tần số nào? Tính tay.
+\item Vì sao CNN không thật sự bất biến dịch chuyển, dù convolution thì có? Chỗ phá vỡ nằm ở tầng nào?
+\item Bạn chồng năm phép augmentation hình học liên tiếp, mỗi phép một lần nội suy. Hại gì xảy ra và sửa thế nào?
+\item Vì sao lấy trung bình cộng các ma trận quay là sai, và cách đúng dựa trên kết quả nào ở mục đại số tuyến tính?
+\item Một mô hình huấn luyện ở \(224\times224\) sụt điểm khi chạy trên ảnh 4K đã crop về \(224\times224\) --- giải thích bằng ngôn ngữ tần số thì chuyện gì đã xảy ra?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,212 @@
+% ---------------------------------------------------------------------------
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: B/09-thiet-ke-ham-mat-mat (forward/reverse KL); A/01/03
+%  Mức độ: cốt lõi (khung của cả chương 17)
+% ---------------------------------------------------------------------------
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Bốn họ và cuộc đánh đổi ba chiều (Four Families of Generative Models)}
+\ptrtarget{C/17-mo-hinh-sinh/01}\ptrtarget{C/17-mo-hinh-sinh/01-bon-ho-mo-hinh-sinh}\ptrtarget{C/17/01}\ptrtarget{C/17/01-bon-ho-mo-hinh-sinh}
+\dependency{\ptr{B/09-thiet-ke-ham-mat-mat} (hướng đo khoảng cách phân phối, forward đối lại reverse KL); \ptr{A/01-toan-toi-thieu/03-xac-suat-va-thong-tin} (likelihood, entropy tương đối); \ptr{C/13-kien-truc-backbone} (U-Net, transformer).}
+
+\begin{tomtat}
+Bốn họ mô hình sinh --- \en{autoregressive}, VAE, GAN, \en{diffusion} --- là bốn định nghĩa khác nhau của cụm từ ``giống dữ liệu thật''. Chất lượng đầu ra khác nhau chính vì định nghĩa khác nhau, không phải vì mô hình này thông minh hơn mô hình kia. Đọc xong bạn nhìn một mô hình sinh là đọc ra ngay nó đang tối ưu đại lượng gì. Từ đó suy được nó sẽ mờ, sẽ thiếu đa dạng, hay sẽ chậm. Và bạn biết mình đang mua cái gì bằng cái gì. Nếu chỉ nhớ một điều: ảnh mờ của VAE và \en{mode collapse} của GAN không phải hai lỗi kỹ thuật khác nhau mà là hai mặt của cùng một lựa chọn --- đo khoảng cách phân phối theo hướng nào.
+\end{tomtat}
+
+\begin{nentang}
+\kn{likelihood (độ hợp lý)}{xác suất mà một mô hình gán cho dữ liệu đã quan sát; ``cực đại hoá likelihood'' là chỉnh tham số sao cho mô hình thấy dữ liệu thật là chuyện bình thường chứ không phải chuyện lạ.}
+\kn{KL divergence (phân kỳ Kullback--Leibler)}{một cách đo khoảng cách giữa hai phân phối; nó \emph{không đối xứng}, và chính sự không đối xứng đó sinh ra khác biệt giữa ``mờ'' và ``mất mode''.}
+\kn{mode (mode của phân phối)}{một vùng tập trung nhiều xác suất --- ví dụ ``ảnh mèo'' và ``ảnh chó'' là hai mode. Phủ hết mode nghĩa là sinh ra được cả hai loại.}
+\kn{mode collapse}{hiện tượng mô hình chỉ sinh ra một phần nhỏ của phân phối (chỉ vài kiểu ảnh) trong khi vẫn đạt điểm cao theo tiêu chí huấn luyện.}
+\kn{biến ẩn (latent variable)}{vectơ chiều thấp mà mô hình dùng làm ``bản tóm tắt'' của một mẫu; sinh ảnh là lấy ngẫu nhiên một vectơ như vậy rồi giải mã.}
+\kn{discriminator (bộ phân biệt)}{mạng thứ hai trong GAN, có việc duy nhất là phân biệt mẫu thật với mẫu do mô hình sinh; nó đóng vai một hàm mất mát \emph{học được}.}
+\kn{score matching}{cách huấn luyện bằng việc khớp gradient của log mật độ thay vì khớp mật độ; đây là nền toán của diffusion.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Một mô hình sinh phải làm được một việc nghe rất mơ hồ: tạo ra mẫu mới ``giống'' dữ liệu huấn luyện nhưng không phải bản sao của nó. Muốn tối ưu bất cứ thứ gì thì phải viết ``giống'' thành một con số, và đây là chỗ bốn họ mô hình rẽ nhánh --- chúng viết ra bốn con số khác nhau. Autoregressive đo bằng \vn{độ hợp lý}{likelihood} chính xác của từng pixel theo thứ tự; VAE đo bằng một cận dưới của likelihood; GAN đo bằng ``một bộ phân biệt học được không tách nổi mẫu giả khỏi mẫu thật''; diffusion đo bằng mức khớp của \en{score} ở mọi mức nhiễu. Bốn định nghĩa, bốn hình dạng lỗi.
+
+Điều làm chủ đề này đáng học kỹ là các chế độ lỗi có thể \emph{suy ra} chứ không phải ghi nhớ. Khi biết một mô hình tối ưu trung bình bình phương theo pixel, bạn dự đoán được nó cho ảnh mờ trước khi chạy nó; khi biết một mô hình tối ưu một hàm mục tiêu dạng trò chơi hai người, bạn dự đoán được nó không hội tụ theo nghĩa thông thường.
+
+\textbf{Học mục này thì làm được gì mà trước đó không làm được?} Đọc một bài báo mô hình sinh và trả lời trong ba mươi giây: mô hình này sẽ mờ, thiếu đa dạng, hay chậm --- và vì sao bắt buộc phải như vậy. Sau đó chọn được họ mô hình cho một bài toán cụ thể thay vì chọn theo cái đang nổi.
+
+\begin{trucgiac}
+Bốn họ giống bốn cách chấm điểm một người làm tranh giả. \emph{Autoregressive} bắt vẽ từng nét theo đúng xác suất của nét tiếp theo: chấm được điểm rất chính xác, nhưng vẽ chậm khủng khiếp vì mỗi nét phải chờ nét trước. \emph{VAE} bắt nén bức tranh thành vài chục con số rồi giải nén: nhanh, nhưng phần giải nén trả về \emph{trung bình} của mọi bức tranh khớp với mấy con số đó, nên nét bị nhoè. \emph{GAN} thuê một giám định viên và chỉ đòi lừa được ông ta: nét rất sắc vì giám định viên soi nét --- nhưng nếu ông ta chỉ quen soi hoa văn ở góc trái thì kẻ làm giả sẽ chỉ học vẽ giỏi đúng cái góc đó. \emph{Diffusion} bắt đầu từ một tờ giấy đầy nhiễu và tẩy dần từng nấc, mỗi nấc chỉ phải đoán lùi một chút. Cách này chậm vì nhiều nấc. Bù lại mỗi nấc là một bài dễ, nên nó không bao giờ ``vẽ hỏng''.
+\end{trucgiac}
+
+\subsection{B. Bốn họ đặt cạnh nhau}
+
+\begin{table}[H]\centering\small
+\caption{Bốn họ mô hình sinh, đọc theo định nghĩa của ``giống''. Cột cuối suy ra được từ cột thứ hai --- đó là điểm của cả bảng.}
+\label{tab:bon-ho-sinh}
+\begin{tabularx}{\linewidth}{@{}L{2.15cm}YYY@{}}
+\toprule
+\textbf{Họ} & \textbf{Định nghĩa ``giống''} & \textbf{Được} & \textbf{Mất / hỏng khi}\\
+\midrule
+Auto\-regressive (PixelRNN/CNN) & Likelihood chính xác, phân rã theo quy tắc chuỗi & Tính được likelihood; huấn luyện ổn định & Sinh cực chậm vì tuần tự theo pixel; lệch giữa lúc huấn luyện và lúc sinh\\
+VAE & Cận dưới của likelihood (ELBO) & Nhanh; có không gian ẩn có nghĩa, nội suy được & Ảnh mờ --- hệ quả trực tiếp của loss trung bình; \en{posterior collapse}\\
+GAN & ``Một discriminator học được không phân biệt nổi'' & Ảnh sắc nét ở cùng ngân sách tính toán & Huấn luyện bất ổn; mode collapse; không có likelihood để chẩn đoán\\
+Diffusion & Khớp score của phân phối ở \emph{mọi} mức nhiễu & Chất lượng và đa dạng cao; huấn luyện ổn định như hồi quy & Sinh chậm vì nhiều bước; nhạy với lựa chọn bộ lấy mẫu\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Ba đại lượng trong cột ba và bốn không độc lập nhau. Trong tài liệu, người ta hay gọi tình thế này là \emph{thế lưỡng nan ba chiều} của mô hình sinh: chất lượng mẫu, độ phủ hết các mode, và tốc độ lấy mẫu --- ba thứ mà cho tới nay chưa họ nào đạt đồng thời cả ba ở mức tốt nhất. Cần nói rõ để trung thực: đây là một \emph{cách gọi tên} một quan sát thực nghiệm lặp lại, không phải một định lý; nó khác hẳn về địa vị với đánh đổi perceptual--distortion ở mục 17.4, vốn là một kết quả có chứng minh. Hình~\ref{fig:tam-giac-sinh} đặt bốn họ lên tam giác đó.
+
+\begin{figure}[H]\centering
+\resizebox{0.72\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize]
+\coordinate (A) at (90:3.4);
+\coordinate (B) at (210:3.4);
+\coordinate (C) at (330:3.4);
+\draw[steel,thick] (A) -- (B) -- (C) -- cycle;
+\node[above=2pt,font=\scriptsize\bfseries,inkblue] at (A) {Chất lượng mẫu};
+\node[below left=1pt,font=\scriptsize\bfseries,inkblue] at (B) {Đa dạng / phủ hết mode};
+\node[below right=1pt,font=\scriptsize\bfseries,inkblue] at (C) {Tốc độ lấy mẫu};
+\node[draw=reddark,fill=redbg,rounded corners=1.5pt,inner sep=2.5pt,font=\scriptsize] (g) at (0.98,0.75) {GAN};
+\node[draw=violetdark,fill=violetbg,rounded corners=1.5pt,inner sep=2.5pt,font=\scriptsize] (v) at (-0.35,-1.55) {VAE};
+\node[draw=steel,fill=bluebg,rounded corners=1.5pt,inner sep=2.5pt,font=\scriptsize] (d) at (-1.05,0.75) {Diffusion};
+\node[draw=steel,fill=bluebg,rounded corners=1.5pt,inner sep=2.5pt,font=\scriptsize] (a) at (-0.1,1.45) {Autoregressive};
+\node[font=\scriptsize\itshape,align=center,text width=3.2cm,color=tiercol] at (0,-2.55)
+ {mỗi mô hình nằm gần hai đỉnh nó chọn, và xa đỉnh nó hy sinh};
+\end{tikzpicture}}
+\caption{Thế lưỡng nan ba chiều. GAN mua chất lượng và tốc độ bằng độ phủ mode; VAE mua tốc độ và độ phủ bằng chất lượng; diffusion và autoregressive mua chất lượng cùng độ phủ bằng tốc độ. Toàn bộ tiến bộ kỹ thuật của mảng này --- \en{sampler distillation}, \en{flow matching}, \en{latent diffusion} --- là các nỗ lực kéo một điểm về gần tâm hơn.}
+\label{fig:tam-giac-sinh}
+\end{figure}
+
+Hình~\ref{fig:bon-co-che-lay-mau} bổ sung cho tam giác một thứ mà tam giác không nói được: \emph{cơ chế} sinh ra mỗi vị trí trên đó.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  b/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=3pt,font=\scriptsize,align=center,minimum height=6mm},
+  ar/.style={-{Stealth[length=3.6pt]},steel},
+  capt/.style={font=\scriptsize,tiercol,align=center,text width=3.4cm}]
+% (a) Autoregressive
+\begin{scope}
+\node[font=\scriptsize\bfseries,inkblue] at (1.5,1.5) {Autoregressive};
+\foreach \i in {0,1,2,3}\foreach \j in {0,1,2}{
+  \pgfmathsetmacro\k{\j*4+\i}
+  \ifdim \k pt<5pt \fill[steel,opacity=0.75] (\i*0.34,0.9-\j*0.34) rectangle ++(0.3,0.3);
+  \else \draw[tiercol,very thin] (\i*0.34,0.9-\j*0.34) rectangle ++(0.3,0.3);\fi}
+\draw[ar] (1.55,0.6) -- (2.6,0.6);
+\node[b] at (3.2,0.6) {pixel\\ kế tiếp};
+\node[capt] at (1.6,-0.55) {\(\approx 2\times10^{5}\) lần chạy \textbf{nối tiếp} cho một ảnh};
+\node[capt] at (1.6,-1.35) {\emph{tối ưu:} likelihood chính xác};
+\end{scope}
+% (b) VAE
+\begin{scope}[xshift=4.9cm]
+\node[font=\scriptsize\bfseries,inkblue] at (1.6,1.5) {VAE};
+\node[b] (z) at (0.35,0.6) {\(z\)};
+\node[b] (d) at (1.7,0.6) {decoder};
+\node[b] (x) at (3.0,0.6) {ảnh};
+\draw[ar] (z) -- (d); \draw[ar] (d) -- (x);
+\node[capt] at (1.6,-0.55) {\textbf{1} lượt xuôi};
+\node[capt] at (1.6,-1.35) {\emph{tối ưu:} cận dưới ELBO \(\Rightarrow\) trung bình \(\Rightarrow\) mờ};
+\end{scope}
+% (c) GAN
+\begin{scope}[xshift=9.8cm]
+\node[font=\scriptsize\bfseries,inkblue] at (1.6,1.5) {GAN};
+\node[b] (z2) at (0.3,0.6) {\(z\)};
+\node[b] (g)  at (1.4,0.6) {\(G\)};
+\node[b] (x2) at (2.4,0.6) {ảnh};
+\node[b,draw=reddark,fill=redbg] (dd) at (3.4,-0.1) {\(D\)};
+\draw[ar] (z2) -- (g); \draw[ar] (g) -- (x2);
+\draw[ar,draw=reddark] (x2) -- (dd);
+\node[capt] at (1.6,-0.9) {\textbf{1} lượt xuôi lúc sinh; \(D\) chỉ có mặt lúc huấn luyện};
+\node[capt] at (1.6,-1.7) {\emph{tối ưu:} một hàm mất mát \textbf{học được}};
+\end{scope}
+% (d) Diffusion
+\begin{scope}[xshift=14.7cm]
+\node[font=\scriptsize\bfseries,inkblue] at (1.6,1.5) {Diffusion};
+\node[b] (n) at (0.3,0.6) {nhiễu};
+\node[b] (s1) at (1.4,0.6) {khử};
+\node[b] (s2) at (2.4,0.6) {khử};
+\node[b] (x3) at (3.4,0.6) {ảnh};
+\draw[ar] (n) -- (s1); \draw[ar] (s1) -- (s2); \draw[ar] (s2) -- (x3);
+\draw[ar,draw=tiercol] (s2) to[bend right=42] node[below,font=\tiny,tiercol]{\(\times\,k\)} (s1);
+\node[capt] at (1.6,-0.9) {\(k\) lần chạy, \(k\) từ 10 tới 1000};
+\node[capt] at (1.6,-1.7) {\emph{tối ưu:} hồi quy trên nhiễu \(\Rightarrow\) ổn định};
+\end{scope}
+\end{tikzpicture}}
+\caption{Bốn cơ chế lấy mẫu, đặt cạnh nhau để thấy chi phí nằm ở đâu. Hai họ ở giữa sinh ảnh trong một lượt xuôi duy nhất; hai họ ở hai đầu phải chạy mạng nhiều lần, và đó chính là đỉnh ``tốc độ lấy mẫu'' mà chúng hy sinh trong Hình~\ref{fig:tam-giac-sinh}. Điểm đáng chú ý nhất là bộ phân biệt \(D\) của GAN: nó \emph{không} tham gia lúc sinh, nó chỉ tồn tại lúc huấn luyện --- vai trò của nó là một hàm mất mát học được, không phải một khối tính toán.}
+\label{fig:bon-co-che-lay-mau}
+\end{figure}
+
+\subsection{C. Vì sao họ sau ra đời}
+
+\begin{mach}[Mạch 1 --- bốn định nghĩa của ``giống dữ liệu thật'']
+\item \vd{muốn mô hình hoá một phân phối trên không gian ảnh, mà không gian đó quá lớn để đếm.} \gp phân rã theo quy tắc chuỗi: \(p(x) = \prod_i p(x_i \mid x_{<i})\), rồi học từng thừa số bằng một mạng. \gd có một thứ tự tự nhiên trên pixel (thường là quét từ trái sang phải, trên xuống dưới --- một giả định đã sai ngay từ đầu với ảnh). \hq likelihood tính được chính xác, nên có thể so sánh mô hình bằng một con số có ý nghĩa. \gia lấy mẫu là tuần tự: một ảnh \(256\times256\) màu cần \(196\,608\) lần chạy mạng nối tiếp nhau; ở 1 ms mỗi lần thì hơn ba phút cho \emph{một} ảnh.
+\item \vd{sinh tuần tự quá chậm để dùng được.} \gp đưa vào một biến ẩn \(z\) chiều thấp, học đồng thời bộ mã hoá và bộ giải mã, tối ưu cận dưới ELBO \cite{kingma2014vae}; lấy mẫu chỉ còn một lượt xuôi. \hq thêm một phần thưởng ngoài dự tính: không gian ẩn có cấu trúc, nội suy giữa hai điểm cho ra biến đổi mượt. \gia bộ giải mã Gauss làm cho phần tái tạo của ELBO trở thành sai số bình phương trung bình theo pixel. Mà nghiệm tối ưu của bình phương trung bình là \emph{kỳ vọng có điều kiện}, tức trung bình của mọi ảnh hợp lệ. Trung bình của nhiều ảnh sắc nét lệch nhau vài pixel là một ảnh mờ.
+\lk{C/17/04}{hệ quả của}{cùng phép tính này quay lại ở khôi phục ảnh, nơi ``mờ'' trở thành nghiệm tối ưu PSNR và là một nửa của đánh đổi perceptual--distortion.} \vdm ảnh mờ không sửa được bằng cách huấn luyện lâu hơn; nó là nghiệm đúng của bài toán đã đặt ra.
+\item \vd{muốn ảnh sắc thì phải bỏ hàm mất mát trung bình, nhưng ta không biết viết công thức nào cho ``trông thật''.} \gp đừng viết --- hãy \emph{học} nó: cho một mạng thứ hai làm bộ phân biệt và huấn luyện bộ sinh để đánh lừa nó \cite{goodfellow2014gan}. \hq bộ phân biệt phạt bất cứ dấu hiệu nào lộ ra chất giả, kể cả dấu hiệu ta không nghĩ ra được, nên ảnh sắc nét \cite{karras2019stylegan}.
+\lk{C/17/02}{cùng nguyên lý với}{``không viết được hàm mất mát thì học nó'' cũng chính là ý tưởng của mất mát tri giác, chỉ khác ở chỗ mạng chấm điểm được đóng băng thay vì huấn luyện đối kháng.} \gia mục tiêu không còn là cực tiểu hoá một hàm cố định mà là điểm cân bằng của một trò chơi hai người; ``hội tụ'' theo nghĩa thông thường không tồn tại, và mô hình có thể đạt mục tiêu bằng cách chỉ sinh ra một phần nhỏ của phân phối --- \en{mode collapse}. \vdm không có likelihood nên mất luôn công cụ chẩn đoán tự nhiên.
+\item \vd{muốn sắc nét như GAN nhưng ổn định như một bài hồi quy.} \gp chẻ bài toán khó thành một chuỗi bài toán dễ: thêm nhiễu dần cho tới khi ảnh thành nhiễu trắng, rồi học khử nhiễu ngược lại từng nấc \cite{ho2020ddpm,song2021score}. \gd chuỗi đủ mịn để mỗi nấc chỉ cần một bước nhỏ. \hq hàm mất mát trở thành bình phương trung bình trên \emph{nhiễu} chứ không trên ảnh. Huấn luyện vì thế ổn định như mọi bài hồi quy. Đó là lý do diffusion đánh bại GAN: không phải bằng ý tưởng đẹp hơn, mà bằng việc dễ huấn luyện hơn ở quy mô lớn. \gia sinh chậm vì phải chạy hàng chục tới hàng trăm nấc. Mục 17.3 dành trọn cho việc gỡ đúng cái giá này.
+\end{mach}
+
+\subsection{D. Ví dụ nhỏ nhất: vì sao mờ và mode collapse là hai mặt của một đồng xu}
+Lấy phân phối thật là hỗn hợp hai Gauss cách nhau: \(p = \tfrac12\mathcal{N}(-1,\,0{,}25) + \tfrac12\mathcal{N}(+1,\,0{,}25)\). Bây giờ ép mô hình phải là \emph{một} Gauss duy nhất \(q=\mathcal{N}(\mu,\sigma^{2})\). Mô hình quá nghèo để khớp --- đúng tình huống thực tế, chỉ là ở chiều thấp.
+
+\begin{itemize}
+\item \textbf{Nếu tối ưu \(\mathrm{KL}(p\,\|\,q)\)} (hướng ``thuận'', hướng mà cực đại hoá likelihood dùng): nghiệm là Gauss khớp mô-men của \(p\), tức \(\mu = 0\) và \(\sigma^{2} = 0{,}25 + 1 = 1{,}25\). Mô hình \emph{trải rộng phủ cả hai mode}, và đặt nhiều khối lượng nhất ở \(x=0\) --- đúng chỗ dữ liệu thật gần như không có gì. Dịch sang ảnh: đây chính là ảnh mờ.
+\item \textbf{Nếu tối ưu \(\mathrm{KL}(q\,\|\,p)\)} (hướng ``ngược''): phạt rất nặng việc đặt khối lượng ở nơi \(p\) nhỏ, nên nghiệm co về đúng \emph{một} mode, \(\mu \approx \pm 1\), \(\sigma^{2} \approx 0{,}25\). Mẫu sinh ra đều hợp lệ và sắc nét --- nhưng một nửa phân phối biến mất. Dịch sang ảnh: đây chính là mode collapse.
+\end{itemize}
+
+Hai dòng trên là toàn bộ lời giải thích. VAE mờ và GAN thiếu đa dạng không phải hai lỗi cần sửa bằng hai mẹo khác nhau; chúng là hai nghiệm của cùng một bài toán, khác nhau ở hướng đo khoảng cách. Chi tiết về hai hướng KL nằm ở \ptr{B/09-thiet-ke-ham-mat-mat}; ở đây chỉ cần nhớ rằng chọn hàm mất mát là chọn kiểu thất bại.
+\lk{B/09}{tiền đề}{hai hướng của KL là điều kiện tiên quyết thật sự của cả chương: không nắm nó thì ``mờ'' và ``mất mode'' trông như hai lỗi rời rạc.}
+
+Hình~\ref{fig:hai-huong-kl} vẽ đúng ba phân phối của ví dụ trên.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.86\linewidth,height=5.6cm,
+  xlabel={\(x\)}, ylabel={mật độ},
+  xlabel style={font=\footnotesize}, ylabel style={font=\footnotesize},
+  tick label style={font=\scriptsize},
+  xmin=-3.4,xmax=3.4,ymin=0,ymax=1.0, axis lines=left,
+  legend style={font=\scriptsize,draw=none,fill=none,at={(0.98,0.98)},anchor=north east},
+  every axis plot/.append style={thick}]
+\addplot[domain=-3.4:3.4,samples=180,inkblue,very thick]{0.39894*(exp(-2*(x+1)^2)+exp(-2*(x-1)^2))};
+\addlegendentry{dữ liệu thật: hai mode}
+\addplot[domain=-3.4:3.4,samples=180,steel,very thick,densely dashed]{0.3568*exp(-0.4*x^2)};
+\addlegendentry{khớp \(\mathrm{KL}(p\|q)\): \(\mu=0,\ \sigma^2=1{,}25\)}
+\addplot[domain=-3.4:3.4,samples=180,reddark,very thick,dotted]{0.7979*exp(-2*(x-1)^2)};
+\addlegendentry{khớp \(\mathrm{KL}(q\|p)\): \(\mu=1,\ \sigma^2=0{,}25\)}
+\draw[steel,-{Stealth[length=4pt]}] (axis cs:0,0.62) -- (axis cs:0,0.40);
+\node[font=\scriptsize,steel,anchor=south,align=center] at (axis cs:0,0.63) {khối lượng dồn vào\\ chỗ dữ liệu \emph{không có}\\ \(\Rightarrow\) ảnh mờ};
+\draw[reddark,-{Stealth[length=4pt]}] (axis cs:-1.9,0.55) -- (axis cs:-1.15,0.30);
+\node[font=\scriptsize,reddark,anchor=south,align=center] at (axis cs:-1.9,0.56) {một nửa phân phối\\ biến mất \(\Rightarrow\) mode collapse};
+\end{axis}
+\end{tikzpicture}
+\caption{Toàn bộ chương gói trong một hình. Cùng một phân phối thật hai mode, cùng một họ mô hình nghèo (một Gauss duy nhất), chỉ đổi \emph{hướng} đo khoảng cách thì ra hai nghiệm trái ngược. Hướng thuận phạt việc bỏ sót mode nên nghiệm trải rộng và đặt nhiều khối lượng nhất ở \(x=0\), đúng chỗ dữ liệu thật gần như trống --- dịch sang ảnh, đó là ảnh mờ của VAE. Hướng ngược phạt việc đặt khối lượng ở nơi mật độ thật thấp nên nghiệm co về đúng một mode --- dịch sang ảnh, đó là mode collapse của GAN. Số trong hình tính tay được từ ví dụ ở mục D.}
+\label{fig:hai-huong-kl}
+\end{figure}
+
+\subsection{E. Giới hạn và trường hợp hỏng}
+Bảng và tam giác ở trên đơn giản hoá một bức tranh thật ra phức tạp hơn, và có ba chỗ cần nói thẳng:
+\begin{itemize}
+\item \textbf{Ranh giới giữa các họ đang mờ đi.} Diffusion trong không gian ẩn dùng một autoencoder kiểu VAE; \en{flow matching} là diffusion viết lại dưới dạng phương trình vi phân thường; mô hình sinh ảnh bằng token tự hồi quy đang quay lại mạnh mẽ. Bốn họ là bốn \emph{nguyên lý}, không phải bốn hộp kín.
+\item \textbf{Likelihood cao không đồng nghĩa mẫu đẹp.} Một mô hình có thể đạt likelihood tốt nhờ mô hình hoá tốt các chi tiết tần số cao vô nghĩa mà vẫn sinh ra ảnh xấu; ngược lại GAN không có likelihood nhưng mẫu đẹp. Hai đại lượng đo hai thứ khác nhau.
+\item \textbf{Đánh giá là chỗ yếu nhất của cả mảng.} Nhìn vài chục mẫu được chọn lọc không nói được gì về độ phủ mode, mà độ phủ mới là thứ hay hỏng. Mục 17.4 nói kỹ về chỗ này.
+\end{itemize}
+
+\begin{cambay}
+Đừng đánh giá một mô hình sinh bằng những mẫu đẹp nhất của nó. Chế độ hỏng đắt nhất --- mode collapse và thu hẹp phân phối --- \emph{không nhìn thấy được} trong mẫu chọn lọc, vì các mẫu còn lại vẫn đẹp, chỉ là chúng giống nhau. Phép thử tối thiểu: sinh vài nghìn mẫu với cùng điều kiện rồi đo độ đa dạng (khoảng cách trung bình theo cặp trong không gian đặc trưng, số cụm sau khi gom nhóm), và đối chiếu với cùng số lượng mẫu thật. Nếu bạn định dùng mẫu sinh làm dữ liệu huấn luyện thì phép thử này là bắt buộc chứ không phải tuỳ chọn --- xem \ptr{C/17-mo-hinh-sinh/04-low-level-vision}.
+\end{cambay}
+
+\begin{cannho}
+Mỗi họ mô hình sinh là một định nghĩa của ``giống dữ liệu thật'', và \emph{kiểu thất bại của mô hình được quyết định bởi định nghĩa đó, không phải bởi kiến trúc}. Trung bình theo pixel cho ảnh mờ; hướng ngược của KL cho mode collapse; chuỗi bài toán dễ cho huấn luyện ổn định nhưng lấy mẫu chậm. Biết mô hình tối ưu đại lượng gì là biết trước nó sẽ hỏng thế nào. \T{2}
+\end{cannho}
+
+\subsection{F. Kết nối}
+Mục này là khung cho cả chương 17: \ptr{C/17-mo-hinh-sinh/02-toi-uu-tren-pixel} tách riêng một ý tưởng cắt ngang cả bốn họ (đóng băng mạng, tối ưu trên chính ảnh); \ptr{C/17-mo-hinh-sinh/03-diffusion} đào sâu họ thứ tư và các bước biến nó thành sản phẩm; \ptr{C/17-mo-hinh-sinh/04-low-level-vision} cho thấy cùng bộ khái niệm này quay lại ở bài toán khôi phục ảnh. Hướng KL và hệ quả ``mờ đối lại thu hẹp'' thuộc \ptr{B/09-thiet-ke-ham-mat-mat}. Ý tưởng ``không viết được hàm mất mát thì học nó'' cũng chính là ý tưởng của \vn{mất mát tri giác}{perceptual loss} \cite{johnson2016perceptual}. Nó cũng là ý tưởng của bộ phân biệt trong \en{pix2pix} \cite{isola2017pix2pix}, một cầu nối trực tiếp sang bài toán ảnh sang ảnh.
+
+\begin{tukiem}
+\item Vì sao ảnh mờ của VAE là \emph{nghiệm đúng} của bài toán đã đặt ra chứ không phải dấu hiệu huấn luyện chưa đủ?
+\item GAN không có likelihood. Điều đó lấy đi của bạn khả năng chẩn đoán cụ thể nào khi mô hình hoạt động kém?
+\item Vì sao diffusion huấn luyện ổn định hơn GAN, và lý do đó có liên quan gì tới việc mục tiêu của nó là một bài hồi quy?
+\item Bạn có một mô hình sinh và một trăm mẫu trông rất đẹp; phép thử ba mươi phút nào cho biết nó có bị thu hẹp phân phối hay không?
+\item Nếu ràng buộc cứng của bạn là sinh 30 ảnh mỗi giây trên một GPU nhúng, tam giác ở Hình~\ref{fig:tam-giac-sinh} chỉ về đâu, và bạn chấp nhận mất gì?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

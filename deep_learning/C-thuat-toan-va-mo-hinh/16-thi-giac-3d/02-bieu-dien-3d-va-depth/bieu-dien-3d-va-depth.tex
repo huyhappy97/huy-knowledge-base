@@ -1,0 +1,276 @@
+% ---------------------------------------------------------------------------
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: C/16-thi-giac-3d/01-bon-the-he-3d; B/07-chia-du-lieu-va-danh-gia
+%  Mức độ: cốt lõi
+% ---------------------------------------------------------------------------
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Chọn biểu diễn 3D, độ sâu và SLAM (3D Representations, Depth and SLAM)}
+\ptrtarget{C/16-thi-giac-3d/02}\ptrtarget{C/16-thi-giac-3d/02-bieu-dien-3d-va-depth}\ptrtarget{C/16/02}\ptrtarget{C/16/02-bieu-dien-3d-va-depth}
+\dependency{\ptr{C/16-thi-giac-3d/01-bon-the-he-3d} (bốn thế hệ); \ptr{B/10-thiet-ke-kien-truc} (thiết kế theo bất biến); \ptr{B/07-chia-du-lieu-va-danh-gia} (ATE/RPE và giao thức đánh giá); \ptr{A/01-toan-toi-thieu/03-xac-suat-va-thong-tin} (tính xác định được của tham số).}
+
+\begin{tomtat}
+Mục này nói về ba quyết định con nằm bên trong mọi hệ thống 3D: lưu cảnh bằng biểu diễn nào, lấy độ sâu từ đâu, và học sâu làm gì được trên dữ liệu không phải lưới. Đọc xong bạn làm được ba việc. Chọn biểu diễn cho một pipeline mới mà không phải viết lại nó sáu tháng sau. Nhìn một mô-đun độ sâu là biết nó có quyền xuất hiện trong phần dư metric hay không. Và đọc một mạng trên point cloud để biết nó mù với cái gì. Nếu chỉ nhớ hai điều: biểu diễn quyết định \emph{phép toán nào rẻ}, nên phải chọn nó theo khâu cuối cùng của pipeline chứ không theo khâu đầu tiên. Và độ sâu đơn ảnh không phải phép đo mà là suy đoán có học, với một tỉ lệ trôi giữa các khung hình --- đó chính là chỗ nó phá hỏng một bộ ước lượng.
+\end{tomtat}
+
+\begin{nentang}
+\kn{voxel}{ô lập phương trong một lưới đều 3D --- ``pixel của không gian ba chiều''. Đơn giản nhưng số ô tăng theo luỹ thừa ba của độ phân giải.}
+\kn{point cloud (point cloud)}{một tập toạ độ 3D không có thứ tự và không có kết nối giữa các điểm; đây là dạng dữ liệu thô của LiDAR và của stereo dày đặc.}
+\kn{mesh (mesh)}{biểu diễn bề mặt bằng các đỉnh nối thành tam giác; chuẩn của đồ hoạ máy tính, vì nó cho biết \emph{đâu là mặt} chứ không chỉ đâu có vật chất.}
+\kn{SDF (signed distance function)}{một hàm gán cho mỗi điểm trong không gian khoảng cách có dấu tới bề mặt gần nhất --- âm ở trong, dương ở ngoài. Bề mặt chính là tập điểm có giá trị 0, nên nó được định nghĩa rất sạch.}
+\kn{trường ẩn (implicit field)}{cách mô tả hình dạng bằng một \emph{hàm} (thường là một mạng nhỏ) thay vì bằng một danh sách phần tử; SDF là ví dụ điển hình.}
+\kn{đường cơ sở (baseline)}{khoảng cách giữa hai tâm camera trong một hệ stereo; nó là thứ duy nhất cấp đơn vị mét cho phép đo độ sâu.}
+\kn{ATE và RPE}{hai chỉ số đánh giá quỹ đạo: ATE đo sai lệch tuyệt đối sau khi căn chỉnh toàn cục hai quỹ đạo, RPE đo sai lệch trên các đoạn ngắn nên không cần căn chỉnh. Bạn đã quen hai chỉ số này; ở đây chỉ dùng chúng làm ví dụ về việc ``phép căn chỉnh che giấu điều gì''.}
+\kn{bất biến hoán vị (permutation invariance)}{tính chất của một hàm mà kết quả không đổi khi ta xáo trộn thứ tự các phần tử đầu vào; bắt buộc phải có nếu đầu vào là một \emph{tập}.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Trong ảnh 2D không ai phải chọn biểu diễn: ảnh là một lưới pixel, hết chuyện. Trong 3D thì không có biểu diễn mặc định nào cả, và lựa chọn đó quyết định nhiều hơn cả việc chọn kiến trúc mạng. Lý do rất cụ thể: \textbf{biểu diễn quyết định phép toán nào rẻ.} Trên lưới \en{voxel}, tích chập là rẻ nhưng bộ nhớ tăng theo luỹ thừa ba. Trên \en{point cloud}, bộ nhớ rẻ nhưng ``lân cận'' không có sẵn nên mọi phép cục bộ phải trả tiền tìm kiếm. Trên \en{mesh}, bề mặt là tường minh nên render và mô phỏng vật lý rẻ, nhưng thay đổi \en{topology} thì gần như không khả vi. Một khi đã chọn biểu diễn, bạn đã chọn luôn tập bài toán còn giải được hiệu quả --- và đây là quyết định khó đảo ngược nhất trong một pipeline 3D.
+
+Câu chuyện thứ hai là nguồn của độ sâu. Bốn thế hệ ở mục trước đều cần độ sâu từ đâu đó. Có ba cách lấy nó: một ảnh, hai ảnh, hoặc cảm biến chủ động. Chúng khác nhau không phải ở độ chính xác mà ở chỗ \emph{cái nào xác định được tỉ lệ tuyệt đối}. Cuối cùng, ta đặt SLAM và VIO vào đúng vị trí: không phải một chủ đề riêng mà là hệ thống duy nhất bắt buộc giải cả ba bài toán --- biểu diễn, độ sâu, tối ưu --- dưới ràng buộc thời gian thực.
+
+\textbf{Học mục này thì làm được gì mà trước đó không làm được?} Ba việc: chọn được biểu diễn cho một pipeline mới mà không phải viết lại nó sáu tháng sau; nhìn một mô-đun độ sâu và nói ngay nó có quyền xuất hiện trong phần dư metric hay không; và đọc được một mô hình học trên point cloud để biết nó mù với cái gì.
+
+\begin{trucgiac}
+Chọn biểu diễn 3D giống chọn hệ toạ độ để viết một bài toán cơ học. Bài toán không đổi, nhưng viết trong hệ Descartes thì trọng lực đơn giản còn chuyển động tròn phức tạp; trong hệ cực thì ngược lại. Voxel là hệ Descartes của 3D: đều đặn, dễ lập trình, và lãng phí khủng khiếp vì phần lớn không gian là rỗng. Point cloud là ``danh sách các chỗ có vật chất'': gọn đúng bằng lượng thông tin thật, nhưng bạn phải tự dựng lại khái niệm hàng xóm mỗi lần cần tới nó.
+\end{trucgiac}
+
+\subsection{B. Năm biểu diễn và cái giá của mỗi cái}
+Năm biểu diễn dưới đây không ngang hàng nhau. Chúng chia làm ba nhóm theo \emph{nguồn gốc}, và biết nhóm nào giúp đoán ngay chỗ hỏng:
+\begin{itemize}
+\item \textbf{Biểu diễn đo được} --- voxel và point cloud, ra thẳng từ cảm biến. Chỗ hỏng của chúng là chỗ hỏng của cảm biến: mật độ không đều, vùng khuất, nhiễu phụ thuộc khoảng cách.
+\item \textbf{Biểu diễn đồ hoạ} --- mesh. Chỗ hỏng là bước tái dựng bề mặt đứng trước nó.
+\item \textbf{Biểu diễn được tối ưu} --- \vn{trường ẩn}{implicit field} và \en{Gaussian splatting}. Chúng không tồn tại cho tới khi chạy xong một vòng tối ưu trên chính cảnh đó, nên chỗ hỏng của chúng là chỗ hỏng của hàm mất mát đã sinh ra chúng.
+\end{itemize}
+
+\begin{table}[H]\centering\small
+\caption{Năm biểu diễn 3D. Cột cuối là cột quyết định: mỗi biểu diễn hỏng ở một chỗ khác nhau, và chỗ đó thường lộ ra muộn.}
+\label{tab:bieu-dien-3d}
+\begin{tabularx}{\linewidth}{@{}L{2.15cm}YYY@{}}
+\toprule
+\textbf{Biểu diễn} & \textbf{Cơ chế lưu} & \textbf{Được} & \textbf{Mất / hỏng khi}\\
+\midrule
+Voxel & Lưới đều 3D, mỗi ô một giá trị & Conv 3D dùng được nguyên xi; lân cận cho sẵn & Bộ nhớ theo luỹ thừa ba; hỏng ngay khi cần độ phân giải cao\\
+Point cloud & Tập điểm không thứ tự & Gọn, hợp với LiDAR và stereo & Không có cấu trúc lân cận; phải bất biến hoán vị; mật độ không đều\\
+Mesh & Đỉnh \(+\) mặt & Chuẩn của đồ hoạ và mô phỏng; bề mặt tường minh & Tối ưu topology gần như không khả vi; mặt tự cắt nhau\\
+Implicit field (SDF, occupancy) & Một hàm \(\mathbb{R}^{3}\to\mathbb{R}\), thường là MLP & Độ phân giải liên tục; bề mặt là tập mức 0, định nghĩa sạch & Render chậm vì phải lấy mẫu nhiều lần dọc tia; khó chỉnh sửa cục bộ\\
+Gaussian splatting & Tập Gaussian dị hướng có màu và độ đục & Rasterize được nên render rất nhanh & Dung lượng lớn; hình học không tường minh nên trích mesh khó\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Hình~\ref{fig:nam-bieu-dien} vẽ cùng một mặt cong bằng cả năm biểu diễn, đặt cạnh nhau --- đây là cách nhanh nhất để thấy mỗi cái giữ lại gì và vứt đi gì.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize]
+\def\CV{(0,0.00) (0.3,0.28) (0.6,0.36) (0.9,0.22) (1.2,-0.02) (1.5,-0.24) (1.8,-0.30) (2.1,-0.16) (2.4,0.06)}
+% --- 1. point cloud ---
+\begin{scope}[xshift=0cm]
+  \foreach \pt in {(0,0.00),(0.3,0.28),(0.6,0.36),(0.9,0.22),(1.2,-0.02),(1.5,-0.24),(1.8,-0.30),(2.1,-0.16),(2.4,0.06)}
+    \fill[steel] \pt circle (1.7pt);
+  \node[font=\scriptsize\bfseries,inkblue] at (1.2,-0.95) {point cloud};
+  \node[font=\scriptsize,tiercol,align=center,text width=2.7cm] at (1.2,-1.45) {chỉ chỗ có vật chất; không biết đâu là mặt};
+\end{scope}
+% --- 2. voxel ---
+\begin{scope}[xshift=3.1cm]
+  \draw[tiercol,very thin,step=0.3cm] (0,-0.6) grid (2.4,0.6);
+  \foreach \c in {(0,0),(0.3,0.3),(0.6,0.3),(0.9,0),(1.2,-0.3),(1.5,-0.3),(1.8,-0.3),(2.1,-0.3)}
+    \fill[steel,opacity=0.75] \c rectangle ++(0.3,0.3);
+  \node[font=\scriptsize\bfseries,inkblue] at (1.2,-0.95) {voxel};
+  \node[font=\scriptsize,tiercol,align=center,text width=2.7cm] at (1.2,-1.45) {lân cận cho sẵn; ô rỗng chiếm gần hết};
+\end{scope}
+% --- 3. mesh ---
+\begin{scope}[xshift=6.2cm]
+  \draw[steel,very thick] plot coordinates {(0,0.00) (0.6,0.36) (1.2,-0.02) (1.8,-0.30) (2.4,0.06)};
+  \foreach \pt in {(0,0.00),(0.6,0.36),(1.2,-0.02),(1.8,-0.30),(2.4,0.06)}
+    \fill[inkblue] \pt circle (1.7pt);
+  \node[font=\scriptsize\bfseries,inkblue] at (1.2,-0.95) {mesh};
+  \node[font=\scriptsize,tiercol,align=center,text width=2.7cm] at (1.2,-1.45) {mặt tường minh; đổi topology thì gãy};
+\end{scope}
+% --- 4. SDF ---
+\begin{scope}[xshift=9.3cm]
+  \draw[steel,very thick] plot coordinates \CV;
+  \draw[violetdark,dashed] plot coordinates {(0,0.20) (0.3,0.48) (0.6,0.56) (0.9,0.42) (1.2,0.18) (1.5,-0.04) (1.8,-0.10) (2.1,0.04) (2.4,0.26)};
+  \draw[violetdark,dashed] plot coordinates {(0,-0.20) (0.3,0.08) (0.6,0.16) (0.9,0.02) (1.2,-0.22) (1.5,-0.44) (1.8,-0.50) (2.1,-0.36) (2.4,-0.14)};
+  \node[font=\scriptsize,violetdark] at (2.62,0.30) {\(+d\)};
+  \node[font=\scriptsize,steel]      at (2.62,0.02) {\(0\)};
+  \node[font=\scriptsize,violetdark] at (2.62,-0.26) {\(-d\)};
+  \node[font=\scriptsize\bfseries,inkblue] at (1.2,-0.95) {implicit field (SDF)};
+  \node[font=\scriptsize,tiercol,align=center,text width=2.7cm] at (1.2,-1.45) {mặt là tập mức 0; render phải dò dọc tia};
+\end{scope}
+% --- 5. Gaussian ---
+\begin{scope}[xshift=12.7cm]
+  \foreach \x/\y/\r in {0.1/0.06/42, 0.65/0.34/8, 1.2/0.00/-38, 1.75/-0.29/-16, 2.3/0.02/40}
+    {\fill[steel,opacity=0.42,rotate around={\r:(\x,\y)}] (\x,\y) ellipse (0.30 and 0.11);}
+  \node[font=\scriptsize\bfseries,inkblue] at (1.2,-0.95) {Gaussian splatting};
+  \node[font=\scriptsize,tiercol,align=center,text width=2.7cm] at (1.2,-1.45) {rasterize rất nhanh; ``mặt'' không được định nghĩa};
+\end{scope}
+\end{tikzpicture}}
+\caption{Cùng một mặt cong, năm biểu diễn. Nhìn hàng chú thích dưới cùng thì thấy ngay điều mà bảng không nói được: mỗi biểu diễn giữ lại một loại thông tin và vứt đi loại khác. Point cloud biết \emph{ở đâu có vật chất} nhưng không biết đâu là mặt; voxel biết cả không gian rỗng nhưng trả tiền cho nó; mesh biết mặt nhưng khoá cứng topology; SDF định nghĩa mặt sạch nhất nhưng phải dò dọc tia mới render được; Gaussian render nhanh nhất nhưng không có mặt để mà trích ra.}
+\label{fig:nam-bieu-dien}
+\end{figure}
+
+Con số làm cho dòng đầu bảng thành cụ thể. Một lưới \(512^{3}\) chứa khoảng \(1{,}34\times 10^{8}\) ô; lưu một số thực 32-bit cho mỗi ô đã tốn 512 MiB, và một tầng conv 3D với 32 kênh ở cùng độ phân giải cần 16 GiB chỉ để giữ \en{activation}. Nâng lên \(1024^{3}\) thì nhân tám. Trong khi đó một quét LiDAR dày đặc của cùng cảnh có chừng \(2\times 10^{5}\) điểm, tức 2,4 MB nếu lưu ba toạ độ float --- ít hơn hai bậc độ lớn. Toàn bộ dòng \vn{tích chập thưa}{sparse convolution} tồn tại chỉ vì khoảng cách này: hơn 99\,\% ô của lưới đều là rỗng, nên trả tiền cho chúng là trả tiền cho hư không.
+
+\subsection{C. Độ sâu đến từ đâu, và cái gì cố định tỉ lệ}
+Với ảnh đơn, bài toán độ sâu không phải khó --- nó \emph{không xác định được}. Nhân toàn bộ cảnh với hệ số \(s\) và nhân luôn mọi vị trí camera với \(s\) thì mọi ảnh thu được giống hệt nhau. Hình~\ref{fig:scale-ambiguity} là toàn bộ chứng minh, vẽ ra trong một hình.
+
+\begin{figure}[H]\centering
+\resizebox{0.88\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize]
+% camera
+\fill[inkblue] (0,0) circle (2.2pt);
+\draw[inkblue,thick] (-0.35,-0.3) -- (0,0) -- (-0.35,0.3) -- cycle;
+\node[anchor=east,font=\scriptsize,inkblue] at (-0.4,0) {camera};
+% rays
+\draw[steel,thick] (0,0) -- (8.4,2.52);
+\draw[steel,thick] (0,0) -- (8.4,-2.52);
+% image plane
+\draw[reddark,very thick] (1.2,-0.36) -- (1.2,0.36);
+\node[anchor=south,font=\scriptsize,reddark] at (1.2,0.4) {ảnh};
+% object A
+\draw[violetdark,very thick] (3.4,-1.02) -- (3.4,1.02);
+\node[anchor=south,font=\scriptsize,violetdark,align=center] at (3.4,1.1) {vật cao \(h\)\\ ở khoảng cách \(Z\)};
+% object B
+\draw[violetdark,very thick,dashed] (6.8,-2.04) -- (6.8,2.04);
+\node[anchor=south,font=\scriptsize,violetdark,align=center] at (6.8,2.12) {vật cao \(2h\)\\ ở khoảng cách \(2Z\)};
+% brace
+\draw[decorate,decoration={brace,mirror,amplitude=5pt},reddark]
+  (1.2,-3.1) -- (6.8,-3.1) node[midway,below=6pt,font=\scriptsize,reddark,align=center]
+  {Hai cảnh khác nhau, \textbf{một ảnh duy nhất}. Không phép đo nào trong ảnh phân biệt được chúng.};
+\end{tikzpicture}}
+\caption{Tính không xác định được của tỉ lệ trong ảnh đơn. Nhân cảnh với \(s\) và nhân quãng đường camera với cùng \(s\) cho ra đúng bộ ảnh cũ; vì vậy \emph{không lượng dữ liệu nào} chữa được, chỉ prior mới chữa được. Đây cũng chính là lý do SLAM đơn mắt có một bậc tự do tỉ lệ, và vì sao chỉ cần thêm một gia tốc kế --- một cảm biến biết đơn vị mét --- là bậc tự do đó biến mất.}
+\label{fig:scale-ambiguity}
+\end{figure}
+
+Đây đúng là hiện tượng \vn{không xác định được}{non-identifiability} ở chương 4: dữ liệu không chứa thông tin để phân biệt hai giả thuyết.
+\lk{B/04}{trường hợp riêng của}{scale ambiguity là một ca sạch của tính không xác định được: hai tham số khác nhau sinh ra cùng một phân phối quan sát, nên thêm dữ liệu không giúp gì.} Một mạng độ sâu đơn ảnh phá thế bế tắc bằng cách học kích thước điển hình của vật thể và mối liên hệ với tiêu cự; nghĩa là con số nó trả về là một \emph{suy đoán có học}, không phải một phép đo. Nó vì thế sai theo kiểu rất đặc trưng ở đúng những cảnh phá vỡ prior kích thước: mô hình thu nhỏ, ảnh chụp từ trên cao, nội soi, ảnh macro.
+
+Bốn nguồn độ sâu, đọc theo cái mà mỗi nguồn dùng để phá thế bế tắc:
+\begin{itemize}
+\item \textbf{Đơn ảnh, metric} --- phá bằng prior kích thước. Cho ra mét ngay, nhưng chỉ đúng trong miền đã học.
+\item \textbf{Đơn ảnh, bất biến affine} --- không phá, mà \emph{bỏ} tỉ lệ đi: huấn luyện trên nhiều tập dữ liệu hỗn tạp với hàm mất mát bất biến với phép biến đổi affine của độ sâu, nên mô hình chỉ phải học thứ tự và hình dạng tương đối \cite{eigen2014depth,ranftl2022midas}. Khái quát rất tốt; đổi lại mỗi khung hình còn dư hai ẩn (tỉ lệ và độ dịch) và hai ẩn đó \emph{không nhất quán giữa các khung hình}.
+\item \textbf{Stereo} --- phá bằng vật lý: đường cơ sở đã biết cho tỉ lệ. Cần hiệu chỉnh chính xác, cần texture để khớp, và có chân trời độ sâu tính được từ \(\Delta Z = Z^{2}\Delta d/(fb)\).
+\item \textbf{RGB-D} --- phá bằng cảm biến chủ động: chiếu ánh sáng ra và đo phản hồi, nên có tỉ lệ tuyệt đối ngay cả trên tường trắng. Chết dưới nắng, trên mặt gương, trên vật hấp thụ hồng ngoại; có sai lệch phụ thuộc khoảng cách cần hiệu chuẩn riêng.
+\end{itemize}
+
+Hình~\ref{fig:cay-quyet-dinh-depth} gói bốn lựa chọn đó thành một cây quyết định dùng được ngay.
+
+\begin{figure}[H]\centering
+\resizebox{0.95\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  q/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\scriptsize},
+  a/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=4pt,align=center,font=\scriptsize},
+  e/.style={-{Stealth[length=4pt]},steel}]
+\node[q] (q1) {Bài toán hạ nguồn có cần\\ \textbf{tỉ lệ tuyệt đối} (mét) không?};
+\node[a,below left=0.9cm and 2.6cm of q1] (a1) {Độ sâu đơn ảnh\\ bất biến affine\\ \emph{(khái quát tốt nhất)}};
+\node[q,below right=0.9cm and 0.6cm of q1] (q2) {Được gắn thêm\\ cảm biến không?};
+\node[q,below left=0.95cm and 1.1cm of q2] (q3) {Cảnh trong nhà,\\ tầm \(<5\) m?};
+\node[a,below right=0.95cm and 0.2cm of q2] (a4) {Đơn mắt \(+\) IMU, hoặc\\ vật mốc đã biết kích thước\\ \emph{(tỉ lệ từ gia tốc kế)}};
+\node[a,below left=0.85cm and 0.4cm of q3] (a2) {RGB-D};
+\node[a,below right=0.85cm and 0.0cm of q3] (a3) {Stereo hoặc LiDAR};
+\draw[e] (q1) -- node[above left,font=\scriptsize]{không} (a1);
+\draw[e] (q1) -- node[above right,font=\scriptsize]{có} (q2);
+\draw[e] (q2) -- node[above left,font=\scriptsize]{có} (q3);
+\draw[e] (q2) -- node[above right,font=\scriptsize]{không} (a4);
+\draw[e] (q3) -- node[above left,font=\scriptsize]{có} (a2);
+\draw[e] (q3) -- node[above right,font=\scriptsize]{không} (a3);
+\end{tikzpicture}}
+\caption{Cây quyết định chọn nguồn độ sâu. Câu hỏi đầu tiên không phải ``mô hình nào chính xác nhất'' mà ``bài toán của tôi có thật sự cần mét không''. Rất nhiều bài toán chỉ cần độ sâu tương đối: tránh vật cản gần, sắp thứ tự lớp, tách nền. Ở đó lựa chọn bất biến affine vừa rẻ vừa bền hơn hẳn.}
+\label{fig:cay-quyet-dinh-depth}
+\end{figure}
+
+\subsection{D. SLAM và VIO đứng ở đâu}
+Bạn đọc chương này đã sống trong SLAM nên mục này không nhắc lại cơ chế; nó chỉ đặt SLAM vào bức tranh bốn thế hệ. SLAM là thế hệ một chạy dưới ràng buộc thời gian thực, và toàn bộ kiến trúc \en{frontend}/\en{backend} là hệ quả trực tiếp của ràng buộc đó: frontend phải quyết định tham lam trong vài mili-giây mỗi khung hình nên chỉ dùng ràng buộc cục bộ, còn backend là nơi hình học thực sự được ép đúng trên một cửa sổ hoặc trên toàn đồ thị \cite{mur2017orbslam2,campos2021orbslam3}. \vn{Đóng vòng}{loop closure} không phải một tính năng phụ mà là thứ duy nhất đổi \emph{bậc} của sai số: không có nó, sai số tích luỹ tăng đơn điệu theo quãng đường; có nó, sai số bị chặn bởi độ chính xác của phép đóng vòng.
+
+Bốn thế hệ chạm vào SLAM ở ba chỗ khác nhau:
+\begin{itemize}
+\item \textbf{Thế hệ lai thay frontend} --- đặc trưng và khớp học được, backend giữ nguyên. Đây là hướng đã thành thực dụng.
+\item \textbf{Thế hệ lai, bản triệt để hơn} --- dòng DROID-SLAM dùng \vn{dòng quang}{optical flow} dày đặc học được nhưng vẫn nhét một tầng hiệu chỉnh chùm tia khả vi vào giữa, nên nó vẫn là thế hệ hai chứ không phải thế hệ bốn.
+\item \textbf{Thế hệ ba thay bản đồ} --- giữ tracker cổ điển nhưng lưu bản đồ bằng trường bức xạ hoặc Gaussian. Đánh đổi bản đồ thưa lấy khả năng render: đáng giá cho robot cần nhìn lại cảnh, đáng ngờ cho robot chỉ cần định vị.
+\end{itemize}
+
+Về đánh giá chỉ cần một câu nhắc: \en{ATE} cần một phép căn chỉnh toàn cục trước khi đo, vì quỹ đạo ước lượng sống trong một hệ toạ độ tự do --- với đơn mắt thì tự do cả tỉ lệ. Chính phép căn chỉnh đó hấp thụ một phần \en{drift} toàn cục. \en{RPE} thì đo trên các đoạn ngắn nên không cần căn chỉnh, và vì thế nhạy với lỗi cục bộ mà ATE làm phẳng đi \cite{sturm2012benchmark}. Hai chỉ số phải đọc cùng nhau, và mọi thảo luận sâu hơn về giao thức --- chia dữ liệu, số lần lặp, khoảng tin cậy --- nằm ở \ptr{B/07-chia-du-lieu-va-danh-gia}.
+\lk{B/07}{ràng buộc bởi}{phép căn chỉnh của ATE là một bước tiền xử lý của giao thức đánh giá, nên nó quyết định lỗi nào còn nhìn thấy được.}
+
+\subsection{E. Học sâu trên point cloud}
+Muốn đưa mạng nơ-ron lên point cloud thì vấp ngay vào một trở ngại cấu trúc: đầu vào là một \emph{tập}, không phải chuỗi hay lưới. Với \(n\) điểm có \(n!\) cách đánh số cùng mô tả một hình dạng, nên bất kỳ hàm nào không bất biến với hoán vị đều đang học lại cùng một hình dạng hàng giai thừa lần.
+
+\begin{mach}[Mạch 2 --- từ tập điểm tới mạng dùng được]
+\item \vd{đầu vào là tập không thứ tự, mà MLP thường thì không bất biến hoán vị.} \gp ép mọi điểm qua cùng một MLP chia sẻ trọng số rồi gộp bằng một \vn{hàm đối xứng}{symmetric function} --- lấy max theo từng chiều đặc trưng \cite{qi2017pointnet}. \gd hình dạng mô tả được đủ tốt bằng một vectơ đặc trưng toàn cục. \hq bất biến hoán vị ở đây là bất biến \emph{theo cấu trúc}, không phải học được từ \vn{tăng cường dữ liệu}{data augmentation}, nên nó đúng tuyệt đối chứ không đúng gần đúng.
+\item \vd{max toàn cục vứt bỏ mọi cấu trúc cục bộ: đầu ra chỉ phụ thuộc một tập điểm ``tới hạn'' rất nhỏ --- những điểm đang giữ giá trị lớn nhất ở mỗi chiều.} \gia thêm hay bớt điểm bên trong bao lồi của tập tới hạn không đổi đầu ra: rất bền với thay đổi mật độ, nhưng mù với chi tiết bề mặt mịn. \gp lồng PointNet vào chính nó theo phân cấp không gian --- nhóm điểm theo bán kính, chạy PointNet trên từng nhóm, rồi lặp lại ở tỉ lệ lớn hơn \cite{qi2017pointnetpp}. \vdm chi phí truy vấn lân cận thành nút cổ chai, và kết quả nhạy với việc chọn bán kính.
+\item \vd{ở quy mô một cảnh đường phố với hàng trăm nghìn điểm, truy vấn lân cận là quá đắt.} \gp quay lại lưới nhưng chỉ giữ ô không rỗng (sparse convolution), hoặc gộp điểm theo cột dọc thành \en{pillar} rồi rơi về một bài toán 2D quen thuộc \cite{lang2019pointpillars}. \gd cảnh ngoài trời gần như phẳng theo phương thẳng đứng nên nén trục \(z\) mất ít thông tin. \gia giả định đó sai ngay trong nhà, nơi vật thể chồng lên nhau theo chiều cao.
+\end{mach}
+
+
+\begin{figure}[H]\centering
+\resizebox{0.92\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  pt/.style={draw=steel,fill=bluebg,circle,inner sep=1.5pt,font=\scriptsize,minimum size=6mm},
+  mlp/.style={draw=steel,fill=white,rounded corners=2pt,inner sep=3pt,font=\scriptsize,align=center,minimum height=6mm,minimum width=1.9cm},
+  ar/.style={-{Stealth[length=4pt]},steel}]
+\node[pt] (p1) at (0,1.3) {\(p_1\)};
+\node[pt] (p2) at (0,0.0) {\(p_2\)};
+\node[pt] (p3) at (0,-1.3) {\(p_3\)};
+\node[mlp] (m1) at (2.3,1.3) {MLP};
+\node[mlp] (m2) at (2.3,0.0) {MLP};
+\node[mlp] (m3) at (2.3,-1.3) {MLP};
+\node[font=\scriptsize,tiercol,align=center] at (2.3,2.1) {\emph{cùng một bộ trọng số}};
+\draw[tiercol,dashed,rounded corners=3pt] (1.25,-1.75) rectangle (3.35,1.75);
+\foreach \a/\b in {p1/m1,p2/m2,p3/m3} \draw[ar] (\a) -- (\b);
+\node[font=\scriptsize] (f1) at (4.7,1.3) {\(f_1=(1;\,0)\)};
+\node[font=\scriptsize] (f2) at (4.7,0.0) {\(f_2=(0;\,\mathbf{2})\)};
+\node[font=\scriptsize] (f3) at (4.7,-1.3) {\(f_3=(\mathbf{3};\,1)\)};
+\foreach \a/\b in {m1/f1,m2/f2,m3/f3} \draw[ar] (\a) -- (\b);
+\node[draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=4pt,font=\scriptsize,align=center]
+  (mx) at (7.3,0.0) {\textbf{max} theo\\ từng chiều};
+\foreach \a in {f1,f2,f3} \draw[ar] (\a) -- (mx);
+\node[draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,font=\scriptsize] (g) at (9.9,0.0) {\((3;\,2)\)};
+\draw[ar] (mx) -- (g);
+\node[font=\scriptsize,inkblue,align=center,text width=3.0cm] at (9.9,-1.05) {vectơ toàn cục,\\ bất biến hoán vị};
+\draw[reddark,thick,-{Stealth[length=4pt]}] (f3.east) to[bend right=22] node[below,font=\scriptsize,reddark]{chiều 1} (mx.south west);
+\draw[reddark,thick,-{Stealth[length=4pt]}] (f2.east) to[bend left=6]  node[above,font=\scriptsize,reddark]{chiều 2} (mx.west);
+\node[font=\scriptsize,reddark,align=left,text width=3.4cm] at (4.7,-2.5)
+  {\(f_1\) \textbf{không đóng góp chiều nào}: dời \(p_1\) đi khá xa mà đầu ra không đổi.};
+\end{tikzpicture}}
+\caption{Hàm đối xứng của PointNet, vẽ trên đúng ba điểm của ví dụ tính tay. Mọi điểm đi qua cùng một MLP rồi được gộp bằng phép max theo từng chiều, nên xáo trộn thứ tự ba điểm cho ra cùng một vectơ \((3;\,2)\) --- tính bất biến ở đây là bất biến theo cấu trúc, không phải học được. Nhưng hình cũng phơi ra cái giá: đầu ra chỉ do \emph{tập điểm tới hạn} quyết định (ở đây là \(f_2\) và \(f_3\)), còn \(f_1\) hoàn toàn vô hình. Đúng cái mẹo giữ cho mạng bất biến cũng là đúng cái mẹo làm nó mù.}
+\label{fig:pointnet-doi-xung}
+\end{figure}
+
+Hình~\ref{fig:pointnet-doi-xung} vẽ đúng cơ chế đó trên ba điểm.
+
+\textbf{Tính tay để thấy hàm đối xứng thật sự làm gì.} Lấy ba điểm đã qua MLP thành các đặc trưng hai chiều \(f_1=(1;\,0)\), \(f_2=(0;\,2)\), \(f_3=(3;\,1)\). Gộp bằng max theo từng chiều cho \((3;\,2)\). Đảo thứ tự ba điểm bằng bất kỳ hoán vị nào vẫn cho \((3;\,2)\) --- đó là toàn bộ mẹo của PointNet. Nhưng phép tính đó cũng phơi ra ngay giới hạn: chiều thứ nhất chỉ do \(f_3\) đóng góp, chiều thứ hai chỉ do \(f_2\); điểm \(f_1\) hoàn toàn không ảnh hưởng, và bạn có thể dời nó đi khá xa mà vectơ toàn cục không nhúc nhích. \emph{Đúng cái mẹo giữ cho mạng bất biến cũng là đúng cái mẹo làm nó mù.} Cùng cơ chế này sẽ xuất hiện lại ở \ptr{C/17-mo-hinh-sinh/02-toi-uu-tren-pixel}, nơi ma trận Gram vứt bỏ vị trí không gian để giữ lại ``phong cách'' --- hai kỹ thuật trông không liên quan, một nguyên lý.
+\lk{C/17/02}{cùng nguyên lý với}{ma trận Gram gộp trên vị trí đúng như PointNet gộp trên điểm: một hàm đối xứng mua tính bất biến bằng chính thông tin bị gộp đi.}
+\lk{B/10}{trường hợp riêng của}{bất biến hoán vị là một ví dụ của việc cài thiên lệch quy nạp thẳng vào kiến trúc thay vì học nó từ dữ liệu.}
+
+\subsection{F. Giới hạn và trường hợp hỏng}
+Điểm yếu chung của cả mục này là các biểu diễn không chuyển đổi qua lại mà không mất mát. Điểm sang mesh cần một bước tái dựng bề mặt vốn tự nó là bài toán ước lượng có prior riêng; mesh sang SDF cần mesh kín, điều gần như không đúng với mesh quét thực tế; Gaussian sang mesh là bài toán mở. Vì vậy lỗi thiết kế đắt nhất trong một pipeline 3D là chọn biểu diễn theo khâu đầu tiên thay vì theo khâu cuối cùng cần dùng kết quả.
+
+Hai chế độ hỏng đáng nhớ riêng:
+\begin{itemize}
+\item \textbf{Độ sâu học được:} nguy hiểm nhất không phải sai số lớn mà là sai số \emph{không nhất quán theo thời gian} --- mỗi khung hình một tỉ lệ khác nhau trong khi từng khung hình đều trông hợp lý.
+\item \textbf{Point cloud:} thay đổi mật độ giữa lúc huấn luyện và lúc chạy. Mô hình huấn luyện trên LiDAR 64 tia thường tụt mạnh trên 32 tia, và triệu chứng là \emph{mất vật ở xa trước tiên} --- đúng nơi mật độ giảm nhanh nhất.
+\end{itemize}
+
+\begin{cambay}
+Cạm bẫy quen thuộc với người làm SLAM: lấy độ sâu đơn ảnh làm phép đo trong một bộ ước lượng có trọng số. Nó không những sai tỉ lệ, mà tỉ lệ đó còn \emph{trôi giữa các khung hình}. Sai số của nó vì thế có tương quan mạnh theo thời gian. Đó là vi phạm đúng giả định nhiễu trắng độc lập mà bộ lọc dựa vào, và hệ quả là hiệp phương sai bị đánh giá quá lạc quan. Có hai cách dùng an toàn. Cách thứ nhất: coi nó như ràng buộc \emph{tương đối} bên trong một khung hình, ví dụ thứ tự độ sâu hay tính phẳng của mặt. Cách thứ hai: ước lượng tường minh một tỉ lệ và một độ dịch cho mỗi khung hình, rồi đưa hai ẩn đó vào bài toán tối ưu. Cách sai là nhét mét thẳng vào phần dư.
+\end{cambay}
+
+\begin{cannho}
+Biểu diễn quyết định phép toán nào rẻ, và vì thế quyết định bài toán nào bạn còn giải được về sau: hãy chọn nó theo khâu \emph{cuối cùng} của pipeline, không theo khâu đầu tiên. Còn về độ sâu: chỉ có baseline và cảm biến chủ động cho ra mét; mọi thứ khác cho ra một suy đoán có học, và suy đoán đó không được phép xuất hiện trong phần dư metric mà không kèm hai ẩn tỉ lệ và độ dịch. \T{4}
+\end{cannho}
+
+\subsection{G. Kết nối}
+Mục này cung cấp vốn từ cho \ptr{C/16-thi-giac-3d/03-nerf-3dgs-va-hop-nhat}, nơi hai biểu diễn cuối bảng được đào sâu như hai câu trả lời cho cùng một bài toán render. Bất biến hoán vị của PointNet là trường hợp riêng của nguyên tắc thiết kế theo bất biến ở \ptr{B/10-thiet-ke-kien-truc}; tính không xác định được của tỉ lệ là trường hợp riêng của \ptr{B/04-nen-tang-hoc-tu-du-lieu}. Phần ATE/RPE nối thẳng sang \ptr{B/07-chia-du-lieu-va-danh-gia}, còn tụt hiệu năng khi đổi mật độ cảm biến là một ca của \ptr{B/08-dich-chuyen-phan-phoi}.
+
+\begin{tukiem}
+\item Vì sao bộ nhớ voxel không phải vấn đề kỹ thuật có thể tối ưu đi mà là hệ quả cấu trúc của biểu diễn?
+\item Độ sâu đơn ảnh bất biến affine tổng quát tốt hơn độ sâu metric. Cái giá của tính tổng quát đó hiện ra ở đâu khi ghép nhiều khung hình?
+\item PointNet bất biến hoán vị ``theo cấu trúc''. Vì sao điều đó mạnh hơn hẳn việc học tính bất biến bằng augmentation, và nó khiến mạng mù với cái gì?
+\item Nếu loop closure bị tắt, sai số của SLAM đổi bậc như thế nào, và chỉ số nào trong hai chỉ số ATE/RPE phản ánh sự thay đổi đó rõ hơn?
+\item Một mô hình phát hiện vật thể trên LiDAR 64 tia được đưa sang cảm biến 32 tia. Bạn dự đoán triệu chứng đầu tiên là gì, và vì sao?
+\item Hình~\ref{fig:scale-ambiguity} nói rằng không lượng dữ liệu nào phá được tính không xác định của tỉ lệ. Vậy vì sao một mạng ``metric depth'' vẫn cho ra mét, và điều đó ngầm giả định gì?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

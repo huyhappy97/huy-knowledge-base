@@ -1,0 +1,139 @@
+% ---------------------------------------------------------------------------
+% Chương 23 — Framework và công cụ
+% Tạo: 2026-09-13 | Phụ thuộc: toàn cây | Mức độ: BỔ TRỢ (mức 1) — tham khảo.
+% CHỐT 9/2026. Phần hết hạn nhanh nhất của cây cùng C/16 và C/17.
+% Nguyên tắc viết: xoay quanh "đọc cái gì để học cái gì", không xoay quanh danh sách,
+%   vì nguyên tắc bền hơn danh sách.
+% Ghi chú trung thực: KHÔNG xếp hạng chất lượng các dự án; chỉ nói mỗi cái dạy được gì.
+% ---------------------------------------------------------------------------
+\documentclass[../../vslam.tex]{subfiles}
+\begin{document}
+\chapter{Framework và công cụ (Frameworks and Tools)}
+\ptrtarget{E/23}\ptrtarget{E/23-framework-va-cong-cu}
+\dependency{Toàn bộ cây --- chương này chỉ có nghĩa khi bạn đã biết mình đang tìm gì. Đọc nó trước khi đọc Phần~A là lãng phí.}
+
+\begin{tomtat}
+Chương này là bản đồ công cụ, và nó được viết xoay quanh một câu hỏi duy nhất: \emph{đọc mã nguồn nào để học được gì?} Cách tổ chức ấy là có chủ ý --- một danh sách dự án hết hạn trong hai năm, nhưng nguyên tắc ``muốn hiểu marginalization thì đọc VINS-Mono'' thì bền hơn nhiều. Nội dung gồm: nguyên tắc chọn mã nguồn để đọc, và vì sao đọc mã dạy nhiều hơn đọc bài báo với phần lớn nội dung Phần~C và Phần~D; sáu hệ thống đáng đọc trọn vẹn, mỗi hệ kèm chỉ dẫn \emph{đọc phần nào trước}; các thư viện nền và tiêu chí chọn giữa chúng; và bộ dữ liệu cùng công cụ đánh giá. Nếu chỉ nhớ một điều: \emph{phần lớn kiến thức ở Phần~C và Phần~D không tồn tại trong bài báo} --- kiến trúc ba luồng, chính sách quản lý bản đồ, các cổng và ngưỡng --- và cách duy nhất học chúng là đọc mã của một hệ đã trưởng thành.
+\end{tomtat}
+
+\begin{cambay}
+\textbf{Chương này chốt tại tháng 9/2026} và là phần hết hạn nhanh nhất của cây cùng với \ptr{C/16} và \ptr{C/17}. Dự án đổi, API đổi, hệ mới xuất hiện. Rà lại mỗi sáu tháng.
+
+Tôi cũng \textbf{không xếp hạng chất lượng} các dự án. Lý do: ``tốt hơn'' phụ thuộc vào việc bạn cần gì, và một bảng xếp hạng sẽ sai ngay khi ai đó có ràng buộc khác tôi. Thay vào đó, mỗi mục trả lời câu \emph{``đọc nó để học được gì''} --- một câu hỏi có câu trả lời ổn định hơn nhiều.
+\end{cambay}
+
+\section{Vì sao đọc mã nguồn}
+\ptrtarget{E/23/01}
+
+Có một sự bất đối xứng đáng nói giữa hai nửa của cây này.
+
+Với Phần~A và phần lớn Phần~B --- hình học, MAP, bundle adjustment, các paradigm back-end --- \emph{bài báo là nguồn tốt}. Nội dung là toán, nó viết ra được, và một bài báo tốt trình bày nó rõ hơn mã nguồn.
+
+Với Phần~C và Phần~D thì ngược lại, và lý do có cấu trúc. Kiến trúc ba luồng ở \ptr{C/13} mục~4A, chính sách chọn và loại keyframe, các cổng ở \ptr{B/10} và \ptr{B/12}, cách hoà nhập loop closure với tracking --- những thứ ấy \emph{không viết được thành định lý}, chúng không phải đóng góp mà một bài báo khoe, và chúng chiếm phần lớn mã nguồn. Một bài báo mô tả hệ thống như thể nó chạy tuần tự; mã nguồn thật đầy hàng đợi, khoá, và cờ trạng thái.
+
+Hệ quả thực hành: \emph{với Phần~C và Phần~D, đọc mã là cách học chính, không phải cách bổ sung}. Và đọc mã của một hệ \emph{đã trưởng thành} --- đã chạy trên nhiều bộ dữ liệu, đã được nhiều người dùng, đã sửa nhiều lỗi --- dạy nhiều hơn đọc mã của một hệ mới hơn nhưng chưa va chạm.
+
+Cách đọc mã có hiệu quả, ba nguyên tắc.
+
+\emph{Một --- đọc theo câu hỏi, không đọc tuần tự.} Mở mã với một câu hỏi cụ thể: ``nó quyết định tạo keyframe thế nào?'' Tìm chỗ ấy, đọc kỹ, rồi đóng lại. Đọc từ đầu tới cuối một hệ vài chục nghìn dòng là cách chắc chắn bỏ cuộc.
+
+\emph{Hai --- tìm các ngưỡng và hỏi chúng từ đâu ra.} Mỗi hằng số trong mã là một quyết định. Phần lớn được chỉnh bằng thực nghiệm, và biết \emph{cái nào} có cơ sở lý thuyết và cái nào không là kiến thức có giá trị.
+
+\emph{Ba --- so mã với bài báo của chính nó.} Chỗ chúng khác nhau là chỗ thú vị nhất: đó là chỗ lý thuyết gặp thực tế, và thường là chỗ có một bài học không được viết ra.
+
+\section{Sáu hệ thống đáng đọc}
+\ptrtarget{E/23/02}
+
+\begin{table}[H]\centering\small
+\caption{Sáu hệ thống và cái đáng học từ mỗi hệ. Cột cuối là chỉ dẫn đọc --- phần nào trước.}
+\label{tab:e23-systems}
+\begin{tabularx}{\linewidth}{@{}L{2.2cm}L{3.2cm}Y@{}}
+\toprule
+\textbf{Hệ thống} & \textbf{Đọc để học} & \textbf{Đọc phần nào trước}\\
+\midrule
+\repo{ORB-SLAM3} & Kiến trúc SLAM đầy đủ nhất: ba luồng, covisibility, Atlas, quản lý bản đồ & Bắt đầu ở vòng lặp tracking; rồi chính sách tạo và loại keyframe (\ptr{C/13}); rồi loop closing và cách nó hoà nhập với tracking\\
+\repo{VINS-Fusion} & Cửa sổ trượt và marginalization, ngắn và dễ đọc nhất trong sáu & Bắt đầu ở chỗ dựng bài toán tối ưu; rồi marginalization (\ptr{A/04} mục 5); rồi khởi tạo VI\\
+\repo{OpenVINS} & Bộ lọc chuẩn mực; hiệu chuẩn trực tuyến; \emph{có mô phỏng có chân trị} & Chỗ định nghĩa vector trạng thái; rồi cờ FEJ và chỗ Jacobian được tính; rồi mô-đun mô phỏng --- đây là chỗ tính NEES được (\ptr{C/18})\\
+\repo{GTSAM} & Đồ thị nhân tử đúng cách; iSAM2; cách viết một loại nhân tử mới & Ví dụ về custom factor; rồi cấu trúc Bayes tree; rồi \code{Marginals} (\ptr{A/06} mục 2B)\\
+\repo{Ceres} & Manifold, auto-diff, bộ giải thưa với Schur & Tài liệu về \code{Manifold} (\ptr{A/03} mục 6); rồi các lựa chọn linear solver và ordering (\ptr{A/04} mục 4D)\\
+\repo{Kalibr} & Toàn bộ tư duy hiệu chuẩn \(=\) batch MAP & \emph{Tài liệu quy trình thu dữ liệu trước mã} --- mỗi yêu cầu trong đó là một hàng của Bảng kích thích ở \ptr{A/05}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Một gợi ý về thứ tự nếu bạn đọc cả sáu: \emph{VINS-Fusion trước} vì nó ngắn nhất và cấu trúc rõ; \emph{OpenVINS} tiếp theo để thấy thế giới bộ lọc và để có mô phỏng; \emph{ORB-SLAM3} thứ ba vì nó đầy đủ nhất và cũng phức tạp nhất --- đọc nó trước khi có nền là nản. \emph{Kalibr} đọc song song khi học \ptr{C/14}. \emph{GTSAM} và \emph{Ceres} đọc như tài liệu tham khảo khi cần, không đọc tuần tự.
+
+\section{Các hệ thống khác, theo chủ đề}
+\ptrtarget{E/23/03}
+
+Xếp theo \emph{chủ đề bạn muốn học} chứ không theo mức độ nổi tiếng.
+
+\emph{Direct method và mô hình quang trắc}: \repo{DSO} là cài đặt tham chiếu; \repo{DM-VIO} thêm quán tính và dynamic marginalization. Đọc DSO để hiểu \ptr{B/08} mục~2B và \ptr{A/02} mục~5B.
+
+\emph{Kỹ thuật số học và chất lượng phần mềm}: \repo{Basalt}. Dạng căn bậc hai (\ptr{B/09} mục~5A), spline \(SE(3)\) cho hiệu chuẩn, và chất lượng kỹ thuật rất cao --- đáng đọc như một ví dụ về cách viết phần mềm SLAM tử tế.
+
+\emph{Semi-direct và tốc độ}: \repo{SVO-Pro}. Đọc để thấy mục~2C của \ptr{B/08} --- phân công theo thế mạnh.
+
+\emph{SfM và localization quy mô lớn}: \repo{COLMAP} cho SfM chuẩn công nghiệp; \repo{HLoc} cho pipeline localization phân cấp (\ptr{B/12} mục~2).
+
+\emph{Kiến trúc lai học được}: \repo{DROID-SLAM} và \repo{DPVO}. Đọc để thấy ranh giới ở \ptr{C/17} mục~3B được đặt ở đâu trong mã.
+
+\emph{Quản lý bản đồ nhiều phiên}: \repo{maplab}. Hiếm framework coi \ptr{C/13} là chủ đề chính chứ không phải phụ.
+
+\emph{Ngữ nghĩa trong đồ thị}: \repo{Kimera}. Ví dụ về việc thông tin ngữ nghĩa cũng chỉ là một loại nhân tử.
+
+\emph{Biểu diễn neural}: \repo{SplaTAM}, \repo{MonoGS}. Chốt 9/2026; xem cảnh báo ở \ptr{C/16} mục~4.
+
+\emph{Fiducial}: \repo{TagSLAM}. Liên quan \code{../marker/}.
+
+\section{Thư viện nền}
+\ptrtarget{E/23/04}
+
+\emph{Lie group}: \repo{Sophus} là lựa chọn phổ biến nhất trong hệ sinh thái C++ SLAM; \repo{manif} có API hiện đại hơn và Jacobian tường minh cho mọi phép toán, và nó đi kèm \cite{sola2018microlie} vốn là tài liệu tham chiếu tốt nhất về quy ước. Tiêu chí chọn: nếu bạn đang học và cần hiểu quy ước rõ ràng, dùng manif; nếu bạn đang tích hợp vào hệ sinh thái có sẵn, dùng cái mà hệ đó dùng.
+
+\emph{Tối ưu}: \repo{Ceres} cho auto-diff và sự trưởng thành; \repo{GTSAM} cho đồ thị nhân tử và smoothing gia tăng; \repo{g2o} cho mã ngắn dễ đọc (tốt để \emph{học}, không nhất thiết để dùng); \repo{SymForce} cho việc sinh mã Jacobian tối ưu; \repo{Theseus} cho tối ưu khả vi (\ptr{C/17} mục~3B).
+
+Tiêu chí chọn giữa Ceres và GTSAM, vốn là lựa chọn hay gặp nhất: nếu bài toán của bạn là một bài toán tối ưu tĩnh --- hiệu chuẩn, BA ngoại tuyến --- thì Ceres đơn giản hơn. Nếu nó là một bài toán \emph{gia tăng} với các biến được thêm liên tục --- SLAM thời gian thực --- thì GTSAM với iSAM2 có lợi thế cấu trúc.
+
+\emph{Thị giác}: \repo{OpenCV} cho gần như mọi thứ ở \ptr{B/07} và \ptr{A/02}. Một cảnh báo thực dụng: kiểm xem build của bạn có bật đúng cờ kiến trúc (SIMD) không --- đây là một lỗi hiệu năng phổ biến và dễ sửa (\ptr{D/20} mục~4B).
+
+\section{Bộ dữ liệu và công cụ đánh giá}
+\ptrtarget{E/23/05}
+
+\emph{Công cụ}: \repo{evo} dễ dùng; \repo{rpg\_trajectory\_evaluation} \cite{zhang2018trajeval} chặt chẽ hơn về căn chỉnh. Với cả hai, \emph{chọn đúng chế độ căn chỉnh} theo \ptr{C/18} mục~2B --- mặc định không phải lúc nào cũng đúng cho cấu hình của bạn, và đây là lỗi phổ biến nhất trong đánh giá.
+
+\emph{Bộ dữ liệu}, xếp theo cái chúng dùng để đo:
+
+Đo \emph{độ chính xác trong điều kiện tốt}: EuRoC \cite{burri2016euroc} (drone, trong nhà, có motion capture), TUM-VI \cite{schubert2018tumvi} (cầm tay, có hiệu chuẩn quang trắc), TUM-RGBD \cite{sturm2012tumrgbd} (RGB-D, định nghĩa gốc của ATE/RPE), KITTI \cite{geiger2012kitti} (xe, ngoài trời).
+
+Đo \emph{hoạt động dài hạn và thay đổi môi trường}: OpenLORIS \cite{shi2020openloris} --- một trong rất ít bộ chạm vào \ptr{C/13} mục~4C.
+
+Đo \emph{localization trong điều kiện thay đổi}: Aachen Day-Night \cite{sattler2018benchmarking}.
+
+\begin{cannho}
+\textbf{Không bộ dữ liệu công khai nào đủ}, và đây là nhắc lại \ptr{D/21} mục~4A vì nó là điều quan trọng nhất của mục này.
+
+Ba lý do: chúng không chứa các chế độ hỏng ở \ptr{D/19}; chúng quá ngắn cho các vấn đề ở \ptr{C/13}; và chúng đo ATE trung bình trên các chuỗi hệ thống chạy được, trong khi sản phẩm cần tỉ lệ thất bại và hành vi ở đuôi.
+
+Dùng chúng cho đúng việc: \emph{so sánh thuật toán trong điều kiện kiểm soát}, và \emph{phát hiện hồi quy}. Không dùng chúng để kết luận hệ thống sẵn sàng cho khách hàng.
+
+Việc cần làm song song: xây bộ dữ liệu nội bộ theo ba phần ở \ptr{D/21} mục~4A --- chuỗi đại diện, chuỗi nghịch cảnh, và chuỗi từ hiện trường. Phần thứ ba có giá trị nhất và chỉ có được nhờ vòng lặp fleet analytics.
+\end{cannho}
+
+\section{Kết nối}
+\ptrtarget{E/23/06}
+
+Chương này là tham khảo cho toàn cây, và cách dùng đúng là tra ngược: khi đọc một chương và muốn xem nó được cài đặt thế nào, quay lại Bảng~\ref{tab:e23-systems} và mục~3.
+
+Nối xuống dưới: \ptr{E/24-lo-trinh} giai đoạn hai là chỗ chương này được dùng nhiều nhất --- đọc ba hệ thống theo thứ tự, và với mỗi hệ vẽ lại đồ thị nhân tử cùng danh sách biến nào bị fix. Đó là bài tập biến việc đọc mã từ tiêu thụ thụ động thành một việc có sản phẩm kiểm được.
+
+\begin{tukiem}
+\item Vì sao với Phần~C và Phần~D thì đọc mã là cách học chính chứ không phải bổ sung?
+\item Nêu ba nguyên tắc đọc mã nguồn có hiệu quả, và nói nguyên tắc nào tiết kiệm nhiều thời gian nhất.
+\item Với mỗi hệ trong sáu hệ ở Bảng~\ref{tab:e23-systems}, nói nó dạy được gì mà năm hệ kia không dạy.
+\item Tiêu chí chọn giữa Ceres và GTSAM là gì?
+\item Vì sao không bộ dữ liệu công khai nào đủ, và chúng nên được dùng cho việc gì?
+\item Khi dùng evo hoặc rpg\_trajectory\_evaluation, lỗi phổ biến nhất là gì?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

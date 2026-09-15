@@ -1,0 +1,69 @@
+% 99-ket-luan.tex — kết luận toàn cây: bốn nguyên lý xuyên suốt, cái gì bền, làm gì tiếp.
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: toàn bộ các phần | Mức độ: cốt lõi — đọc lại mỗi lần ôn ba tháng
+\documentclass[deep_learning.tex]{subfiles}
+\begin{document}
+\chapter*{Kết luận: cái gì còn lại sau khi mọi kiến trúc đã cũ}
+\addcontentsline{toc}{chapter}{Kết luận: cái gì còn lại sau khi mọi kiến trúc đã cũ}
+\markboth{KẾT LUẬN}{}
+
+\begin{tomtat}
+Ba mươi bốn chương của cây này rút lại còn bốn nguyên lý và một thói quen. Bốn nguyên lý --- độ khó chỉ bị đẩy đi chỗ khác, trục đánh đổi giữa giả định và dữ liệu, không thể không có giả định, và hiểu nghĩa là biết chỗ hỏng --- sẽ còn đúng khi mọi tên mô hình trong cây đã cũ. Thói quen là luôn hỏi \emph{nó giả định gì} và \emph{nó hỏng khi nào} trước khi hỏi \emph{nó đạt bao nhiêu điểm}. Nếu chỉ giữ lại một trang trong toàn bộ tài liệu, hãy giữ trang này.
+\end{tomtat}
+
+\section{Bốn nguyên lý xuyên suốt}
+
+Một tài liệu dài có nguy cơ để lại ấn tượng rằng lĩnh vực này là một tập hợp rời rạc của rất nhiều kỹ thuật. Thực ra không phải. Gần như mọi chương ở trên là một cách nhìn khác của bốn ý sau, và nhận ra chúng lặp lại chính là dấu hiệu đã đọc đúng.
+
+\begin{itemize}
+\item \textbf{Độ khó không biến mất, nó chỉ bị đẩy đi chỗ khác.} Khi một phương pháp trông như bữa trưa miễn phí thì bạn chưa tìm ra chỗ nó trả giá --- sang dữ liệu, sang hậu xử lý, sang thời gian huấn luyện, hay sang một giả định ngầm về đầu vào. Nguyên lý này xuất hiện ở chương~3 như một công cụ đọc hệ thống, rồi quay lại ở \en{anchor-free} chuyển chi phí sang \vn{gán mẫu}{label assignment}, ở \en{style transfer} feed-forward chuyển chi phí từ lúc suy luận sang lúc huấn luyện, và ở \vn{lượng tử hoá}{quantization} đổi độ chính xác lấy thông lượng.
+
+\item \textbf{Trục giả định mạnh với ít dữ liệu, đối lại giả định yếu với nhiều dữ liệu.} Đây là trục giải thích phần lớn tiến bộ mười lăm năm qua. Nó xuất hiện dưới dạng \en{CNN} đối lại \en{ViT}, hình học cổ điển đối lại mô hình \en{feed-forward} trong thị giác 3D, và mô hình chuyên biệt đối lại \vn{mô hình nền tảng}{foundation model}. Không đầu nào của trục đúng tuyệt đối; vị trí đúng phụ thuộc vào lượng dữ liệu bạn thực sự có.
+
+\item \textbf{Không thể không có giả định, chỉ có việc chọn giả định nào.} Giả định vào hệ thống qua đúng bốn cửa: kiến trúc, hàm mất mát, dữ liệu và \vn{tăng cường dữ liệu}{data augmentation}, và thuật toán tối ưu. Người tin rằng mình đang làm việc ``không giả định gì'' chỉ là người chưa biết mình đã giả định gì. Hệ quả thực dụng: khi mô hình kém, hãy hỏi giả định nào đang sai trước khi hỏi nên thêm bao nhiêu dữ liệu --- vì nếu bài toán không \vn{định danh được}{identifiable}, thêm dữ liệu không cứu được.
+
+\item \textbf{Hiểu một hệ thống nghĩa là biết nó hỏng ở đâu.} Không phải biết nó chạy được gì. Đây là lý do mọi tài liệu trong cây đều có một mục bắt buộc về giới hạn và trường hợp hỏng, và là lý do cột giá trị nhất trong mọi bảng so sánh là cột cuối cùng.
+\end{itemize}
+
+\section{Cái gì bền và cái gì sẽ cũ}
+
+Cây được phân tầng theo chu kỳ bán rã ngay từ bản đồ gốc, và kết luận đáng nói lại ở đây là tầng nào đáng dành thời gian khi bạn phải chọn.
+
+\begin{table}[H]\centering\small
+\caption{Dự đoán về tuổi thọ của từng loại nội dung trong cây này.}
+\label{tab:ket-luan-ban-ra}
+\begin{tabularx}{\linewidth}{@{}L{3.4cm}L{2.2cm}Y@{}}
+\toprule
+\textbf{Loại nội dung} & \textbf{Tuổi thọ} & \textbf{Vì sao}\\
+\midrule
+Tên mô hình dẫn đầu bảng, phần \emph{Repo và SOTA} & 6--12 tháng & Chốt tại 9/2026; đây là phần hết hạn nhanh nhất và nên đọc như chỗ bắt đầu tìm\\
+Chi tiết \en{API} và \en{framework} & 2--3 năm & Tầng \T{4}; tra khi cần, không đầu tư sâu\\
+Kiến trúc cụ thể và thủ thuật huấn luyện & 5--10 năm & Tầng \T{3}; học ý tưởng cốt lõi và lý do ra đời, không học danh sách\\
+Nguyên lý thiết kế, đánh đổi, giới hạn tính toán & \(>\)10 năm & Tầng \T{2}; Phần B và E gần như không hết hạn\\
+Toán, vật lý tạo ảnh, hình học & \(>\)20 năm & Tầng \T{1}; Phần A, học vừa đủ nhưng học chắc\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng~\ref{tab:ket-luan-ban-ra} dẫn tới một lời khuyên hơi nghịch trực giác: phần thú vị nhất khi đọc (Phần C, các mô hình) không phải phần đáng đầu tư nhất khi ôn. Khi quay lại cây sau sáu tháng, hãy ôn Phần B và Phần E trước, vì đó là phần thay đổi cách bạn đọc mọi thứ khác.
+
+\section{Ba thói quen đáng mang theo}
+
+Thứ nhất, \textbf{đọc phần giới hạn trước phần kết quả}. Đó là chỗ tác giả nói thật nhất, và một paper không có phần giới hạn là một tín hiệu cảnh báo chứ không phải dấu hiệu của một hệ thống hoàn hảo.
+
+Thứ hai, \textbf{không tin một lần chạy}. Điều này bạn đã trả giá để học trong công việc SLAM của mình, và trong học sâu thì nguồn bất định còn nhiều hơn: thứ tự \vn{rút gọn}{reduction} trên GPU, chế độ tự chọn thuật toán của thư viện, phép cộng nguyên tử không kết hợp. Một cải thiện nhỏ hơn khoảng dao động giữa các \vn{hạt giống}{seed} thì chưa phải cải thiện.
+
+Thứ ba, \textbf{ghi lại kết luận âm}. Một ý tưởng đã thử và không có tác dụng vẫn là kết quả, và là kết quả tốn kém nhất khi bị mất --- vì không ai khác biết bạn đã loại nó, kể cả chính bạn sáu tháng sau.
+
+\section{Làm gì tiếp}
+
+Phần F là chỗ bốn nguyên lý ấy bị đem ra thử trên một hệ thật. Nó gần như không thêm nguyên lý mới; việc của nó là bắt bạn dùng bốn nguyên lý trên để trả lời một câu hỏi tốn kém, rằng có nên thay một khối cổ điển đã chạy tốt bằng một mạng hay không. Câu trả lời đúng thường là không, và biết vì sao không mới là thứ đáng học.
+
+Cây này là bản đồ, không phải chuyến đi. Bước hợp lý ngay sau khi đọc xong lần đầu là mở chương~26, chọn một đề tài xuyên suốt, và chạy vòng đầu tiên của nó cho tới khi có một hệ thống chạy được từ đầu tới cuối --- dù kết quả xấu. Lý do là toàn bộ Phần B chỉ trở nên cụ thể khi bạn có một hệ thống thật để áp các câu hỏi vào, và toàn bộ Phần E chỉ có nghĩa khi bạn có số liệu thật của chính mình để nghi ngờ.
+
+Song song với đó, hãy giữ lịch ôn của kho: sau một ngày, một tuần, một tháng, ba tháng, trả lời các câu hỏi tự kiểm \emph{trước} khi mở lại bài. Mỗi lần ôn, sửa ngay chỗ nào đọc lại thấy không hiểu. Cây này là tài liệu sống; một chương không bao giờ được sửa là một chương chưa bao giờ được dùng.
+
+\begin{cannho}
+Nếu quên hết mọi thứ khác: trước mỗi kỹ thuật mới, hỏi ba câu --- \emph{nó giải quyết vấn đề gì mà cái trước không giải quyết được}, \emph{nó giả định gì}, và \emph{nó hỏng khi nào}. Ba câu đó biến một danh mục thuật ngữ thành một bản đồ, và đó là toàn bộ mục đích của tài liệu này.
+\end{cannho}
+\end{document}

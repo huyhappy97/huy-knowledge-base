@@ -1,0 +1,297 @@
+% ---------------------------------------------------------------------------
+% Chương 4 — Nền tảng học từ dữ liệu
+% Tạo: 2026-09  |  Sửa gần nhất: 2026-09-03  |  Ôn gần nhất: —
+% Phụ thuộc: B/03-giai-phau-he-thong
+% Mức độ: cốt lõi — chương giải thích vì sao mọi chương sau tồn tại.
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Nền tảng học từ dữ liệu (Foundations of Learning from Data)}
+\ptrtarget{B/04}\ptrtarget{B/04-nen-tang-hoc-tu-du-lieu}
+\dependency{\ptr{B/03-giai-phau-he-thong} cho khung ``bài toán \(\rightarrow\) nguyên lý \(\rightarrow\) cài đặt''. Nguyên lý ``độ khó không biến mất'' ở chương đó, tại đây có tên chính thức là trục đánh đổi giả định \(\leftrightarrow\) dữ liệu. Nền toán: xác suất cơ bản và chuẩn vector.}
+
+\begin{tomtat}
+Chương này giải thích khe hở duy nhất mà từ đó mọi vấn đề của học máy sinh ra: ta tối ưu một trung bình trên mẫu hữu hạn nhưng muốn tốt trên cả phân phối thật. Nó đi từ \en{ERM} qua thất bại của \en{KNN} trên pixel, qua \vn{lời nguyền số chiều}{curse of dimensionality} và \vn{giả thuyết đa tạp}{manifold hypothesis}, tới bốn nguồn của \en{inductive bias}, tới \en{double descent}, và kết ở \en{identifiability}. Đọc xong bạn trả lời được câu hỏi đắt tiền nhất trong mọi dự án, bằng phép đo chứ không bằng cảm tính: mô hình chưa đủ tốt thì nên thêm dữ liệu, thêm giả định, hay thêm \vn{sức chứa}{capacity}? Bạn cũng nhận ra được những bài toán mà thêm dữ liệu chỉ là ném tiền qua cửa sổ. Nếu chỉ nhớ một điều: bạn không chọn được ``không có giả định'', bạn chỉ chọn giả định nào, và trục duy nhất là \emph{giả định mạnh với ít dữ liệu} đối lại \emph{giả định yếu với nhiều dữ liệu}.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mô hình, huấn luyện, suy luận}{mô hình là một hàm \(f\) có tham số, nhận đầu vào \(x\) và trả về dự đoán \(f(x)\). Huấn luyện là đi tìm bộ tham số làm dự đoán sát nhãn nhất trên dữ liệu đã có; suy luận là chạy hàm đó trên dữ liệu mới. Cả chương này nói về khoảng cách giữa hai việc đó.}
+\kn{phân phối dữ liệu và giả định i.i.d.}{``phân phối'' là quy luật xác suất sinh ra dữ liệu bạn sẽ gặp --- ảnh nào hay xuất hiện, nhãn nào đi kèm. Giả định i.i.d. (\emph{independent and identically distributed}) nói rằng mỗi mẫu được rút độc lập từ cùng một phân phối; đây là giả định ngầm của gần như mọi kết quả trong chương.}
+\kn{hàm mất mát và rủi ro (loss, risk)}{hàm mất mát \(\ell\) đo một dự đoán sai bao nhiêu so với nhãn của \emph{một} mẫu. Rủi ro là kỳ vọng của hàm mất mát trên toàn phân phối --- tức mức sai trung bình trên thế giới thật. Ta muốn tối thiểu rủi ro nhưng chỉ đo được trung bình trên mẫu đã có.}
+\kn{tham số và sức chứa (capacity)}{tham số là các con số bên trong mô hình mà huấn luyện điều chỉnh. Sức chứa là mức độ phong phú của tập hàm mà mô hình biểu diễn được --- càng nhiều tham số và càng ít ràng buộc thì sức chứa càng lớn, và mô hình càng dễ khớp mọi thứ, kể cả nhiễu.}
+\kn{overfitting và underfitting}{overfitting là khi mô hình khớp rất tốt dữ liệu huấn luyện nhưng kém trên dữ liệu mới --- nó học thuộc chi tiết riêng của mẫu. Underfitting là khi nó kém ở cả hai, vì sức chứa hoặc thời gian huấn luyện chưa đủ. Phân biệt hai trạng thái này quyết định bạn nên thêm dữ liệu hay thêm mô hình.}
+\kn{bias --- ba nghĩa khác nhau}{(a) trong thống kê, độ lệch hệ thống giữa kỳ vọng của bộ ước lượng và giá trị thật --- đây là nghĩa dùng trong cụm ``bias--variance''; (b) \emph{inductive bias}, tập giả định mà mô hình mang sẵn về dạng lời giải, nghĩa dùng nhiều nhất trong chương này; (c) tham số cộng thêm \(b\) trong \(Wx+b\) của một tầng tuyến tính --- nghĩa này \emph{không} xuất hiện ở đây. Khi đọc, luôn hỏi đang là nghĩa nào.}
+\kn{vectơ, chuẩn \(L_2\), số chiều}{một ảnh xám \(32\times32\) được xem như một vectơ \(1024\) chiều bằng cách xếp các pixel thành một dãy số. Chuẩn \(L_2\) của hiệu hai vectơ, \(\|A-B\|_2=\sqrt{\sum_i (A_i-B_i)^2}\), là khoảng cách Euclid quen thuộc mở rộng lên nhiều chiều --- ``số chiều'' ở đây chỉ đơn giản là số pixel.}
+\kn{SGD và batch}{thuật toán huấn luyện phổ biến nhất là \emph{stochastic gradient descent}: lặp đi lặp lại việc lấy một nhóm nhỏ mẫu (một \emph{batch}), tính hướng làm giảm hàm mất mát trên nhóm đó, rồi dịch tham số một bước theo hướng ngược lại. Chương này chỉ cần bạn biết rằng lựa chọn thuật toán tối ưu cũng là một giả định, không cần biết chi tiết cơ chế.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Nếu KNN trên pixel thất bại thảm hại còn KNN trên đặc trưng DINOv3 lại rất mạnh, mà thuật toán phân loại không đổi một dòng, thì ``trí tuệ'' của hệ thống thực ra nằm ở đâu?}
+\h{Một ảnh xám trống rỗng lại gần một cạnh dọc hơn chính cạnh đó dịch một pixel --- vậy thứ gì đã hỏng trong khái niệm ``khoảng cách''?}
+\h{Giáo trình nói tăng sức chứa thì sai số kiểm thử phải xấu đi. Vì sao những mạng có nhiều tham số hơn cả số mẫu vẫn tổng quát hoá tốt?}
+\h{Có bài toán nào mà gán nhãn thêm một triệu ảnh cũng không cải thiện được gì không, và làm sao biết trước điều đó thay vì biết sau khi đã tiêu tiền?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+Bạn tối ưu trên một tập hữu hạn nhưng muốn hệ thống hoạt động tốt trên thế giới. Khoảng cách đó lấp bằng gì? Câu hỏi nghe hiển nhiên tới mức dễ bị bỏ qua, nhưng nó là khe hở duy nhất mà từ đó \emph{mọi} vấn đề của ngành sinh ra: \en{overfitting}, \en{domain gap}, \en{shortcut learning}, mô hình tốt trên \en{benchmark} mà vô dụng khi triển khai. Hãy hiểu chính xác khe hở này rộng bao nhiêu và cái gì thu hẹp nó lại. Khi đó phần lớn kỹ thuật ở Phần C và Phần D không còn là một danh sách mẹo rời rạc. Chúng trở thành các câu trả lời khác nhau cho cùng một câu hỏi.
+
+Chương này khác chương 3 ở chỗ nó không dạy cách đọc mà dạy cách \emph{dự đoán}: vì sao một giả định lại giúp ích, và trong hoàn cảnh nào chính nó quay ra làm hại. Đó là điều kiện cần để trả lời câu hỏi thực dụng nhất trong mọi dự án --- mô hình chưa đủ tốt, nên thêm dữ liệu, thêm giả định, hay thêm sức chứa?
+
+Có một lý do riêng để một kỹ sư SLAM đọc kỹ chương này. Trong hình học đa tầm nhìn, bạn biết chính xác khi nào bài toán suy biến vì \vn{ma trận thông tin}{information matrix} mất hạng. Học từ dữ liệu không cho sự rõ ràng đó miễn phí. Nhưng khái niệm identifiability ở cuối chương chính là bản dịch của trực giác ``suy biến'' sang ngôn ngữ thống kê. Nó cho bạn quyền nói ``thêm dữ liệu sẽ không cứu được'' bằng một lập luận, thay vì bằng một linh cảm.
+
+\begin{trucgiac}
+Huấn luyện là chụp ảnh một địa hình từ vài trăm điểm quan sát rồi dựng lại toàn bộ bản đồ. Dữ liệu cho bạn các điểm; inductive bias là giả thiết về địa hình \emph{giữa} các điểm --- nó phẳng, nó liên tục, nó không đổi khi dịch ngang. Không có giả thiết nào thì có vô hạn địa hình đi qua đúng những điểm ấy và bạn không chọn được cái nào; giả thiết sai thì bạn dựng ra một bản đồ trơn tru, tự tin, và sai ở đúng những chỗ bạn chưa nhìn tới.
+\end{trucgiac}
+
+\section{Từ ERM tới no free lunch (From ERM to No Free Lunch)}
+
+\subsection{A. Bản đồ của mạch trước khi đi vào từng bước}
+Mạch dưới đây có tám bước, và mỗi bước tồn tại vì bước trước để lại đúng một nút thắt. Hình~\ref{fig:chuoi-nut-that} cho thấy chuỗi nút thắt đó trước, để bạn đọc từng bước với bối cảnh sẵn có thay vì phải chờ tới cuối mới thấy hình dạng tổng thể.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.45cm and 0.75cm,
+  st/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\small,text width=2.2cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=violetdark,thick},
+  kn/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.0cm}]
+\node[st] (a) {ERM\\trên mẫu};
+\node[st,right=of a] (b) {KNN trên\\pixel};
+\node[st,right=of b] (c) {Giả thuyết\\đa tạp};
+\node[st,right=of c] (d) {Inductive\\bias};
+\node[st,right=of d] (e) {Double\\descent};
+\node[st,right=of e] (f) {Identifi-\\ability};
+\draw[ar] (a) -- node[kn,below=2pt] {khe hở mẫu\(\rightarrow\)phân phối} (b);
+\draw[ar] (b) -- node[kn,below=2pt] {khoảng cách pixel vô nghĩa} (c);
+\draw[ar] (c) -- node[kn,below=2pt] {ERM khớp cả nhiễu} (d);
+\draw[ar] (d) -- node[kn,below=2pt] {khung chữ U dự đoán sai} (e);
+\draw[ar] (e) -- node[kn,below=2pt] {có bài toán dữ liệu không cứu được} (f);
+\end{tikzpicture}}
+\caption{Chuỗi nút thắt của chương. Mỗi khái niệm ra đời để gỡ nút thắt ghi dưới mũi tên đi vào nó; đọc theo chiều này thì không khái niệm nào là tuỳ tiện.}
+\label{fig:chuoi-nut-that}
+\end{figure}
+
+\subsection{B. Tám bước}
+
+\begin{mach}[Mạch từ ERM tới no free lunch]
+\item \vd{cái ta muốn tối thiểu thì không đo được.} Ta muốn tối thiểu \vn{rủi ro kỳ vọng}{expected risk} \(R(f)=\mathbb{E}_{(x,y)\sim P}\,[\ell(f(x),y)]\) trên phân phối thật \(P\), nhưng chỉ có \(n\) mẫu rút từ nó. \gp \vn{tối thiểu hoá rủi ro thực nghiệm}{empirical risk minimization}: tối thiểu \(\hat{R}(f)=\tfrac{1}{n}\sum_i \ell(f(x_i),y_i)\) và hy vọng nó xấp xỉ \(R(f)\) \cite{vapnik1999}. Công thức chỉ nói một điều: \emph{ta thay một tích phân không tính được bằng một trung bình cộng đếm được}. \gd mẫu đại diện cho phân phối, và phân phối lúc triển khai vẫn là \(P\). \gia mọi vấn đề tổng quát hoá của ngành sinh ra từ khe hở giữa \(\hat{R}\) và \(R\). \lk{B/08}{đối lập với}{chương dịch chuyển phân phối bỏ đúng giả định i.i.d. mà ERM dựa vào, nên mọi cận ở đây mất hiệu lực ở đó}
+\item \vd{liệu bộ phân loại có phải chỗ đáng đầu tư không?} \gp chạy thí nghiệm mở màn rẻ nhất: \vn{k láng giềng gần nhất}{k-nearest neighbours} trên pixel thô, với khoảng cách \(L_1\) hoặc \(L_2\). Nó không huấn luyện gì và dồn toàn bộ chi phí sang lúc suy luận. Trên ảnh, nó thất bại thảm hại. \hq bài học không phải ``KNN dở'', vì cùng thuật toán ấy chạy trên đặc trưng của một mô hình \vn{tự giám sát}{self-supervised} lại rất mạnh \cite{caron2021dino,oquab2024dinov2}. Thất bại nằm ở \vn{biểu diễn}{representation}: khoảng cách pixel không tương ứng với khoảng cách ngữ nghĩa, và toàn bộ deep learning cho thị giác là nỗ lực học một không gian mà ở đó khoảng cách mới có nghĩa.
+\item \vd{vì sao khoảng cách pixel lại vô nghĩa đến vậy?} \gp lời nguyền số chiều: trong không gian nhiều nghìn chiều, thể tích tập trung ở vỏ ngoài và mọi cặp điểm gần như cách đều nhau, nên ``láng giềng gần nhất'' mất phần lớn nội dung thông tin. \vdm nếu vậy thì học trong không gian đó lẽ ra phải bất khả thi, mà thực tế thì không. \gp giả thuyết đa tạp: dữ liệu thật không rải đều khắp không gian mà nằm gần một đa tạp số chiều thấp hơn nhiều nhúng trong đó \cite{goodfellow2016}.
+\item \vd{ERM một mình sẽ khớp cả nhiễu.} Một mạng đủ lớn học thuộc được cả nhãn ngẫu nhiên, nên đạt \(\hat{R}=0\) không nói gì về \(R\) \cite{zhang2017rethinking}. \gp thêm \en{inductive bias} --- giả định về lời giải, thứ thu hẹp không gian hàm \emph{trước khi} dữ liệu lên tiếng. \gd giả định đó đúng với bài toán của bạn. \hq nhận thức then chốt: bạn không thể ``không có giả định''; bạn chỉ chọn giả định nào, và việc không nói ra không làm nó biến mất.
+\item \vd{nên đặt bao nhiêu giả định?} \gp nhìn nó như một trục liên tục: \term{giả định mạnh + ít dữ liệu} ở một đầu, \term{giả định yếu + nhiều dữ liệu} ở đầu kia. \gd bạn ước lượng đúng vị trí mình đang đứng trên trục đó, mà vị trí ấy do lượng dữ liệu quyết định chứ không do sở thích. \hq đây chính là nguyên lý ``độ khó bị đẩy đi chỗ khác'' của chương 3, lần này có tên và có trục. Bạn sẽ gặp lại nó nguyên vẹn hai lần nữa: ở CNN so với \en{ViT} tại chương 13, và ở hình học cổ điển so với mô hình \vn{tiến thẳng}{feed-forward} tại chương 16. \lk{C/13}{tiền đề}{CNN đứng ở đầu giả định mạnh, ViT ở đầu giả định yếu. Đó là toàn bộ lý do ViT cần nhiều dữ liệu hơn}
+\item \vd{khung lý thuyết cổ điển dự đoán sai với mạng lớn.} \gd khung \en{bias--variance}: tăng sức chứa thì độ lệch hệ thống giảm nhưng kết quả dao động mạnh hơn giữa các lần huấn luyện, và sai số kiểm thử có dạng chữ U. \vdm quan sát mâu thuẫn --- mạng có nhiều tham số hơn cả số mẫu huấn luyện vẫn tổng quát hoá tốt. \gp \en{double descent}: vượt qua \vn{ngưỡng nội suy}{interpolation threshold}, sai số kiểm thử tăng vọt rồi \emph{giảm trở lại} \cite{belkin2019double,nakkiran2020deep}. \hq đừng suy luận về overfitting bằng trực giác lấy từ giáo trình cũ; hãy đo.
+\item \vd{có những bài toán mà thêm dữ liệu không cứu được.} \gp khái niệm identifiability: nếu nhiều nghiệm khác nhau sinh ra cùng một quan sát thì mọi lượng dữ liệu đều vô ích. \hq hành động đúng không phải thêm mẫu mà là đổi bài toán, thêm ràng buộc, hoặc thêm cảm biến.
+\item \vd{vậy cuối cùng nên chọn kiến trúc nào?} \hq kết luận của cả chương là \en{no free lunch}: lấy trung bình trên mọi bài toán có thể, không thuật toán nào tốt hơn thuật toán nào \cite{wolpert1997nfl}. Ở dạng nghiêm ngặt, định lý nói về một không gian bài toán mà thế giới thật không lấy mẫu từ đó, nên đừng dùng nó để phủ nhận việc so sánh. Ở dạng thực dụng: không có kiến trúc tốt nhất, chỉ có kiến trúc mà giả định của nó khớp với dữ liệu của bạn.
+\end{mach}
+
+\section{Vì sao khoảng cách pixel vô nghĩa (Why Pixel Distance Fails)}
+
+\subsection{A. Một phép tính \(4\times4\) làm được trên giấy}
+Bước hai của mạch trên dễ bị chấp nhận như một khẩu hiệu, nên hãy tính tay một ví dụ đủ nhỏ. Xét ``ảnh'' \(4\times4\) một kênh.
+
+\begin{itemize}
+\item \textbf{Ba ảnh dùng trong ví dụ:}
+  \begin{itemize}
+  \item \(A\) --- hai cột trái bằng \(1\), hai cột phải bằng \(0\): một cạnh dọc.
+  \item \(B\) --- chính \(A\) dịch sang phải một pixel (cột \(2,3\) bằng \(1\)). Về ngữ nghĩa, \(A\) và \(B\) là cùng một vật.
+  \item \(G\) --- ảnh xám đồng nhất, mọi pixel bằng \(0{,}5\): không cạnh, không cấu trúc, không vật thể.
+  \end{itemize}
+\end{itemize}
+
+Hiệu \(A-B\) khác không ở cột \(1\) và cột \(3\), mỗi cột bốn pixel với độ lệch \(1\); còn \(A-G\) lệch \(0{,}5\) ở cả mười sáu pixel. Do đó
+\[
+\|A-B\|_2 = \sqrt{4\cdot 1^2 + 4\cdot 1^2} = \sqrt{8} \approx 2{,}83,
+\qquad
+\|A-G\|_2 = \sqrt{16\cdot 0{,}5^2} = 2{,}00 .
+\]
+Hai con số này nói một điều rất khó chịu: \emph{ảnh xám trống rỗng gần \(A\) hơn chính \(A\) dịch một pixel}. Đây không phải tình huống bệnh lý được dựng lên. Dịch chuyển, đổi độ sáng và đổi nền là ba biến đổi phổ biến nhất trong ảnh thật. Cả ba đều giữ nguyên nội dung nhưng làm khoảng cách pixel nhảy vọt.
+
+\subsection{B. Lời nguyền số chiều bằng con số}
+Với ảnh CIFAR-10, không gian có \(32\times32\times3 = 3072\) chiều. Muốn phủ khối lập phương đơn vị trong không gian đó bằng một lưới rất thô, mười mức mỗi trục, bạn cần \(10^{3072}\) điểm --- một con số không có nghĩa vật lý nào. Ý nghĩa của phép tính: không tập dữ liệu nào ``phủ'' được không gian pixel, nên láng giềng gần nhất trong đó không bao giờ thực sự gần, và mọi phương pháp dựa vào khoảng cách thô đều đang đo một đại lượng gần như ngẫu nhiên. Đây cũng chính là lý do các công cụ chiếu xuống chiều thấp như \en{UMAP} \cite{mcinnes2018umap} chỉ hữu ích khi áp lên \emph{đặc trưng đã học}, không phải lên pixel.
+
+\section{Bốn nguồn của inductive bias (Four Sources of Inductive Bias)}
+Nói ``thêm giả định'' thì dễ, nhưng giả định được cài vào hệ thống ở đúng bốn chỗ, và biết nó nằm ở chỗ nào quyết định bạn sửa cái gì khi nó sai.
+
+\begin{itemize}
+\item \textbf{Bốn nguồn, kèm giả định cụ thể mà mỗi nguồn phát biểu:}
+  \begin{itemize}
+  \item \textbf{Kiến trúc} --- \en{convolution} phát biểu hai điều: đặc trưng hữu ích thì cục bộ, và ý nghĩa của một mẫu hình không đổi khi nó dịch vị trí. Đó là lý do CNN học được từ vài chục nghìn ảnh trong khi mạng toàn kết nối cần nhiều hơn hẳn.
+  \item \textbf{Hàm mất mát} --- \vn{sai số bình phương}{squared error} ngầm giả định nhiễu Gauss đồng nhất; \en{cross-entropy} ngầm giả định đầu ra là một phân phối phạm trù. Chọn loss là chọn mô hình nhiễu, dù bạn có nghĩ tới điều đó hay không. \lk{B/09}{trường hợp riêng của}{cả chương thiết kế hàm mất mát là việc chọn một nguồn inductive bias duy nhất trong bốn nguồn ở đây}
+  \item \textbf{Dữ liệu} --- mỗi phép \vn{tăng cường dữ liệu}{data augmentation} là một phát biểu ``nhãn không đổi dưới phép này''. Lật ngang là phát biểu về đối xứng trái phải của thế giới, và nó sai ngay khi bài toán cần đọc chữ hoặc phân biệt tay trái với tay phải.
+  \item \textbf{Thuật toán tối ưu} --- \en{SGD} không dừng ở một nghiệm bất kỳ trong tập nghiệm; có bằng chứng thực nghiệm rằng \en{batch} lớn dẫn tới nghiệm ``nhọn'' hơn kèm tổng quát hoá kém hơn \cite{keskar2017large}. Cơ chế vẫn còn tranh cãi, nên hãy coi đây là quan sát thực nghiệm, không phải định luật.
+  \end{itemize}
+\end{itemize}
+
+Bốn nguồn này không tương đương về chi phí sửa chữa, và đó mới là thông tin dùng được khi chẩn đoán (Bảng~\ref{tab:bon-nguon}).
+
+\begin{table}[H]\centering\small
+\caption{Bốn nguồn inductive bias xếp theo chi phí sửa khi bạn phát hiện đã đặt sai giả định. Chẩn đoán nên đi từ trên xuống.}
+\label{tab:bon-nguon}
+\begin{tabularx}{\linewidth}{@{}L{2.5cm}YL{2.3cm}Y@{}}
+\toprule
+\textbf{Nguồn} & \textbf{Giả định nó phát biểu} & \textbf{Chi phí sửa} & \textbf{Hỏng khi nào}\\
+\midrule
+Augmentation & Nhãn bất biến dưới một nhóm phép biến đổi & Một buổi, huấn luyện lại & Khi phép biến đổi thật sự đổi nhãn (chữ, trái/phải, màu chẩn đoán)\\
+Thuật toán tối ưu & Nghiệm ``phẳng'' tổng quát hoá tốt hơn & Vài lần chạy để dò lại & Khi thay đổi batch size hoặc lịch học làm dịch nghiệm mà không ai để ý\\
+Hàm mất mát & Dạng phân phối của nhiễu và của đầu ra & Huấn luyện lại, thường phải sửa cả metric & Khi nhiễu lệch nặng, hoặc khi lớp mất cân bằng cực đoan\\
+Kiến trúc & Cấu trúc không gian của tín hiệu (cục bộ, đẳng biến tịnh tiến) & Thiết kế lại và huấn luyện lại từ đầu & Khi quan hệ tầm xa mới là thứ quyết định, hoặc dữ liệu không có cấu trúc lưới\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Chữ U cũ và hai lần đi xuống (Bias--Variance vs Double Descent)}
+Hình~\ref{fig:double-descent} đặt cạnh nhau điều giáo trình cổ điển dự đoán và điều thường quan sát được với mạng lớn. Cần đọc hình này cẩn thận, vì nó rất dễ bị hiểu thành ``cứ tăng mô hình là tốt''.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.92\linewidth,height=5.2cm,
+  xlabel={Sức chứa của mô hình \(\longrightarrow\)}, ylabel={Sai số kiểm thử},
+  xtick=\empty, ytick=\empty, xmin=0.3, xmax=9.4, ymin=0.15, ymax=1.05,
+  axis lines=left, legend style={font=\footnotesize,draw=rulecol,at={(0.02,0.03)},anchor=south west},
+  label style={font=\footnotesize}, clip=false]
+\addplot[steel,dashed,thick,smooth] coordinates
+  {(0.5,0.90)(1,0.62)(2,0.42)(3,0.36)(4,0.40)(5,0.50)(6,0.62)(7,0.74)(8,0.85)(9,0.95)};
+\addlegendentry{khung bias--variance cổ điển}
+\addplot[violetdark,thick,smooth] coordinates
+  {(0.5,0.90)(1,0.62)(2,0.42)(3,0.36)(4,0.45)(4.6,0.72)(5,0.97)(5.4,0.70)(6,0.44)(7,0.33)(8,0.28)(9,0.25)};
+\addlegendentry{double descent (quan sát thực nghiệm)}
+\draw[reddark,dotted,thick] (axis cs:5,0.15) -- (axis cs:5,1.0);
+\node[font=\scriptsize\itshape,color=reddark,anchor=south] at (axis cs:5,1.0) {ngưỡng nội suy};
+\end{axis}
+\end{tikzpicture}
+\caption{Hai dự đoán về sai số kiểm thử khi sức chứa tăng. Trước ngưỡng nội suy --- điểm mà mô hình vừa đủ sức khớp toàn bộ tập huấn luyện --- hai khung trùng nhau; sau ngưỡng đó chúng đi ngược chiều. Trục không có đơn vị: đây là hình minh hoạ dạng hàm, không phải một phép đo.}
+\label{fig:double-descent}
+\end{figure}
+
+Điều đáng rút ra không phải là ``mô hình càng lớn càng tốt'' --- vùng nguy hiểm nhất trong hình là quanh ngưỡng nội suy, và một dự án ngân sách hẹp rất dễ dừng lại đúng ở đó. Điều đáng rút ra là lời khuyên cổ điển ``train loss thấp hơn test loss nhiều thì phải giảm mô hình'' không còn là suy luận hợp lệ; nó là một giả thuyết phải kiểm chứng bằng cách quét kích thước mô hình. Cũng cần nói thẳng rằng double descent hiện rõ trong một số cấu hình và mờ nhạt hoặc vắng mặt trong nhiều cấu hình khác, nên đừng trông đợi thấy nó trên mọi bài toán.
+
+\section{Khi thêm dữ liệu là vô ích (Identifiability)}
+Ví dụ sạch nhất nằm ngay trong lĩnh vực bạn đã làm. Ước lượng độ sâu từ một ảnh đơn: nhân toàn bộ cảnh và toàn bộ khoảng cách camera với cùng một hệ số \(s>0\) thì ảnh thu được giống hệt. Nói gọn thì phép chiếu đã xoá thông tin về tỉ lệ tuyệt đối, nên không hàm nào nhận ảnh làm đầu vào phục hồi được tỉ lệ đó từ hình học thuần tuý --- thêm một triệu ảnh nữa cũng không đổi. Đó là lý do các công trình độ sâu đơn ảnh dùng hàm mất mát bất biến theo tỉ lệ, hoặc theo cả tỉ lệ lẫn dịch chuyển, thay vì hồi quy độ sâu tuyệt đối \cite{eigen2014depth,ranftl2022midas}.
+
+Ở đây cần \emph{phức tạp hoá} thay vì cắt gọn, vì bức tranh thật sự không đơn giản. Các mô hình đơn ảnh vẫn đoán được tỉ lệ ở mức nào đó --- nhưng nhờ tiên nghiệm về kích thước quen thuộc của vật thể (người cao chừng ấy, xe rộng chừng ấy) chứ không nhờ hình học. Nói cách khác, phần không định danh được về mặt hình học được lấp bằng một inductive bias học từ dữ liệu, và bias ấy sập ngay khi cảnh chứa vật thể lạ kích thước. Vì vậy câu ``mô hình này ước lượng được độ sâu tuyệt đối'' vừa đúng vừa sai, và biết nó đúng theo nghĩa nào là điều kiện để dùng nó an toàn. Hệ SLAM đơn camera mang đúng tính chất này: bản đồ và quỹ đạo chỉ xác định tới một hệ số tỉ lệ. Cách xử lý đúng không phải thu thập thêm ảnh mà là thêm một phép đo khác: IMU, \en{stereo baseline}, hoặc một vật mốc đã biết kích thước \cite{mur2017orbslam2}. \lk{B/05}{tiền đề}{learning curve phẳng có đúng hai nguyên nhân: hết tín hiệu trong dữ liệu, hoặc bài toán vốn không identifiable. Phân biệt được chúng thì mới biết nên tiêu tiền vào đâu}
+
+\section{Ba đòn bẩy khi mô hình chưa đủ tốt (Three Levers)}
+Toàn bộ chương quy về một quyết định lặp đi lặp lại trong mọi dự án. Bảng~\ref{tab:ba-don-bay} là dạng vận hành được của nó; cột cuối đáng đọc nhất vì nó cho bạn dấu hiệu nhận ra mình đang kéo nhầm đòn bẩy trước khi tiêu hết ngân sách.
+
+\begin{table}[H]\centering\small
+\caption{Ba nguồn cải thiện khi mô hình chưa đủ tốt, và dấu hiệu bạn đang chọn sai.}
+\label{tab:ba-don-bay}
+\begin{tabularx}{\linewidth}{@{}L{2.4cm}YYL{3.3cm}@{}}
+\toprule
+\textbf{Đòn bẩy} & \textbf{Giả định ngầm} & \textbf{Hiệu quả nhất khi} & \textbf{Hỏng khi nào}\\
+\midrule
+Thêm dữ liệu & Bài toán identifiable và nhãn nhất quán & \en{learning curve} theo kích thước dữ liệu chưa bão hoà & Curve đã phẳng từ lâu mà vẫn tiếp tục thu thập\\
+Thêm giả định (kiến trúc, loss, augmentation) & Bạn thật sự biết một tính chất đúng của bài toán & Dữ liệu ít, tri thức miền rõ ràng & Thêm bias sai làm mô hình tệ hơn cả baseline\\
+Thêm sức chứa & Đang \en{underfit} chứ không phải thiếu tín hiệu & Train loss còn cao và còn giảm đều & Train loss đã gần \(0\) mà vẫn phóng to mô hình\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Ba đòn bẩy cạnh tranh cùng một ngân sách, nên có một thứ tự chẩn đoán rẻ nhất:
+
+\begin{enumerate}
+\item Nhìn train loss để loại hoặc xác nhận underfit. Đây là bước rẻ nhất vì bạn đã có sẵn số.
+\item Vẽ learning curve theo kích thước dữ liệu để biết mình còn ở đoạn dốc hay đã bão hoà --- quy trình cụ thể nằm ở \ptr{B/05-thiet-ke-bai-toan}.
+\item Chỉ khi cả hai bước trên đều nói ``không'' mới đặt câu hỏi về giả định, vì đó là đòn bẩy đòi hỏi hiểu biết miền và cũng là đòn bẩy dễ dùng sai nhất.
+\end{enumerate}
+
+\section{Thực hành}
+Chương này trừu tượng hơn các chương khác, nên bài tập được thiết kế để biến một mệnh đề trừu tượng --- ``vấn đề nằm ở biểu diễn'' --- thành một con số bạn tự đo được.
+
+\begin{description}
+\item[Repo và tài nguyên.] \repo{scikit-learn} cho KNN và baseline cổ điển; \repo{facebookresearch/dinov3} để lấy đặc trưng tự giám sát mạnh làm đối chứng; \repo{faiss} khi vét cạn không còn khả thi; \repo{umap-learn} để nhìn cấu trúc đa tạp bằng mắt \cite{mcinnes2018umap}. Sách nền: Goodfellow và cộng sự \cite{goodfellow2016} cho manifold hypothesis, Murphy \cite{murphy2022} cho phần thống kê. Tên mô hình nền tảng chốt tại tháng 9/2026 và sẽ cũ trong sáu đến mười hai tháng; \repo{scikit-learn} và \repo{faiss} bền hơn nhiều, nên hãy học giao diện chứ đừng học tên \en{checkpoint}.
+\item[Câu hỏi kiểm tra hiểu.] Vì sao KNN trên pixel thất bại còn KNN trên đặc trưng DINOv3 lại rất mạnh, dù thuật toán phân loại không đổi một dòng --- điều đó nói gì về vị trí thật sự của ``trí tuệ'' trong hệ thống? Double descent phá vỡ lời khuyên cổ điển nào mà có thể bạn vẫn đang áp dụng theo phản xạ? Nếu ai đó đề nghị gán nhãn thêm mười nghìn ảnh để cải thiện một mô hình ước lượng độ sâu tuyệt đối từ ảnh đơn, bạn phản biện thế nào trong ba câu?
+\item[Bài tập phụ.] Nếu muốn một phiên bản không dính tới SLAM để khởi động, chạy KNN trên CIFAR-10 ở ba biểu diễn: pixel thô, \en{HOG}, và đặc trưng DINOv3 đóng băng. Sau đó vẽ độ chính xác theo \(k\) cho cả ba trên cùng một trục. Mini project SLAM ở cuối chương là phiên bản nghiêm túc của chính thí nghiệm này, trên dữ liệu của bạn.
+\end{description}
+
+\section{Giới hạn và trường hợp hỏng}
+
+\begin{itemize}
+\item \textbf{Giả định i.i.d. gần như luôn sai ở mức độ nào đó.} Mọi lập luận về tổng quát hoá trong chương này sụp đổ \emph{hoàn toàn} khi phân phối dịch chuyển, chứ không suy giảm dần dần. Cả chương \ptr{B/08-dich-chuyen-phan-phoi} tồn tại để xử lý phần sai đó.
+\item \textbf{Khung này im lặng về shortcut learning}, một chế độ hỏng nguy hiểm hơn overfitting. Mô hình có thể đạt \(\hat{R}\) rất thấp \emph{và} tổng quát hoá tốt trên tập kiểm thử cùng phân phối. Nó vẫn có thể đang dựa vào một tương quan giả: nền ảnh, \en{watermark}, hay kết cấu thay vì hình dạng. Tương quan đó biến mất thì mô hình sập \cite{geirhos2020shortcut}. ERM không phân biệt được đặc trưng nhân quả với đặc trưng chỉ tương quan; nó chỉ tối thiểu một trung bình.
+\item \textbf{Các khái niệm ở đây mô tả \emph{giới hạn} chứ không phải \emph{quy trình}.} Chúng nói khi nào một hướng đi là vô vọng, nhưng không nói kiến trúc nào nên thử trước. Hãy dùng chúng để loại bỏ những thí nghiệm không cần chạy.
+\end{itemize}
+
+\begin{cambay}
+Cạm bẫy hay gặp nhất là dùng ``no free lunch'' như một cái cớ để không so sánh. Định lý phát biểu về trung bình trên \emph{mọi} bài toán khả dĩ, kể cả những bài toán mà nhãn hoàn toàn ngẫu nhiên --- một không gian mà thế giới thật không lấy mẫu từ đó. Trên lớp bài toán thực tế, có những kiến trúc tốt hơn hẳn những kiến trúc khác một cách ổn định, và câu ``không có kiến trúc nào tốt nhất'' không cho phép bạn bỏ qua việc đo. Cách dùng đúng: để đặt câu hỏi ``giả định của mô hình này khớp với dữ liệu của tôi ở điểm nào'', chứ không phải để kết thúc tranh luận.
+\end{cambay}
+
+\begin{cannho}
+Bạn không chọn được ``không có giả định'' --- bạn chỉ chọn giả định nào, và trục đánh đổi duy nhất là \emph{giả định mạnh với ít dữ liệu} đối lại \emph{giả định yếu với nhiều dữ liệu}. Trước khi kéo bất kỳ đòn bẩy nào, kiểm tra hai điều theo thứ tự: bài toán có identifiable không (nếu không, mọi dữ liệu thêm vào đều lãng phí), và train loss đã thấp chưa (nếu chưa, bạn đang underfit chứ không thiếu dữ liệu). \T{1}
+\end{cannho}
+
+
+\begin{onbai}
+\ar[3]{ERM}{Tối thiểu sai số trung bình trên mẫu đã có, rồi hy vọng nó xấp xỉ sai số trên phân phối thật. Đây là thứ mọi thuật toán học có giám sát thực sự làm.}
+\ar[3]{Rủi ro kỳ vọng}{Sai số trung bình trên toàn phân phối thật, tức đại lượng ta muốn tối thiểu nhưng không đo được. Khe hở giữa nó và trung bình trên mẫu là nơi mọi vấn đề tổng quát hoá sinh ra.}
+\ar[2]{Giả định i.i.d.}{Mỗi mẫu được rút độc lập từ cùng một phân phối, và phân phối lúc triển khai vẫn là phân phối đó. Nó sập thì mọi lập luận về tổng quát hoá mất hiệu lực hoàn toàn chứ không suy giảm dần.}
+\ar[3]{KNN trên pixel}{Phép thử mở màn rẻ nhất: phân loại bằng láng giềng gần nhất, không huấn luyện gì. Nó thất bại thảm hại trên ảnh, và cùng thuật toán đó chạy trên đặc trưng tự giám sát lại rất mạnh.}
+\ar[3]{Vì sao khoảng cách pixel không đo được ngữ nghĩa?}{Vì nó đo chênh lệch độ sáng ở từng vị trí. Một ảnh xám trống rỗng cách một cạnh dọc 2,00 đơn vị, còn chính cạnh đó dịch một pixel thì cách 2,83 đơn vị.}
+\ar[2]{Lời nguyền số chiều}{Trong không gian nhiều nghìn chiều, mọi cặp điểm gần như cách đều nhau, nên ``láng giềng gần nhất'' mất phần lớn nội dung thông tin. Không tập dữ liệu nào phủ nổi không gian pixel.}
+\ar[2]{Giả thuyết đa tạp}{Dữ liệu thật không rải đều khắp không gian mà nằm gần một mặt có số chiều thấp hơn nhiều. Nó giải thích vì sao học vẫn khả thi dù lời nguyền số chiều có thật.}
+\ar[3]{Inductive bias}{Giả định về dạng lời giải, cài vào trước khi dữ liệu lên tiếng. Nó đến từ đúng bốn nguồn: kiến trúc, hàm mất mát, augmentation, và thuật toán tối ưu.}
+\ar[2]{Augmentation}{Mỗi phép biến đổi áp lên ảnh huấn luyện là một phát biểu ``nhãn không đổi dưới phép này''. Lật ngang sai ngay khi bài toán cần đọc chữ hoặc phân biệt tay trái với tay phải.}
+\ar[2]{Vì sao thuật toán tối ưu cũng là một nguồn giả định?}{Vì SGD không dừng ở một nghiệm bất kỳ trong tập nghiệm. Có bằng chứng thực nghiệm rằng batch lớn dẫn tới nghiệm ``nhọn'' hơn kèm tổng quát hoá kém hơn, dù cơ chế vẫn còn tranh cãi.}
+\ar[3]{Trục giả định --- dữ liệu}{Một đầu là giả định mạnh với ít dữ liệu, đầu kia là giả định yếu với nhiều dữ liệu. Bạn không chọn được ``không có giả định'', chỉ chọn giả định nào và đứng ở đâu trên trục.}
+\ar[2]{Vì sao train loss bằng không không nói gì về tổng quát hoá?}{Vì một mạng đủ lớn học thuộc được cả nhãn hoàn toàn ngẫu nhiên. Khả năng khớp dữ liệu huấn luyện không phải bằng chứng về khả năng đoán dữ liệu mới.}
+\ar[2]{Double descent}{Vượt qua ngưỡng nội suy, tức điểm mà mô hình vừa đủ sức khớp toàn bộ tập huấn luyện, sai số kiểm thử tăng vọt rồi giảm trở lại. Hệ quả: trực giác chữ U từ giáo trình cũ không còn là suy luận hợp lệ.}
+\ar[3]{Identifiability}{Bài toán identifiable là bài toán mà quan sát xác định nghiệm duy nhất. Nếu nhiều nghiệm khác nhau sinh ra cùng một quan sát thì mọi lượng dữ liệu thêm vào đều vô ích.}
+\ar[3]{Vì sao thêm dữ liệu vô ích với độ sâu tuyệt đối từ ảnh đơn?}{Nhân cả cảnh và khoảng cách camera với cùng một hệ số thì ảnh thu được giống hệt. Phép chiếu đã xoá tỉ lệ tuyệt đối, nên không hàm nào nhận ảnh làm đầu vào phục hồi được nó.}
+\ar[2]{Ba đòn bẩy}{Thêm dữ liệu, thêm giả định, thêm sức chứa. Chúng cạnh tranh cùng một ngân sách, nên phải chẩn đoán trước khi kéo.}
+\ar[3]{Train loss còn cao và còn giảm đều. Kéo đòn bẩy nào?}{Bạn đang underfit, nên thêm sức chứa hoặc huấn luyện lâu hơn. Phép phân biệt: nếu train loss đã gần không mà test vẫn kém thì vấn đề nằm ở dữ liệu hoặc ở giả định, không ở kích thước mô hình.}
+\ar[2]{Tốt trên tập kiểm thử cùng phân phối rồi sập ngoài đời. Nghi ngờ gì?}{Shortcut learning: mô hình dựa vào một tương quan giả như nền ảnh, watermark hay kết cấu. Phép phân biệt là dựng một tập kiểm thử phá vỡ đúng tương quan đó.}
+\ar[1]{No free lunch}{Lấy trung bình trên mọi bài toán khả dĩ, không thuật toán nào tốt hơn thuật toán nào. Dùng nó để hỏi giả định của mô hình khớp dữ liệu của bạn ở đâu, không phải để từ chối đo.}
+\end{onbai}
+
+
+\begin{ungdung}
+\ud{DINOv2, DINOv3}{Bằng chứng trực tiếp cho luận điểm ``vấn đề nằm ở biểu diễn'': KNN và probe tuyến tính trên đặc trưng đóng băng đạt mức mà pixel thô không bao giờ với tới}{Mô hình dẫn đầu tính tới 9/2026}
+\ud{Scaling law (Kaplan, Chinchilla)}{Dạng đo được của trục giả định \(\leftrightarrow\) dữ liệu: khi giả định yếu đi thì dữ liệu và tính toán phải tăng theo quy luật luỹ thừa để bù}{Kết quả đã công bố, dùng để lập ngân sách huấn luyện}
+\ud{MiDaS và dòng ước lượng độ sâu đơn ảnh}{Xử lý trực tiếp một bài toán không identifiable bằng cách bỏ tỉ lệ tuyệt đối ra khỏi hàm mất mát thay vì cố học nó}{Hạ tầng ước lượng độ sâu, bền}
+\ud{\repo{faiss}}{Tìm láng giềng gần nhất ở quy mô lớn chỉ có nghĩa sau khi không gian đã được học --- đây là hiện thực công nghiệp của bước hai trong mạch}{Hạ tầng, bền}
+\end{ungdung}
+
+\begin{duan}{Khoảng cách nào mới có nghĩa: ghép cặp mảnh ảnh quanh đặc trưng ORB}{1--2 ngày}
+\dmt kiểm chứng luận điểm trung tâm của chương ngay trên dữ liệu của chính bạn: thất bại nằm ở biểu diễn chứ không ở thuật toán. Cách kiểm chứng là giữ nguyên bộ phân loại và chỉ đổi không gian đo khoảng cách.
+\ddl một chuỗi EuRoC bất kỳ. Cho ORB-SLAM3 chạy và xuất ra, với mỗi đặc trưng ORB, một mảnh ảnh \(32\times32\) quanh nó cùng với id của điểm 3D mà nó được gán. Nhãn của một \emph{cặp} mảnh là nhị phân: cùng điểm 3D hay không. Lấy vài chục nghìn cặp, cân bằng dương/âm.
+\dbc chạy KNN trên tập cặp và đo độ chính xác ghép cặp theo \(k\), lần lượt với ba biểu diễn: pixel thô; mô tả tử ORB 256 bit sẵn có, dùng khoảng cách Hamming; và đặc trưng từ một mô hình tự giám sát đóng băng. Chú ý dùng đúng khoảng cách của từng không gian, và chia tập theo \emph{chuỗi con} chứ không theo cặp, nếu không hai mảnh của cùng một điểm 3D sẽ nằm ở cả hai phía.
+\dxk bạn có một hình duy nhất với ba đường độ chính xác ghép cặp theo \(k\), và ba câu giải thích chênh lệch trong đó ít nhất một câu nói về \emph{khoảng cách} chứ không về ``mô hình mạnh hơn''. Con số phụ bắt buộc: khoảng cách \(L_2\) trung bình giữa hai mảnh của cùng một điểm 3D, đặt cạnh khoảng cách \(L_2\) trung bình giữa hai mảnh ngẫu nhiên. Hai con số gần nhau nghĩa là bạn vừa tái hiện ví dụ \(4\times4\) ở mục trên, lần này trên dữ liệu thật.
+\dnv \ptr{B/03} cung cấp datasheet nói cho bạn biết đặc trưng và mô tả tử nằm ở khối nào; \ptr{B/05} dùng chính tập cặp này làm ví dụ về đơn vị phân tích và rò rỉ theo chuỗi; \ptr{B/07} cho giao thức chia tập chống rò rỉ.
+\end{duan}
+
+\begin{traloi}
+\tl{Nằm ở biểu diễn, không ở bộ phân loại. Cùng một KNN chạy trên hai không gian khác nhau cho hai kết quả khác hẳn, nên phần tạo ra chênh lệch là ánh xạ từ pixel sang đặc trưng --- và đó là thứ deep learning thực sự học.}
+\tl{Hỏng ở chỗ khoảng cách Euclid trên pixel đo sự khác nhau về \emph{giá trị sáng từng vị trí}, không đo sự khác nhau về \emph{nội dung}. Dịch chuyển, đổi độ sáng và đổi nền đều làm nó nhảy vọt trong khi giữ nguyên ngữ nghĩa.}
+\tl{Vì chữ U cổ điển chỉ mô tả vùng trước ngưỡng nội suy. Sau ngưỡng đó, trong nhiều cấu hình sai số kiểm thử giảm trở lại --- hiện tượng double descent --- nên khoảng cách train/test lớn không còn tự động là bằng chứng phải thu nhỏ mô hình.}
+\tl{Có: các bài toán không identifiable, mà ví dụ sạch nhất là tỉ lệ tuyệt đối trong ước lượng độ sâu đơn ảnh. Biết trước bằng cách tìm một phép biến đổi tham số giữ nguyên quan sát; tìm được thì mọi dữ liệu thêm vào đều vô ích, và việc đúng là thêm ràng buộc hoặc thêm cảm biến.}
+\end{traloi}
+
+\begin{dongian}
+Bạn nấu một nồi canh to và muốn biết đã vừa miệng chưa. Bạn không thể uống hết nồi, nên bạn nếm một thìa. Toàn bộ chuyện máy học từ dữ liệu nằm gọn trong hành động đó: đo trên một thìa rồi kết luận về cả nồi.
+
+Mẹo này chạy được nhờ hai điều. Thứ nhất, bạn khuấy đều trước khi nếm; nếu múc đúng chỗ vừa đổ muối vào thì thìa ấy nói dối, và mọi kết luận sau đó đều hỏng chứ không phải chỉ lệch đi một chút. Thứ hai, khi thìa quá nhỏ so với nồi, bạn phải bù bằng hiểu biết có sẵn: bạn biết canh thường mặn ở đáy, biết loại rau này hút muối. Chính phần hiểu biết thêm vào ấy giúp bạn đoán đúng phần nồi mình chưa nếm. Điều quan trọng là bạn không thể chọn ``không thêm hiểu biết nào'' --- bạn chỉ chọn thêm cái gì. Thêm đúng thì một thìa là đủ; thêm sai thì nếm mười thìa vẫn kết luận sai, và sai một cách rất tự tin.
+
+Cái giá phải trả là mọi kết luận đều là một vụ đặt cược rằng thìa của bạn giống phần còn lại. Và có những câu hỏi mà nếm bao nhiêu cũng vô ích: nếm không cho biết nồi này được bắc lên bếp lúc mấy giờ. Gặp loại câu hỏi đó, việc đúng là đi tìm cái đồng hồ, chứ không phải nếm thêm.
+
+\chuadongian{vì sao một cái máy khổng lồ, đủ sức học thuộc cả những chỗ dữ liệu bị ghi sai, mà vẫn đoán tốt trên dữ liệu mới, thì tới nay chưa ai nói gọn được mà vẫn đúng. Mọi lời giải thích ngắn hiện có đều bỏ sót một trường hợp ngược lại.}
+\motcau{Bạn luôn kết luận về cả nồi từ một thìa, nên việc quan trọng nhất không phải là nếm nhiều hơn mà là biết thìa của mình đại diện cho cái gì.}
+\end{dongian}
+
+\section{Kết nối}
+
+\begin{itemize}
+\item \textbf{Bốn nguồn inductive bias} tách thành các chương riêng: hàm mất mát ở \ptr{B/09-thiet-ke-ham-mat-mat}, kiến trúc ở \ptr{B/10-thiet-ke-kien-truc} rồi cả Phần C, dữ liệu và thuật toán tối ưu ở Phần D.
+\item \textbf{Chương đối lập trực tiếp} là \ptr{B/08-dich-chuyen-phan-phoi}: ở đây ta giả định phân phối đứng yên, ở đó ta bỏ giả định ấy.
+\item \textbf{Learning curve} --- công cụ quyết định trong Bảng~\ref{tab:ba-don-bay} --- được xây dựng cụ thể ở \ptr{B/05-thiet-ke-bai-toan}, chương kế tiếp, nơi ``đầu tư dữ liệu hay đầu tư mô hình'' trở thành quyết định kinh tế có con số.
+\item \textbf{Ngược lên,} \ptr{B/03-giai-phau-he-thong} dạy cách phát hiện giả định của người khác; chương này dạy cách chọn giả định của mình.
+\end{itemize}
+
+\begin{tukiem}
+\item Vì sao ERM là một xấp xỉ chứ không phải một phép giải, và chính xác đại lượng nào trong định nghĩa của nó là thứ ta không đo được?
+\item KNN trên pixel thất bại còn KNN trên đặc trưng tự giám sát thành công. Kết luận đúng rút ra là gì, và kết luận sai mà nhiều người rút ra là gì?
+\item Bốn nguồn inductive bias là gì, và xếp theo chi phí sửa chữa khi phát hiện đặt sai giả định thì thứ tự của chúng ra sao?
+\item Vì sao ``train loss thấp hơn test loss nhiều nên phải giảm kích thước mô hình'' không còn là suy luận hợp lệ?
+\item Trong lĩnh vực của bạn, bài toán nào mà thêm dữ liệu chắc chắn vô ích, và phép biến đổi cụ thể nào giữ nguyên quan sát chứng minh nó không identifiable?
+\item Shortcut learning khác overfitting ở chỗ nào, và vì sao tập kiểm thử rút cùng phân phối không phát hiện được nó?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

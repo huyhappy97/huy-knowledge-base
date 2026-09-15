@@ -1,0 +1,161 @@
+% ---------------------------------------------------------------------------
+% Chương 12 — Cơ chế huấn luyện, từ vi mô tới vĩ mô  (file chương, có 4 mục con)
+% Tạo: 2026-09-03  |  Sửa gần nhất: 2026-09-03  |  Ôn gần nhất: —
+% Phụ thuộc: A/01-toan-toi-thieu, B/09-thiet-ke-ham-mat-mat
+% Mức độ: cốt lõi — chương quan trọng nhất của cây về kỹ năng thực hành.
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Cơ chế huấn luyện, từ vi mô tới vĩ mô (Training Mechanics, from Micro to Macro)}
+\ptrtarget{C/12}\ptrtarget{C/12-co-che-huan-luyen}
+\dependency{\ptr{A/01-toan-toi-thieu} (quy tắc chuỗi, phương sai, số điều kiện); \ptr{B/09-thiet-ke-ham-mat-mat} (biết mất mát là gì trước khi hỏi cách tối thiểu hoá nó). Chương này là tiền đề cho toàn bộ Phần C: mọi kiến trúc ở các chương sau đều được huấn luyện bằng bộ máy mô tả ở đây.}
+
+\begin{tomtat}
+Cả chương là câu trả lời cho \emph{một} câu hỏi: làm sao đưa \en{gradient} đi qua một mạng sâu mà không làm nó chết hoặc nổ. Gần như mọi thủ thuật trong một file cấu hình huấn luyện --- từ cách khởi tạo, chọn hàm kích hoạt, đặt normalization, tới warmup và \en{mixed precision} --- tồn tại vì lý do đó. Đọc xong bốn mục, bạn tự viết được lượt ngược cho một tầng mới và đặt được siêu tham số có căn cứ. Bạn cũng chẩn đoán được một lần chạy hỏng trong vài phút, và đưa được mô hình lên nhiều GPU đúng thứ tự. Nếu chỉ nhớ một điều: đây là chương duy nhất trong cây mà kỹ năng chỉ hình thành qua tay --- đọc hiểu hết mà chưa từng cố ý làm hỏng một lần chạy thì coi như chưa học.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mô hình (model)}{một hàm có tham số, nhận đầu vào và trả về dự đoán; ``huấn luyện'' nghĩa là đi tìm bộ tham số làm dự đoán sát nhãn nhất.}
+\kn{tham số (parameter, weight)}{các con số bên trong mô hình mà huấn luyện được phép thay đổi; một mạng thị giác cỡ vừa có hàng chục triệu con số như vậy.}
+\kn{hàm mất mát (loss function)}{hàm biến dự đoán và nhãn thành một số duy nhất đo mức sai; toàn bộ huấn luyện là bài toán làm giảm số đó.}
+\kn{gradient}{vectơ đạo hàm riêng của hàm mất mát theo từng tham số; nó chỉ hướng làm mất mát TĂNG nhanh nhất, nên ta đi ngược lại.}
+\kn{batch và epoch}{``batch'' là nhóm mẫu đi qua mạng cùng lúc; một ``epoch'' là khi mô hình đã đi hết tập huấn luyện một lượt. Một epoch gồm nhiều bước cập nhật, mỗi bước một batch.}
+\kn{learning rate}{độ dài bước mà thuật toán tối ưu đi theo hướng ngược gradient ở mỗi lần cập nhật; đây là siêu tham số quan trọng nhất trong cả chương.}
+\kn{kích hoạt và hàm kích hoạt}{``kích hoạt'' là giá trị đầu ra của một tầng giữa mạng; ``hàm kích hoạt'' là phép phi tuyến sinh ra nó, ví dụ ReLU. Tên gần giống nhưng là hai thứ khác nhau.}
+\kn{normalization}{phép chuẩn hoá lại phân bố của kích hoạt ở giữa mạng về trung bình \(0\) độ lệch chuẩn \(1\); nó tồn tại để giữ tín hiệu không trôi khi đi qua nhiều tầng.}
+\kn{overfitting}{mô hình khớp rất tốt dữ liệu huấn luyện nhưng kém trên dữ liệu mới; đây là chủ đề của \emph{mục 4}.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao một mạng \(10^9\) tham số huấn luyện được trong vài ngày, trong khi vi phân thuận cần \(10^9\) lượt chạy để có cùng lượng thông tin?}
+\h{Nếu gradient chỉ là quy tắc chuỗi --- thứ đã có từ thế kỷ XVII --- vì sao suốt hai mươi năm người ta không huấn luyện nổi mạng sâu?}
+\h{Bảy \en{optimizer} quen thuộc thường được dạy như bảy lựa chọn trong một menu. Vì sao thực ra chúng là bảy lần vá liên tiếp, và cái nào sinh ra chỉ để sửa lỗi do chính cái trước tạo ra?}
+\h{Một mạng đủ sức học thuộc cả một tập ảnh với nhãn xáo ngẫu nhiên --- vậy vì sao nó vẫn tổng quát hoá tốt khi nhãn là chân trị?}
+\h{\en{bf16} có dải động rộng đúng bằng fp32. Vậy vì sao huấn luyện ở bf16 vẫn buộc phải giữ một bản trọng số fp32?}
+\end{khoigoi}
+
+\section{Vì sao chương này chia làm bốn mục}
+Bốn mục dưới đây không phải bốn chủ đề song song. Chúng là bốn tầng của cùng một câu hỏi, xếp từ vi mô tới vĩ mô. Và \emph{mỗi tầng chỉ có nghĩa khi tầng dưới nó đã đúng}. Đó là lý do thứ tự đọc ở đây là bắt buộc chứ không phải gợi ý.
+
+\begin{enumerate}
+\item \textbf{Cơ học của gradient} hỏi: gradient được tính thế nào, và vì sao cách tính đó rẻ. Đây là tầng vi mô nhất --- một phép toán, một tầng, một đồ thị. Không nắm tầng này thì ba tầng sau chỉ là các quy tắc phải học thuộc.
+\item \textbf{Làm cho training chạy được} hỏi: gradient đúng rồi thì làm sao nó sống sót qua năm mươi tầng. Ở đây xuất hiện đại lượng trung tâm của cả chương --- hệ số nhân của tích các Jacobian --- và ba hướng tấn công vào nó.
+\item \textbf{Tối ưu hoá và siêu tham số} giả định gradient đã lành mạnh và hỏi tiếp: nên đi bước dài bao nhiêu, theo hướng nào, ở độ chính xác số nào. Đây là tầng mà bảy \en{optimizer} quen thuộc hiện ra như một chuỗi vá lỗi chứ không như một menu.
+\item \textbf{Tổng quát hoá và chẩn đoán} là tầng vĩ mô nhất: mô hình chạy tốt trên dữ liệu huấn luyện rồi, còn ngoài đời thì sao, và khi mọi thứ không như kỳ vọng thì tìm nguyên nhân theo trình tự nào.
+\end{enumerate}
+
+Hình~\ref{fig:bon-tang} cho thấy vì sao thứ tự này không đảo được. Mỗi tầng tiêu thụ đúng thứ mà tầng dưới sản xuất ra. Một lỗi ở tầng dưới lại luôn hiện ra thành triệu chứng ở tầng trên. Đó chính là lý do người ta hay tune learning rate để chữa một bug ở lượt ngược.
+
+\begin{figure}[H]\centering
+\resizebox{0.95\linewidth}{!}{%
+\begin{tikzpicture}[
+  lv/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=6pt,align=center,font=\small,text width=3.1cm},
+  ar/.style={-{Latex[length=2.4mm]},draw=steel,thick},
+  bk/.style={-{Latex[length=2.4mm]},draw=reddark,thick,dashed},
+  lb/.style={font=\scriptsize,color=steel,align=center},
+  bl/.style={font=\scriptsize\itshape,color=reddark,align=center}]
+\node[lv] (l1) at (0,0)    {\textbf{1.} Cơ học\\của gradient};
+\node[lv] (l2) at (4.0,0)  {\textbf{2.} Làm cho\\training chạy được};
+\node[lv] (l3) at (8.0,0)  {\textbf{3.} Tối ưu hoá\\và siêu tham số};
+\node[lv] (l4) at (12.0,0) {\textbf{4.} Tổng quát hoá\\và chẩn đoán};
+\draw[ar] (l1) -- node[lb,above]{gradient\\đúng} (l2);
+\draw[ar] (l2) -- node[lb,above]{gradient\\lành mạnh} (l3);
+\draw[ar] (l3) -- node[lb,above]{mô hình\\khớp được} (l4);
+\draw[bk] (l4.south) to[out=200,in=-20] node[bl,below]{triệu chứng luôn hiện ở tầng trên, nguyên nhân thường nằm ở tầng dưới} (l1.south);
+\end{tikzpicture}}
+\caption{Bốn tầng của chương, và chiều mà lỗi lan truyền. Mũi tên liền là quan hệ ``tầng sau giả định tầng trước đã đúng''; mũi tên đứt là điều khiến việc gỡ lỗi khó: một bug ở tầng \(1\) hầu như luôn biểu hiện thành một đường cong xấu ở tầng \(4\).}
+\label{fig:bon-tang}
+\end{figure}
+
+\subfile{00-map}
+\subfile{01-co-hoc-cua-gradient/co-hoc-cua-gradient}
+\subfile{02-lam-cho-training-chay-duoc/lam-cho-training-chay-duoc}
+\subfile{03-toi-uu-hoa/toi-uu-hoa}
+\subfile{04-tong-quat-hoa-va-chan-doan/tong-quat-hoa-va-chan-doan}
+
+\section{Thực hành}
+Chương này khác các chương khác ở một điểm: đọc hiểu không tạo ra kỹ năng. Hai mục dưới đây là phần đọc và phần tự vấn; phần tay chân nằm ở khối mini project cuối chương, và đó mới là chỗ kiến thức chuyển thành phản xạ.
+
+\begin{description}
+\item[Repo và tài nguyên.] Để hiểu autodiff từ gốc, \repo{karpathy/micrograd} là bản cài đặt reverse-mode gọn trong khoảng một trăm dòng và đọc hết trong một buổi; \repo{tinygrad/tinygrad} là bước tiếp theo, đủ nhỏ để đọc nhưng đã có đầy đủ khái niệm của một framework thật. Để tự derive gradient theo lối bài tập, bộ assignment của CS231n vẫn là tài liệu tốt nhất, và \repo{labmlai/annotated\_deep\_learning\_paper\_implementations} cho bạn bản cài đặt có chú giải của phần lớn kỹ thuật nêu trong chương. Về augmentation, \repo{albumentations-team/albumentations} và \code{transforms.v2} là hai lựa chọn mặc định. Về huấn luyện phân tán, đọc trực tiếp tài liệu DDP và FSDP của PyTorch trước, rồi mới tới \repo{microsoft/DeepSpeed} nếu cần các giai đoạn ZeRO sâu hơn. Danh sách này chốt tại tháng 9/2026, và tên các mô hình dẫn đầu sẽ cũ trong sáu tới mười hai tháng. Nhưng phần lớn nội dung chương này là hạ tầng chứ không phải mô hình, nên nó bền hơn hẳn mức trung bình của cây.
+\item[Câu hỏi kiểm tra hiểu.] Vì sao AdamW khác Adam cộng L2, và bạn kỳ vọng khác biệt đó lớn cỡ nào trong thực tế? Một đường cong học giảm rất nhanh rồi phẳng ở mức cao --- nêu ba nguyên nhân khả dĩ và ba phép đo phân biệt chúng. Vì sao BatchNorm làm lượt ngược tốn thêm bộ nhớ, và điều đó gợi ý gì khi bạn phải chọn giữa BatchNorm và GroupNorm ở một bài detection chạy hai ảnh mỗi GPU?
+\end{description}
+
+\begin{onbai}
+\ar[3]{Lan truyền ngược}{Thuật toán tính gradient bằng cách đi ngược đồ thị phép tính đúng một lượt. Nó rẻ hơn vi phân thuận khoảng tám bậc độ lớn, vì một lượt trả về đạo hàm theo \emph{mọi} tham số. Nó không bao giờ dựng ma trận Jacobian, chỉ áp tích vector-Jacobian ở từng nút.}
+\ar[2]{Lượt xuôi, lượt ngược}{Lượt xuôi tính giá trị và ghi lại kết quả trung gian; lượt ngược dùng chúng để tính gradient. Cả hai là \emph{một lần chạy} của lan truyền ngược, đừng nhầm với chính thuật toán.}
+\ar[3]{Ba mẫu gradient}{Cộng phân phối adjoint đều cho mọi nhánh. Nhân hoán đổi: mỗi nhánh nhận adjoint nhân giá trị nhánh kia. Max định tuyến toàn bộ về nhánh thắng. Mẫu thứ tư hay bị quên: rẽ nhánh thì cộng dồn, nên lượt ngược của broadcast là một phép cộng theo trục.}
+\ar[3]{Bộ nhớ kích hoạt}{Toàn bộ đầu ra trung gian của lượt xuôi, phải giữ lại vì lượt ngược cần tới. Nó đạt đỉnh ở chỗ hai lượt giao nhau, nên nó mới là thứ chặn batch chứ không phải số trọng số. Gradient checkpointing hạ đỉnh xuống \(O(\sqrt{L})\) với giá khoảng \(30\) phần trăm thời gian.}
+\ar[3]{Vì sao gradient tắt hoặc nổ khi mạng sâu?}{Vì adjoint bị nhân dồn qua từng tầng. Nếu hệ số mỗi tầng là \(\rho\) thì gradient ở tầng đầu tỉ lệ với \(\rho^{L}\); \(\rho = 0{,}9\) qua \(50\) tầng còn \(5\cdot10^{-3}\).}
+\ar[3]{Khởi tạo He}{Đặt \(\operatorname{Var}(w) = 2/n_{\text{in}}\) để phương sai tín hiệu không đổi qua mỗi tầng. Hệ số \(2\) đến từ việc ReLU xoá một nửa số đầu ra, nên nó đúng cho ReLU chứ không đúng cho tanh.}
+\ar[3]{BatchNorm}{Chuẩn hoá kích hoạt theo thống kê của cả batch, rồi trả quyền chỉnh lại cho mạng qua \(\gamma\) và \(\beta\). Vì nó ghép các mẫu trong batch lại với nhau, nó hỏng khi batch nhỏ, khi train và eval dùng hai nguồn thống kê, và khi các GPU không đồng bộ.}
+\ar[2]{Val loss thấp bất thường, và đổi khi đổi batch size lúc đánh giá --- nguyên nhân?}{Quên gọi \code{model.eval()}, nên BatchNorm dùng thống kê của chính batch kiểm thử. Phân biệt với rò rỉ dữ liệu: rò rỉ cho điểm cao ổn định, còn lỗi này đổi điểm khi bạn đổi batch size lúc đánh giá.}
+\ar[3]{Vì sao momentum thắng trong rãnh hẹp?}{Thành phần vuông góc với rãnh đổi dấu mỗi bước nên triệt tiêu trong tổng trượt. Thành phần dọc rãnh giữ nguyên dấu nên cộng dồn tới hệ số \(1/(1-\mu)\), gấp \(10\) lần khi \(\mu = 0{,}9\).}
+\ar[3]{AdamW}{Adam với weight decay tách khỏi mẫu số thích nghi, cộng thẳng vào bước cập nhật. Nhờ đó suy giảm là một phép co đều, không phụ thuộc lịch sử gradient. \code{Adam(weight\_decay=...)} \emph{không} phải AdamW.}
+\ar[3]{Vì sao learning rate là siêu tham số quan trọng nhất?}{Vì nó là đại lượng duy nhất nhân trực tiếp vào mọi bước cập nhật. Sai một bậc ở nó đổi hẳn bản chất quá trình; sai một bậc ở weight decay chỉ mất vài phần trăm điểm số. Warmup tồn tại cũng vì lý do này: \(\hat v\) của Adam ở vài trăm bước đầu quá nhiễu để tin.}
+\ar[2]{Vì sao fp16 làm huấn luyện tê liệt?}{Gradient thị giác thường nằm quanh \(10^{-7}\) tới \(10^{-4}\), dưới ngưỡng chuẩn hoá \(6{,}1\cdot10^{-5}\) của fp16, nên bị làm tròn về \(0\). Loss scaling nhân loss với \(2^{16}\) để dịch cả phổ vào vùng biểu diễn được, rồi chia lại trước bước cập nhật.}
+\ar[3]{Loss thành NaN trong vài chục bước đầu --- nguyên nhân?}{Learning rate quá lớn, hoặc tràn số ở fp16. Phân biệt: hạ learning rate mười lần mà vẫn NaN thì là tràn số, hãy thử bf16 hoặc bật loss scaling.}
+\ar[3]{Loss giảm gần tuyến tính và không bão hoà khi hết lịch --- nguyên nhân?}{Learning rate quá nhỏ. Phân biệt với mô hình thiếu sức chứa: đo tỉ lệ cập nhật trên trọng số, dưới \(10^{-5}\) là learning rate, còn quanh \(10^{-3}\) mà loss vẫn cao thì là sức chứa hoặc dữ liệu.}
+\ar[2]{Loss răng cưa với chu kỳ đúng bằng một epoch --- nguyên nhân?}{Quên shuffle, nên mô hình gặp lại đúng thứ tự dữ liệu mỗi vòng. Phân biệt với learning rate quá cao: vẽ loss theo từng bước, răng cưa có chu kỳ đều là shuffle, còn nhiễu không chu kỳ là learning rate.}
+\ar[3]{Train loss giảm bình thường nhưng val accuracy quanh mức ngẫu nhiên --- nguyên nhân?}{Nhãn bị lệch chỉ số hoặc ghép sai mẫu: mạng học thuộc một ánh xạ sai nhưng nhất quán. Phân biệt bằng ma trận nhầm lẫn --- nó lệch hẳn khỏi đường chéo đúng một cột.}
+\ar[2]{Augmentation}{Sinh thêm mẫu bằng cách biến đổi mẫu có sẵn. Mỗi phép là một tuyên bố ``nhãn không đổi dưới phép này'', nên nó thêm thông tin chứ không ràng buộc sức chứa. Nó hỏng khi phép biến đổi phá nhãn, ví dụ lật ngang một biển báo rẽ.}
+\ar[2]{ZeRO và FSDP}{Chia trọng số, gradient và trạng thái optimizer giữa các tiến trình, theo ba giai đoạn tăng dần. Nó là hệ quả trực tiếp của bảng kế toán \(16P\) byte, và trả giá bằng lưu lượng giao tiếp.}
+\ar[3]{Overfit một batch nhỏ}{Huấn luyện \(20\)--\(50\) mẫu tới loss gần \(0\) sau khi tắt mọi augmentation. Không đạt thì bug nằm trong vòng lặp chứ không ở khả năng tổng quát hoá. Nó vẫn qua nếu nhãn bị hoán vị theo một quy tắc cố định.}
+\ar[1]{\en{Double descent}}{Vượt qua ngưỡng nội suy, sai số kiểm thử đạt đỉnh rồi \emph{giảm trở lại} khi mô hình lớn thêm. Hệ quả: trực giác chữ U của giáo trình cũ không dùng được cho mạng quá tham số.}
+\end{onbai}
+
+
+\begin{ungdung}
+\ud{PyTorch \code{autograd}, JAX}{Toàn bộ cơ chế tính gradient là hiện thực của vi phân ngược trên đồ thị: mỗi phép toán khai báo một tích vector-Jacobian}{Hạ tầng bền; API gần như không đổi từ 2017, nên đây là phần ít mất giá nhất của chương}
+\ud{FlashAttention}{Tính lại theo ô thay vì lưu ma trận \(T\times T\) --- chính là ý tưởng gradient checkpointing áp cho attention, đổi phép tính lấy bộ nhớ}{Mặc định trong phần lớn thư viện transformer hiện nay}
+\ud{DeepSpeed ZeRO, PyTorch FSDP}{Hệ quả trực tiếp của bảng kế toán \(16P\) byte: chia trọng số, gradient và trạng thái Adam giữa các tiến trình}{Ba giai đoạn ZeRO tương ứng ba dòng của bảng đó}
+\ud{AdamW làm mặc định trong \repo{timm}, \repo{transformers}, và phần lớn recipe thị giác}{Tách weight decay khỏi mẫu số thích nghi --- đúng bước cuối của mạch bảy optimizer}{Lỗi Adam cộng L2 vẫn còn trong nhiều mã nguồn cũ}
+\ud{\code{torch.amp}, bf16 trên GPU thế hệ Ampere trở đi}{Loss scaling và master weights fp32 --- hai hệ quả trực tiếp của phân tích dải động}{Bf16 làm loss scaling gần như không cần, nhưng không bỏ được master weights}
+\ud{RandAugment, Mixup và CutMix trong \repo{timm} và \code{transforms.v2}}{Augmentation như nơi phát biểu bất biến, và như công cụ chính quy hoá mạnh nhất trong thị giác}{Chính các thành phần recipe này là thứ ConvNeXt dùng để bắt kịp ViT ở chương 13}
+\end{ungdung}
+
+\begin{duan}{Bảng triệu chứng cho mạng chấm điểm ghép đặc trưng}{1--2 ngày}
+\dmt tạo một thư viện triệu chứng dùng được suốt sự nghiệp: huấn luyện một mạng nhỏ dự đoán độ tin cậy của một cặp ghép đặc trưng ORB, rồi cố ý phá nó tám cách để học nhận ra từng dạng hỏng \emph{chỉ bằng hình dạng đường loss}, trước khi cần tới chúng trong một hệ thật.
+\ddl một chuỗi EuRoC bất kỳ, chẳng hạn \code{MH\_01}. Trích cặp ghép ORB giữa các khung hình liên tiếp; gán nhãn dương khi sai số tái chiếu dưới ngưỡng theo chân trị pose, âm khi vượt. Vài chục nghìn cặp là quá đủ; đầu vào có thể chỉ là khoảng cách Hamming, chênh lệch góc, chênh lệch tỉ lệ và toạ độ chuẩn hoá.
+\dbc chạy một lần baseline tới khi loss xác thực phẳng và ghi lại ba chỉ báo sức khoẻ; rồi chạy tám phiên bản hỏng có chủ đích --- learning rate nhân \(100\), learning rate chia \(100\), quên shuffle, quên \code{eval()}, nhãn lệch một chỉ số, chuẩn hoá đầu vào bằng thống kê của chuỗi khác, khởi tạo toàn hằng số, tắt chuẩn hoá giữa mạng; vẽ cả chín đường loss vào \emph{một} hình; cuối cùng che nhãn và tự đoán từng đường là lỗi nào.
+\dxk bạn có bảng ánh xạ chín đường cong sang chín nguyên nhân, nhận đúng ít nhất bảy trên chín khi che nhãn, và với mỗi cặp dễ nhầm nêu được một phép đo phân biệt --- tỉ lệ cập nhật trên trọng số, hoặc mức đổi điểm số khi đổi batch size lúc đánh giá.
+\dnv \ptr{C/12/04} cho cây chẩn đoán mà bảng này bổ sung số liệu; \ptr{C/12/03} cho ba chỉ báo sức khoẻ dùng làm phép đo phân biệt; tập cặp ghép đã gán nhãn tạo ở đây được dùng lại nguyên vẹn cho mini project của chương 13.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì vi phân ngược trả về đạo hàm theo \emph{mọi} đầu vào chỉ trong một lượt duy nhất, còn vi phân thuận cho đạo hàm theo đúng một hướng mỗi lượt. Bài toán huấn luyện có một đầu ra và \(10^9\) đầu vào, tức đúng hình dạng mà vi phân ngược phục vụ; tỉ số chi phí giữa hai cách chính là tỉ số giữa số đầu vào và số đầu ra.}
+\tl{Vì quy tắc chuỗi cho ra một \emph{tích} của \(L\) Jacobian, và tích luỹ thừa thì hoặc tắt hoặc nổ --- một hệ số \(0{,}9\) qua \(50\) tầng còn \(5\cdot10^{-3}\). Cái thiếu suốt hai mươi năm không phải công thức đạo hàm mà là ba cách giữ hệ số đó gần \(1\): hàm kích hoạt không bão hoà, khởi tạo theo lập luận phương sai, và chuẩn hoá.}
+\tl{Vì chúng nằm trên hai nhánh giải quyết hai vấn đề khác nhau --- momentum lọc \emph{hướng}, AdaGrad và RMSProp chỉnh \emph{độ dài bước} cho từng tham số --- rồi hợp lại ở Adam. AdamW là cái sinh ra chỉ để sửa lỗi của phép hợp nhất đó: khi hình phạt L2 bị chia cho mẫu số thích nghi, nó không còn là weight decay nữa.}
+\tl{Vì nghiệm không do lớp hàm quyết định một mình, mà do \emph{quá trình} tìm nghiệm quyết định. Nhiễu của SGD, khởi tạo và lịch học đều thiên vị những nghiệm nhất định. Ngành gọi đó là chính quy hoá ngầm và chưa mô tả được nó một cách định lượng --- nên các cận sai số dựa trên sức chứa gần như rỗng.}
+\tl{Vì dải động và độ chính xác là hai chuyện khác nhau. bf16 chỉ có \(7\) bit định trị, tức độ chính xác tương đối khoảng \(4\cdot 10^{-3}\). Bước cập nhật lành mạnh lại chỉ bằng \(10^{-3}\) độ lớn trọng số. Cộng một số nhỏ như vậy vào trọng số bf16 thì phép cộng làm tròn về giá trị cũ, và bước đi biến mất hoàn toàn.}
+\end{traloi}
+
+\begin{dongian}
+Hãy tưởng tượng bạn phải chỉnh một cây đàn piano khổng lồ có mười triệu sợi dây, và mỗi lần chỉnh xong bạn chỉ được nghe đúng một hợp âm rồi nhận đúng một con số: nghe chênh bao nhiêu. Nếu thử từng dây một --- vặn nhẹ, gảy lại, nghe xem con số đổi thế nào --- thì bạn cần mười triệu lần gảy chỉ để biết nên vặn theo hướng nào. Không ai làm nổi.
+
+Mẹo của cả chương là đừng đi xuôi mà đi ngược. Sau khi gảy một lần, bạn bắt đầu từ tiếng chênh ở đầu ra và lần ngược qua từng cơ cấu truyền lực, hỏi mỗi cái đúng một câu rất hẹp: kéo đầu ra của anh nhích một li thì đầu vào của anh phải nhích bao nhiêu. Mỗi cơ cấu chỉ cần biết quy đổi nội bộ của riêng nó, và một vòng đi ngược duy nhất trả lời cho cả mười triệu dây.
+
+Cái giá có ba phần. Thứ nhất, muốn đi ngược được thì lượt đi xuôi phải ghi nhớ trạng thái của mọi cơ cấu, nên thứ chặn bạn thường là chỗ để ghi chứ không phải thời gian. Thứ hai, lực truyền qua ba mươi khớp nối: mỗi khớp nuốt một chút thì tới cuối chẳng còn gì, mỗi khớp thêm một chút thì nó giật đứt dây --- gần như mọi thủ thuật còn lại chỉ để giữ mỗi khớp truyền đúng bằng lực nhận vào. Thứ ba, vặn bao nhiêu mỗi lần: mạnh tay thì vọt qua, nhẹ tay thì cả đời không xong.
+
+\chuadongian{vì sao một cách chỉnh nằm ở vùng ``phẳng'' --- vùng mà vặn lệch đi một chút vẫn nghe được --- lại chơi hay hơn trên những bản nhạc chưa từng thử, thì tới nay chưa có lời giải thích vừa gọn vừa đúng. Mọi cách nói đơn giản hiện có đều bỏ sót một phản ví dụ, nên đây là chỗ nên biết là mình chưa biết.}
+\motcau{Đi xuôi một lần để ghi nhớ, đi ngược một lần để quy trách nhiệm cho từng núm vặn, rồi vặn thật nhẹ --- và mọi thứ còn lại chỉ là giữ cho lực truyền qua ba mươi khớp nối không tắt cũng không giật.}
+\end{dongian}
+
+\section{Kết nối}
+Chương này đứng ở giữa cây và có hai chiều nối rõ ràng. Ngược lên, nó tiêu thụ \ptr{A/01-toan-toi-thieu} cho quy tắc chuỗi và lập luận phương sai, và \ptr{B/09-thiet-ke-ham-mat-mat} cho thứ mà toàn bộ bộ máy này đang tối thiểu hoá. Xuôi xuống, nó là tiền đề của \emph{mọi} chương còn lại trong Phần C: không có nó thì các kiến trúc ở chương 13 tới 18 chỉ là sơ đồ khối không chạy được. Hai nhánh nối ngang đáng đi ngay sau chương này. Thứ nhất là \ptr{B/11-gioi-han-tinh-toan}: ở đó bộ nhớ kích hoạt và dải động số được đặt vào mô hình roofline. Thứ hai là \ptr{E/24-thi-nghiem-va-ablation}: ở đó bạn học cách không để một bảng so sánh dẫn tới kết luận sai, vì bảng ấy thường chỉ phản ánh khác biệt công thức huấn luyện.
+
+\subsection*{Tổng kết chương}
+Ta đã đi từ một phép nhân Jacobian cục bộ tới việc chia trạng thái optimizer giữa nhiều GPU, và điều đáng giữ lại là toàn bộ hành trình đó có một sợi chỉ duy nhất. Mục 1 cho thấy vì sao đạo hàm rẻ và cái giá của nó là bộ nhớ. Mục 2 cho thấy tích các Jacobian là đại lượng phải kiểm soát, và ba nhóm kỹ thuật tưởng rời rạc đều nhắm vào nó. Mục 3 cho thấy bảy optimizer là bảy lần vá liên tiếp, và learning rate vẫn là siêu tham số không có đối thủ. Mục 4 cho thấy phần lớn các lần ``mô hình không tổng quát hoá'' thực ra là lỗi trong vòng lặp, và đưa ra quy trình tách hai thứ đó.
+
+Còn bỏ ngỏ hai chỗ lớn. Thứ nhất là chính quy hoá ngầm: ta chưa biết vì sao SGD lại chọn được nghiệm tổng quát hoá tốt trong một không gian đầy nghiệm học thuộc, nên mọi kết luận về sức chứa mô hình đều nên phát biểu thận trọng. Thứ hai là chương này cố tình bỏ qua kết nối tắt, thành viên thứ tư của họ ``giữ tích Jacobian gần \(1\)'', vì nó là một lựa chọn kiến trúc; nó mở đầu chương tiếp theo. Đọc tiếp \ptr{C/13-kien-truc-backbone} với một câu hỏi trong đầu: trong mỗi bước tiến hoá kiến trúc, bao nhiêu phần là kiến trúc thật và bao nhiêu phần là công thức huấn luyện vừa học ở đây?
+\begin{tukiem}
+\item Sợi chỉ của cả chương là giữ tích các Jacobian không chết cũng không nổ. Khởi tạo, normalization và lịch learning rate tấn công tích đó ở ba chỗ khác nhau nào, và vì sao có cả ba vẫn chưa đủ để bỏ warmup?
+\item BatchNorm xuất hiện ở cả bốn mục với bốn vai khác nhau: gradient của một mẫu phụ thuộc cả batch, ảnh hưởng tới số điều kiện, tương tác với weight decay, và giới hạn của gradient accumulation. Bốn điều đó suy ra từ đúng một tính chất --- tính chất nào, và nó ép bạn chọn gì khi huấn luyện phân tán?
+\item Bộ nhớ kích hoạt của mục 1, trạng thái optimizer của mục 3 và phân mảnh ZeRO của mục 4 là ba khoản chi bộ nhớ khác nhau. Khi một lần chạy hết bộ nhớ, bạn cắt khoản nào trước, và mỗi lựa chọn đổi lấy cái gì?
+\item Loss huấn luyện phẳng ở mức cao có thể do hình dạng landscape, do công thức huấn luyện, hoặc do một lỗi trong vòng lặp dữ liệu. Ba phép thử nào tách ba nguyên nhân đó, và vì sao phép ``overfit một batch'' phải chạy trước hai phép còn lại?
+\item Vì sao một cải tiến đo trong công thức huấn luyện cũ có thể biến mất khi đo lại trong công thức mới, và điều đó ràng buộc thế nào cách bạn thiết kế ablation cho những kỹ thuật trong chương này?
+\item Mục 4 thừa nhận ta chưa biết vì sao SGD chọn được nghiệm tổng quát hoá tốt. Với khoảng trống đó, quyết định thực hành nào trong chương vẫn giữ nguyên căn cứ, và quyết định nào chỉ còn là kinh nghiệm?
+\item Bạn hạ mixed precision từ fp32 xuống bf16 và loss xấu đi một chút. Ba nguyên nhân nằm ở ba mục khác nhau của chương là gì, và mỗi nguyên nhân phân biệt bằng phép đo nào?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

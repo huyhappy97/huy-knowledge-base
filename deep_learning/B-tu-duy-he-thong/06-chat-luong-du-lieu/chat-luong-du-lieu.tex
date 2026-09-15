@@ -1,0 +1,292 @@
+% Tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: —
+% Dependency: B/04 (giả định IID, learning curve), B/05 (unit of analysis, selection bias)
+% Mức độ: cốt lõi
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Chất lượng dữ liệu và nhãn (Data and Label Quality)}
+\ptrtarget{B/06}\ptrtarget{B/06-chat-luong-du-lieu}
+\dependency{\ptr{B/05-thiet-ke-bai-toan} (\vn{đơn vị phân tích}{unit of analysis}, \vn{thiên lệch chọn mẫu}{selection bias}); \ptr{B/04-nen-tang-hoc-tu-du-lieu} (vì sao thêm dữ liệu không phải lúc nào cũng giúp). Chương này là tiền đề trực tiếp của \ptr{B/07-chia-du-lieu-va-danh-gia}.}
+
+\begin{tomtat}
+Chương này nói về chỗ mà trần hiệu năng của một hệ thống thị giác thật sự nằm: không ở kiến trúc, mà ở độ nhất quán của người gán nhãn. Đọc xong bạn đặt được một con số lên trần đó, trước khi huấn luyện mô hình đầu tiên. Bạn phân biệt được hai loại nhiễu nhãn có cơ chế gây hại khác hẳn nhau. Bạn tìm ra vài nghìn nhãn sai trong một trăm nghìn ảnh mà không phải xem hết bằng mắt. Nếu chỉ nhớ một điều: nhãn là một phép đo có sai số riêng, nên mức đồng thuận giữa người gán nhãn là trần trên của mọi con số bạn báo cáo. Và 3\%
+ nhiễu hệ thống hại hơn 10\%
+nhiễu ngẫu nhiên, vì mô hình học được cái thứ nhất.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mô hình (model), huấn luyện (training) và hàm mất mát (loss function)}{mô hình là một hàm có tham số, nhận một ảnh và trả về dự đoán. Hàm mất mát là con số đo mức lệch giữa dự đoán và nhãn của \emph{một} mẫu, và huấn luyện chính là đi tìm bộ tham số làm trung bình con số đó nhỏ nhất. Cần biết vì cả chương bàn về chuyện nhãn sai; khi nhãn sai thì ``làm dự đoán sát nhãn'' không còn là mục tiêu đúng. Cần biết thêm vì cách tìm nhãn sai rẻ nhất là xếp hạng mẫu theo giá trị mất mát.}
+\kn{nhãn (label) và chân trị (ground truth)}{nhãn là đáp án gắn cho mỗi mẫu: với phân loại là tên lớp, với phát hiện là khung bao kèm lớp, với phân vùng là mặt nạ từng pixel. \emph{Chân trị} là toàn bộ tập nhãn được coi là đúng khi chấm điểm. Luận điểm trung tâm của chương là chân trị cũng chỉ là một phép đo có sai số riêng, không phải chân lý.}
+\kn{accuracy, precision, recall và IoU}{accuracy là tỉ lệ dự đoán đúng trên toàn bộ mẫu; precision là trong số lần mô hình báo ``có'' thì bao nhiêu phần đúng; recall là trong số ca ``có'' thật thì mô hình bắt được bao nhiêu phần. IoU là tỉ số giữa diện tích phần giao và diện tích phần hợp của hai vùng, bằng 1 khi trùng khít và 0 khi rời nhau. Ba con số đầu khác nhau rất xa khi một lớp hiếm; IoU là cách đo ``hai người vẽ mask có giống nhau không''.}
+\kn{mức đồng thuận giữa người gán nhãn (inter-annotator agreement) và Cohen kappa}{cho hai người cùng gán một tập ảnh rồi đếm xem họ trùng nhau ở bao nhiêu phần trăm --- đó là mức đồng thuận trần. Cohen kappa sửa con số đó bằng cách trừ đi phần trùng nhau chỉ nhờ may rủi, rồi chia cho phần dư địa còn lại: kappa \(=0\) nghĩa là chỉ ngang mức đoán bừa, kappa \(=1\) nghĩa là đồng ý hoàn toàn. Cần nó vì với lớp hiếm, hai người gán bừa vẫn đồng ý tới hơn 90\%.}
+\kn{trùng lặp gần đúng (near-duplicate)}{hai ảnh khác nhau từng byte nhưng giống hệt nhau với mắt người --- cùng một tấm bị nén lại, cắt cúp, đổi kích thước, thêm watermark, hoặc hai khung hình liền nhau trong video. Cần biết vì nếu một ảnh nằm ở tập huấn luyện còn bản sao gần đúng của nó nằm ở tập kiểm tra thì kết quả đo được là kết quả giả.}
+\kn{bias --- phân biệt ba nghĩa}{(a) \emph{độ lệch} thống kê: sai luôn về một hướng của một phép đo hay một tập dữ liệu so với thực tế; (b) \emph{thiên lệch quy nạp} (\emph{inductive bias}): các giả định được cài sẵn vào kiến trúc hay hàm mất mát; (c) tham số cộng thêm \(b\) trong tầng tuyến tính \(Wx+b\). Chương này luôn dùng nghĩa (a).}
+\kn{embedding}{vectơ vài trăm chiều mà một mạng đã huấn luyện sinh ra để biểu diễn một ảnh; hai ảnh giống nhau về nội dung cho hai vectơ gần nhau, đo bằng khoảng cách thông thường. Cần biết vì đây là cách duy nhất phát hiện được trùng lặp gần đúng --- so từng byte thì không thấy gì.}
+\kn{dự đoán ngoài mẫu (out-of-sample) và kiểm định chéo (cross-validation)}{dự đoán ngoài mẫu là dự đoán cho một mẫu mà mô hình \emph{không} được nhìn thấy lúc huấn luyện. Kiểm định chéo là cách lấy được dự đoán như vậy cho \emph{mọi} mẫu: chia dữ liệu thành \(k\) phần, lần lượt giữ một phần ra ngoài, huấn luyện trên \(k-1\) phần còn lại rồi đoán cho phần bị giữ. Không có nó thì mọi phép ``dùng mô hình soi nhãn'' đều vô nghĩa.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Hai người gán nhãn giỏi chỉ đồng ý với nhau ở 85\%
+ số ảnh. Vậy con số accuracy 92\%
+mà bạn vừa báo cáo đang đo cái gì --- sự thật, hay sự bất đồng của con người?}
+\h{Vì sao 3\%
+ nhãn sai lại có thể tàn phá một mô hình nặng hơn 10\%
+nhãn sai, dù ít hơn ba lần?}
+\h{Tập validation của ImageNet --- thứ cả ngành dùng để xếp hạng suốt hơn một thập kỷ --- chứa khoảng 6\%
+nhãn sai. Bao nhiêu phần của bảng xếp hạng đó là cuộc đua khớp lỗi nhãn?}
+\h{Bạn có 100 nghìn ảnh, nghi vài nghìn nhãn sai, và không có ngân sách xem lại bằng mắt. Làm sao bắt chính mô hình chỉ ra chúng mà không để nó bao che cho lỗi nó đã học thuộc?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+Ở chương trước, bài toán đã được định nghĩa: đơn vị phân tích là gì, đầu ra dạng nào, mẫu lấy từ đâu. Bây giờ có người ngồi gán nhãn, và câu hỏi trở nên khó chịu hơn nhiều: \emph{nhãn của bạn đến từ con người, và con người thì không nhất quán — vậy trần hiệu năng của hệ thống nằm ở đâu, và làm sao nâng nó lên với một ngân sách hữu hạn?}
+
+Câu hỏi này thường bị bỏ qua vì nó không có vẻ là một câu hỏi kỹ thuật: tập dữ liệu bị coi như hằng số của bài toán, còn công sức thì dồn hết vào phần \emph{mô hình}. Cái giá không hiện ra ngay. Nó hiện ra ba tháng sau, dưới dạng một câu hỏi không trả lời được: đã thử mười kiến trúc, con số kẹt ở 91\%
+ và không nhúc nhích, tại sao? Nếu hai người gán nhãn giỏi chỉ đồng ý với nhau ở 90\%
+ số ảnh thì 91\%
+chính là chỗ mọi thứ phải dừng, và mười kiến trúc kia chưa bao giờ là biến số quyết định.
+
+Người đọc đã làm SLAM thấy ngay chuyện này quen. Trong benchmark visual-inertial, \vn{chân trị}{ground truth} là đầu ra của một hệ đo khác: Vicon, Leica hay RTK-GNSS. Hệ đó có sai số riêng và độ trễ riêng. Phép \vn{hiệu chỉnh ngoại}{extrinsic calibration} nối nó với camera cũng chỉ là một ước lượng, và sai số của phép hiệu chỉnh cộng thẳng vào chân trị. Khi sai số quỹ đạo của thuật toán tụt xuống cùng bậc độ lớn với sai số của hệ tham chiếu, bảng so sánh giữa các thuật toán thôi không còn đo cái nó tự nhận là đo. Chất lượng nhãn trong thị giác máy tính là đúng hiện tượng đó, chỉ khác là ít ai nói ra.
+
+\begin{trucgiac}
+Coi tập nhãn như một hệ đo tham chiếu chứ không như chân lý. Mọi hệ đo có ba đặc trưng: một độ phân giải (chi tiết nhỏ hơn mức này thì nó không thấy), một sai số ngẫu nhiên (đo lại thì lệch), và một sai số hệ thống (lệch cùng một hướng mọi lần). Ba thứ này quyết định bạn được phép kết luận gì. Một thước kẹp chia vạch 0{,}1\,mm không cho phép bạn tranh luận về chênh lệch 0{,}02\,mm, dù có đo bao nhiêu lần đi nữa; và nếu thước bị cong, đo nhiều lần chỉ làm bạn tự tin hơn vào một con số sai.
+\end{trucgiac}
+
+\section{Gán nhãn là một quy trình đo (Annotation as Measurement)}
+Nói gọn thì: chất lượng nhãn không phải thứ đo được ở khâu nghiệm thu, mà là thứ \emph{được tạo ra} ở khâu quy trình. Kiểm tra cuối chỉ bắt được nhiễu ngẫu nhiên; nó gần như mù với nhiễu hệ thống, vì nhiễu hệ thống trông hoàn toàn nhất quán nên trông giống như đúng. Hình~\ref{fig:quy-trinh-nhan} cho thấy điều làm nên khác biệt không phải các khối, mà là hai vòng phản hồi quay ngược về guideline.
+
+\begin{figure}[H]\centering
+\resizebox{0.97\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.5cm and 0.75cm,
+  blk/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\small},
+  hot/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=4pt,align=center,font=\small\bfseries},
+  ar/.style={-{Latex[length=2mm]},draw=steel,thick},
+  fb/.style={-{Latex[length=2mm]},draw=reddark,thick,dashed}]
+\node[hot] (g) {Guideline\\+ ca biên};
+\node[blk,right=of g] (p) {Pilot\\200 mẫu};
+\node[blk,right=of p] (k) {Đo đồng thuận\\kappa hoặc IoU};
+\node[blk,right=of k] (m) {Gán đại trà};
+\node[blk,right=of m] (c) {Soi nhãn\\ngoài mẫu};
+\node[blk,right=of c] (d) {Datasheet};
+\draw[ar] (g) -- (p); \draw[ar] (p) -- (k); \draw[ar] (k) -- (m);
+\draw[ar] (m) -- (c); \draw[ar] (c) -- (d);
+\draw[fb] (k.north) to[out=110,in=70] node[above,font=\scriptsize\itshape,color=reddark] {kappa thấp: sửa định nghĩa nhãn} (g.north);
+\draw[fb] (c.south) to[out=-110,in=-70] node[below,font=\scriptsize\itshape,color=reddark] {cụm lỗi cùng bản chất: sửa guideline, gán lại cả cụm} (g.south);
+\end{tikzpicture}}
+\caption{Quy trình gán nhãn. Các khối là phần ai cũng làm; hai mũi tên đứt đỏ là phần quyết định chất lượng. Vòng trên bắt lỗi \emph{định nghĩa nhãn} khi còn rẻ (200 mẫu); vòng dưới bắt lỗi \emph{hệ thống} sau khi đã có mô hình. Bỏ hai vòng này thì quy trình biến thành dây chuyền một chiều, và mọi hiểu nhầm ban đầu được nhân lên đúng bằng kích thước tập dữ liệu.}
+\label{fig:quy-trinh-nhan}
+\end{figure}
+
+\subsection{A. Từ ``có nhãn'' tới ``biết nhãn tốt tới đâu''}
+\begin{mach}[Mạch 1 --- bốn bước dựng trần hiệu năng]
+\item \vd{chất lượng nhãn không tự có.} \gp viết guideline kèm ca biên trước khi gán mẫu đầu tiên, chạy pilot vài trăm mẫu, đọc lại chỗ bất đồng, rồi \emph{sửa guideline} và gán lại. Sản phẩm chính của pilot là vòng sửa guideline chứ không phải mấy trăm nhãn kia. \hq chất lượng được quyết định ở khâu hiệu chuẩn, không ở khâu đọc số.
+\item \vd{không biết nhãn tốt tới đâu.} \gp đo \vn{mức đồng thuận giữa người gán nhãn}{inter-annotator agreement} bằng cách cho hai người gán chồng lên nhau một tập con. \hq nếu hai người chỉ đồng ý ở 85\%
+ số mẫu thì accuracy 92\%
+trên test không nói về sự thật, nó nói về mức mô hình khớp với \emph{nhiễu của người gán}. Đồng thuận là trần trên, và mọi phần trăm giành được phía trên trần đó đáng nghi hơn đáng mừng.
+\item \vd{không phải nhiễu nào cũng như nhau.} \gd tách \vn{nhiễu ngẫu nhiên}{random label noise} (người gán mệt, bấm nhầm, kéo lệch một biên --- phân bố đều, chủ yếu làm chậm hội tụ) khỏi \vn{nhiễu hệ thống}{systematic label noise} (guideline mơ hồ ở một chỗ cụ thể: mọi người gán đều bỏ vật nhỏ hơn 20 pixel, đều coi xe đạp có người ngồi là ``người''). \hq mạng học được cái thứ hai và tái tạo nó rất trung thành, nên 3\%
+ nhiễu hệ thống nguy hiểm hơn 10\%
+nhiễu ngẫu nhiên; việc mạng sâu thừa sức thuộc lòng cả một tập nhãn ngẫu nhiên hoàn toàn \cite{zhang2017rethinking} cho thấy \vn{sức chứa}{capacity} không phải hàng rào bảo vệ nào cả.
+\item \vd{ta coi chân trị là chân lý.} \gd nó cũng chỉ là một ước lượng, có sai số của thiết bị đo và của người gán. \hq khi sai số của mô hình tụt xuống dưới sai số của chân trị, mọi bảng so sánh mất ý nghĩa và bạn đang tối ưu nhiễu. Đây là lúc hành động đúng là đi cải thiện phép đo, không phải thử kiến trúc thứ mười một.
+\end{mach}
+
+\subsection{B. Cohen kappa, và vì sao ``đồng ý 95\%
+'' có thể là con số rỗng}
+Đo đồng thuận bằng tỉ lệ đồng ý trần (\en{raw agreement}) có một lỗ hổng chết người: khi một lớp hiếm, hai người gán bừa cũng đồng ý gần như tuyệt đối. \en{Cohen's kappa} \cite{cohen1960kappa} sửa chuyện đó bằng cách trừ đi phần đồng thuận giải thích được bởi ngẫu nhiên:
+\[
+\kappa \;=\; \frac{p_o - p_e}{1 - p_e}.
+\]
+Công thức này nói: \emph{trong khoảng cải thiện còn lại phía trên mức ngẫu nhiên, hai người gán đã đi được bao nhiêu phần}. Mẫu số \(1-p_e\) là toàn bộ dư địa; tử số là phần thực sự đạt được. Ở đây \(p_o\) là tỉ lệ đồng ý quan sát được, \(p_e\) là tỉ lệ đồng ý kỳ vọng nếu hai người gán độc lập nhưng giữ nguyên tần suất từng lớp của mình.
+
+Hai trường hợp tính tay được, cùng cỡ mẫu 100 ảnh nhị phân, cho thấy toàn bộ vấn đề:
+\begin{itemize}
+\item \textbf{Lớp dương phổ biến.} Cùng dương 45, cùng âm 40, bất đồng 15 (A dương B âm 10, A âm B dương 5). Vậy \(p_o = 0{,}85\); A nói dương 55\%
+ số lần, B nói dương 50\%, nên \(p_e = 0{,}55\cdot 0{,}50 + 0{,}45\cdot 0{,}50 = 0{,}50\) và \(\kappa = 0{,}35/0{,}50 = 0{,}70\).
+\item \textbf{Lớp dương hiếm.} Cùng dương 3, cùng âm 92, bất đồng 5. Bây giờ \(p_o = 0{,}95\) --- nghe tuyệt vời --- nhưng \(p_e = 0{,}06\cdot 0{,}05 + 0{,}94\cdot 0{,}95 \approx 0{,}896\), nên \(\kappa \approx 0{,}054/0{,}104 \approx 0{,}52\).
+\end{itemize}
+Bảng đồng thuận trông đẹp hơn hẳn lại cho kappa thấp hơn hẳn. Bài học không phải ``kappa tốt hơn accuracy''. Với lớp hiếm, cả đồng thuận trần lẫn accuracy đều bị nền âm tính khổng lồ kéo lên, vì mẫu số của chúng là toàn bộ tập chứ không phải riêng phần đáng quan tâm. Hai con số vì thế nói dối theo cùng một cách. Đây chính là lý do \ptr{B/07} phải dành hẳn một mục cho việc chọn metric.
+\lk{B/07}{tiền đề}{nền âm tính khổng lồ kéo cả accuracy lẫn đồng thuận trần lên; ở đó cùng cơ chế này làm AUROC nói dối khi lớp dương chỉ chiếm một phần trăm.}
+
+Kappa chỉ định nghĩa cho nhãn phân loại rời rạc. Với mask, bbox hay keypoint, hãy đo đồng thuận bằng chính metric hình học của bài toán: IoU giữa hai mask của hai người gán, hoặc sai số pixel giữa hai bộ keypoint. Và đọc \emph{phân bố} của con số đó chứ đừng đọc trung bình, vì bất đồng giữa người gán dồn hết vào phần đuôi --- chỗ vật nhỏ và biên mờ. Cách này không có nền lý thuyết gọn như kappa nhưng trả lời đúng câu hỏi cần: mô hình còn bao nhiêu chỗ trống trước khi chạm trần người.
+
+\section{Lỗi nhãn trong chính tập test chuẩn (Label Errors in Benchmarks)}
+Có một phản bác hợp lý: nhiễu nhãn nghe như vấn đề của dữ liệu tự thu thập, còn ImageNet hay COCO đã qua bao năm soi xét. Phản bác này sai theo một cách đã được đo: khảo sát mười tập test chuẩn của học máy tìm thấy tỉ lệ lỗi nhãn trung bình vài phần trăm, riêng tập validation của ImageNet khoảng 6\%
+\cite{northcutt2021pervasive}. Hệ quả sắc hơn con số: khi sửa lại các nhãn sai đó, \emph{thứ tự xếp hạng giữa các mô hình có thể đảo}, và mô hình lớn hơn --- thứ khớp tập test gốc tốt hơn --- hoá ra cũng là thứ khớp nhiễu nhãn tốt hơn.
+
+Từ đó ra câu hỏi thực dụng: tìm nhãn sai trong 100 nghìn ảnh bằng cách nào? Câu trả lời là dùng chính mô hình làm cảm biến, ở ba mức từ rẻ tới đắt:
+\begin{itemize}
+\item \textbf{Lọc theo loss.} Xếp hạng mẫu theo giá trị mất mát sau khi huấn luyện; đuôi cao chứa cả nhãn sai lẫn mẫu khó. Rẻ nhất, nhiễu nhất, nhưng thường đủ để bắt đầu.
+\item \textbf{\en{Confident learning}} \cite{northcutt2021confident} --- ước lượng ma trận chung giữa nhãn quan sát được và nhãn tiềm ẩn từ xác suất dự đoán \emph{ngoài mẫu}, rồi suy ra ngưỡng cắt từ chính ma trận đó thay vì đặt ngưỡng bằng tay. Đây là mức nên dùng mặc định.
+\item \textbf{\en{influence function}} --- hỏi mẫu huấn luyện nào đang kéo dự đoán trên tập val đi sai. Đắt nhất, nhưng là công cụ duy nhất trả lời được câu hỏi ``mẫu nào gây ra lỗi \emph{này}''.
+\end{itemize}
+Cả ba đều giả định mô hình đủ tốt để sự bất đồng của nó mang tín hiệu; với một mô hình chưa học được gì, danh sách nghi vấn chỉ là danh sách ngẫu nhiên. Và cả ba đều đánh dấu nhầm các mẫu \emph{khó nhưng đúng}, nên đây không phải bộ lọc tự động mà là bộ sắp thứ tự cho mắt người: nó biến ``xem 100k ảnh'' thành ``xem 2k ảnh đáng ngờ nhất''. Ai để nó tự xoá mẫu sẽ vô tình xoá đúng phần đuôi khó --- chính phần mô hình cần nhất --- và tạo ra một tập dữ liệu sạch một cách giả tạo. Khi phát hiện một cụm lỗi cùng bản chất (mọi vật bị che quá nửa đều bị bỏ), đó là lỗi guideline chứ không phải lỗi người gán: sửa guideline rồi gán lại cả cụm, đúng vòng phản hồi dưới của Hình~\ref{fig:quy-trinh-nhan}.
+\lk{E/24}{tiền đề}{cùng một kỹ thuật ``dùng mô hình soi dữ liệu'', ở đó dùng để phân rã lỗi theo loại thay vì để tìm nhãn sai.}
+
+\section{Ngân sách hữu hạn: bốn đường thoát (Label-Efficient Learning)}
+Giả sử quy trình đã tốt và ta biết nhãn đáng tin tới đâu. Vẫn còn ràng buộc cuối: không đủ tiền gán nhãn. Cơ chế của bốn hướng thoát đều đơn giản, nên đó không phải chỗ đáng học. Chỗ đáng học là \emph{mỗi hướng mua sự rẻ bằng một giả định khác nhau}. Hình~\ref{fig:cay-quyet-dinh-nhan} xếp bốn hướng theo đúng thứ tự dễ kiểm chứng của giả định đó.
+
+\begin{figure}[H]\centering
+\resizebox{0.92\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.42cm and 0.7cm,
+  q/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\small},
+  a/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=4pt,align=center,font=\small\bfseries},
+  ar/.style={-{Latex[length=2mm]},draw=steel,thick,font=\scriptsize\itshape}]
+\node[q] (q1) {Có luật hay metadata\\dự đoán nhãn tốt hơn ngẫu nhiên?};
+\node[a,right=2.0cm of q1] (a1) {Weak supervision};
+\node[q,below=of q1] (q2) {Có nhiều dữ liệu không nhãn\\cùng phân phối?};
+\node[a,right=2.0cm of q2] (a2) {Semi-supervised};
+\node[q,below=of q2] (q3) {Còn ngân sách gán nhãn,\\chỉ là ít?};
+\node[a,right=2.0cm of q3] (a3) {Active learning};
+\node[q,below=of q3] (q4) {Mô phỏng được cảnh\\và chuỗi tạo ảnh?};
+\node[a,right=2.0cm of q4] (a4) {Dữ liệu tổng hợp};
+\node[q,below=of q4] (q5) {Quay lại \ptr{B/05}: đổi bài toán,\\đổi dạng đầu ra, hoặc đổi cảm biến};
+\draw[ar] (q1) -- node[above] {có} (a1);
+\draw[ar] (q2) -- node[above] {có} (a2);
+\draw[ar] (q3) -- node[above] {có} (a3);
+\draw[ar] (q4) -- node[above] {có} (a4);
+\draw[ar] (q1) -- node[left] {không} (q2);
+\draw[ar] (q2) -- node[left] {không} (q3);
+\draw[ar] (q3) -- node[left] {không} (q4);
+\draw[ar] (q4) -- node[left] {không} (q5);
+\end{tikzpicture}}
+\caption{Cây quyết định chọn hướng giảm chi phí nhãn. Thứ tự các câu hỏi không tuỳ tiện: nó đi từ hướng có giả định dễ kiểm chứng nhất (bạn \emph{biết} mình có luật hay không) tới hướng có giả định khó kiểm chứng nhất (mô phỏng ``đủ gần'' là một phán đoán). Nhánh cuối cùng --- không hướng nào áp dụng được --- là một kết quả hợp lệ, và nó nói rằng vấn đề nằm ở khâu thiết kế bài toán chứ không ở khâu dữ liệu.}
+\label{fig:cay-quyet-dinh-nhan}
+\end{figure}
+
+\begin{table}[H]\centering\footnotesize
+\caption{Bốn cách giảm chi phí nhãn. Cột cuối đáng đọc nhất: mỗi hướng hỏng theo một kiểu riêng, và cả bốn kiểu hỏng đều tạo ra nhiễu \emph{hệ thống}.}
+\label{tab:bon-duong-nhan}
+\begin{tabularx}{\linewidth}{@{}L{2.2cm}YYL{3.9cm}@{}}
+\toprule
+\textbf{Hướng} & \textbf{Cơ chế} & \textbf{Giả định} & \textbf{Hỏng khi nào}\\
+\midrule
+\vn{giám sát yếu}{weak supervision} & Sinh nhãn từ heuristic, luật, metadata & Heuristic tốt hơn ngẫu nhiên và sai một cách đo được & Nhiễu bám đúng thiên lệch của heuristic \ra mô hình học lại chính heuristic đó\\
+\vn{học chủ động}{active learning} & Chọn mẫu đáng gán nhất theo độ bất định & Ước lượng bất định đáng tin & Bất định kém hiệu chuẩn; tập thu được lệch phân phối nên khó tái dùng cho mô hình khác\\
+\vn{học bán giám sát}{semi-supervised learning}, \en{pseudo-labeling} & Khai thác dữ liệu không nhãn quanh cụm & Biên quyết định nằm ở vùng mật độ thấp & Mô hình khởi đầu lệch \ra vòng lặp tự củng cố lỗi, càng train càng tự tin sai\\
+\vn{dữ liệu tổng hợp}{synthetic data}, sim2real & Render cảnh có nhãn miễn phí & Mô phỏng đủ gần ở những đặc trưng mô hình thật sự dùng & Khoảng cách miền nằm ở khâu tạo ảnh (nhiễu cảm biến, ISP, quang sai) chứ không ở khâu hình học\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng~\ref{tab:bon-duong-nhan} có một quy luật ngầm đáng nhớ: cả bốn hướng đều đổi \emph{nhiễu ngẫu nhiên đắt tiền} lấy \emph{nhiễu hệ thống rẻ tiền} --- hợp lý khi bạn biết mình đang đổi gì, là bẫy khi không biết. Đây chính là trục đánh đổi ``thêm dữ liệu hay thêm giả định'' ở \ptr{B/04}, lần này xuất hiện dưới dạng một quyết định về ngân sách. Riêng sim2real, chỗ hở hiếm khi nằm ở hình học (render chính xác tuyệt đối) mà nằm ở chuỗi tạo ảnh: nhiễu đọc của cảm biến, đường cong đáp ứng, khử nhiễu và làm nét của ISP, ảnh mờ do chuyển động --- đó là lý do \ptr{A/02-vat-ly-tao-anh} có giá trị rất thực tế ở đây.
+\lk{A/02}{ràng buộc bởi}{khoảng cách giữa ảnh render và ảnh thật nằm ở chuỗi tạo ảnh, nên nó bị chặn bởi mức bạn mô phỏng được cảm biến và ISP.}
+\lk{B/04}{cùng nguyên lý với}{cả bốn hướng đều là ``thêm giả định thay cho thêm dữ liệu'', đúng trục đánh đổi đã dựng ở chương nền tảng.}
+
+\section{Ba vấn đề âm thầm (Duplicates, Missingness, Documentation)}
+Ba thứ còn lại ít hào nhoáng nhưng gây thiệt hại lớn, và chúng có chung một đặc điểm: không thứ nào báo lỗi.
+
+\begin{itemize}
+\item \textbf{\vn{trùng lặp gần đúng}{near-duplicate}.} Khi kết quả đẹp một cách khó hiểu, đây nên là nghi ngờ đầu tiên. Ảnh crawl từ web có vô số bản resize, crop, nén lại, thêm watermark; video thì mọi frame liền kề gần như trùng nhau.
+  \begin{itemize}
+  \item \textbf{Vì sao hash thất bại} --- chỉ cần nén lại một lần là mã băm đổi hoàn toàn, trong khi ảnh với mắt người vẫn y hệt.
+  \item \textbf{Công cụ đúng} --- khử trùng lặp trên không gian \en{embedding} với một ngưỡng khoảng cách, hoặc trên \en{perceptual hash}.
+  \item \textbf{Nối sang nền có sẵn} --- hai frame cách nhau 33\,ms không phải hai quan sát độc lập, đúng như hai keyframe liền kề trong bundle adjustment không cho hai ràng buộc độc lập.
+  \end{itemize}
+\item \textbf{\vn{dữ liệu thiếu}{missing data}: ba loại, không phải một.} Cách dữ liệu bị thiếu tự nó mang thông tin.
+  \begin{itemize}
+  \item \textbf{MCAR} (thiếu hoàn toàn ngẫu nhiên) --- bỏ mẫu là an toàn, chỉ tốn dữ liệu.
+  \item \textbf{MAR} (thiếu phụ thuộc các biến \emph{quan sát được}) --- bù được bằng mô hình.
+  \item \textbf{MNAR} (thiếu phụ thuộc chính giá trị bị thiếu) --- trường hợp độc: ảnh quá tối nên người gán bỏ qua, cảm biến depth trả về lỗ đúng ở bề mặt bóng và vật trong suốt. Áp cách xử lý của MCAR lên đây không loại được thiên lệch mà tạo ra một thiên lệch mới, và thiên lệch mới thì vô hình vì nó vừa được ``dọn sạch''.
+  \end{itemize}
+\item \textbf{Trí nhớ của tổ chức.} Sáu tháng sau không ai còn nhớ tập dữ liệu này là gì: thư mục còn đó nhưng lý do chọn nguồn, tiêu chí loại ảnh, phiên bản guideline, mức đồng thuận đo được đều bốc hơi. \en{Datasheets for Datasets} \cite{gebru2021datasheets} và \en{Model Cards} \cite{mitchell2019model} là câu trả lời rẻ đến bất ngờ: vài trang về động cơ thu thập, quy trình, thành phần, lớp bị thiếu, và những cách dùng \emph{không} nên dùng. Đây là một dạng cụ thể của khoản nợ kỹ thuật ẩn trong hệ thống học máy \cite{sculley2015hidden} --- chi phí không nằm ở lúc viết mà ở lúc không viết.
+\end{itemize}
+
+Và cuối cùng, thứ không công cụ nào thay thế được: \emph{ngồi xem 200 ảnh bằng mắt}. Đây là kinh nghiệm thực hành, không phải kết quả đo. Nhưng nó nhất quán tới mức đáng coi là quy tắc. Lần nào cũng lộ ra thứ mà không thống kê nào cho thấy: một lớp được gán bằng hai định nghĩa ở hai đợt, hay một watermark xuất hiện đúng ở các mẫu dương. Lý do đơn giản là thống kê chỉ đếm được thứ bạn đã nghĩ ra để đếm.
+\lk{B/05}{hệ quả của}{mọi thứ chương này phải dọn dẹp đều bắt nguồn từ định nghĩa nhãn và khung lấy mẫu đã chốt ở khâu thiết kế bài toán.}
+
+\section{Giới hạn và trường hợp hỏng}
+Toàn bộ chương này đứng trên vài giả định nên nói rõ. Khái niệm ``trần đồng thuận'' giả định có một sự thật khách quan mà người gán đang cố xấp xỉ; với các nhãn mang tính đánh giá --- mức độ hư hỏng, độ thẩm mỹ, mức nguy hiểm --- giả định đó sai, và bất đồng giữa người gán là tín hiệu chứ không phải nhiễu. Khi đó thứ cần làm không phải ép về một nhãn mà là giữ lại phân bố nhãn và huấn luyện với nhãn mềm.
+
+Confident learning và mọi biến thể ``dùng mô hình soi nhãn'' giả định nhiễu nhãn độc lập với đặc trưng đầu vào khi đã biết lớp thật; với nhiễu hệ thống gắn với ngoại hình, giả định này vỡ đúng ở chỗ ta quan tâm nhất và phương pháp sẽ báo sạch một tập vẫn còn lệch. Đo đồng thuận cũng hỏng lặng lẽ khi hai người gán do cùng một người huấn luyện: họ chia sẻ cùng một hiểu nhầm nên kappa cao mà cả hai cùng sai --- thuốc giải là để một người thứ ba, không đọc guideline của bạn, gán mù một tập nhỏ.
+
+\begin{cambay}
+Cạm bẫy phổ biến nhất là kiểm tra chất lượng bằng chính mô hình đã được train trên tập cần kiểm tra, rồi kết luận ``dữ liệu sạch'' vì loss thấp đều. Mô hình đã hấp thụ nhiễu hệ thống và bây giờ đồng ý với nó --- bạn đang hỏi bị cáo xem mình có tội không. Muốn tín hiệu có nghĩa, dự đoán dùng để soi nhãn phải là dự đoán \emph{ngoài mẫu} (\vn{kiểm định chéo}{cross-validation}), đúng như confident learning yêu cầu.
+\end{cambay}
+
+\begin{cannho}
+Mức đồng thuận giữa người gán nhãn là trần trên của mọi con số bạn báo cáo, nên hãy đo nó \emph{trước} khi huấn luyện mô hình đầu tiên. Và 3\%
+ nhiễu hệ thống hại hơn 10\%
+nhiễu ngẫu nhiên, vì mô hình học được cái thứ nhất và chỉ chậm hội tụ vì cái thứ hai. \T{2}
+\end{cannho}
+
+\section{Thực hành}
+\begin{description}
+\item[Repo và tài nguyên.] \repo{cleanlab/cleanlab} (confident learning); \repo{visual-layer/fastdup} và \repo{idealo/imagededup} (trùng lặp gần đúng); \repo{voxel51/fiftyone} (soát dữ liệu có hệ thống); \repo{snorkel-team/snorkel} (weak supervision); \repo{baal-org/baal} và \repo{modAL} (active learning); \repo{lightly-ai/lightly} (chọn mẫu theo embedding). Dữ liệu tổng hợp: Blender kèm \repo{BlenderProc}, hoặc NVIDIA Omniverse Replicator. Danh sách này chốt tại tháng 9/2026 và tên công cụ sẽ cũ trong 6--12 tháng; hạ tầng (FiftyOne, Blender) bền hơn nhiều so với tên phương pháp đang dẫn đầu.
+\item[Câu hỏi kiểm tra hiểu.] Nhãn nhiễu ngẫu nhiên 10\%
+ và nhãn nhiễu hệ thống 3\%
+ --- cái nào hại hơn và cơ chế gây hại khác nhau ở đâu? Nếu mức đồng thuận giữa người gán nhãn là 85\%
+ thì con số accuracy 92\%
+trên test đang nói điều gì? Vì sao khử trùng lặp bằng mã băm byte gần như vô dụng với ảnh web?
+\item[Bài tập phụ.] Làm hỏng 10\%
+ nhãn CIFAR-10 ngẫu nhiên, train một mạng nhỏ, dùng cleanlab tìm lại, báo cáo precision/recall của việc phát hiện. Lặp lại với nhiễu hệ thống (đổi lớp A thành B ở 3\%
+số mẫu): trường hợp sau khó phát hiện hơn hẳn dù tỉ lệ nhiễu thấp hơn ba lần.
+\end{description}
+
+\begin{onbai}
+\ar[3]{Chân trị}{Tập nhãn được coi là đúng khi chấm điểm. Nó do thiết bị và con người tạo ra nên có sai số riêng, và khi sai số của mô hình tụt xuống dưới sai số đó thì mọi bảng so sánh mất ý nghĩa.}
+\ar[3]{\en{Inter-annotator agreement}}{Mức đồng thuận giữa người gán nhãn: tỉ lệ hai người gán độc lập trùng nhau trên cùng một tập con. Nó là trần trên của mọi con số bạn báo cáo, nên phải đo trước khi huấn luyện mô hình đầu tiên.}
+\ar[3]{Nhiễu hệ thống}{Một quy tắc sai được lặp lại nhất quán, ví dụ mọi vật nhỏ hơn 20 pixel đều bị bỏ. Mô hình học được nó và tái tạo nó trên dữ liệu mới, nên nó không tự lộ ra ở khâu nghiệm thu.}
+\ar[2]{Nhiễu ngẫu nhiên}{Sai sót rải đều: người gán mệt, bấm nhầm, kéo lệch một biên. Nó chủ yếu làm chậm hội tụ chứ không cài một thiên lệch vào mô hình.}
+\ar[2]{Vì sao 3\% nhiễu hệ thống hại hơn 10\% nhiễu ngẫu nhiên?}{Vì mạng học được quy tắc sai và áp lại nó cho dữ liệu mới. Nhiễu ngẫu nhiên thì trung bình về không, còn dung lượng lớn không cứu được: mạng sâu thừa sức thuộc lòng cả một tập nhãn ngẫu nhiên.}
+\ar[3]{Cohen kappa}{Mức đồng thuận sau khi trừ đi phần trùng nhau do may rủi, chia cho phần dư địa còn lại. Nó chỉ định nghĩa cho nhãn rời rạc; với mask hay keypoint phải đo bằng IoU hoặc sai số pixel.}
+\ar[2]{Hai người gán đồng ý 95\% mà kappa chỉ 0{,}52 --- nguyên nhân?}{Lớp dương quá hiếm, nên nền âm tính khổng lồ kéo tỉ lệ đồng ý trần lên. Phân biệt bằng cách nhìn tỉ lệ lớp: nếu lớp dương dưới vài phần trăm thì luôn đọc kappa, đừng đọc tỉ lệ đồng ý.}
+\ar[3]{Confident learning}{Ước lượng ma trận chung giữa nhãn quan sát được và nhãn tiềm ẩn, rồi suy ngưỡng cắt từ chính ma trận đó. Nó giả định nhiễu độc lập với ngoại hình khi đã biết lớp thật, nên vỡ với nhiễu hệ thống gắn ngoại hình.}
+\ar[2]{Vì sao phải soi nhãn bằng dự đoán ngoài mẫu?}{Vì mô hình đã hấp thụ nhiễu hệ thống và bây giờ đồng ý với nó. Dự đoán dùng để soi nhãn phải là dự đoán ngoài mẫu, lấy bằng kiểm định chéo.}
+\ar[2]{Weak supervision}{Sinh nhãn từ heuristic, luật hoặc metadata thay vì từ người. Giá phải trả là nhiễu bám đúng thiên lệch của heuristic, nên mô hình học lại chính heuristic đó.}
+\ar[2]{Active learning}{Chỉ gán nhãn những mẫu mô hình bất định nhất. Giá phải trả là tập thu được lệch phân phối, nên khó tái dùng cho một mô hình khác.}
+\ar[1]{Pseudo-labeling}{Dùng dự đoán của chính mô hình làm nhãn cho dữ liệu không nhãn. Nó giả định biên quyết định nằm ở vùng mật độ thấp, và hỏng thành vòng lặp tự củng cố lỗi nếu mô hình khởi đầu lệch.}
+\ar[2]{Sim2real}{Huấn luyện trên ảnh render rồi triển khai trên ảnh thật. Khoảng cách hiếm khi nằm ở hình học mà nằm ở chuỗi tạo ảnh: nhiễu cảm biến, đường cong đáp ứng, khử nhiễu của ISP, ảnh mờ do chuyển động.}
+\ar[3]{Trùng lặp gần đúng}{Hai ảnh khác nhau từng byte nhưng giống hệt với mắt người: bản nén lại, cắt cúp, đổi kích thước, hay hai khung hình liền nhau. Phải khử trước khi chia dữ liệu.}
+\ar[2]{Vì sao mã băm byte vô dụng với trùng lặp gần đúng?}{Vì chỉ cần nén lại một lần là mã băm đổi hoàn toàn, trong khi nội dung ảnh không đổi. Công cụ đúng là khoảng cách trên embedding hoặc \en{perceptual hash}.}
+\ar[2]{Mô hình mới vọt 8 điểm trên test mà không đổi gì lớn --- nghi ngờ đầu tiên?}{Trùng lặp gần đúng giữa train và test, thường do ảnh crawl web hoặc khung hình liền nhau. Phân biệt với ``mô hình thật sự tốt'' bằng cách khử trùng lặp theo embedding rồi đo lại: nếu con số tụt hẳn về mức cũ thì thủ phạm là bản sao.}
+\ar[1]{MNAR}{Dữ liệu thiếu mà lý do thiếu phụ thuộc chính giá trị bị thiếu, ví dụ ảnh quá tối nên người gán bỏ qua. Xử lý nó như thiếu ngẫu nhiên sẽ tạo ra một thiên lệch mới đã được ``dọn sạch'' nên vô hình.}
+\ar[1]{Datasheet for datasets}{Vài trang ghi nguồn, quy trình gán nhãn, mức đồng thuận đo được, các lớp bị thiếu, và những cách dùng không nên dùng. Không có nó thì sáu tháng sau tập dữ liệu thành một thư mục bí ẩn.}
+\ar[2]{Khi nào bất đồng của người gán là tín hiệu?}{Với nhãn mang tính đánh giá: mức hư hỏng, độ thẩm mỹ, mức nguy hiểm. Khi đó hãy giữ lại phân bố nhãn và huấn luyện với nhãn mềm thay vì ép về một nhãn.}
+\ar[2]{Thử mười kiến trúc mà con số kẹt ở 91\% --- đo gì tiếp theo?}{Đo mức đồng thuận giữa hai người gán trên hai trăm mẫu. Nếu nó cũng quanh 90\% thì bạn đã chạm trần và phải đầu tư vào nhãn; nếu nó 98\% thì vấn đề đúng là ở mô hình.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{\repo{cleanlab}}{Cài đặt trực tiếp confident learning: ước lượng ma trận chung giữa nhãn quan sát và nhãn tiềm ẩn từ dự đoán ngoài mẫu}{Chính nhóm này công bố khảo sát lỗi nhãn trên mười tập test chuẩn}
+\ud{FiftyOne (\repo{voxel51})}{Biến ``xem 200 ảnh bằng mắt'' thành thao tác có hệ thống: lọc theo lát, sắp theo độ nghi ngờ, so hai phiên bản nhãn}{Hạ tầng soát dữ liệu, bền hơn tên mô hình}
+\ud{Trợ lý gán nhãn bằng mô hình nền tảng (SAM 3, Grounding DINO)}{Chính là giám sát yếu, chỉ khác là nguồn nhãn thô đến từ một mô hình lớn thay vì từ luật viết tay}{Tên mô hình sẽ đổi nhanh; cơ chế và cái giá (nhiễu hệ thống theo thiên lệch của mô hình nguồn) thì không}
+\ud{\repo{snorkel}}{Gộp nhiều luật nhiễu thành nhãn xác suất, mô hình hoá luôn độ tin cậy của từng luật}{Ý tưởng đã lan sang các pipeline lọc dữ liệu huấn luyện mô hình ngôn ngữ}
+\ud{Dataset card và model card trên Hugging Face Hub}{Đúng nội dung của Datasheets và Model Cards, được đưa thành mục mặc định khi công bố tập dữ liệu}{Bằng chứng rõ nhất rằng ý tưởng tài liệu hoá đã thành chuẩn ngành}
+\end{ungdung}
+
+\begin{duan}{Đo mức đồng thuận của chính bạn trên bài toán đóng vòng}{1--2 ngày}
+\dmt biến ``trần hiệu năng'' từ một khái niệm thành một con số của riêng bạn, trên đúng quyết định mà mọi hệ đóng vòng phải đưa ra: hai khung hình này có phải cùng một chỗ hay không.
+\ddl 200 cặp khung hình rút từ hai chuỗi EuRoC (ví dụ \code{MH\_03} và \code{V1\_02}), trộn ba nhóm với tỉ lệ ngang nhau: cặp thật sự cùng chỗ, cặp gần nhau về thời gian nhưng khác chỗ, và cặp ngẫu nhiên.
+\dbc viết guideline một trang \emph{trước} khi gán mẫu đầu tiên, chốt rõ ca biên (bao nhiêu phần cảnh chồng lấn thì tính là cùng chỗ, lệch góc nhìn tới đâu thì thôi, ảnh mờ tới mức nào thì bỏ). Gán lần một. Chờ ba tới năm ngày. Gán lại đúng 200 cặp đó với thứ tự đã xáo trộn. Lập bảng \(2\times2\) giữa hai lần gán, tính \(p_o\), \(p_e\) và kappa bằng tay.
+\dxk bạn có con số kappa của chính mình kèm bảng \(2\times2\), \emph{và} một danh sách ít nhất mười cặp bạn tự mâu thuẫn với bản thân, mỗi cặp kèm đúng một dòng sửa guideline.
+\dnv \ptr{B/07-chia-du-lieu-va-danh-gia} dùng lại chính 200 cặp này làm tập test có nhãn cho mini project chương sau; \ptr{E/24-thi-nghiem-va-ablation} đọc kappa như trần trên khi so hai bộ phát hiện đóng vòng.
+\end{duan}
+
+\begin{traloi}
+\tl{Nó đo mức mô hình khớp với \emph{nhiễu của người gán}, không đo sự thật. 85\%
+là trần: mọi phần trăm giành được phía trên nó chỉ nói rằng mô hình đã học luôn cả các hiểu nhầm nhất quán trong guideline.}
+\tl{Vì hai loại nhiễu có cơ chế gây hại khác hẳn. Nhiễu ngẫu nhiên phân bố đều nên chủ yếu làm chậm hội tụ; nhiễu hệ thống là một quy tắc sai được lặp lại, và mô hình học được quy tắc đó rồi tái tạo nó trên dữ liệu mới.}
+\tl{Đủ để đảo thứ hạng: khi sửa lại nhãn, mô hình lớn hơn --- thứ khớp tập test gốc tốt hơn --- hoá ra cũng là thứ khớp nhiễu nhãn tốt hơn. Một phần cuộc đua nhiều năm là cuộc đua khớp lỗi nhãn, không phải khớp thực tế.}
+\tl{Bằng dự đoán \emph{ngoài mẫu}: chia \(k\) phần, mỗi mẫu chỉ được chấm bởi mô hình chưa nhìn thấy nó, rồi dùng confident learning để suy ngưỡng từ ma trận nhầm lẫn. Dùng mô hình đã train trên chính tập đó thì nó chỉ xác nhận nhiễu nó đã hấp thụ.}
+\end{traloi}
+
+\begin{dongian}
+Tưởng tượng bạn thuê hai người chấm cùng một tập hai trăm bài văn, thang mười điểm. Chấm xong, bạn so hai bảng điểm và thấy trung bình họ lệch nhau một điểm rưỡi. Bây giờ bạn xây một cái máy chấm tự động và khoe rằng nó chỉ lệch nửa điểm so với bảng điểm của người thứ nhất. Nửa điểm đó không có nghĩa là máy giỏi hơn người. Nó chỉ có nghĩa là máy đã học được thói quen chấm của đúng một người, kể cả những chỗ người đó chấm sai.
+
+Bài toán gốc là như vậy: thứ bạn dùng làm đáp án cũng do người làm ra, nên nó có sai số riêng. Mẹo thoát ra gồm hai bước rẻ tiền. Một, cho hai người chấm chồng lên nhau một phần nhỏ rồi đo xem họ lệch bao nhiêu; con số đó là mức tốt nhất mà máy có quyền đạt tới, và mọi thứ vượt qua nó nên bị nghi ngờ. Hai, viết trước cách xử lý các bài khó --- bài lạc đề nhưng viết hay thì mấy điểm --- rồi sửa bản hướng dẫn chấm, chứ không sửa từng bài một.
+
+Cái giá là vài ngày làm việc nhàm chán trước khi có mô hình đầu tiên, cộng với việc phải thừa nhận rằng một phần công sức trước đây của bạn đã đổ vào đuổi theo nhiễu.
+
+\chuadongian{ranh giới giữa ``bài bị chấm sai'' và ``bài khó nhưng chấm đúng'' thì không nói gọn được. Mọi cách diễn đạt đơn giản đều biến nó thành một quy tắc máy móc, trong khi chính ranh giới đó là thứ mà cả người lẫn máy đang phải học.}
+\motcau{Trước khi hỏi mô hình giỏi tới đâu, hãy hỏi đáp án của bạn đúng tới đâu --- vì con số thứ hai chặn trên con số thứ nhất.}
+\end{dongian}
+
+\section{Kết nối}
+Chương này là phần thực thi của \ptr{B/05-thiet-ke-bai-toan}: ở đó ta quyết định nhãn \emph{là gì}, ở đây ta đối mặt với việc nhãn \emph{trở thành gì} sau khi qua tay người. Nó là tiền đề bắt buộc của \ptr{B/07-chia-du-lieu-va-danh-gia}, vì trùng lặp gần đúng chính là một dạng rò rỉ và trần đồng thuận quyết định chênh lệch nào giữa hai mô hình mới đáng bàn. Nó đối lập hữu ích với \ptr{B/08-dich-chuyen-phan-phoi}: ở đây nhãn sai vì con người không nhất quán, ở đó nhãn đúng nhưng thế giới đã đổi. Phần ``dùng mô hình soi nhãn'' quay lại đầy đủ ở \ptr{E/24-thi-nghiem-va-ablation}.
+
+\begin{tukiem}
+\item Vì sao mức đồng thuận giữa người gán nhãn là trần trên của accuracy, chứ không chỉ là một con số tham khảo?
+\item Cùng một bảng đồng thuận cho \(p_o = 0{,}95\) lại có thể cho kappa thấp hơn một bảng có \(p_o = 0{,}85\). Cơ chế nào gây ra chuyện đó, và nó cảnh báo gì về accuracy?
+\item Confident learning giả định gì về cấu trúc của nhiễu, và loại nhiễu nào làm giả định đó vỡ đúng ở chỗ ta cần nhất?
+\item Vì sao dùng chính mô hình đã train trên tập đó để soi nhãn lại cho kết luận vô nghĩa, và sửa bằng cách nào?
+\item Bạn có 500 giờ công gán nhãn: khi nào tiêu vào việc \emph{gán lại} dữ liệu cũ có giá trị hơn gán thêm dữ liệu mới?
+\item Trong cây quyết định ở Hình~\ref{fig:cay-quyet-dinh-nhan}, vì sao câu hỏi về heuristic lại đứng trước câu hỏi về mô phỏng?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

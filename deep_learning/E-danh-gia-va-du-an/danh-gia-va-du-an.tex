@@ -1,0 +1,19 @@
+\documentclass[../deep_learning.tex]{subfiles}
+\begin{document}
+\part{ĐÁNH GIÁ, ĐỘ TIN CẬY VÀ DỰ ÁN}
+\begin{tomtat}
+Phần E trả lời câu hỏi khó chịu nhất: làm sao biết mình không đang tự lừa mình. Bốn chương gồm đọc paper, thiết kế thí nghiệm và ablation, độ tin cậy và vận hành, và dự án xuyên suốt qua ba vòng. Đọc xong bạn phân biệt được một cải thiện thật với một cải thiện nằm trong khoảng nhiễu, và biết một so sánh không công bằng trông như thế nào. Nếu chỉ nhớ một điều: cơ chế tự lừa trong học máy rất cụ thể và xảy ra với người trung thực đang vội, nên nó phải được chặn bằng quy trình chứ không bằng thiện chí.
+\end{tomtat}
+
+Bốn phần trước dạy cách xây. Phần này trả lời câu hỏi khó chịu hơn và quan trọng hơn: \textbf{làm sao biết mình không đang tự lừa mình?} Đó không phải một câu hỏi về đạo đức mà là một câu hỏi kỹ thuật, bởi vì cơ chế tự lừa trong học máy rất cụ thể và đã được mô tả kỹ: một baseline chưa được tune tử tế, một test set đã bị nhìn quá nhiều lần, một cải thiện nằm gọn trong khoảng nhiễu giữa các lần chạy, một ablation chỉ chạy một hạt giống. Không cái nào trong số đó cần ác ý; tất cả đều xảy ra với người trung thực đang vội.
+
+Chương~23 là kỹ năng đọc: đọc paper theo ba lượt, đọc phần giới hạn trước phần kết quả, và ghi chú theo cách buộc phải nêu được chỗ mình không tin. Chương~24 là chương nặng nhất của phần và là nơi phần lớn giá trị nằm: thiết kế so sánh cho công bằng, kỹ thuật ablation, lượng thống kê tối thiểu để không kết luận sai, phân tích lỗi có hệ thống, và cách đọc ablation của người khác. Chương~25 chuyển từ đúng sang \emph{đáng tin}: trực quan hoá và những gì nó nói dối, hiệu chỉnh xác suất, ước lượng bất định, rồi vận hành sau khi mô hình đã ra thế giới. Chương~26 đóng vòng bằng dự án xuyên suốt qua ba vòng lặp, và chứa luôn thứ tự học đề xuất cho cả cây.
+
+Một điểm đáng nói trước khi vào: kết luận âm --- một ý tưởng đã thử và không có tác dụng --- vẫn là kết quả, và là kết quả tốn kém nhất khi bị mất. Ghi nó lại đầy đủ ngang với kết quả dương là một trong những thói quen phân biệt người làm nghiên cứu tử tế với người sưu tầm số đẹp.
+\subfile{00-map}
+\subfile{23-doc-paper/doc-paper}
+\subfile{24-thi-nghiem-va-ablation/thi-nghiem-va-ablation}
+\subfile{25-do-tin-cay-va-van-hanh/do-tin-cay-va-van-hanh}
+\subfile{26-lo-trinh-hoc/lo-trinh-hoc}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

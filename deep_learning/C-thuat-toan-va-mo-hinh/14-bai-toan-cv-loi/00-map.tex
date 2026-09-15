@@ -1,0 +1,40 @@
+\documentclass[../../deep_learning.tex]{subfiles}
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+\begin{document}
+\section*{Bản đồ chương 14 --- Bài toán CV lõi (Core Vision Tasks)}
+
+\begin{tomtat}
+Chương 14 gồm bốn mục, chia theo \emph{dạng đầu ra} chứ không theo thứ tự lịch sử: hai mục đầu về đầu ra dạng tập khung (detection), mục ba về đầu ra dạng mask, mục bốn về những dạng đầu ra còn lại mà kỹ sư gặp hằng ngày. Đọc bản đồ này để biết mục nào là cốt lõi phải nắm chắc, mục nào tra khi cần, và thứ tự phụ thuộc giữa chúng. Nếu chỉ nhớ một điều: mục~2 là mục cốt lõi của cả chương, vì nó chứa bài học ``cách gán mẫu quyết định nhiều hơn kiến trúc''.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mục (section) và chương}{chương là một chủ đề lớn; mỗi mục là một file riêng đọc độc lập được. Số thứ tự trong tên thư mục phản ánh \emph{thứ tự nên đọc}, không phải thứ tự lịch sử.}
+\kn{cốt lõi và tham khảo}{``cốt lõi'' là phần phải nắm chắc và quay lại nhiều lần; ``tham khảo'' là phần biết-là-có, đọc kỹ khi thật sự gặp bài toán đó.}
+\kn{detection và segmentation}{detection trả về danh sách khung chữ nhật kèm nhãn; segmentation trả về nhãn cho từng pixel. Khác biệt cốt lõi là \emph{dạng đầu ra}, và nó kéo theo hàm mất mát lẫn thước đo.}
+\kn{gán mẫu (label assignment)}{quy tắc quyết định vị trí dự đoán nào phải học vật nào. Nó nằm trong định nghĩa của hàm mất mát chứ không phải trong kiến trúc --- lý do nó là bài học trung tâm của chương.}
+\end{nentang}
+
+\subsection*{Có gì trong chương này}
+
+\begin{itemize}
+\item \textbf{Mục 1 --- Detection hai giai đoạn} \emph{(cốt lõi)}. R-CNN \(\rightarrow\) Fast R-CNN \(\rightarrow\) Faster R-CNN với RPN \(\rightarrow\) FPN \(\rightarrow\) Mask R-CNN với RoIAlign. Đây là nơi định nghĩa các khái niệm nền dùng lại suốt chương: anchor, RoI, NMS, IoU, loss đa nhiệm.
+\item \textbf{Mục 2 --- Một giai đoạn và cuộc đánh đổi tốc độ} \emph{(cốt lõi, đọc kỹ nhất)}. YOLO/SSD, mất cân bằng nền--vật thể, focal loss, anchor-free, và trục thật sự quan trọng: \vn{gán mẫu}{label assignment} từ IoU cố định qua ATSS tới SimOTA, rồi DETR bỏ NMS bằng Hungarian matching.
+\item \textbf{Mục 3 --- Phân vùng ảnh và sự hợp nhất} \emph{(cốt lõi)}. FCN, U-Net, DeepLab với atrous/ASPP, SegFormer, Mask2Former, rồi bước dịch sang mô hình nền tảng nhận prompt.
+\item \textbf{Mục 4 --- Các bài toán lân cận} \emph{(tham khảo có trọng điểm)}. Pose, OCR, metric learning và truy hồi, fine-grained và long-tail. Đọc lướt để biết là có, quay lại khi thật sự gặp.
+\end{itemize}
+
+\subsection*{Vì sao chia như vậy}
+Ba câu hỏi kinh điển của thị giác --- \emph{ảnh này là gì}, \emph{có gì ở đâu}, \emph{mỗi pixel thuộc về cái gì} --- trông như ba mức chi tiết của cùng một bài toán, nhưng chỉ câu đầu có đầu ra kích thước cố định. Chương chia theo đúng ranh giới đó: mục 1 và 2 xử lý đầu ra dạng tập hợp khung, mục 3 xử lý đầu ra dạng mask, mục 4 gom các dạng còn lại. Cách chia này quan trọng vì \emph{dạng đầu ra} kéo theo hàm mất mát, metric và chế độ hỏng --- ba thứ khó đổi hơn kiến trúc rất nhiều.
+
+\subsection*{Thứ tự đọc và phụ thuộc}
+\begin{enumerate}
+\item Đọc \ptr{C/13-kien-truc-backbone} trước; toàn chương giả định bạn hiểu stride, trường tiếp nhận và feature map đa tỉ lệ.
+\item Mục 1 trước mục 2: mất cân bằng nền--vật thể chỉ lộ ra \emph{sau khi} bỏ giai đoạn đề xuất, nên đọc ngược thứ tự thì mất luôn nguyên nhân.
+\item Mục 2 trước mục 3: khung truy vấn của Mask2Former mượn nguyên ý tưởng dự đoán tập hợp của DETR.
+\item Mục 4 độc lập, đọc lúc nào cũng được.
+\item Đọc \ptr{B/09-thiet-ke-ham-mat-mat} song song với mục 2 nếu phần focal loss chưa rõ, và \ptr{B/07-chia-du-lieu-va-danh-gia} song song với mục 4.
+\end{enumerate}
+
+\subsection*{Nếu chỉ có một buổi}
+Đọc phần đặt vấn đề của mục 1, rồi đọc trọn mục 2. Mục 2 chứa bài học lặp lại của cả lĩnh vực --- rằng những chi tiết không được viết trong abstract thường quyết định kết quả nhiều hơn kiến trúc --- và bài học đó thay đổi cách bạn đọc mọi bảng kết quả về sau.
+\end{document}

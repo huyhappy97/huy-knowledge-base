@@ -1,0 +1,59 @@
+% ============================================================================
+%  C/00-map.tex — bản đồ phần C
+%  Ngày tạo: 2026-09-07 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../english.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ phần C --- Viết rõ}
+
+\begin{tomtat}
+Năm chương xếp theo kích thước đơn vị văn bản, và đó cũng là thứ tự nên học. Chuỗi phụ thuộc là một đường thẳng 11 \(\rightarrow\) 12 \(\rightarrow\) 13, với 14 cắt ngang cả ba và 15 là bước cuối cùng áp lên mọi thứ. Nếu chỉ có thời gian cho hai chương, hãy đọc 11 và 12 --- chúng cho phần lớn mức cải thiện.
+\end{tomtat}
+
+\subsection*{A. Bảng tra ngược: bạn đang gặp gì \(\rightarrow\) đọc chương nào}
+\begin{center}\footnotesize
+\begin{tabularx}{\linewidth}{@{}L{5.6cm}L{2.0cm}Y@{}}
+\toprule
+\textbf{Triệu chứng} & \textbf{Chương} & \textbf{Công cụ chính}\\
+\midrule
+Người đọc bảo câu ``nặng'' nhưng không sai & 11 & Chủ thể--hành động, gỡ danh từ hoá\\
+Từng câu đều đúng nhưng đoạn rời rạc & 12 & Cũ trước mới sau, vị trí nhấn\\
+Không biết mở bài và tóm tắt viết gì & 13 & IMRAD, bốn câu tóm tắt, CARS\\
+Bị chê ``khẳng định quá'' hoặc ``mơ hồ'' & 14 & Thang cam kết, rào đón có chủ đích\\
+Viết xong không biết sửa từ đâu & 15 & Quy trình sửa ba lượt, danh sách kiểm\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection*{B. Vì sao chia như vậy}
+Phần lớn tài liệu dạy viết học thuật chia theo \emph{thể loại} --- viết tóm tắt, viết mở bài, viết thảo luận. Cách chia đó tiện cho người đang phải nộp bài nhưng dạy được rất ít, vì nó cho khuôn mà không cho nguyên lý: bạn học được cách viết một phần mở bài mà vẫn không biết vì sao câu của mình khó đọc.
+
+Năm chương ở đây chia theo \emph{đơn vị} và theo \emph{nguyên lý điều khiển đơn vị đó}. Ở cấp câu, nguyên lý là ai làm gì. Ở cấp nối câu, nguyên lý là thứ tự cũ trước mới sau. Ở cấp đoạn và bài, nguyên lý là kỳ vọng của cộng đồng người đọc. Ở cấp mệnh đề, nguyên lý là mức cam kết phải khớp bằng chứng. Học nguyên lý thì các khuôn ở chương 13 trở thành hệ quả dễ nhớ chứ không phải danh sách phải thuộc.
+
+\subsection*{C. Phụ thuộc và thứ tự đọc}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.58cm and 0.95cm,
+  m/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=2.7cm},
+  o/.style={draw=accent,fill=amberbg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=2.7cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  ard/.style={-{Latex[length=2.2mm]},draw=tiercol,thick,dashed},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.3cm}]
+\node[m] (c11) {\textbf{11.} Câu rõ};
+\node[m,right=of c11] (c12) {\textbf{12.} Mạch văn};
+\node[m,right=of c12] (c13) {\textbf{13.} Đoạn, bài, tóm tắt};
+\node[o,below=1.05cm of c12] (c14) {\textbf{14.} Nói đúng mức};
+\node[o,below=1.05cm of c13] (c15) {\textbf{15.} Sửa bài};
+\draw[ar] (c11) -- node[lb,above=0pt] {nối câu} (c12);
+\draw[ar] (c12) -- node[lb,above=0pt] {gộp thành đoạn} (c13);
+\draw[ard] (c14) -- (c11);
+\draw[ard] (c14) -- (c13);
+\draw[ar] (c13) -- (c15);
+\draw[ard] (c14) -- (c15);
+\end{tikzpicture}
+\caption{Mạch chính là đường thẳng 11--12--13 theo kích thước đơn vị. Chương 14 (tô hổ phách) cắt ngang: mức cam kết phải đúng ở mọi cấp. Chương 15 là bước cuối, dùng lại toàn bộ bốn chương trước dưới dạng danh sách kiểm.}
+\label{fig:map-C-en}
+\end{figure}
+
+\subsection*{D. Cốt lõi hay tham khảo}
+\textbf{Cốt lõi:} nguyên tắc chủ thể--hành động và cách gỡ danh từ hoá ở chương 11; quy tắc cũ trước mới sau cùng vị trí nhấn ở chương 12; bốn câu tóm tắt ở chương 13; thang cam kết ở chương 14; và quy trình ba lượt ở chương 15. \textbf{Tham khảo:} phần chi tiết về các nước đi CARS ở chương 13 và bảng đầy đủ các dạng rào đón ở chương 14 --- đọc một lần để nhận ra chúng khi gặp, rồi quay lại khi thật sự phải viết phần đó.
+\end{document}

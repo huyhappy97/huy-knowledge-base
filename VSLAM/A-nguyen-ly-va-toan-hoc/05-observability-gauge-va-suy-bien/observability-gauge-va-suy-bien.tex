@@ -1,0 +1,366 @@
+% ---------------------------------------------------------------------------
+% Chương 5 — Observability, gauge và suy biến
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-13  |  Ôn gần nhất: —
+% Phụ thuộc: A/01 (cấu hình suy biến cụ thể), A/03 (nhiễu loạn), A/04 (ma trận thông tin)
+% Mức độ: XƯƠNG SỐNG. Chương này giải thích VÌ SAO mọi chương sau hỏng.
+% Kiểm chứng công thức lõi:
+%   (1) SfM đơn mắt có 7 DoF gauge (Sim(3)) — cửa (a) tự dẫn bằng phép biến đổi bất biến
+%       trên phương trình chiếu; cửa (c) triggs2000ba §9, hartley2004.
+%   (2) Lambda u = 0 <=> H_k u = 0 với mọi k — cửa (a) dẫn từ tính nửa xác định dương.
+%   (3) Xoay thuần: E = 0 nên cấu trúc không quan sát được — cửa (a) thay t=0; đã kiểm ở A/01.
+%   (4) So sánh 3 cách cố định gauge cho cùng quỹ đạo tương đối — cửa (c) zhang2018gaugeba.
+%   (5) Với VIO: 4 DoF (3 tịnh tiến + yaw) — cửa (c) jones2011visualinertial, hesch2014consistency;
+%       chi tiết suy dẫn nằm ở ../IMU_Fusion/ chương 5, ở đây chỉ nhắc kết quả.
+% Ghi chú trung thực: KHÔNG có con số thực nghiệm của tôi. Ví dụ số ở mục 4B là tự đặt,
+%   tính tay, và ghi rõ "giả sử".
+% ---------------------------------------------------------------------------
+\documentclass[../../vslam.tex]{subfiles}
+\begin{document}
+\chapter{Observability, gauge và suy biến (Observability, Gauge and Degeneracy)}
+\ptrtarget{A/05}\ptrtarget{A/05-observability-gauge-va-suy-bien}
+\dependency{\ptr{A/01-hinh-hoc-da-thi} (bốn cấu hình suy biến cụ thể --- chương này tổng quát hoá chúng); \ptr{A/03-lie-group-va-toi-uu-tren-da-tap} (ngôn ngữ nhiễu loạn để viết ``dịch cả thế giới'' thành phép toán); \ptr{A/04-uoc-luong-map-va-bundle-adjustment} (ma trận thông tin \(\Lambda = \sum H^\top\Omega H\) --- toàn bộ chương này là câu hỏi về chỗ ma trận đó suy biến). Phần quán tính tương ứng ở \code{../IMU\_Fusion/} chương 5.}
+
+\begin{tomtat}
+Chương này trả lời câu hỏi mà bốn chương trước không hỏi được: trong số các biến ta vừa đặt vào bài toán MAP, biến nào dữ liệu \emph{thật sự} nói được điều gì đó? Câu trả lời có ba tầng, và ba tầng ấy đòi ba cách xử lý ngược nhau nên trộn chúng là nguồn của phần lớn chẩn đoán sai. Tầng cấu trúc: SfM đơn mắt luôn có đúng bảy bậc tự do không quan sát được --- ba tịnh tiến, ba xoay, một tỉ lệ, hợp thành \(Sim(3)\) --- bất kể chuyển động tốt đến đâu; đó là \emph{quy ước}, không phải thiếu dữ liệu, và cách chữa là chọn một quy ước. Tầng chuyển động: ngoài bảy bậc đó, một số đại lượng chỉ quan sát được nếu chuyển động kích thích đúng chiều; xoay thuần và cảnh phẳng ở \ptr{A/01} là hai ví dụ, và cách chữa là đổi chuyển động hoặc thêm nguồn thông tin. Tầng thuật toán: ngay cả khi lý thuyết nói một hướng không quan sát được, bộ ước lượng vẫn có thể tự bịa ra thông tin theo hướng ấy do tuyến tính hoá không nhất quán, và hậu quả là hiệp phương sai nhỏ hơn sự thật. Nếu chỉ nhớ một điều: \emph{quan sát được hay không là tính chất của cặp (mô hình, chuyển động), không phải của thuật toán} --- đổi bộ giải không cứu được một hướng mà dữ liệu không chứa thông tin.
+\end{tomtat}
+
+\begin{nentang}
+\kn{quan sát được (observability)}{tính chất của một hệ: hai trạng thái khác nhau thì sinh ra hai chuỗi phép đo khác nhau. Nếu hai trạng thái khác nhau sinh ra \emph{chính xác} cùng chuỗi đo thì không phép xử lý nào phân biệt được chúng, và hướng nối chúng gọi là hướng không quan sát được.}
+\kn{không gian rỗng (null space)}{tập các véctơ \(\mathbf{u}\) với \(\Lambda\mathbf{u} = 0\). Đi theo \(\mathbf{u}\) thì hàm mục tiêu không đổi tới bậc hai, nên bộ giải không có lý do gì để ở lại chỗ nó đang đứng.}
+\kn{tự do gauge (gauge freedom)}{một hướng không quan sát được sinh ra từ \emph{quy ước}, không từ thiếu dữ liệu. Ta phải chọn một hệ quy chiếu ở đâu đó; chọn chỗ nào cũng được, và chính cái ``cũng được'' ấy là bậc tự do dư.}
+\kn{chuyển động suy biến (degenerate motion)}{một chuyển động làm mất thêm bậc quan sát được so với trường hợp tổng quát: xoay thuần, cảnh phẳng, đi dọc trục quang, đứng yên.}
+\kn{kích thích (excitation)}{mức độ mà chuyển động ``chạm'' vào một biến. Đủ kích thích nghĩa là tồn tại một phần quỹ đạo mà nếu đổi biến đó thì phép đo đổi rõ rệt so với mức nhiễu.}
+\kn{số điều kiện (condition number)}{tỉ số giữa giá trị riêng lớn nhất và nhỏ nhất khác không của \(\Lambda\). Nó đo mức ``dẹt'' của bát; số điều kiện rất lớn nghĩa là gần suy biến, tức bệnh chưa thành nhưng sắp thành.}
+\kn{tính nhất quán (consistency)}{một bộ ước lượng nhất quán khi sai số có trung bình bằng không \emph{và} hiệp phương sai nó khai báo đúng bằng hiệp phương sai thật \cite{barshalom2001}. Chính xác nhưng khai hiệp phương sai quá nhỏ là bất nhất, và nguy hiểm hơn kém chính xác mà trung thực.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Bộ ước lượng trả về tỉ lệ \(s = 1{,}03\) với độ lệch chuẩn \(0{,}004\). Con số đó có thể hoàn toàn vô nghĩa mà không có bất kỳ dấu hiệu nào trong đầu ra. Cơ chế nào cho phép một bộ ước lượng vừa sai vừa tự tin, và vì sao nó không thể tự phát hiện?}
+\h{SfM đơn mắt có bảy bậc tự do không quan sát được, VIO có bốn, còn SLAM stereo có sáu. Ba con số khác nhau ấy đến từ đâu --- và chúng nói gì về việc pose graph nên tối ưu mấy bậc?}
+\h{Hai kỹ sư chạy cùng một bộ giải trên cùng dữ liệu, một người cố định tư thế đầu và một người dùng giả nghịch đảo. Kết quả giống nhau ở đâu và khác nhau ở đâu --- và nếu \emph{quỹ đạo} của họ khác nhau thì điều đó nói lên chuyện gì?}
+\h{Bạn phát hiện tỉ lệ không hội tụ nên thêm một prior mạnh để ghim nó lại. Hệ thống ngừng trôi và mọi thứ trông ổn định. Vì sao đó có thể là điều tệ nhất bạn vừa làm, và phép thử nào phân biệt trường hợp nó hợp lệ với trường hợp nó là bẫy?}
+\h{Ba loại suy biến --- do quy ước, do chuyển động, do số học --- đều biểu hiện thành ``ma trận thông tin gần suy biến''. Nêu phép thử phân biệt ba loại, và nói vì sao dùng cách chữa của loại này cho loại kia thì hỏng.}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{A/05/01}
+
+Có một kiểu hỏng mà mọi kỹ sư SLAM gặp sớm hay muộn, và nó khác mọi kiểu hỏng khác ở một điểm: nó không phát ra tiếng động nào.
+
+Hình dung tình huống cụ thể. Robot của bạn đang chạy trong một hành lang dài, camera nhìn thẳng về phía trước. Ảnh sắc nét, hàng trăm đặc trưng được trích ra và khớp hoàn hảo giữa các khung, RANSAC báo hơn \(90\%\) inlier, sai số chiếu lại trung bình dưới một pixel. Bundle adjustment hội tụ trong năm vòng lặp. Bản đồ trông đẹp. Hệ thống in ra một quỹ đạo kèm hiệp phương sai, và hiệp phương sai ấy nhỏ.
+
+Rồi bạn so với chân trị và phát hiện quỹ đạo dài hơn thực tế \(15\%\).
+
+Bài toán gốc là như vậy, và nó thuộc về bất kỳ ai ước lượng trạng thái từ cảm biến: người làm SLAM đơn mắt, người hiệu chuẩn camera trên dây chuyền, người làm localization trong bản đồ cũ. Trước khi có lý thuyết, cách xử lý phổ biến là kinh nghiệm truyền miệng: ``đi chữ chi khi khởi tạo'', ``đừng để robot quay tại chỗ quá lâu'', ``hiệu chuẩn thì nghiêng bảng nhiều hướng''. Những lời khuyên đó \emph{đúng}, nhưng chúng là các mảnh rời của một định lý mà không ai phát biểu ra. Hệ quả là chúng không tổng quát hoá được: gặp một cấu hình cảm biến mới, không ai biết phải đi kiểu gì, hay đi như vậy đã đủ chưa.
+
+Chỗ khác biệt với mọi kiểu hỏng khác nằm ở đây. Nếu một điểm khớp sai, phần dư sẽ lớn và bạn nhìn thấy. Nếu trọng số sai, NEES lệch và bạn đo được (\ptr{C/18}). Nhưng nếu dữ liệu \emph{không chứa thông tin} về một đại lượng, thì hàm mục tiêu phẳng theo hướng đó, mọi giá trị đều cho phần dư như nhau, và bộ giải --- vốn chỉ biết giảm hàm mục tiêu --- dừng lại ở một điểm tuỳ tiện trong thung lũng phẳng ấy rồi báo cáo điểm đó như một kết quả. Tệ hơn, nếu bộ ước lượng bị bệnh bất nhất mà mục~6 sẽ mô tả, nó còn khai một hiệp phương sai \emph{nhỏ}. Sai lầm được đóng gói trong một con số trông tự tin.
+
+Đây là lý do chương này nằm ở vị trí gần cuối Phần~A chứ không phải một phụ lục. Bốn chương trước cho công cụ: hình học, mô hình đo, đạo hàm, bộ giải. Chương này hỏi câu đứng trước tất cả: \emph{bài toán MAP bạn vừa dựng có nghiệm duy nhất không, và nếu không thì thiếu ở hướng nào?} Không trả lời được câu này thì mọi kỹ thuật ở các phần sau chỉ là những cách khác nhau để tính ra một con số vô nghĩa nhanh hơn.
+
+Cách hiển nhiên hơn --- và cách gần như ai cũng thử trước --- là chữa triệu chứng: thấy tỉ lệ trôi thì thêm prior, thấy hiệu chuẩn ngoại không hội tụ thì khoá nó, thấy bộ giải dao động thì tăng damping. Ba cách đó đều \emph{hoạt động} theo nghĩa hệ thống ngừng gây rối, và chính vì thế chúng nguy hiểm: chúng che mất chẩn đoán. Thêm prior mạnh cho tỉ lệ nghĩa là bạn đã tự quyết định tỉ lệ và bộ ước lượng chỉ xác nhận lại quyết định đó. Cả ba đều hợp lệ \emph{nếu} bạn biết mình đang làm gì, và đều là bẫy nếu không. Phân biệt hai trường hợp là toàn bộ nội dung của chương.
+
+\begin{trucgiac}
+Hình dung hàm mục tiêu MAP như một cảnh quan trong không gian nhiều chiều: mỗi điểm là một cấu hình biến, độ cao là tổng bình phương phần dư có trọng số. Bộ giải là một quả bóng lăn xuống.
+
+Trường hợp lành mạnh: cảnh quan là một cái bát. Có đúng một đáy, quả bóng dừng ở đó, và độ cong theo mỗi hướng cho biết bạn chắc chắn tới mức nào theo hướng ấy --- đó chính là ma trận thông tin.
+
+Trường hợp bệnh: cảnh quan không phải bát mà là một \emph{máng}. Cong theo vài hướng, nhưng có ít nhất một hướng mà đi dọc theo nó thì độ cao không đổi chút nào. Quả bóng vẫn dừng --- ma sát số học, điều kiện dừng của bộ giải, một chút nhiễu làm nghiêng máng --- và nó dừng ở một chỗ hoàn toàn tuỳ tiện dọc theo máng.
+
+Điều then chốt: quả bóng không biết mình đang ở trong máng. Nó chỉ biết nó không lăn nữa. Toàn bộ lý thuyết observability là cách trả lời câu ``cảnh quan này có máng không, và máng chạy theo hướng nào'' \emph{trước khi} thả bóng.
+
+Và một chi tiết quyết định về cách chữa: có loại máng là \emph{cố hữu} --- nó tồn tại vì bài toán thật sự có nhiều nghiệm tương đương, và cách chữa là chọn một nghiệm rồi đi tiếp. Có loại máng là \emph{tạm thời} --- nó xuất hiện vì dữ liệu vừa rồi nghèo, và nó sẽ biến mất nếu bạn đi kiểu khác. Dùng cách chữa của loại này cho loại kia là sai lầm tốn kém nhất trong chương.
+\end{trucgiac}
+
+\section{Observability, phát biểu cho đúng một lần}
+\ptrtarget{A/05/02}
+
+\subsection{A. Phát biểu theo phép đo}
+
+Cho một hệ với biến \(\boldsymbol{\theta}\) và hàm đo \(\mathbf{z} = h(\boldsymbol{\theta})\). Hệ không quan sát được nếu tồn tại \(\boldsymbol{\theta} \neq \boldsymbol{\theta}'\) mà \(h(\boldsymbol{\theta}) = h(\boldsymbol{\theta}')\) --- hai cấu hình khác nhau sinh ra \emph{chính xác} cùng tập phép đo.
+
+Định nghĩa này có một hệ quả cần nói rõ ngay vì nó là trục của cả chương. Nếu hai cấu hình sinh ra cùng phép đo, thì \emph{không có thuật toán nào} phân biệt được chúng. Không phải ``thuật toán hiện tại chưa đủ tốt''. Không phải ``cần thêm dữ liệu cùng loại''. Thông tin không tồn tại trong dữ liệu, và không phép biến đổi nào tạo ra thông tin từ chỗ không có. Đây là lý do câu ``quan sát được là tính chất của cặp (mô hình, chuyển động)'' được ghi vào \ptr{00-map} như một trong bốn nguyên lý xuyên suốt.
+
+\subsection{B. Phát biểu theo ma trận thông tin}
+
+Trong khung MAP của \ptr{A/04}, quanh nghiệm \(\hat{\boldsymbol{\theta}}\) ta có xấp xỉ bậc hai
+\[
+J(\hat{\boldsymbol{\theta}} \boxplus \boldsymbol{\delta}) \approx J(\hat{\boldsymbol{\theta}}) + \tfrac12 \boldsymbol{\delta}^{\top}\Lambda\,\boldsymbol{\delta},
+\qquad \Lambda = \sum_k H_k^{\top}\Omega_k H_k .
+\]
+Nếu tồn tại \(\mathbf{u}\neq 0\) với \(\Lambda\mathbf{u} = 0\), thì đi theo \(\mathbf{u}\) không làm hàm mục tiêu tăng tới bậc hai. Vì sao bước này hợp lệ? Vì \(\Lambda\) là tổng các ma trận nửa xác định dương, nên
+\[
+\mathbf{u}^{\top}\Lambda\,\mathbf{u} = \sum_k \bigl\|\Omega_k^{1/2}H_k\mathbf{u}\bigr\|^2 = 0
+\]
+buộc \emph{từng} số hạng bằng không, tức \(H_k\mathbf{u} = 0\) với mọi \(k\). Nói cách khác, \emph{không một phép đo nào} thay đổi khi ta nhiễu loạn theo \(\mathbf{u}\). Đó đúng là định nghĩa ở mục~A, viết ở dạng tuyến tính hoá.
+
+Sự gặp nhau này đáng dừng lại một câu. Nó chuyển câu hỏi trừu tượng ``hệ có quan sát được không'' thành một phép thử số học cụ thể: lấy ma trận thông tin, tính phổ giá trị riêng, đếm xem bao nhiêu giá trị bằng không hoặc gần không. Và nó cho biết ngay hậu quả: hiệp phương sai là \(\Lambda^{-1}\), nên một giá trị riêng bằng không nghĩa là phương sai \emph{vô hạn} theo hướng tương ứng. Bộ giải nào báo hiệp phương sai hữu hạn theo hướng đó thì hoặc đã thêm một prior, hoặc đang bịa.
+
+\subsection{C. Ba mức suy biến cần tách bạch}
+
+Trong thực hành, ba thứ khác nhau đều biểu hiện thành ``\(\Lambda\) gần suy biến'', và trộn chúng là nguồn của rất nhiều chẩn đoán sai. Đây là câu trả lời cho câu hỏi mở đầu thứ năm.
+
+\begin{itemize}
+\item \textbf{Suy biến do quy ước (gauge).} Bài toán \emph{thật sự} có vô số nghiệm, và điều đó đúng về mặt toán học --- ta chỉ chưa chọn hệ quy chiếu. Bảy bậc của SfM đơn mắt ở mục~3 thuộc loại này. Cách chữa: chọn quy ước; mọi cách chọn đều hợp lệ và cho cùng kết quả có nghĩa vật lý. Dấu hiệu: số chiều không gian rỗng \emph{không đổi} dù chuyển động thế nào.
+\item \textbf{Suy biến do chuyển động.} Mô hình quan sát được với chuyển động tổng quát, nhưng chuyển động \emph{cụ thể} vừa rồi nằm trong một tập suy biến. Xoay thuần và cảnh phẳng thuộc loại này. Cách chữa: đổi chuyển động; nếu không đổi được thì thừa nhận và thêm thông tin từ nguồn khác. Dấu hiệu: số chiều không gian rỗng \emph{thay đổi} theo đoạn quỹ đạo.
+\item \textbf{Suy biến do số học.} Ma trận về nguyên tắc khả nghịch nhưng số điều kiện quá lớn so với độ chính xác máy hoặc mức nhiễu. Đây là trường hợp xấu nhất để chẩn đoán vì nó nằm giữa hai loại trên và di chuyển theo dữ liệu. Cách chữa: đổi tham số hoá (nghịch đảo độ sâu thay cho XYZ), scaling biến, hoặc dùng dạng căn bậc hai \cite{demmel2021rootba}.
+\end{itemize}
+
+Ba loại đòi ba cách xử lý khác nhau, và dùng cách của loại này cho loại kia thì hỏng. Cố định gauge cho một hướng suy biến do chuyển động --- ví dụ khoá tỉ lệ vì nó không hội tụ --- là tự áp đặt một giá trị mà bạn không có cơ sở nào để chọn, và đó là câu trả lời cho câu hỏi mở đầu thứ tư. Ngược lại, đổi chuyển động để cứu một tự do gauge là vô ích: bảy bậc của SfM không biến mất dù bạn đi kiểu gì.
+
+\section{Bảy bậc tự do của SfM đơn mắt}
+\ptrtarget{A/05/03}
+
+\subsection{A. Trực giác: dịch, xoay, co giãn cả thế giới}
+
+Đặt câu hỏi ngược: có phép biến đổi nào của \emph{toàn bộ} bài toán --- mọi tư thế, mọi điểm --- mà sau đó mọi phép đo vẫn giữ nguyên?
+
+Phép đo là toạ độ ảnh \(\mathbf{x}_{ij} = \pi\bigl(R_i(\mathbf{P}_j - \mathbf{c}_i)\bigr)\), với \(\mathbf{c}_i\) là tâm camera. Xét phép biến đổi \(Sim(3)\) áp cho mọi thứ:
+\[
+\mathbf{P}_j \mapsto s\,R_g\mathbf{P}_j + \mathbf{t}_g,
+\qquad
+\mathbf{c}_i \mapsto s\,R_g\mathbf{c}_i + \mathbf{t}_g,
+\qquad
+R_i \mapsto R_i R_g^{\top}.
+\]
+Thay vào:
+\[
+R_i R_g^{\top}\bigl(s R_g\mathbf{P}_j + \mathbf{t}_g - s R_g\mathbf{c}_i - \mathbf{t}_g\bigr)
+= R_i R_g^{\top} s R_g(\mathbf{P}_j - \mathbf{c}_i)
+= s\,R_i(\mathbf{P}_j - \mathbf{c}_i).
+\]
+Và vì \(\pi\) là phép chia cho thành phần \(z\), hệ số \(s\) triệt tiêu hoàn toàn: \(\pi(s\mathbf{v}) = \pi(\mathbf{v})\). Phép đo \emph{không đổi}, với mọi \(R_g\), mọi \(\mathbf{t}_g\), mọi \(s>0\).
+
+Đếm: ba tịnh tiến, ba xoay, một tỉ lệ --- \textbf{bảy bậc tự do không quan sát được}, hợp thành nhóm \(Sim(3)\) ở \ptr{A/03} mục~4B. Tôi tự dẫn lại toàn bộ (cửa a) và đối chiếu \cite[§9]{triggs2000ba} cùng \cite{hartley2004} (cửa c).
+
+\subsection{B. Vì sao con số thay đổi theo cấu hình cảm biến}
+
+Đây là chỗ đáng dừng lại, vì nó là một hệ quả trực tiếp và đẹp của luận đề trung tâm --- và là câu trả lời cho câu hỏi mở đầu thứ hai.
+
+Bảy bậc trên là của SfM \emph{thuần thị giác đơn mắt}. Thêm cảm biến thì con số giảm, và giảm đúng theo thứ cảm biến ấy đo được:
+
+Thêm \emph{stereo} với đường cơ sở đã biết bằng mét: tỉ lệ trở thành quan sát được, vì nhân đôi thế giới sẽ làm disparity giảm một nửa và điều đó \emph{nhìn thấy được}. Còn sáu bậc, tức \(SE(3)\).
+
+Thêm \emph{IMU}: gia tốc kế cho đơn vị mét (nếu chuyển động có gia tốc thay đổi --- điều kiện quan trọng, xem \code{../IMU\_Fusion/} chương 5), và trọng lực ghim roll với pitch vì gia tốc kế đo lực riêng nên nó ``thấy'' hướng xuống. Còn bốn bậc: ba tịnh tiến và yaw.
+
+Thêm \emph{GNSS} hoặc \emph{marker có toạ độ đã biết}: tịnh tiến và yaw cũng được ghim. Còn không bậc --- bài toán có nghiệm tuyệt đối.
+
+\begin{cannho}
+Số bậc tự do gauge \textbf{không phải một lựa chọn kỹ thuật mà là hệ quả trực tiếp của việc cảm biến nào có mặt}. Bảng dưới là thứ nên thuộc:
+
+Mono thuần thị giác: \textbf{7} (\(Sim(3)\)). Stereo: \textbf{6} (\(SE(3)\)). VIO: \textbf{4} (tịnh tiến \(+\) yaw). Có GNSS hoặc anchor tuyệt đối: \textbf{0}.
+
+Hai hệ quả thực hành theo ngay. Thứ nhất, \emph{pose graph phải tối ưu đúng số bậc ấy}: \(Sim(3)\) cho mono \cite{strasdat2010scaledrift}, \(SE(3)\) cho stereo, bốn bậc cho VIO. Xiết thêm bậc là xiết thứ dữ liệu đã xác định rồi --- vô hại nhưng vô ích; để dư bậc là tạo thêm đường cho sai số tích luỹ.
+
+Thứ hai, và đây là chỗ hay sai nhất: \emph{căn chỉnh quỹ đạo khi đánh giá phải dùng đúng số bậc ấy}. Căn bảy bậc (có tỉ lệ) cho một hệ VIO là \textbf{che mất lỗi tỉ lệ} --- tức che mất đúng thứ bạn cần đo. Căn bốn bậc cho một hệ mono là vô nghĩa vì bốn bậc không đủ hấp thụ gauge. Chi tiết ở \ptr{C/18} và \cite{zhang2018trajeval}.
+\end{cannho}
+
+\subsection{C. Vì sao đây là tin tốt}
+
+Phản ứng tự nhiên khi gặp kết quả này lần đầu là coi nó như khiếm khuyết. Thật ra nó là điều kiện lành mạnh nhất có thể có.
+
+Bảy bậc ấy không phải thiếu thông tin mà là \emph{dư quy ước}. Thế giới không có gốc toạ độ; ta phải chọn một. Không có hướng bắc trong bài toán thuần thị giác; ta phải chọn một. Không có đơn vị chiều dài; ta phải chọn một. Bảy bậc đó chính xác là số cách chọn, và mọi cách chọn cho cùng một quỹ đạo tương đối, cùng một hình dạng bản đồ, cùng mọi thứ có ý nghĩa vật lý.
+
+Điều cần để ý là chúng \emph{không biến mất khi đi lâu hơn hay giỏi hơn}. Đây là điểm phân biệt quan trọng nhất với mục~4. Tỉ lệ dưới xoay thuần là vấn đề của chuyển động và chữa được bằng cách đổi chuyển động; bảy bậc gauge thì không --- chúng là tính chất của mô hình.
+
+\section{Ba cách cố định gauge}
+\ptrtarget{A/05/04}
+
+Biết có bảy bậc dư là một chuyện; xử lý trong bộ giải là chuyện khác. Để nguyên thì \(\Lambda\) có bảy giá trị riêng bằng không, Cholesky thất bại, và Gauss-Newton không có bước đi xác định. Có đúng ba cách, và chúng không tương đương ở mọi khía cạnh \cite{zhang2018gaugeba}.
+
+\subsection{A. Cố định tư thế đầu (và một khoảng cách)}
+
+Chọn khung đầu làm gốc, khoá sáu bậc tư thế của nó; rồi khoá thêm một đại lượng có đơn vị chiều dài --- thường là khoảng cách giữa hai khung đầu, đặt bằng một. Bảy ràng buộc cho bảy bậc dư.
+
+Ưu điểm: rõ ràng và rẻ; ma trận còn lại xác định dương. Nhược điểm ít người để ý: hiệp phương sai đầu ra là hiệp phương sai \emph{tương đối so với khung đầu}, nên nó tăng đơn điệu theo khoảng cách tới khung đó. Một điểm gần khung đầu trông rất chắc chắn, một điểm cuối quỹ đạo trông rất bất định, và sự bất đối xứng ấy là \emph{nhân tạo}. Khi bạn lấy hiệp phương sai đó dùng cho việc khác --- quyết định đóng vòng, đặt trọng số, lập kế hoạch --- bạn đang mang một quy ước tuỳ tiện vào một quyết định vật lý.
+
+\subsection{B. Thêm prior}
+
+Không khoá cứng mà thêm một số hạng phạt mềm nối vào khung đầu với hiệp phương sai nhỏ. Cộng một ma trận xác định dương vào \(\Lambda\), làm nó khả nghịch.
+
+Ưu điểm: mọi biến vẫn tự do, quan trọng khi ta không hoàn toàn chắc khung đầu ở đâu. Nhược điểm: \emph{độ mạnh} của prior trở thành một núm vặn không có cơ sở vật lý. Quá mạnh thì hành xử như khoá cứng nhưng làm hỏng hiệp phương sai theo cách khó lần; quá yếu thì ma trận vẫn gần suy biến. Ranh giới đúng phụ thuộc vào tỉ lệ của các trọng số khác, nên phải chỉnh lại khi đổi cấu hình cảm biến --- đúng loại tinh chỉnh mà cây này cố tránh.
+
+\subsection{C. Gauge tự do với giả nghịch đảo}
+
+Không cố định gì. Chấp nhận \(\Lambda\) suy biến và giải bằng giả nghịch đảo Moore--Penrose, lấy nghiệm chuẩn nhỏ nhất. Hình học: chọn điểm trên máng gần nhất với điểm khởi đầu hiện tại.
+
+Ưu điểm: không áp đặt quy ước, và hiệp phương sai thu được là ``trung bình trên gauge'', không thiên vị khung nào. Nhược điểm là chi phí: cần SVD hoặc xử lý thưa tinh vi hơn, đắt hơn Cholesky rõ rệt. Với bài toán cỡ lớn, đây là khác biệt quyết định.
+
+\begin{table}[H]\centering\small
+\caption{Ba cách cố định gauge. Cả ba cho \emph{cùng một quỹ đạo tương đối}; chúng khác nhau ở hiệp phương sai báo cáo, ở chi phí, và ở chỗ có đưa thêm một hằng số tuỳ ý vào hệ hay không \cite{zhang2018gaugeba}.}
+\label{tab:a05-gauge}
+\begin{tabularx}{\linewidth}{@{}L{2.4cm}YYL{2.4cm}@{}}
+\toprule
+\textbf{Cách} & \textbf{Cơ chế} & \textbf{Giá phải trả} & \textbf{Khi nào chọn}\\
+\midrule
+Cố định tư thế đầu & Xoá 7 cột khỏi Jacobian; \(\Lambda\) rút gọn xác định dương & Hiệp phương sai là tương đối so với khung đầu, tăng đơn điệu theo khoảng cách --- bất đối xứng nhân tạo & Mặc định cho BA cửa sổ trượt; đơn giản nhất, rẻ nhất\\
+Thêm prior & Cộng nhân tử phạt mềm vào khung đầu & Độ mạnh prior là hằng số không có cơ sở vật lý, phải chỉnh lại khi đổi cấu hình & Khi cần giữ mọi biến tự do, hoặc khi thật sự có tiên nghiệm\\
+Gauge tự do & Giả nghịch đảo Moore--Penrose; nghiệm chuẩn nhỏ nhất & Cần SVD hoặc xử lý thưa phức tạp; đắt hơn Cholesky & Khi cần hiệp phương sai không thiên vị để so sánh --- thường là nghiên cứu\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Lưu ý quan trọng để tránh hiểu nhầm, và là câu trả lời cho câu hỏi mở đầu thứ ba: \emph{cả ba cho cùng một quỹ đạo tương đối}. Chúng khác nhau ở hiệp phương sai báo cáo và ở chi phí, không ở nghiệm có nghĩa vật lý. Nếu ba cách cho ba quỹ đạo khác nhau về hình dạng, thì bạn \emph{không} đang gặp vấn đề gauge mà đang gặp một vấn đề khác --- nhiều khả năng là một hướng suy biến do chuyển động, hoặc một lỗi cài đặt.
+
+\section{Suy biến do chuyển động: mục thực dụng nhất}
+\ptrtarget{A/05/05}
+
+Bảy bậc gauge là chuyện cấu trúc và không đổi. Phần này nói về chuyện ngược lại: những bậc \emph{lẽ ra} quan sát được nhưng mất đi vì chuyển động cụ thể vừa rồi không kích thích chúng.
+
+\subsection{A. Bốn cấu hình từ chương 1, nhìn bằng ngôn ngữ mới}
+
+\ptr{A/01} mục~6 liệt kê bốn cấu hình suy biến bằng ngôn ngữ hình học. Với công cụ của chương này, cả bốn trở thành phát biểu về không gian rỗng của \(\Lambda\), và việc thống nhất ấy có giá trị: nó cho một \emph{phép thử duy nhất} thay cho bốn phép thử riêng.
+
+\emph{Xoay thuần}: mọi điểm có thể ở bất kỳ độ sâu nào dọc tia của nó mà không đổi ảnh. Nếu có \(n\) điểm, ta được thêm \(n\) hướng không quan sát được --- không gian rỗng phình từ bảy lên \(7+n\). Phép thử: đếm số giá trị riêng gần không, thấy nó tăng theo số điểm.
+
+\emph{Cảnh phẳng}: họ nghiệm \(E\) không duy nhất; về mặt \(\Lambda\), có thêm hướng tương ứng với việc nghiêng mặt phẳng và bù bằng tư thế.
+
+\emph{Đi dọc trục quang}: không suy biến hoàn toàn, nhưng số điều kiện rất lớn --- các điểm gần epipole gần như không đóng góp thông tin về tịnh tiến. Đây là ví dụ của loại suy biến số học ở mục~2C.
+
+\emph{Mọi điểm ở vô hạn}: hướng tịnh tiến mất; không gian rỗng phình thêm ba hướng (hoặc hai, tuỳ ràng buộc còn lại).
+
+\subsection{B. Ví dụ nhỏ tính tay: hai giả thuyết, một chuỗi đo}
+
+Dựng ví dụ nhỏ nhất chứng minh tỉ lệ không quan sát được bằng số cụ thể.
+
+Giả sử bài toán một chiều: camera ở vị trí \(p\), một điểm ở vị trí \(f\) trên cùng trục, và camera đo góc nhìn tới điểm --- nhưng vì là một chiều, ta đo đại lượng tỉ lệ nghịch với khoảng cách, \(z = c/(f - p)\), đúng như kích thước ảnh của một vật tỉ lệ nghịch với độ sâu.
+
+Giả thuyết một: \(c = 1\), \(p_0 = 0\), camera đi với \(p(t) = t\), điểm ở \(f = 10\). Lấy mẫu tại \(t = 0,1,2,3\):
+\[
+z_0 = \tfrac{1}{10} = 0{,}1,\quad
+z_1 = \tfrac{1}{9} \approx 0{,}1111,\quad
+z_2 = \tfrac{1}{8} = 0{,}125,\quad
+z_3 = \tfrac{1}{7} \approx 0{,}1429 .
+\]
+Giả thuyết hai: nhân đôi mọi thứ có đơn vị mét --- \(p'(t) = 2t\), \(f' = 20\), và giữ nguyên tia nhìn bằng cách để \(c' = 2\):
+\[
+z_k' = \frac{2}{20 - 2t_k} = \frac{2}{2(10-t_k)} = \frac{1}{10-t_k} = z_k .
+\]
+Chuỗi đo trùng khít, từng chữ số. Hai giả thuyết khác nhau hoàn toàn về mét, không phân biệt được từ dữ liệu. (Cửa kiểm chứng b.)
+
+Một câu giải thích về \(c\), vì nó dễ gây hiểu nhầm. Trong bài toán thật, \(c\) là tiêu cự đã biết nên không được nhân lên. Điều đó \emph{không} cứu tình hình, và lý do đáng ghi: bất biến thật của bài toán thị giác đơn mắt là phép co giãn đồng thời \emph{quỹ đạo và bản đồ}, giữ nguyên tham số nội --- và phép co giãn ấy giữ nguyên mọi \emph{tia nhìn} từ camera tới điểm, nên giữ nguyên mọi toạ độ ảnh. Đó chính là suy dẫn ở mục~3A. Ví dụ một chiều là cách rẻ nhất để thấy cơ chế, với cái giá là phải cho \(c\) co giãn theo để mô phỏng ``tia nhìn không đổi''.
+
+\subsection{C. Điều kiện kích thích cho tham số hiệu chuẩn}
+
+Khi thả tham số hiệu chuẩn ra (\ptr{C/14}), mỗi tham số cần một loại kích thích riêng, và đây là bảng đáng thuộc vì nó biến những lời khuyên truyền miệng thành điều kiện kiểm được.
+
+\begin{table}[H]\centering\small
+\caption{Điều kiện kích thích cho từng nhóm tham số. Cột cuối là cách phát biểu lại dưới dạng thao tác --- và đó chính là nội dung của mọi hướng dẫn thu dữ liệu hiệu chuẩn.}
+\label{tab:a05-kichthich}
+\begin{tabularx}{\linewidth}{@{}L{2.8cm}YL{3.4cm}@{}}
+\toprule
+\textbf{Tham số} & \textbf{Cần gì để quan sát được} & \textbf{Phát biểu thành thao tác}\\
+\midrule
+Tiêu cự \(f\) & Đa dạng \emph{độ sâu} --- target ở nhiều khoảng cách & Đưa bảng lại gần rồi ra xa\\
+Điểm chính \((c_x,c_y)\) & Target xuất hiện ở \emph{nhiều vị trí} trong khung, nhất là bốn góc & Quét bảng khắp khung hình\\
+Hệ số méo & Target ở \emph{rìa} ảnh, nơi méo lớn nhất & Đẩy bảng ra sát mép\\
+Tỉ lệ (mono) & Gia tốc thay đổi (có IMU) hoặc một chiều dài đã biết & Chuyển động có tăng giảm tốc\\
+Ngoại tịnh tiến camera--IMU & Xoay quanh \emph{nhiều trục} (số hạng \(\boldsymbol{\omega}\times\mathbf{p}\)) & Xoay quanh cả ba trục\\
+Ngoại xoay stereo & Cảnh có \emph{độ sâu đa dạng} & Cảnh có cả vật gần và xa\\
+Sai lệch thời gian \(t_d\) & Tốc độ góc \emph{cao và biến thiên} & Lắc nhanh\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Điều đáng nói về bảng này: nó giải thích vì sao mọi hướng dẫn hiệu chuẩn đều bảo bạn ``nghiêng bảng nhiều hướng, đưa ra sát rìa, lại gần rồi ra xa''. Ba thao tác đó không phải mê tín --- chúng là ba điều kiện kích thích ở ba hàng đầu, phát biểu bằng ngôn ngữ thao tác tay. Và nó cho một tiêu chí để \emph{tự động đánh giá} một bộ dữ liệu hiệu chuẩn trước khi chạy tối ưu, điều mà \ptr{D/21} cần cho dây chuyền.
+
+\section{Nhất quán: khi bộ ước lượng tự bịa thông tin}
+\ptrtarget{A/05/06}
+
+Tầng thứ ba, và là tầng tinh vi nhất. Ngay cả khi lý thuyết nói một hướng không quan sát được, bộ ước lượng vẫn có thể báo cáo hiệp phương sai hữu hạn theo hướng ấy.
+
+Cơ chế là \term{thông tin giả} (spurious information). Trong một hệ có marginalization (\ptr{A/04} mục~5), thông tin về một biến được lưu lại dưới dạng nhân tử prior, tính bằng Jacobian tại một điểm tuyến tính hoá. Biến ấy tiếp tục di chuyển; khi các phần khác của bài toán tuyến tính hoá nó ở điểm mới, hai Jacobian \emph{không tương thích}. Tích của các ma trận chuyển không còn giữ đúng không gian rỗng mà lý thuyết dự đoán, và kết quả là ma trận thông tin có hạng cao hơn hạng thật \cite{huang2008fej}.
+
+Hậu quả đi theo chiều nguy hiểm chứ không phải chiều an toàn: thông tin \emph{tăng}, nên hiệp phương sai \emph{giảm}, nên bộ ước lượng trở nên \emph{quá tự tin}. Một hệ báo sai số \(\pm 2\) cm khi sai thật là \(\pm 20\) cm gây hại nhiều hơn một hệ báo \(\pm 50\) cm --- vì bộ lập kế hoạch dựa vào con số ấy để quyết định đi qua một khe hẹp.
+
+Hai cách chữa. \term{FEJ}: cố định điểm tuyến tính hoá của các biến bị chạm bởi prior, chấp nhận Jacobian hơi lỗi thời để đổi lấy tính nhất quán của không gian rỗng. \term{Công thức bất biến} (InEKF): chọn một cấu trúc nhóm mà động học sai số không phụ thuộc trạng thái, nên vấn đề không phát sinh \cite{barrau2017invariant}. Cây \code{../IMU\_Fusion/} chương 5 và 8 nói kỹ cả hai; ở đây điều cần nhớ là \emph{hiệp phương sai do một bộ ước lượng có marginalization báo ra phải bị nghi ngờ mặc định}, và \ptr{C/18} cho công cụ đo mức độ nghi ngờ ấy bằng NEES.
+
+\begin{cambay}
+\textbf{Bốn phép thử để phát hiện suy biến, xếp theo độ rẻ.} Không phép nào là số inlier --- xem \ptr{A/01} mục 6.
+
+\textbf{(1) Chạy lại với nhiều khởi đầu khác nhau.} Rẻ nhất, mạnh bất ngờ. Nếu nghiệm \emph{đi theo} giá trị khởi đầu thì hướng đó không quan sát được. Đây là phép thử duy nhất không cần chân trị và không cần đụng vào ma trận.
+
+\textbf{(2) Phổ giá trị riêng của \(\Lambda\).} Đếm số giá trị riêng gần không, so với số bậc gauge lý thuyết ở mục 3B. Nhiều hơn dự đoán nghĩa là có suy biến do chuyển động. Xem cả \emph{véctơ riêng} để biết hướng nào --- đó là chẩn đoán, không chỉ báo động.
+
+\textbf{(3) Số điều kiện theo thời gian.} Rẻ hơn phổ đầy đủ và dùng được tại runtime. Nó bắt được suy biến số học, tức trường hợp bệnh chưa thành nhưng sắp thành --- và đó là thứ bạn muốn biết \emph{trước} khi hỏng.
+
+\textbf{(4) NEES với chân trị.} Đắt nhất vì cần chân trị, nhưng là phép thử duy nhất bắt được bệnh bất nhất ở mục 6. Chỉ làm được trong mô phỏng hoặc trên bộ dữ liệu có chân trị --- và đó là một lý do chính đáng để dựng mô phỏng, xem \ptr{C/18}.
+
+Điểm chung của cả bốn: chúng đo \emph{mức xác định của mô hình}, không đo \emph{mức nhất quán của dữ liệu với mô hình}. Nhầm hai thứ đó là gốc của kiểu hỏng im lặng.
+\end{cambay}
+
+\begin{ungdung}
+\ud{OpenVINS \cite{geneva2020openvins}}{FEJ bật/tắt bằng cờ; hiệu chuẩn trực tuyến có kiểm observability; bộ mô phỏng có chân trị}{Nơi tốt nhất để đọc mã liên quan chương này; cũng là chỗ tính được NEES}
+\ud{Kalibr \cite{furgale2013kalibr}}{Quy trình thu dữ liệu có yêu cầu chuyển động cụ thể}{Mỗi yêu cầu trong tài liệu là một hàng của Bảng~\ref{tab:a05-kichthich} viết thành thao tác}
+\ud{ORB-SLAM3 \cite{campos2021orbslam3}}{Từ chối khởi tạo khi parallax không đủ; \(Sim(3)\) cho loop mono, \(SE(3)\) khi có stereo/IMU}{Mục 3B thành quyết định kiến trúc}
+\ud{rpg\_trajectory\_evaluation \cite{zhang2018trajeval}}{Căn chỉnh theo đúng số bậc tự do của cấu hình cảm biến}{Khối \emph{Cần nhớ} mục 3B cài thành công cụ}
+\ud{\cite{zhang2018gaugeba}}{So sánh có hệ thống ba cách xử lý gauge trong VIO}{Nguồn trực tiếp của Bảng~\ref{tab:a05-gauge}}
+\end{ungdung}
+
+\begin{duan}{Xác nhận bảy bậc tự do bằng phổ, rồi làm nó phình ra bằng ba chuyển động suy biến}{3 ngày}
+\dmt nhìn tận mắt bảy giá trị riêng bằng không, rồi nhìn chúng thành nhiều hơn khi chuyển động suy biến --- tự kiểm chứng mục 3 và mục 5 bằng số.
+\ddl tự sinh, vì bạn cần kiểm soát chính xác chuyển động: một quỹ đạo tổng quát, một quỹ đạo xoay thuần, một cảnh phẳng, và một quỹ đạo đi dọc trục quang. Một bản đồ điểm ngẫu nhiên.
+\dbc dựng bài toán BA nhỏ với vài chục tư thế và vài trăm điểm dùng mã từ \ptr{A/04}; \emph{không} cố định gauge; dựng \(\Lambda\) dạng đặc; tính toàn bộ phổ giá trị riêng; với quỹ đạo tổng quát, xác nhận đúng bảy giá trị riêng ở mức không số học và kiểm rằng bảy véctơ riêng tương ứng đúng là ba tịnh tiến, ba xoay, một tỉ lệ; lặp với ba quỹ đạo suy biến và đếm lại; cuối cùng thêm tham số nội vào tập biến rồi đếm thêm một lượt.
+\dxk bạn có một bảng: bốn hàng quỹ đạo, mỗi hàng ghi số giá trị riêng gần không và \emph{diễn giải vật lý} của các véctơ riêng. Kiểm tra chéo bắt buộc: với quỹ đạo tổng quát và có thêm tham số nội, số chiều không gian rỗng phải \emph{vẫn} là bảy --- nếu ra nhiều hơn thì quỹ đạo chưa đủ đa dạng theo Bảng~\ref{tab:a05-kichthich}, và đó cũng là một kết quả đáng ghi. Thêm một cột: với mỗi quỹ đạo, chạy lại từ ba khởi đầu khác nhau và ghi độ tán của nghiệm --- xác nhận phép thử (1) ở khối \emph{Cạm bẫy}.
+\dnv \ptr{B/10-khoi-tao} dùng bảng này làm tiêu chí quyết định khi nào được phép khởi tạo; \ptr{C/14-hieu-chuan-nhu-mot-nhanh-cua-slam} dùng cột cuối để quyết định thả biến nào ra.
+\end{duan}
+
+\begin{traloi}
+\tl{Cơ chế là hàm mục tiêu phẳng theo một hướng: mọi giá trị của tỉ lệ dọc hướng đó cho \emph{chính xác} cùng tập phần dư, nên bộ giải không có tín hiệu nào để chọn và nó dừng ở chỗ nhiễu số học đẩy tới. Nó không tự phát hiện được vì thứ duy nhất bộ giải quan sát là hàm mục tiêu, và hàm mục tiêu không phân biệt các điểm trên máng. Độ lệch chuẩn \(0{,}004\) khi đó đến từ một prior ngầm, từ damping LM, hoặc từ thông tin giả do tuyến tính hoá không nhất quán --- ba nguồn đều không phải phép đo. Cách bắt rẻ nhất: chạy lại với nhiều khởi đầu; nếu nghiệm đi theo khởi đầu thì hướng đó không quan sát được.}
+\tl{Ba con số đến từ việc cảm biến nào cung cấp thông tin gì. Mono thuần thị giác: không có đơn vị chiều dài, không có hướng tuyệt đối, không có gốc --- bảy bậc, đúng \(Sim(3)\). Stereo: đường cơ sở đã biết bằng mét nên tỉ lệ quan sát được, còn sáu. VIO: gia tốc kế cho mét (nếu gia tốc thay đổi) và trọng lực ghim roll--pitch vì gia tốc kế đo lực riêng, còn bốn. Hệ quả: pose graph phải tối ưu đúng số bậc ấy --- \(Sim(3)\), \(SE(3)\), hay bốn bậc. Và quan trọng không kém, \emph{căn chỉnh khi đánh giá} phải dùng đúng số đó; căn bảy bậc cho hệ VIO là che mất lỗi tỉ lệ.}
+\tl{Giống nhau: \emph{quỹ đạo tương đối} --- hình dạng đường đi và hình dạng bản đồ trùng khít sau khi căn chỉnh. Khác nhau: hiệp phương sai báo cáo (cách 1 cho hiệp phương sai tương đối so với khung đầu, tăng đơn điệu theo khoảng cách; cách 3 cho hiệp phương sai không thiên vị) và chi phí tính toán. Nếu \emph{quỹ đạo} của họ khác nhau về hình dạng thì đó \textbf{không} phải vấn đề gauge --- gauge chỉ làm khác nhau một phép biến đổi \(Sim(3)\) toàn cục. Khác nhau về hình dạng nghĩa là có một hướng suy biến do chuyển động, hoặc một lỗi cài đặt, và phải điều tra chứ không được bỏ qua.}
+\tl{Vì bạn vừa \emph{tự quyết định} tỉ lệ, và bộ ước lượng chỉ xác nhận lại quyết định đó --- con số đầu ra bây giờ phản ánh prior của bạn chứ không phản ánh dữ liệu. Nếu prior đúng thì tốt; nếu sai thì bạn đã đóng băng một sai số có hệ thống và nó sẽ chảy vào mọi thứ khác. Tệ hơn, hiệp phương sai bây giờ trông nhỏ vì prior mạnh, nên không có gì cảnh báo. Phép thử phân biệt: hỏi \emph{prior này đến từ đâu}. Nếu từ một phép đo thật --- đường cơ sở stereo, một vật có kích thước đã biết, IMU --- thì nó hợp lệ và nên được mô hình hoá thành một nhân tử có hiệp phương sai đúng. Nếu nó chỉ là một con số bạn chọn để hệ thống ngừng trôi thì đó là bẫy: bạn đã che chẩn đoán thay vì chữa bệnh.}
+\tl{Phép thử: (a) \emph{số chiều không gian rỗng có đổi theo chuyển động không?} Không đổi thì là gauge; đổi thì là suy biến do chuyển động. (b) \emph{giá trị riêng có \emph{đúng} bằng không hay chỉ rất nhỏ?} Đúng bằng không (tới mức không số học) thì là hai loại đầu; chỉ nhỏ thì là suy biến số học. Dùng sai cách chữa thì hỏng: cố định gauge cho hướng suy biến do chuyển động là tự áp đặt một giá trị không có cơ sở; đổi chuyển động để cứu gauge là vô ích vì bảy bậc không biến mất dù đi kiểu gì; và đổi tham số hoá để chữa một gauge thật thì chỉ dịch vấn đề đi chỗ khác.}
+\end{traloi}
+
+\begin{dongian}
+Tưởng tượng bạn tỉnh dậy trong một căn phòng trắng không cửa sổ, không đồ đạc, và người ta hỏi bạn đang ở đâu.
+
+Có những câu bạn không bao giờ trả lời được, dù ngồi bao lâu. Phòng này ở toạ độ nào trên Trái Đất? Nó quay mặt về hướng nào? Nếu mọi thứ trong phòng --- kể cả bạn --- được thu nhỏ đúng một nửa cùng lúc, bạn có nhận ra không? Không, không, và không. Ba câu đó không phải vì bạn quan sát kém mà vì \emph{trong phòng không có thông tin đó}. Đấy là bảy điều mà một cái máy chỉ có camera cũng không bao giờ biết được, và điều quan trọng là: nó \emph{không cần} biết. Ta chỉ cần chọn đại một gốc, một hướng, một đơn vị, rồi mọi thứ còn lại vẫn đúng so với nhau.
+
+Rồi có loại câu hỏi thứ hai, thú vị hơn. ``Cái bàn kia cách tôi bao xa?'' Nếu bạn ngồi im, bạn không biết --- một cái bàn nhỏ ở gần trông giống hệt một cái bàn to ở xa. Nhưng nếu bạn \emph{đi vài bước}, bạn biết ngay. Đây là loại khác hẳn loại trên: hôm nay không biết nhưng sẽ biết nếu làm đúng việc.
+
+Và có loại thứ ba, khó chịu nhất. Bạn đi vài bước, nhưng đi theo đúng hướng cái bàn --- nên nó chỉ to dần lên chứ không lệch sang bên. Bạn \emph{có} thông tin nhưng rất ít, và ước lượng của bạn chập chờn. Đây không phải không biết, cũng không phải biết chắc, mà là ở giữa --- và ở giữa là chỗ khó chẩn đoán nhất.
+
+Điều nguy hiểm nhất không phải việc không biết. Nó là việc \emph{nói ra một con số kèm sự tự tin mà mình không có quyền có}. Cái máy trong cả ba tình huống trên vẫn đọc ra một con số, vì người ta bảo nó phải đọc ra một con số. Và nếu lập trình sơ ý, nó còn kèm thêm ``tôi khá chắc''.
+
+Toàn bộ chương này là cách trả lời: trong những con số máy đang đọc ra, con số nào là kết quả của một phép đo, con số nào là một quy ước ta tự chọn, và con số nào chỉ là chỗ ngẫu nhiên mà thuật toán dừng lại.
+
+\chuadongian{ranh giới giữa ``không biết được vĩnh viễn'' và ``chưa biết được vì chuyển động chưa đủ'' không nhìn ra được từ đầu ra của bộ ước lượng --- hai trường hợp cho cùng triệu chứng. Phân biệt chúng đòi phân tích chính mô hình, và đó là việc phải làm bằng tay một lần cho mỗi cấu hình cảm biến. Không có công cụ tự động nào làm hộ, và việc đó vẫn còn là một khoảng trống nghiên cứu --- xem \ptr{D/22}.}
+\motcau{Trước khi hỏi bộ ước lượng trả lời đúng không, hãy hỏi dữ liệu có chứa câu trả lời không.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{A/05/07}
+
+Mệnh đề chính --- \emph{SfM đơn mắt có đúng bảy bậc tự do không quan sát được} --- bị bác bỏ nếu ai đó chỉ ra một phép biến đổi thứ tám, độc lập với bảy phép kia, giữ nguyên mọi phép đo trong mô hình chuẩn (cảnh tĩnh, camera đã hiệu chuẩn nội, không có cảm biến khác). Nó cũng bị bác bỏ theo hướng ngược lại nếu ai đó chỉ ra rằng một trong bảy hướng thực ra \emph{có} ảnh hưởng tới một phép đo. Tôi đã kiểm chiều thuận bằng cách thay trực tiếp vào phương trình chiếu ở mục~3A (cửa a) và đối chiếu \cite{triggs2000ba} cùng \cite{hartley2004} (cửa c).
+
+Mệnh đề thứ hai --- \emph{ba cách cố định gauge cho cùng quỹ đạo tương đối} --- bị bác bỏ nếu một thí nghiệm có kiểm soát cho thấy chúng cho ba hình dạng quỹ đạo khác nhau sau khi căn chỉnh \(Sim(3)\), trên một bài toán không có suy biến do chuyển động. \cite{zhang2018gaugeba} khảo sát đúng câu hỏi này trong ngữ cảnh VIO; tôi chưa đọc tới lượt ba nên chưa kiểm được liệu kết luận của họ có điều kiện nào mà tôi đang bỏ sót không.
+
+Mệnh đề thứ ba --- \emph{thông tin giả làm bộ ước lượng quá tự tin} --- đã được thiết lập cho bộ lọc \cite{huang2008fej,hesch2014consistency}. Nó bị bác bỏ trong ngữ cảnh cửa sổ trượt tối ưu hoá nếu một thí nghiệm Monte-Carlo cẩn thận cho thấy ANEES nằm trong dải chấp nhận trong thời gian dài mà \emph{không} nhờ nhiễu quá trình được nới rộng hay một prior bù vào. Đây là mệnh đề dễ kiểm nhất trong ba, và tôi chưa kiểm.
+
+Một mệnh đề mềm hơn nhưng đáng nêu: chương này khẳng định rằng \emph{chẩn đoán qua observability có giá trị thực dụng cao hơn việc đổi bộ giải}. Điều đó bị bác bỏ nếu trong thực tế, phần lớn ca hỏng mà kỹ sư gặp bắt nguồn từ lỗi cài đặt và lỗi số học chứ không từ thiếu kích thích. Tôi không có số liệu để khẳng định tỉ lệ, và đây là chỗ tôi phát biểu dựa trên cấu trúc của vấn đề chứ không dựa trên thống kê \emph{(tôi suy ra, chưa đối chiếu nguồn)}. \ptr{D/21} đề nghị cách thu số liệu đó từ fleet analytics, và đó là cách duy nhất tôi biết để trả lời câu này một cách trung thực.
+
+\section{Kết nối}
+\ptrtarget{A/05/08}
+
+Chương này đứng ở chỗ Phần~A gập lại, và gần như mọi chương sau đều gọi ngược về đây.
+
+Nối lên trên. \ptr{A/01-hinh-hoc-da-thi} cung cấp bốn cấu hình suy biến cụ thể mà mục~5A tổng quát hoá; điều đáng chú ý là chương 1 cho bốn phép thử riêng còn chương này cho \emph{một} phép thử duy nhất thay thế được cả bốn. \ptr{A/02-mo-hinh-camera} cung cấp một ví dụ sớm ở mục~4B của nó: tương quan giữa các hệ số méo bậc cao là một hướng gần suy biến, và ``hiệu chuẩn ba lần ra ba kết quả'' chính là phép thử (1) ở khối \emph{Cạm bẫy}. \ptr{A/03-lie-group-va-toi-uu-tren-da-tap} cho ngôn ngữ để ``co giãn cả thế giới'' viết thành một phép toán trên \(Sim(3)\). \ptr{A/04-uoc-luong-map-va-bundle-adjustment} cho ma trận \(\Lambda\); chương này chỉ làm một việc là hỏi chỗ nó suy biến.
+
+Nối xuống dưới, theo thứ tự cấp bách. \ptr{B/10-khoi-tao} là nơi mục~5 trở thành điều kiện chấp nhận: bộ khởi tạo tốt không phải bộ luôn trả về kết quả mà là bộ biết \emph{từ chối} khi kích thích chưa đủ. \ptr{C/14-hieu-chuan-nhu-mot-nhanh-cua-slam} nhận Bảng~\ref{tab:a05-kichthich}: mọi thảo luận về hiệu chuẩn trực tuyến đều phải kèm điều kiện kích thích, nếu không nó chỉ là mở rộng trạng thái một cách mù quáng. \ptr{B/09-paradigm-uoc-luong-back-end} nhận mục~6: FEJ và các biến thể tồn tại \emph{chỉ vì} bệnh bất nhất mô tả ở đây. \ptr{C/18-danh-gia-va-phuong-phap-luan} nhận hai thứ: quy tắc căn chỉnh theo đúng số bậc tự do, và NEES như thước đo bổ sung cho ATE --- hai con số đo hai thứ khác nhau, ATE hỏi bạn đúng bao nhiêu, NEES hỏi bạn có thành thật về việc mình đúng bao nhiêu không.
+
+Nối xa hơn: \ptr{D/19-ben-vung-trong-the-gioi-thuc} và \ptr{D/22-huong-nghien-cuu-con-trong} đều lấy chương này làm nền. Hướng nghiên cứu số một --- hiệu chuẩn trực tuyến có ý thức về observability --- chính là việc cài Bảng~\ref{tab:a05-kichthich} thành một cơ chế chạy theo thời gian thực, và nó còn thô sơ trong mọi hệ thống hiện có.
+
+Nối ngang: \code{../IMU\_Fusion/} chương 5 là chương sinh đôi của chương này, viết cho trường hợp có quán tính. Bốn bậc tự do của VIO, FEJ, InEKF và NEES được nói kỹ ở đó; ở đây tôi chỉ nhắc kết quả và trỏ sang, theo quy tắc một nguồn duy nhất của kho.
+
+\begin{tukiem}
+\item Tự dẫn lại bảy bậc tự do của SfM đơn mắt bằng cách thay phép biến đổi \(Sim(3)\) vào phương trình chiếu, không nhìn bài.
+\item Vì sao số bậc tự do gauge giảm từ bảy xuống sáu khi thêm stereo, và xuống bốn khi thêm IMU? Trả lời bằng ngôn ngữ ``cảm biến nào đo được gì''.
+\item Ba loại suy biến --- quy ước, chuyển động, số học --- phân biệt bằng hai phép thử nào, và mỗi loại chữa thế nào?
+\item Một bộ ước lượng cho tỉ lệ rất ổn định qua hai mươi lần chạy. Vì sao điều đó \emph{không} chứng minh tỉ lệ quan sát được, và phép thử nào mới chứng minh được?
+\item Nếu chỉ xoay quanh đúng một trục trong suốt quá trình hiệu chuẩn camera--IMU, thành phần nào của phép biến đổi ngoại không xác định được, và vì sao?
+\item Bộ ước lượng tự tạo thông tin theo hướng không quan sát được bằng cơ chế nào, và vì sao hậu quả đi theo chiều nguy hiểm chứ không phải chiều an toàn?
+\item Ba giả thiết ngầm của chương là cảnh tĩnh, camera đã hiệu chuẩn nội, và nhiễu Gauss. Với mỗi giả thiết, bỏ nó thì kết luận nào thay đổi, và bạn có nhận ra lúc nó bị vi phạm không?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

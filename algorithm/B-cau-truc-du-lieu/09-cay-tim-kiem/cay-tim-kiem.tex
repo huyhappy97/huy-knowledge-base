@@ -1,0 +1,271 @@
+% ============================================================================
+%  B/09-cay-tim-kiem — file chương
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+%  Dependency: B/07, B/08, A/04. Mức độ: cốt lõi ở phần ý tưởng, tham khảo ở phần cài đặt.
+% ============================================================================
+\documentclass[../../algorithm.tex]{subfiles}
+\begin{document}
+\chapter{Cây tìm kiếm và cân bằng (Search Trees and Balance)}
+\ptrtarget{B/09}\ptrtarget{B/09-cay-tim-kiem}
+\dependency{\ptr{B/08} cho phía đối lập --- băm không thứ tự; \ptr{A/04} cho bất biến, vì cân bằng chính là một bất biến được duy trì sau mỗi thao tác.}
+
+\begin{tomtat}
+Cây tìm kiếm là câu trả lời cho câu hỏi mà băm không trả lời được: \emph{giữ dữ liệu có thứ tự với chi phí cập nhật rẻ}. Ý tưởng gốc rất đơn giản --- mỗi nút chia dữ liệu thành nhỏ hơn và lớn hơn --- nhưng nó thoái hoá thành danh sách nếu dữ liệu vào theo thứ tự sắp sẵn, và toàn bộ chương này là các cách khác nhau để chống lại sự thoái hoá đó: quay để giữ chiều cao (AVL, đỏ--đen), làm nút to ra cho hợp với đĩa (B-cây), hoặc dùng ngẫu nhiên để cân bằng gần như miễn phí (treap, danh sách bỏ qua). Chương cũng nói về \emph{tăng cường} --- gắn thêm thông tin vào mỗi nút để cây trả lời được câu hỏi mới, kỹ thuật đáng giá nhất ở đây. Nếu chỉ nhớ một điều: chiều cao cây là bất biến cần duy trì, và mọi cấu trúc chỉ khác nhau ở cách trả tiền cho bất biến đó.
+\end{tomtat}
+
+\begin{nentang}
+\kn{cây tìm kiếm nhị phân (BST)}{cây nhị phân trong đó mọi nút ở cây con trái nhỏ hơn nút gốc, mọi nút ở cây con phải lớn hơn. Duyệt giữa cho dãy tăng dần.}
+\kn{chiều cao cây}{số cạnh trên đường dài nhất từ gốc tới lá; quyết định chi phí mọi thao tác. Cây cân bằng có chiều cao \Ob{\log n}, cây thoái hoá có chiều cao \Ob{n}.}
+\kn{phép quay (rotation)}{thao tác cục bộ đổi chỗ một nút với con của nó, giữ nguyên thứ tự nhưng đổi chiều cao. Đây là công cụ cơ bản của mọi cây tự cân bằng.}
+\kn{tăng cường (augmentation)}{lưu thêm thông tin ở mỗi nút --- kích thước cây con, tổng, cực đại --- để trả lời được truy vấn mới mà vẫn giữ \Ob{\log n}.}
+\kn{B-cây}{cây tìm kiếm nhiều nhánh, mỗi nút chứa nhiều khoá, thiết kế để mỗi nút vừa một khối đĩa. Cơ sở của mọi chỉ mục cơ sở dữ liệu.}
+\kn{treap}{cây kết hợp tính chất BST theo khoá và tính chất heap theo một độ ưu tiên \emph{ngẫu nhiên}; cân bằng theo nghĩa kỳ vọng mà không cần luật quay phức tạp.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Cây tìm kiếm nhị phân đơn giản chạy \Ob{\log n} ``trung bình''. Vì sao trong thực tế nó lại nguy hiểm, và tình huống nào làm nó tệ nhất?}
+\h{Cây đỏ--đen và AVL cùng cho \Ob{\log n}. Vì sao thư viện chuẩn thường chọn đỏ--đen còn cơ sở dữ liệu lại chọn B-cây?}
+\h{Treap dùng số ngẫu nhiên để cân bằng và không có luật quay phức tạp nào. Vì sao nó vẫn đảm bảo được chiều cao \Ob{\log n}?}
+\h{Vì sao ``tăng cường'' là kỹ thuật đáng giá nhất của chương này, hơn cả việc thuộc luật cân bằng?}
+\h{Khi nào một cây cân bằng \Ob{\log n} lại thua một mảng đã sắp \Ob{n} trên máy thật?}
+\end{khoigoi}
+
+Chương trước cho ta tra cứu \Ob{1} nhưng không có thứ tự. Rất nhiều bài toán cần thứ tự: tìm phần tử gần nhất, liệt kê mọi phần tử trong một khoảng, tìm phần tử nhỏ nhất lớn hơn \(x\), hỏi phần tử đứng thứ \(k\). Nếu dữ liệu tĩnh thì mảng đã sắp cộng tìm kiếm nhị phân giải hết --- rẻ và nhanh. Bài toán chỉ trở nên khó khi dữ liệu \emph{vừa cần thứ tự vừa thay đổi liên tục}, vì chèn vào mảng đã sắp tốn \Ob{n}.
+
+Cây tìm kiếm là câu trả lời cho đúng tình huống đó, và ý tưởng thì hiển nhiên: thay vì giữ dữ liệu thành một dãy, hãy giữ nó thành một cấu trúc phân nhánh, để việc chèn chỉ động tới một đường từ gốc xuống lá. Cái không hiển nhiên --- và là toàn bộ nội dung của chương --- là làm sao giữ cho đường đó ngắn.
+
+\section{Bài toán thoái hoá và ý nghĩa của cân bằng}
+
+Cây tìm kiếm nhị phân thô sơ chèn phần tử mới bằng cách đi từ gốc, rẽ trái nếu nhỏ hơn, rẽ phải nếu lớn hơn, cho tới khi gặp chỗ trống. Nếu dữ liệu tới theo thứ tự ngẫu nhiên, chiều cao kỳ vọng là \Ob{\log n} và mọi thứ đều tốt.
+
+Nhưng nếu dữ liệu tới theo thứ tự \emph{đã sắp} --- tình huống cực kỳ phổ biến trong thực tế, vì dữ liệu thật thường có trật tự sẵn --- thì mọi phần tử đều rẽ phải và cây thành một danh sách liên kết dài \(n\). Mọi thao tác thành \Ob{n}, và cấu trúc mà bạn chọn để tăng tốc lại làm chậm chương trình so với mảng thường.
+
+Đây là cùng một câu chuyện với chương \ptr{B/08}: một cấu trúc nhanh ``trung bình'' nhưng có trường hợp xấu mà dữ liệu thực tế lại rất dễ rơi vào. Và có hai hướng chữa, hệt như ở đó.
+
+\emph{Hướng tất định:} thêm một bất biến về hình dạng và duy trì nó sau mỗi thao tác. AVL yêu cầu chiều cao hai cây con của mọi nút chênh nhau không quá 1 --- rất chặt, nên cây thấp và tìm kiếm nhanh, nhưng phải quay nhiều khi chèn/xoá. Cây đỏ--đen yêu cầu lỏng hơn --- không đường nào từ gốc tới lá dài quá hai lần đường ngắn nhất --- nên cây cao hơn một chút nhưng số phép quay ít hơn. Sự khác nhau đó giải thích lựa chọn của các thư viện: khi tỉ lệ chèn/xoá cao, đỏ--đen tổng thể rẻ hơn.
+
+\emph{Hướng ngẫu nhiên:} không ép hình dạng, mà làm cho hình dạng \emph{không phụ thuộc thứ tự dữ liệu vào}. Đây là ý tưởng của treap và danh sách bỏ qua, và mục 3 sẽ nói kỹ vì nó rất đẹp.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.42cm and 0.3cm,
+  n/.style={circle,draw=steel,fill=bluebg,inner sep=0pt,minimum size=6.5mm,font=\scriptsize},
+  b/.style={circle,draw=reddark,fill=redbg,inner sep=0pt,minimum size=6.5mm,font=\scriptsize},
+  ar/.style={draw=steel,thick}, arb/.style={draw=reddark,thick}]
+% degenerate
+\node[b] (d1) at (0.6,3.0) {1};
+\node[b] (d2) at (1.3,2.3) {2};
+\node[b] (d3) at (2.0,1.6) {3};
+\node[b] (d4) at (2.7,0.9) {4};
+\node[b] (d5) at (3.4,0.2) {5};
+\draw[arb] (d1)--(d2); \draw[arb] (d2)--(d3); \draw[arb] (d3)--(d4); \draw[arb] (d4)--(d5);
+\node[font=\scriptsize,color=reddark,align=center] at (1.5,-0.55) {chèn 1,2,3,4,5 theo thứ tự\\chiều cao \Ob{n}};
+% balanced
+\node[n] (b3) at (7.4,3.0) {3};
+\node[n] (b2) at (6.5,2.1) {2};
+\node[n] (b4) at (8.3,2.1) {4};
+\node[n] (b1) at (5.9,1.2) {1};
+\node[n] (b5) at (8.9,1.2) {5};
+\draw[ar] (b3)--(b2); \draw[ar] (b3)--(b4); \draw[ar] (b2)--(b1); \draw[ar] (b4)--(b5);
+\node[font=\scriptsize,color=steel,align=center] at (7.4,-0.55) {cùng dữ liệu, cây cân bằng\\chiều cao \Ob{\log n}};
+\draw[-{Latex[length=2.4mm]},very thick,color=accent] (4.3,1.6) -- (5.2,1.6);
+\node[font=\scriptsize,color=accent,anchor=south] at (4.75,1.75) {quay};
+\end{tikzpicture}
+\caption{Cùng năm khoá, hai hình dạng. Cây trái là kết quả của việc chèn dữ liệu đã sắp sẵn --- trường hợp rất hay gặp trong thực tế, không phải trường hợp hiếm. Mọi cấu trúc trong chương này chỉ làm một việc: ngăn hình dạng bên trái xuất hiện, bằng phép quay hoặc bằng ngẫu nhiên hoá.}
+\label{fig:bst-degenerate}
+\end{figure}
+
+\section{Phép quay: thao tác cơ bản duy nhất}
+
+Mọi cây tự cân bằng đều dựa trên một thao tác duy nhất là phép quay: đổi chỗ một nút với con của nó, nối lại ba cây con cho đúng. Điều quan trọng nhất về phép quay --- và là chỗ đáng dừng lại một phút --- là nó \emph{bảo toàn thứ tự duyệt giữa} nhưng \emph{thay đổi chiều cao}. Nói theo ngôn ngữ chương \ptr{A/04}: phép quay giữ nguyên bất biến ngữ nghĩa (tính chất BST) trong khi sửa bất biến cấu trúc (chiều cao). Đó chính là lý do nó là công cụ đúng: bạn cần sửa hình dạng mà không được làm hỏng nội dung.
+
+Từ đó, các cấu trúc chỉ khác nhau ở \emph{khi nào quay} và \emph{quay bao nhiêu}: AVL quay khi chênh lệch chiều cao vượt 1; đỏ--đen quay và đổi màu theo một bộ luật dài hơn nhưng ít quay hơn; treap quay để khôi phục tính chất heap theo độ ưu tiên ngẫu nhiên; splay quay đưa nút vừa truy cập lên gốc.
+
+Cây splay đáng nhắc riêng vì nó đại diện cho một triết lý khác\cite{sleator1985}: không đảm bảo gì cho từng thao tác, chỉ đảm bảo \Ob{\log n} \emph{khấu hao}, đổi lại có tính chất rất hay là các phần tử hay truy cập tự động nổi lên gần gốc. Trong hệ thống có tính cục bộ truy cập cao, điều đó làm nó nhanh hơn cây cân bằng chặt. Nhược điểm: mỗi lần \emph{đọc} cũng làm thay đổi cấu trúc, nên nó khó dùng trong môi trường nhiều luồng.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[yscale=0.78,xscale=0.9,
+  bn/.style={draw=steel,fill=bluebg,thick,minimum width=6mm,minimum height=4.5mm,inner sep=1pt,font=\tiny},
+  bl/.style={draw=accent,fill=amberbg,thick,minimum width=26mm,minimum height=4.5mm,inner sep=1pt,font=\tiny}]
+\node[font=\scriptsize\bfseries,color=steel] at (1.6,3.7) {Cây nhị phân};
+\node[bn] at (1.6,3.0) {}; \node[bn] at (0.7,2.2) {}; \node[bn] at (2.5,2.2) {};
+\node[bn] at (0.25,1.4) {}; \node[bn] at (1.15,1.4) {}; \node[bn] at (2.05,1.4) {}; \node[bn] at (2.95,1.4) {};
+\node[font=\tiny,color=tiercol] at (1.6,0.75) {\dots};
+\draw[-{Latex[length=1.8mm]},color=reddark,thick] (3.6,3.0) -- (3.6,0.6);
+\node[font=\scriptsize,color=reddark,anchor=west,text width=1.9cm] at (3.7,1.8) {\(\log_2 n\) lần đọc đĩa};
+\node[font=\scriptsize\bfseries,color=accent] at (8.3,3.7) {B-cây};
+\node[bl] at (8.3,3.0) {khối đĩa: hàng trăm khoá};
+\node[bl] at (6.6,1.9) {}; \node[bl] at (10.0,1.9) {};
+\node[font=\tiny,color=tiercol] at (8.3,1.1) {\dots};
+\draw[-{Latex[length=1.8mm]},color=greendark,thick] (11.9,3.0) -- (11.9,1.7);
+\node[font=\scriptsize,color=greendark,anchor=west,text width=1.9cm] at (12.0,2.35) {\(\log_B n\): 3--4 lần};
+\end{tikzpicture}
+\caption{Đổi đơn vị chi phí thì đổi hình dạng cấu trúc. Khi chi phí thật là \emph{lần đọc khối} chứ không phải phép so sánh, việc đằng nào cũng phải trả tiền cho một lần đọc khiến ta muốn đọc thật nhiều khoá một lúc --- và cây từ nhị phân biến thành nhiều nhánh với nút vừa một khối đĩa.}
+\label{fig:btree-vs-bst}
+\end{figure}
+
+\section{Ngẫu nhiên hoá: cách rẻ nhất để cân bằng}
+
+Treap là một trong những ý tưởng đẹp nhất trong cấu trúc dữ liệu, và nó chỉ cần một câu để phát biểu: mỗi nút có khoá (do dữ liệu quyết định) và một \emph{độ ưu tiên ngẫu nhiên} (do bạn sinh ra); cây được giữ sao cho theo khoá thì nó là BST, còn theo độ ưu tiên thì nó là heap.
+
+Vì sao điều đó cho cân bằng? Vì hình dạng của một treap chỉ phụ thuộc vào \emph{thứ tự các độ ưu tiên}, không phụ thuộc thứ tự chèn. Mà độ ưu tiên do bạn sinh ngẫu nhiên, nên hình dạng của treap giống hệt hình dạng của một BST được chèn theo thứ tự ngẫu nhiên --- và chiều cao kỳ vọng của cây đó là \Ob{\log n}. Nói cách khác: bạn không thể kiểm soát thứ tự dữ liệu tới, nhưng bạn có thể tự tạo ra một thứ tự ngẫu nhiên khác và để hình dạng phụ thuộc vào thứ tự đó.
+
+Đây chính xác là ý tưởng của băm phổ dụng ở chương \ptr{B/08} và của chốt ngẫu nhiên trong quicksort ở chương \ptr{C/14}, xuất hiện lần thứ ba trong quyển sách này. Nếu bạn thấy mẫu ấy lặp lại thì đó không phải trùng hợp mà là một nguyên lý: \emph{khi trường hợp xấu phụ thuộc vào dữ liệu, hãy chuyển sự phụ thuộc đó sang một nguồn ngẫu nhiên mà bạn kiểm soát}. Chương \ptr{C/20} dành trọn để khai thác nguyên lý này.
+
+Danh sách bỏ qua (skip list) là một hiện thực hoá khác của cùng ý tưởng, dùng nhiều tầng danh sách liên kết với xác suất lên tầng là \(1/2\). Nó không phải cây, nhưng cho cùng đảm bảo kỳ vọng, dễ cài hơn cây cân bằng và dễ làm phiên bản nhiều luồng --- đó là lý do một số hệ cơ sở dữ liệu chọn nó cho phần dữ liệu nằm trong bộ nhớ.
+
+\section{Tăng cường: kỹ thuật đáng giá nhất của chương}
+
+Đây là mục mà nếu chỉ đọc một mục thì nên đọc mục này. Ý tưởng: gắn thêm thông tin vào mỗi nút, miễn là thông tin đó \emph{tính được từ hai con}, thì bạn giữ được nó qua mọi thao tác với chi phí không đổi, và cây trả lời được câu hỏi hoàn toàn mới.
+
+Ví dụ quan trọng nhất: lưu ở mỗi nút \emph{kích thước cây con} của nó. Với thông tin đó, cây trả lời được hai câu hỏi mà băm và heap đều chịu: ``phần tử đứng thứ \(k\) là ai'' và ``có bao nhiêu phần tử nhỏ hơn \(x\)'' --- cả hai trong \Ob{\log n}, bằng cách đi xuống từ gốc và trừ dần. Cấu trúc này gọi là cây thống kê thứ tự, và nó là công cụ chuẩn cho các bài đếm nghịch thế hoặc đếm phần tử nhỏ hơn trong đoạn.
+
+Ví dụ thứ hai: lưu \emph{giá trị lớn nhất của điểm kết thúc} trong cây con, ta được cây khoảng --- trả lời ``có đoạn nào chứa điểm \(x\) không'' hoặc ``liệt kê mọi đoạn giao với \([l,r]\)''. Đây là cấu trúc dùng trong hình học tính toán (\ptr{D/22}) và trong các hệ thống lập lịch.
+
+Quy tắc chung đáng nhớ: \emph{thông tin tăng cường phải tổng hợp được từ các con trong \Ob{1}}. Kích thước, tổng, cực đại, cực tiểu đều thoả; ``phần tử phổ biến nhất trong cây con'' thì không, vì không suy ra được từ hai con. Cùng điều kiện này sẽ xuất hiện lại ở chương \ptr{B/10} với cây phân đoạn, và ở đó ta sẽ thấy nó chính là điều kiện ``phép toán có tính kết hợp''.
+
+\section{B-cây: khi chi phí thật không phải là số phép so sánh}
+
+Mọi phân tích trên đếm số phép so sánh. Nhưng nếu dữ liệu nằm trên đĩa, chi phí thật là số lần đọc khối --- và một lần đọc đĩa đắt hơn hàng triệu phép so sánh trong bộ nhớ. Với mô hình chi phí đó, cây nhị phân là lựa chọn tệ: chiều cao \(\log_2 n\) nghĩa là \(\log_2 n\) lần đọc đĩa, mà với một tỉ bản ghi thì đó là 30 lần đọc cho một truy vấn.
+
+B-cây giải quyết bằng cách làm nút to ra: mỗi nút chứa hàng trăm khoá và vừa đúng một khối đĩa. Chiều cao trở thành \(\log_{100} n\), tức là ba tới bốn tầng cho một tỉ bản ghi. Trong nút thì tìm kiếm bằng so sánh --- rẻ, vì nút đã nằm trong bộ nhớ sau khi đọc.
+
+Đây là ví dụ rõ nhất trong cả quyển sách cho luận điểm ở chương \ptr{A/03}: \emph{đổi mô hình chi phí thì đổi luôn cấu trúc tối ưu}. Cùng bài toán, cùng yêu cầu, nhưng khi đơn vị chi phí chuyển từ ``phép so sánh'' sang ``lần chuyển khối'' thì lời giải tốt nhất đổi hẳn hình dạng. Và điều đó vẫn đúng khi dữ liệu nằm trong RAM: vì bộ nhớ cũng có phân cấp cache, các cấu trúc ``B-cây thu nhỏ'' với nút vừa một dòng cache thường nhanh hơn cây nhị phân thuần tuý.
+
+\begin{center}\footnotesize
+\begin{tabularx}{\linewidth}{@{}L{2.6cm}L{2.5cm}L{2.6cm}Y@{}}
+\toprule
+\textbf{Cấu trúc} & \textbf{Đảm bảo} & \textbf{Cài đặt} & \textbf{Chọn khi}\\
+\midrule
+AVL & \Ob{\log n} chặt, cây thấp & Khó & Đọc nhiều hơn ghi rất nhiều\\
+Đỏ--đen & \Ob{\log n}, ít quay hơn & Khó & Thư viện chuẩn, ghi và đọc cân bằng\\
+Treap & \Ob{\log n} kỳ vọng & Dễ & Tự cài trong thi đấu; cần tách/ghép cây\\
+Danh sách bỏ qua & \Ob{\log n} kỳ vọng & Dễ & Cần phiên bản nhiều luồng\\
+Splay & \Ob{\log n} khấu hao & Trung bình & Truy cập có tính cục bộ cao\\
+B-cây / B\(^+\)-cây & \Ob{\log_B n} lần đọc khối & Khó & Dữ liệu trên đĩa; chỉ mục cơ sở dữ liệu\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{cambay}
+Trong lập trình thi đấu, đừng cài AVL hay đỏ--đen. Nếu cần cây cân bằng tự viết --- thường là để có thao tác tách và ghép, thứ mà thư viện chuẩn không cho --- hãy dùng treap: ngắn hơn nhiều lần, ít lỗi hơn hẳn, và đảm bảo kỳ vọng là đủ. Còn nếu chỉ cần tập hợp có thứ tự thông thường thì dùng thẳng thư viện chuẩn; viết lại chỉ tăng nguy cơ sai.
+\end{cambay}
+
+\section{Splay và câu hỏi mở nổi tiếng nhất của ngành cấu trúc dữ liệu}
+
+Bảng ở mục trước xếp splay tree vào ô ``\Ob{\log n} khấu hao, hợp khi truy cập có tính cục bộ''. Dòng đó đúng nhưng giấu mất phần thú vị nhất, và phần ấy đáng kể lại vì nó dạy một cách nghĩ chứ không chỉ một cấu trúc.
+
+Splay tree không lưu \emph{bất kỳ} thông tin cân bằng nào --- không chiều cao, không màu, không độ ưu tiên. Luật duy nhất: mỗi lần chạm vào một nút, hãy quay nó lên tận gốc theo một khuôn cố định gồm các bước hai tầng. Sleator và Tarjan\cite{sleator1985} chứng minh rằng chỉ luật đó đã đủ cho \Ob{\log n} khấu hao --- nhưng kết quả đáng nhớ hơn là hai tính chất mạnh hơn cận ấy.
+
+\emph{Tối ưu tĩnh:} trên bất kỳ dãy truy cập nào, tổng chi phí của splay chỉ hơn một hằng số lần so với \emph{cây tĩnh tốt nhất} dựng bởi một người biết trước tần suất truy cập của mọi khoá. Nói cách khác, splay đạt được cận entropy của phân phối mà \emph{không hề biết} phân phối đó --- nó học từ chính dãy thao tác. \emph{Tính chất tập làm việc:} chi phí chạm vào một khoá phụ thuộc số khoá phân biệt đã được chạm kể từ lần trước chạm nó, chứ không phụ thuộc \(n\). Vì vậy một chương trình liên tục quay lại vài trăm khoá quen sẽ trả giá theo vài trăm chứ không theo hàng triệu --- đúng hành vi mà bộ nhớ đệm mong muốn.
+
+Câu hỏi mở nằm ở bước tiếp theo. Sleator và Tarjan phỏng đoán rằng splay không chỉ tối ưu so với cây tĩnh tốt nhất, mà tối ưu trong vòng một hằng số so với \emph{mọi} thuật toán trên cây tìm kiếm nhị phân --- kể cả thuật toán được phép quay tuỳ ý và được biết trước toàn bộ dãy truy cập. Đó là \emph{phỏng đoán tối ưu động}, và sau bốn thập kỷ nó vẫn mở. Tiến bộ lớn đầu tiên là Tango tree của Demaine, Harmon, Iacono và Pătraşcu\cite{demaine2007}: một cây trực tuyến có tỉ lệ cạnh tranh \Ob{\log\log n}, dựng trên một cận dưới cho \emph{mọi} cây nhị phân. Trước đó, tỉ lệ tốt nhất người ta biết chỉ là \Ob{\log n} --- tức là ``không tệ hơn việc chẳng thích nghi gì cả''.
+
+Có hai điều đáng mang theo, và cả hai đều lớn hơn bản thân splay tree. Thứ nhất là cách đặt câu hỏi: thay vì hỏi ``cấu trúc này tốn bao nhiêu'', ta hỏi ``nó tốn bao nhiêu \emph{so với lời giải tốt nhất có thể trên cùng dãy thao tác}''. Đó chính là phân tích cạnh tranh, thước đo chuẩn của các bài toán trực tuyến ở chương \ptr{D/24}, và ở đây nó được áp cho một cấu trúc dữ liệu. Thứ hai là lời nhắc rằng chữ ``tối ưu'' luôn kèm một lớp đối thủ và một mô hình: tối ưu so với cây tĩnh, so với mọi cây nhị phân, hay so với mọi cấu trúc bất kỳ --- ba câu hỏi khác nhau với ba câu trả lời khác nhau.
+
+Còn phần thực dụng thì ngắn. Đừng cài splay trong kỳ thi: hằng số lớn, một thao tác đơn lẻ có thể tốn \Ob{n}, và mọi lần \emph{đọc} đều \emph{ghi} vào cây --- điều làm nó khó dùng trong môi trường nhiều luồng và bất lợi với bộ nhớ đệm chỉ đọc. Giá trị của nó với người học nằm ở chỗ khác: nó là bằng chứng rằng một cấu trúc không giữ chút siêu dữ liệu cân bằng nào vẫn có thể tự điều chỉnh theo dữ liệu, và nó là cửa vào cho cả một nhánh nghiên cứu vẫn còn sống.
+
+\section{Gốc rễ: từ bài toán chiều cao tới bài toán đĩa quay}
+
+Cây tìm kiếm nhị phân là ý tưởng cổ và không có tác giả rõ ràng --- nó xuất hiện tự nhiên ở nhiều nơi trong thập niên 1950. Điều \emph{có} tác giả rõ ràng là bài toán cân bằng, và cây tự cân bằng đầu tiên ra đời năm 1962 do hai nhà toán học Liên Xô, Adelson-Velsky và Landis, đề xuất --- tên AVL là chữ đầu của họ. Đóng góp thực sự của họ không phải cấu trúc mà là \emph{ý niệm}: rằng có thể duy trì một bất biến hình dạng sau mỗi thao tác với chi phí không đổi, và nhờ đó biến một đảm bảo ``trung bình'' thành đảm bảo tuyệt đối.
+
+B-cây ra đời năm 1970 tại phòng nghiên cứu của Boeing, từ một bài toán hoàn toàn thực tế: chỉ mục cho các tệp lớn nằm trên đĩa quay. Rudolf Bayer và Edward McCreight nhận ra điều mà mô hình đếm phép so sánh che mất --- rằng chi phí đọc một khối đĩa gần như không phụ thuộc kích thước khối, nên nếu đằng nào cũng phải trả tiền cho một lần đọc thì hãy đọc thật nhiều khoá một lúc. Từ nhận xét đó ra cả một họ cấu trúc, và ngày nay gần như mọi hệ cơ sở dữ liệu quan hệ và mọi hệ tệp hiện đại đều dùng một biến thể của nó. Đây là ví dụ đẹp cho việc \emph{đặt lại câu hỏi về đơn vị chi phí} có thể sinh ra cấu trúc mới.
+
+Cây đỏ--đen có nguồn gốc thú vị: nó khởi đầu như một cách biểu diễn B-cây bậc 4 bằng cây nhị phân, rồi được Guibas và Sedgewick trình bày lại vào năm 1978 dưới dạng luật màu mà ta biết ngày nay. Nghĩa là hai cấu trúc trông rất khác nhau thực ra là hai cách nhìn cùng một thứ --- một liên hệ đáng nhớ vì nó giải thích vì sao luật đỏ--đen trông tuỳ tiện: chúng là dấu vết của cấu trúc nhiều nhánh gốc.
+
+Cuối cùng, hai cấu trúc ngẫu nhiên hoá ra đời muộn hơn nhiều và vì một lý do rất người: cây cân bằng tất định quá khó cài đúng. Pugh đề xuất danh sách bỏ qua năm 1990 với luận điểm thẳng thắn rằng nó đơn giản hơn hẳn cây cân bằng mà vẫn cho cùng đảm bảo kỳ vọng; Seidel và Aragon đưa ra treap năm 1996 với cùng tinh thần. Sự chuyển dịch này --- chấp nhận đảm bảo kỳ vọng để đổi lấy code ngắn và đúng --- là một chủ đề lặp lại trong ngành, và nó gắn với chương \ptr{C/20}.
+
+\begin{gocre}
+\gr{Thập niên 1950 --- BST}{Cần cấu trúc vừa tra cứu nhanh vừa chèn được, thay cho mảng đã sắp.}{Ý tưởng phân nhánh theo khoá; nhưng chưa ai lo chuyện thoái hoá.}
+\gr{1962 --- Adelson-Velsky \& Landis}{BST thoái hoá thành danh sách khi dữ liệu vào có trật tự.}{Cây AVL --- cây tự cân bằng đầu tiên; xác lập ý niệm ``duy trì bất biến hình dạng sau mỗi thao tác''.}
+\gr{1970 --- Bayer \& McCreight (Boeing)}{Chỉ mục tệp lớn trên đĩa quay; mỗi lần đọc đĩa đắt hơn hàng triệu phép so sánh.}{B-cây: đổi đơn vị chi phí từ phép so sánh sang lần đọc khối \(\Rightarrow\) nút to, cây thấp. Nền của mọi chỉ mục cơ sở dữ liệu.}
+\gr{1972--78 --- Bayer, Guibas \& Sedgewick}{Muốn ưu điểm của B-cây bậc 4 nhưng ở dạng cây nhị phân.}{Cây đỏ--đen; luật màu trông tuỳ tiện chính là dấu vết của cấu trúc nhiều nhánh gốc.}
+\gr{1985 --- Sleator \& Tarjan}{Có cần đảm bảo cho \emph{từng} thao tác không, hay tổng thể là đủ?}{Splay tree: \Ob{\log n} khấu hao, tự thích nghi với mẫu truy cập; kèm theo là cả lý thuyết phân tích khấu hao.}
+\gr{1990--96 --- Pugh; Seidel \& Aragon}{Cây cân bằng tất định quá khó cài đúng.}{Danh sách bỏ qua và treap: dùng ngẫu nhiên để đạt cùng đảm bảo kỳ vọng với code ngắn hơn nhiều lần.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Cơ sở dữ liệu}{Chỉ mục B\(^+\)-cây, quét khoảng, khoá chính}{Cùng cấu trúc, và lý do chọn nó chính là mục 6. Điểm đáng nhớ: chỉ mục băm nhanh hơn cho truy vấn bằng nhưng vô dụng cho \code{BETWEEN} --- đó là vì sao B-cây là mặc định.}
+\lh{Hệ tệp}{Chỉ mục thư mục, ánh xạ khối}{Cùng ràng buộc đĩa nên cùng lời giải. Ví dụ về việc một mô hình chi phí (chuyển khối) sinh ra một họ cấu trúc riêng --- xem thêm \ptr{D/24}.}
+\lh{Hình học tính toán}{Cây khoảng, cây phân đoạn, cây \(k\)-d}{Đều là cây tìm kiếm được \emph{tăng cường}: thêm thông tin ở mỗi nút để trả lời câu hỏi hình học. Cùng điều kiện: thông tin phải tổng hợp được từ các con (\ptr{D/22}).}
+\lh{SLAM và xử lý đám mây điểm}{Cây \(k\)-d cho tìm điểm gần nhất trong ICP}{Cùng ý tưởng chia không gian theo ngưỡng, chỉ khác là chia luân phiên theo từng chiều toạ độ. Cùng điểm yếu: dữ liệu phân bố lệch làm cây mất cân bằng, nên trong thực tế phải xây lại định kỳ.}
+\lh{Đồ hoạ, dò tia}{Cây bao khối (BVH), cây phân vùng không gian}{Cùng mục tiêu: giảm số phép kiểm tra từ tuyến tính xuống lôgarit bằng cấu trúc phân cấp. Tiêu chí xây cây khác nhau (diện tích bề mặt thay vì cân bằng số nút).}
+\lh{Lập trình hàm}{Cấu trúc bền vững, cây bất biến}{Cây rất hợp với biểu diễn bền vững vì một thao tác chỉ đụng \Ob{\log n} nút, phần còn lại chia sẻ được giữa các phiên bản\cite{okasaki1998}. Đây là nền của cây bền vững ở \ptr{B/10}.}
+\lh{Hệ thống nhiều luồng}{Danh sách bỏ qua trong bộ nhớ đệm ghi của cơ sở dữ liệu}{Lý do chọn không phải tốc độ mà là \emph{dễ làm phiên bản đồng thời}: các thao tác chỉ động vào con trỏ cục bộ, không cần quay cả cây.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Vì trường hợp xấu nhất của nó không hiếm mà lại rất phổ biến: dữ liệu thật thường tới theo trật tự nào đó --- theo thời gian, theo mã tăng dần, theo thứ tự đã sắp từ nguồn khác. Khi đó mọi phần tử rẽ cùng một hướng và cây thành danh sách với chiều cao \(n\). Đây là cùng dạng vấn đề với bảng băm ở \ptr{B/08}: ``trung bình nhanh'' vô nghĩa nếu phân phối thực tế nằm đúng vào vùng xấu.}
+\tl{Vì hai bối cảnh có đơn vị chi phí khác nhau. Trong bộ nhớ, chi phí là số phép so sánh và số lần lần theo con trỏ, nên cây nhị phân là hợp lý; giữa AVL và đỏ--đen thì đỏ--đen quay ít hơn nên tốt hơn khi có nhiều chèn/xoá, và đó là lựa chọn của thư viện chuẩn. Trên đĩa, chi phí là số lần đọc khối và một lần đọc đắt hơn hàng triệu phép so sánh; lúc đó phải làm nút thật to để cây thật thấp --- B-cây. Cùng bài toán, đổi mô hình chi phí, đổi cấu trúc tối ưu.}
+\tl{Vì hình dạng của treap chỉ phụ thuộc vào thứ tự tương đối của các độ ưu tiên, chứ không phụ thuộc thứ tự chèn. Mà độ ưu tiên do bạn sinh ngẫu nhiên, nên treap có phân phối hình dạng giống hệt một BST được chèn theo thứ tự ngẫu nhiên đều --- và chiều cao kỳ vọng của cây đó là \Ob{\log n}. Điểm mấu chốt: đối thủ chọn được dữ liệu nhưng không chọn được độ ưu tiên, nên không dựng được trường hợp xấu.}
+\tl{Vì luật cân bằng thì bạn hầu như luôn dùng lại từ thư viện, còn tăng cường là thứ bạn phải tự nghĩ cho từng bài. Nó biến một cấu trúc chỉ biết ``có hay không'' thành cấu trúc trả lời được ``phần tử thứ \(k\)'', ``bao nhiêu phần tử nhỏ hơn \(x\)'', ``đoạn nào chứa điểm này''. Điều kiện áp dụng cũng rất dễ kiểm: thông tin thêm phải tổng hợp được từ hai con trong \Ob{1} --- và chính điều kiện đó sẽ trở lại ở \ptr{B/10} dưới tên ``phép toán có tính kết hợp''.}
+\tl{Khi dữ liệu tĩnh hoặc gần như tĩnh. Mảng đã sắp cho tìm kiếm nhị phân với truy cập gần như tuần tự, rất hợp cache, không có con trỏ và không có chi phí cấp phát; cây cân bằng lần theo con trỏ nên mỗi tầng có thể là một lần trượt cache. Với vài triệu phần tử, khác biệt hằng số này lớn hơn khác biệt giữa \Ob{\log n} và \Ob{n} chèn --- miễn là số lần chèn nhỏ. Quy tắc thực dụng: ít cập nhật thì mảng đã sắp; cập nhật liên tục thì cây.}
+\end{traloi}
+
+\begin{dongian}
+Hãy tưởng tượng một cuốn danh bạ. Nếu tên được ghi lộn xộn, muốn tìm ai bạn phải đọc từ đầu. Nếu ghi theo thứ tự chữ cái, bạn mở giữa quyển rồi lật qua lật lại --- đó là tìm kiếm nhị phân, rất nhanh, nhưng thêm một cái tên mới vào giữa thì phải chép lại cả quyển.
+
+Cây tìm kiếm là cách sắp xếp danh bạ thành nhiều tờ rời có mũi tên chỉ nhau, để thêm một tên chỉ phải sửa vài tờ. Vấn đề duy nhất: nếu bạn thêm tên theo đúng thứ tự chữ cái từ A tới Z, các mũi tên sẽ nối thành một hàng dài và bạn quay lại đúng tình cảnh đọc từ đầu.
+
+Có hai cách chống. Cách thứ nhất là cứ vài lần thêm lại chỉnh cho cây khỏi lệch --- giống việc sắp lại giá sách cho hai bên đều nhau. Cách thứ hai thông minh hơn và rất đáng nhớ: gán cho mỗi tờ một con số ngẫu nhiên và xếp cây theo con số đó thay vì theo thứ tự bạn thêm vào. Vì con số là do bạn tung ra, người khác không thể cố tình đưa dữ liệu theo thứ tự xấu để hại bạn.
+
+Cuối cùng là một chuyện thực tế thú vị. Nếu quyển danh bạ để trên bàn, việc lật một trang gần như miễn phí. Nhưng nếu nó nằm trong kho và mỗi lần cần một trang thì phải chạy xuống kho lấy, thì bạn sẽ không muốn mỗi trang chỉ có một cái tên --- bạn sẽ muốn mỗi lần chạy xuống kho mang lên một tập dày. Đó chính là lý do cơ sở dữ liệu không dùng cây nhị phân mà dùng cây có nút rất to.
+\motcau{Chiều cao là thứ phải giữ; cách trả tiền cho nó --- quay tay hay tung ngẫu nhiên --- là chỗ các cấu trúc khác nhau.}
+\chuadongian{Việc chọn thông tin tăng cường cho một bài cụ thể vẫn là bước sáng tạo; điều kiện ``tổng hợp được từ hai con'' chỉ nói cái gì \emph{không} dùng được.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Vấn đề gốc của BST}{Dữ liệu vào theo thứ tự đã sắp làm cây thoái hoá thành danh sách, chiều cao \Ob{n}. Đây là trường hợp phổ biến, không hiếm.}
+\ar[3]{Phép quay làm gì}{Bảo toàn thứ tự duyệt giữa (bất biến ngữ nghĩa) trong khi thay đổi chiều cao (bất biến cấu trúc). Là thao tác cơ bản duy nhất của mọi cây tự cân bằng.}
+\ar[3]{Vì sao treap cân bằng}{Hình dạng chỉ phụ thuộc thứ tự các độ ưu tiên ngẫu nhiên, không phụ thuộc thứ tự chèn \(\Rightarrow\) tương đương BST chèn ngẫu nhiên \(\Rightarrow\) chiều cao kỳ vọng \Ob{\log n}.}
+\ar[3]{Tăng cường --- điều kiện}{Thông tin thêm phải tổng hợp được từ hai con trong \Ob{1}: kích thước, tổng, cực trị được; ``phần tử phổ biến nhất'' thì không.}
+\ar[3]{Cây thống kê thứ tự}{Lưu kích thước cây con \(\Rightarrow\) trả lời ``phần tử thứ \(k\)'' và ``bao nhiêu phần tử nhỏ hơn \(x\)'' trong \Ob{\log n}.}
+\ar[3]{Vì sao B-cây tồn tại}{Chi phí thật trên đĩa là số lần đọc khối, không phải số phép so sánh. Nút to \(\Rightarrow\) chiều cao \(\log_B n\) \(\Rightarrow\) 3--4 lần đọc cho một tỉ bản ghi.}
+\ar[2]{AVL so với đỏ--đen}{AVL chặt hơn nên cây thấp hơn, tìm nhanh hơn, nhưng quay nhiều hơn khi cập nhật. Đỏ--đen lỏng hơn, ít quay hơn --- lựa chọn của thư viện chuẩn.}
+\ar[2]{Splay tree}{Không đảm bảo từng thao tác, chỉ \Ob{\log n} khấu hao; phần tử hay truy cập tự nổi lên gần gốc. Nhược điểm: thao tác đọc cũng làm đổi cấu trúc.}
+\ar[2]{Danh sách bỏ qua}{Nhiều tầng danh sách liên kết, xác suất lên tầng \(1/2\); cùng đảm bảo kỳ vọng với cây, dễ cài và dễ làm phiên bản nhiều luồng.}
+\ar[2]{Mẫu ngẫu nhiên hoá lặp lại}{Băm phổ dụng (\ptr{B/08}), treap (chương này), chốt quicksort (\ptr{C/14}) --- cùng một nguyên lý: chuyển sự phụ thuộc từ dữ liệu sang nguồn ngẫu nhiên bạn kiểm soát.}
+\ar[2]{Cây khoảng}{Lưu cực đại của điểm kết thúc trong cây con \(\Rightarrow\) hỏi ``đoạn nào chứa \(x\)'', ``đoạn nào giao \([l,r]\)''.}
+\ar[1]{Khi nào mảng đã sắp thắng cây}{Dữ liệu tĩnh hoặc ít cập nhật: không con trỏ, hợp cache, không cấp phát. Cây chỉ thắng khi có cập nhật liên tục.}
+\ar[1]{Lời khuyên thi đấu}{Đừng cài AVL hay đỏ--đen; cần cây tự viết thì dùng treap (đặc biệt khi cần tách/ghép), còn lại dùng thư viện chuẩn.}
+\ar[2]{Splay và phỏng đoán tối ưu động}{Splay không lưu thông tin cân bằng nào, vẫn đạt tối ưu tĩnh và tính chất tập làm việc. Phỏng đoán ``cạnh tranh hằng số với mọi cây nhị phân'' vẫn mở; tiến bộ lớn nhất là Tango tree, \Ob{\log\log n}-cạnh tranh.}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Khi nào tôi thực sự cần tự cài cây cân bằng thay vì dùng thư viện?}{Chủ yếu khi cần hai thao tác mà thư viện chuẩn không có: \emph{tách} cây thành hai theo khoá và \emph{ghép} hai cây, hoặc cần truy vấn ``phần tử thứ \(k\)''. Với nhu cầu thứ nhất, treap là lựa chọn gần như bắt buộc vì tách/ghép trên treap chỉ vài dòng. Với nhu cầu thứ hai, nếu khoá là số nguyên trong khoảng vừa phải thì Fenwick (\ptr{B/10}) đơn giản hơn nhiều và nhanh hơn --- hãy kiểm tra khả năng đó trước khi viết cây.}
+\qa{Tôi nghe nói cây đỏ--đen ``khó cài''. Khó ở chỗ nào?}{Ở phần xoá. Chèn có bốn trường hợp và còn dễ nhớ; xoá có nhiều trường hợp hơn, phải xử lý cả tình huống ``nút thiếu màu đen'' lan ngược lên gốc, và mỗi trường hợp lại chia theo màu của anh em và của các cháu. Sai một nhánh thì cây vẫn chạy đúng về mặt thứ tự nhưng mất cân bằng dần --- một lỗi im lặng rất khó phát hiện. Đây là lý do thực tế khiến treap và danh sách bỏ qua được ưa chuộng ngoài các thư viện chuẩn.}
+\qa{Cây \(k\)-d có phải là cây tìm kiếm không, và vì sao nó hay mất cân bằng?}{Nó là cây tìm kiếm nhị phân trên không gian nhiều chiều: mỗi tầng chia theo một chiều toạ độ khác nhau. Nó mất cân bằng vì chiều được chọn luân phiên chứ không theo phân bố dữ liệu; nếu điểm dồn về một mặt phẳng hoặc một trục thì nhiều lần chia gần như không tách được gì. Trong thực tế --- ví dụ tìm điểm gần nhất trên đám mây điểm của cảm biến --- cách xử lý phổ biến là chọn chiều có phương sai lớn nhất thay vì luân phiên, và xây lại cây định kỳ thay vì cập nhật từng điểm.}
+\qa{Cây cân bằng có dùng được trong môi trường nhiều luồng không?}{Được nhưng khó, vì phép quay động tới nhiều nút cùng lúc nên phải khoá một vùng lớn. Có ba hướng thực tế: dùng danh sách bỏ qua, vốn chỉ cần sửa vài con trỏ cục bộ và có bản không khoá; dùng cấu trúc bền vững kiểu lập trình hàm, ở đó người đọc luôn nhìn một ảnh chụp bất biến\cite{okasaki1998}; hoặc dùng B-cây với kỹ thuật khoá theo nút và tách trước khi đi xuống. Splay tree là lựa chọn tệ nhất ở đây vì ngay cả thao tác đọc cũng làm thay đổi cấu trúc.}
+\qa{Vì sao đếm nghịch thế lại là bài tiêu biểu cho chương này?}{Vì nó có ba lời giải bằng ba công cụ khác nhau của phần B, và so sánh chúng dạy nhiều hơn bản thân bài. Cách một: cây thống kê thứ tự, chèn dần từ trái sang phải và mỗi lần hỏi ``bao nhiêu phần tử đã chèn lớn hơn giá trị này''. Cách hai: Fenwick trên giá trị đã nén (\ptr{B/10}) --- ngắn hơn và nhanh hơn. Cách ba: sắp xếp trộn, đếm trong lúc trộn (\ptr{C/14}). Ba cách cùng \Ob{n\log n} nhưng hằng số và độ dài code rất khác.}
+\qa{``Bền vững'' nghĩa là gì và vì sao cây lại hợp với nó?}{Bền vững là khả năng giữ lại mọi phiên bản cũ sau khi cập nhật, để truy vấn được quá khứ. Cây rất hợp vì một thao tác chỉ đụng tới các nút trên một đường từ gốc xuống lá --- chỉ \Ob{\log n} nút. Thay vì sửa tại chỗ, ta tạo bản sao của đúng đường đó và cho các nhánh còn lại trỏ chung sang cây cũ; chi phí thêm là \Ob{\log n} bộ nhớ mỗi phiên bản. Ý tưởng này sẽ quay lại với cây phân đoạn bền vững ở \ptr{B/10}.}
+\qa{Nếu khoá là số nguyên trong khoảng hẹp, có gì tốt hơn cây không?}{Có, và chênh lệch lớn. Với khoá trong \([0,U)\), cấu trúc van Emde Boas cho mọi thao tác trong \Ob{\log\log U} --- nhanh hơn hẳn \Ob{\log n} khi \(U\) không quá lớn, đổi lại tốn bộ nhớ \Ob{U} và cài đặt phức tạp. Trong thực hành thi đấu, thường chỉ cần một Fenwick trên mảng bit hoặc một cấu trúc phân tầng đơn giản là đủ nhanh. Bài học chung vẫn thế: biết thêm về dữ liệu --- ở đây là ``khoá là số nguyên nhỏ'' --- thì luôn mua được tốc độ.}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Cài BST cơ bản, rồi chèn 1..\(n\) theo thứ tự và đo chiều cao}{Bài tập cài đặt}{Thấy tận mắt sự thoái hoá; sau đó chèn theo thứ tự ngẫu nhiên và đo lại.}
+\bt[1]{Dùng tập hợp có thứ tự để tìm phần tử gần nhất với mỗi truy vấn}{CSES ``Concert Tickets''\cite{cses}}{Bài mẫu cho việc dùng \code{lower\_bound} --- thứ mà bảng băm không làm được.}
+\bt[2]{Đếm số nghịch thế}{CSES ``Inversions''-loại; bài kinh điển}{Giải bằng cả ba cách (cây thống kê thứ tự, Fenwick, sắp xếp trộn) và so hằng số.}
+\bt[2]{Cài treap với chèn, xoá, tìm phần tử thứ \(k\)}{Bài tập cài đặt}{Bắt đầu bằng tách/ghép; mọi thao tác khác viết từ hai thao tác đó.}
+\bt[2]{Duy trì trung vị của một tập thay đổi bằng cây thống kê thứ tự}{Bài tập kinh điển}{So sánh với cách hai heap ở \ptr{B/07} --- cây tổng quát hơn, heap nhanh hơn cho đúng bài này.}
+\bt[2]{Lịch đặt phòng: kiểm tra chồng lấn khi thêm mỗi lịch}{LeetCode ``My Calendar I/II''}{Cây khoảng hoặc tập hợp có thứ tự; chú ý xử lý biên đóng/mở cho đúng.}
+\bt[3]{Cài danh sách bỏ qua và so tốc độ với cây cân bằng của thư viện}{Bài tập thực nghiệm}{Đo cả thời gian lẫn bộ nhớ; giải thích chênh lệch bằng cache chứ không bằng độ phức tạp.}
+\bt[3]{Dùng treap để chèn/xoá cả đoạn của một dãy}{Bài tập thi đấu kinh điển}{Treap theo chỉ số ngầm định --- ứng dụng mạnh nhất của treap và là lý do chính để tự cài nó.}
+\bt[3]{Cài B-cây bậc lớn và đo số lần truy cập nút so với cây nhị phân}{Bài tập hệ thống}{Mô phỏng chi phí đọc khối; đây là cách rẻ nhất để thấy vì sao cơ sở dữ liệu chọn B-cây.}
+\bt[3]{Cây \(k\)-d cho tìm điểm gần nhất trên đám mây điểm 3D}{Bài tập ứng dụng}{So với vét cạn về thời gian; thử phân bố lệch để thấy cây mất cân bằng.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Cây tìm kiếm là câu chuyện về một bất biến: chiều cao phải là \Ob{\log n}. Mọi cấu trúc trong chương chỉ khác nhau ở cách trả tiền cho bất biến đó --- quay theo luật chặt, quay theo luật lỏng, quay theo độ ưu tiên ngẫu nhiên, hay làm nút to ra cho hợp với đơn vị chi phí của đĩa. Kỹ thuật đáng mang theo nhất không phải luật cân bằng mà là \emph{tăng cường}, cùng điều kiện của nó: thông tin thêm phải tổng hợp được từ các con.
+
+Chương tiếp theo lấy đúng ý tưởng tăng cường ấy và đẩy tới cùng cho một bài toán rất cụ thể: truy vấn trên đoạn kèm cập nhật. Bạn sẽ gặp lại điều kiện ``tổng hợp được từ các con'' dưới cái tên chính xác của nó --- tính kết hợp --- và sẽ thấy hai cấu trúc có tỉ lệ sức mạnh trên độ dài code cao nhất trong cả phần B là Fenwick và cây phân đoạn (\ptr{B/10}).
+\begin{docthem}
+\ct{Sleator \& Tarjan, ``Self-Adjusting Binary Search Trees''}{Journal of the ACM, 1985}{Bài gốc của splay tree. Đọc phần phát biểu tối ưu tĩnh và tập làm việc; phần chứng minh là ví dụ mẫu mực cho phương pháp thế năng (\ptr{A/03}).}
+\ct{Demaine, Harmon, Iacono, Pătraşcu, ``Dynamic Optimality---Almost''}{SIAM Journal on Computing, 2007}{Tango tree và cận dưới đan xen. Đọc mục giới thiệu để hiểu phát biểu của phỏng đoán tối ưu động, kể cả khi bỏ qua chi tiết kỹ thuật.}
+\ct[2]{Knuth, ``Optimum Binary Search Trees''}{Acta Informatica, 1971}{Cây tĩnh tối ưu tính được bằng quy hoạch động \Ob{n^2} nhờ tính đơn điệu của điểm chia --- cùng kết quả sẽ trở lại ở \ptr{C/16}.}
+\ct[2]{Demaine, khoá học MIT 6.851 \emph{Advanced Data Structures}}{tài liệu khoá học công khai, MIT}{Bài giảng về cây bền vững, tối ưu động và các cấu trúc gần biên; hợp để đi tiếp sau chương này.}
+\end{docthem}
+
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

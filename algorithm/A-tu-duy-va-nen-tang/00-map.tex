@@ -1,0 +1,53 @@
+% ============================================================================
+%  A/00-map.tex — bản đồ phần A
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../algorithm.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ phần A --- Tư duy và nền tảng}
+
+\begin{tomtat}
+Phần A gồm năm chương chia theo \emph{câu hỏi chúng trả lời}, không theo môn học. Chương 1 trả lời ``bí thì làm gì''; chương 2 trả lời ``người giỏi luyện thế nào''; chương 3 trả lời ``lời giải này có đủ nhanh không''; chương 4 trả lời ``lời giải này có đúng không''; chương 5 là kho toán tra khi cần. Chuỗi bắt buộc chỉ là 1 \(\rightarrow\) 3 \(\rightarrow\) 4. Chương 2 đọc được bất cứ lúc nào và nên đọc sớm, chương 5 không đọc tuần tự.
+\end{tomtat}
+
+\subsection*{A. Phần này có gì}
+\begin{itemize}
+\item \textbf{\code{01-nghe-thuat-giai-bai}} --- bốn bước Pólya áp vào lập trình, bộ heuristic sinh ý tưởng, mô hình Schoenfeld về tự giám sát, cách hỏi đúng câu hỏi khi bí.
+\item \textbf{\code{02-kinh-nghiem-nguoi-gioi}} --- khảo sát cách luyện của Knuth, Dijkstra, Tarjan, Bentley, Skiena, Erik Demaine, các kỳ thủ lập trình hàng đầu; bản đồ sách kinh điển; luyện tập có chủ đích và nhật ký lỗi.
+\item \textbf{\code{03-mo-hinh-may-va-do-phuc-tap}} --- mô hình RAM, ký hiệu tiệm cận, hệ thức truy hồi, phân tích khấu hao, hằng số thật, phân cấp bộ nhớ, cách đọc giới hạn đề bài ra độ phức tạp cho phép.
+\item \textbf{\code{04-tinh-dung-va-chung-minh}} --- bất biến vòng lặp, quy nạp, tính dừng, lập luận đổi chỗ, phản chứng, phản ví dụ, và kỷ luật viết chương trình cùng lúc với chứng minh của Dijkstra và Gries.
+\item \textbf{\code{05-toan-cho-thuat-toan}} --- tổng và chặn, tổ hợp đếm, xác suất và kỳ vọng, số học modulo, đại số tuyến tính rời rạc, lý thuyết trò chơi nhỏ.
+\end{itemize}
+
+\subsection*{B. Vì sao chia như vậy}
+Một giáo trình thường gộp ``toán rời rạc'' và ``phân tích thuật toán'' thành một khối lớn đặt ở đầu sách, và người đọc bỏ dở ở khối đó. Cây này tách thành ba vai trò khác nhau, vì chúng được dùng vào ba thời điểm khác nhau trong quá trình giải. Mô hình chi phí (chương 3) dùng \emph{trước} khi gõ code, để loại các hướng chắc chắn quá chậm. Công cụ chứng minh (chương 4) dùng \emph{trong lúc} nghĩ, vì bất biến vừa là công cụ chứng minh vừa là công cụ sinh ý tưởng. Toán nền (chương 5) dùng \emph{khi cần}, rải rác. Gộp cả ba vào một chương sẽ che mất sự khác nhau đó.
+
+\subsection*{C. Phụ thuộc và thứ tự đọc}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.62cm and 1.05cm,
+  m/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.85cm},
+  o/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.85cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  ard/.style={-{Latex[length=2.2mm]},draw=tiercol,thick,dashed},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.4cm}]
+\node[m] (c1) {\textbf{1.} Nghệ thuật\\giải bài};
+\node[m,right=of c1] (c3) {\textbf{3.} Mô hình máy\\và độ phức tạp};
+\node[m,right=of c3] (c4) {\textbf{4.} Tính đúng\\và chứng minh};
+\node[o,below=1.1cm of c1] (c2) {\textbf{2.} Kinh nghiệm\\người giỏi};
+\node[o,below=1.1cm of c3] (c5) {\textbf{5.} Toán cho\\thuật toán};
+\node[draw=rulecol,fill=codebg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,
+      text width=2.85cm,below=1.1cm of c4] (bc) {Phần B và C\\(mọi chương)};
+\draw[ar] (c1) -- node[lb,above=0pt] {ước lượng chi phí là bước 2 của Pólya} (c3);
+\draw[ar] (c3) -- node[lb,above=0pt] {nhanh chưa đủ, phải đúng} (c4);
+\draw[ard] (c2) -- (c1);
+\draw[ar] (c5) -- (c3);
+\draw[ar] (c4) -- (bc);
+\draw[ard] (c5) -- (bc);
+\end{tikzpicture}
+\caption{Phụ thuộc giữa năm chương của phần A. Chuỗi ngang 1 \(\rightarrow\) 3 \(\rightarrow\) 4 là bắt buộc. Hai chương tô tím vào được bất cứ lúc nào: chương 2 là kinh nghiệm luyện tập, chương 5 là kho toán tra cứu.}
+\label{fig:map-A}
+\end{figure}
+
+\subsection*{D. Cốt lõi hay tham khảo}
+\textbf{Cốt lõi:} toàn bộ chương 1; mục ``đọc giới hạn đề bài ra độ phức tạp'' và mục phân tích khấu hao của chương 3; mục bất biến vòng lặp và lập luận đổi chỗ của chương 4; mục tổng--chặn và kỳ vọng tuyến tính của chương 5. \textbf{Tham khảo:} phần chứng minh hình thức kiểu Hoare ở chương 4, phần giải hệ thức truy hồi bằng hàm sinh ở chương 5.
+\end{document}

@@ -1,0 +1,165 @@
+% ---------------------------------------------------------------------------
+%  Chương 17 — Mô hình sinh, style transfer và low-level vision
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: B/09-thiet-ke-ham-mat-mat; C/13-kien-truc-backbone; C/12
+%  Mức độ: cốt lõi
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Mô hình sinh, style transfer và low-level vision (Generative Models and Low-Level Vision)}
+\ptrtarget{C/17}\ptrtarget{C/17-mo-hinh-sinh}
+\dependency{\ptr{B/09-thiet-ke-ham-mat-mat} (hướng đo khoảng cách phân phối --- điều kiện tiên quyết thật sự của chương này); \ptr{C/12-co-che-huan-luyen} (huấn luyện ổn định, quy mô); \ptr{C/13-kien-truc-backbone} (U-Net, transformer); \ptr{A/02-vat-ly-tao-anh} (nhiễu thật, dải sáng động).}
+
+\begin{tomtat}
+Chương này gom bốn chủ đề thường bị dạy rời nhau --- mô hình sinh, chuyển phong cách, diffusion, và khôi phục ảnh --- vì chúng chia chung đúng một câu hỏi: khi nhiều đầu ra cùng hợp lệ, cái gì quyết định chọn cái nào? Bốn họ mô hình sinh là bốn câu trả lời, chuyển phong cách là câu trả lời viết thẳng lên pixel, diffusion là câu trả lời hiện đang thắng, và low-level vision là nơi câu hỏi trở thành vấn đề đúng sai chứ không còn là thẩm mỹ. Đọc xong bạn nhìn một mô hình sinh là đọc ra kiểu thất bại của nó trước khi chạy. Nếu chỉ nhớ một điều: chất lượng đầu ra khác nhau là vì \emph{định nghĩa ``giống dữ liệu thật''} khác nhau, không phải vì mô hình này thông minh hơn mô hình kia --- và mọi cơ chế làm ảnh ``đẹp hơn'' đều mua độ trung thành bằng độ đa dạng.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mô hình sinh (generative model)}{mô hình học \emph{phân phối} của dữ liệu, để có thể lấy mẫu ra dữ liệu mới; khác với mô hình phân biệt, vốn chỉ học ánh xạ từ đầu vào sang nhãn.}
+\kn{phân phối dữ liệu (data distribution)}{cách nghĩ về tập ảnh thật như các mẫu rút ra từ một phân phối xác suất trên không gian ảnh; ``sinh ảnh mới'' nghĩa là rút thêm một mẫu từ phân phối đó.}
+\kn{hàm mất mát (loss function)}{đại lượng số mà quá trình huấn luyện cực tiểu hoá. Toàn chương này là một minh hoạ kéo dài cho nguyên tắc: chọn hàm mất mát là chọn trước kiểu sai lầm mà mô hình sẽ mắc.}
+\kn{không gian ẩn (latent space)}{không gian chiều thấp mà mô hình dùng để mã hoá một ảnh; nó vừa là nơi ``ý nghĩa'' được sắp xếp, vừa là mẹo giúp diffusion chạy được trên GPU thường.}
+\kn{style transfer (chuyển phong cách)}{bài toán giữ nội dung của một ảnh nhưng khoác lên nó ``chất'' của một ảnh khác --- nét cọ, bảng màu, kết cấu.}
+\kn{ill-posed (đặt không chỉnh)}{bài toán có nhiều nghiệm cùng hợp lệ vì thông tin đã bị xoá; mọi bài toán khôi phục ảnh đều thuộc loại này.}
+\kn{FID / LPIPS / PSNR}{ba chỉ số đánh giá ở ba tầng khác nhau: FID so hai \emph{phân phối} ảnh, LPIPS so hai ảnh trong không gian đặc trưng học được, PSNR so hai ảnh theo từng pixel. Mục 17.4 nói rõ mỗi cái mù với gì.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao mô hình tối ưu MSE \emph{luôn} cho ảnh mờ, và vì sao đó là một kết quả toán học chứ không phải lỗi cài đặt?}
+\h{VAE hỏng vì mờ, GAN hỏng vì nghèo --- hai triệu chứng trái ngược nhau. Vì sao chúng lại là hai mặt của cùng một quyết định thiết kế?}
+\h{Vì sao diffusion, thứ phải chạy mạng hàng chục tới hàng trăm lần cho một ảnh, lại đánh bại GAN vốn chỉ cần một lượt xuôi?}
+\h{Vì sao chỉnh một pipeline sinh ảnh tới lúc trông ``đẹp nhất'' lại là cách chắc chắn nhất để làm hỏng nó khi dùng đầu ra làm dữ liệu huấn luyện?}
+\end{khoigoi}
+
+\section*{Vì sao chương này chia làm bốn mục}
+Bốn mục là bốn tầng của cùng một câu hỏi, và thứ tự là thứ tự phụ thuộc.
+
+Hình~\ref{fig:ban-do-ch17} vẽ bốn mục cùng nút thắt mà mỗi mục gỡ.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  sec/.style={draw=steel,fill=bluebg,rounded corners=3pt,inner sep=5pt,align=center,
+              font=\scriptsize,text width=3.0cm,minimum height=1.15cm},
+  ar/.style={-{Stealth[length=5pt]},steel,very thick},
+  nt/.style={font=\scriptsize,color=reddark,align=center,text width=3.3cm}]
+\node[sec] (s1) {\textbf{17.1} Bốn họ mô hình sinh};
+\node[sec,right=1.5cm of s1] (s2) {\textbf{17.2} Tối ưu trên pixel};
+\node[sec,right=1.5cm of s2] (s3) {\textbf{17.3} Diffusion};
+\node[sec,right=1.5cm of s3] (s4) {\textbf{17.4} Low-level vision};
+\draw[ar] (s1) -- node[above,font=\scriptsize,steel,align=center,text width=1.5cm]{cung cấp\\ \emph{khung}} (s2);
+\draw[ar] (s2) -- node[above,font=\scriptsize,steel,align=center,text width=1.5cm]{trao lại\\ \emph{mẫu hình}} (s3);
+\draw[ar] (s3) -- node[above,font=\scriptsize,steel,align=center,text width=1.5cm]{trao lại\\ \emph{công cụ}} (s4);
+\node[nt,below=0.3cm of s1] {\emph{gỡ:} suy được kiểu thất bại từ hàm mất mát, khỏi phải nhớ từng ca};
+\node[nt,below=0.3cm of s2] {\emph{gỡ:} năm kỹ thuật rời rạc thành một vòng lặp; giới thiệu phép dời chi phí};
+\node[nt,below=0.3cm of s3] {\emph{gỡ:} bốn bước biến một ý tưởng đắt thành thứ chạy được trên máy cá nhân};
+\node[nt,below=0.3cm of s4] {\emph{gỡ:} khi hậu quả là thật, ``đẹp hơn'' trở thành câu hỏi đúng sai};
+\draw[-{Stealth[length=4pt]},reddark,thick,dashed] ([yshift=-2.5cm]s4.south) to[bend left=14]
+  node[midway,below,font=\scriptsize,reddark,align=center]{cùng một kết luận: chọn hàm mất mát là chọn trước kiểu sai lầm}
+  ([yshift=-2.5cm]s1.south);
+\end{tikzpicture}}
+\caption{Bốn mục của chương, xếp theo thứ tự phụ thuộc chứ không theo mức độ phổ biến. Mục 17.2 nằm giữa lý thuyết và diffusion không phải ngẫu nhiên: nó là ví dụ sạch nhất cho việc hàm mục tiêu quyết định tất cả, và nó giới thiệu mẫu hình ``dời chi phí sang lúc huấn luyện'' mà mục 17.3 dùng lại nguyên vẹn. Mũi tên đứt là kết luận chung mà cả bốn mục đều dẫn tới.}
+\label{fig:ban-do-ch17}
+\end{figure}
+
+Mục thứ nhất dựng khung: bốn họ mô hình sinh là bốn định nghĩa khác nhau của cụm từ ``giống dữ liệu thật''. Khung này quan trọng hơn bất kỳ chi tiết kiến trúc nào, vì nó cho phép suy ra kiểu thất bại từ hàm mất mát --- ảnh mờ, mất mode, hay chậm --- thay vì phải ghi nhớ từng trường hợp.
+
+Mục thứ hai tách riêng một ý tưởng cắt ngang: đóng băng mạng, coi ảnh là biến, hạ gradient trên chính pixel. Nó được đặt ở đây, giữa lý thuyết và diffusion, vì hai lý do: nó là ví dụ sạch nhất về việc hàm mục tiêu quyết định tất cả (đổi một dòng là được một kỹ thuật khác), và nó giới thiệu mẫu hình ``dời chi phí từ lúc chạy sang lúc huấn luyện'' mà mục ba sẽ dùng lại nguyên vẹn.
+
+Mục thứ ba là họ đang thắng. Nó không chỉ trình bày nguyên lý mà đi qua bốn bước kỹ thuật đã biến diffusion từ một ý tưởng thành sản phẩm chạy được trên máy cá nhân --- và mỗi bước là một đánh đổi cụ thể mà người dùng phải chỉnh bằng tay.
+
+Mục thứ tư đưa cùng bộ khái niệm sang một bối cảnh mà hậu quả là thật: khôi phục ảnh. Ở đây ``sắc nét hơn'' đồng nghĩa với ``bịa nhiều hơn'', và điều đó không phải một lời than phiền mà là một kết quả có chứng minh. Mục này đặt cuối vì nó cần cả ba mục trước để nói cho đủ.
+
+\subfile{00-map}
+\subfile{01-bon-ho-mo-hinh-sinh/bon-ho-mo-hinh-sinh}
+\subfile{02-toi-uu-tren-pixel/toi-uu-tren-pixel}
+\subfile{03-diffusion/diffusion}
+\subfile{04-low-level-vision/low-level-vision}
+
+\section{Thực hành}
+Chương này có một đặc điểm hiếm: bài thực hành nhỏ nhất của nó --- vẽ đường cong chất lượng theo số bước lấy mẫu --- dạy được nhiều hơn cả chục trang lý thuyết, vì nó biến một đánh đổi trừu tượng thành một hình vẽ bạn tự tay tạo ra. Một lưu ý về bán rã trước khi vào danh sách: danh sách dưới đây chốt tại \textbf{tháng 9/2026}; tên các mô hình dẫn đầu sẽ cũ trong 6--12 tháng, trong khi phần hạ tầng --- \repo{diffusers}, \repo{k-diffusion}, \repo{clean-fid} --- thì bền hơn nhiều --- hãy đầu tư kỹ năng vào nhóm sau.
+
+\begin{description}
+\item[Repo và tài nguyên.] \emph{Hạ tầng:} \repo{huggingface/diffusers}, \repo{comfyanonymous/ComfyUI}, \repo{crowsonkb/k-diffusion}. \emph{Ảnh:} FLUX.2 (dẫn về ảnh chân thực; bản \repo{klein} 4B chạy được trong khoảng 8 GB VRAM), Stable Diffusion 3.5 (hệ sinh thái tinh chỉnh sâu nhất), Qwen-Image (dựng chữ trong ảnh), Z-Image Turbo (nhanh). \emph{Video:} Wan 2.2 (Apache 2.0, lựa chọn an toàn nhất về giấy phép, bản 5B từ 8 GB), LTX-2.3 (sinh âm thanh đồng bộ trong cùng lượt khuếch tán), HunyuanVideo 1.5. \emph{Học nguyên lý:} \repo{lucidrains/denoising-diffusion-pytorch} --- đọc mã nguồn này một lần đáng giá hơn đọc ba bài báo. \emph{Đánh giá:} \repo{GaParmar/clean-fid}, \repo{richzhang/PerceptualSimilarity}.
+\item[Câu hỏi kiểm tra hiểu.] Vì sao mô hình tối ưu MSE cho ảnh mờ, và perceptual loss ``sửa'' điều đó bằng cách đánh đổi gì? FID nhạy với thứ gì mà mắt người không quan tâm, và ngược lại? Latent diffusion tiết kiệm tính toán bằng cách nào, và mất gì ở đúng chỗ đó?
+\item[Mini project (vài giờ đến hai ngày).] Cài một DDPM tối giản khoảng 200 dòng, huấn luyện trên MNIST hoặc CIFAR-10. Cố định mô hình, chỉ đổi bộ lấy mẫu và số bước (10, 25, 50, 250), rồi vẽ FID theo số bước \emph{và} theo thời gian tường. Đường cong đó là bài học đánh đổi rõ nhất của cả mảng diffusion --- và nó cũng cho bạn thấy tận mắt rằng chất lượng bão hoà trước khi thời gian bão hoà.
+\end{description}
+
+\begin{onbai}
+\ar[3]{Độ hợp lý}{Xác suất mà mô hình gán cho dữ liệu đã quan sát. Chỉ họ autoregressive tính được nó chính xác; GAN không có nó, và đó là lý do GAN mất công cụ chẩn đoán tự nhiên.}
+\ar[2]{ELBO}{Cận dưới của log độ hợp lý, thứ mà VAE thực sự tối ưu. Phần tái tạo của nó là bình phương trung bình theo pixel, nên ảnh mờ là hệ quả trực tiếp của chính công thức này.}
+\ar[3]{Mode collapse}{Mô hình chỉ sinh ra một phần nhỏ của phân phối trong khi vẫn đạt điểm cao theo tiêu chí huấn luyện. Nhìn mẫu chọn lọc không phát hiện được, vì các mẫu vẫn đẹp --- chúng chỉ giống nhau.}
+\ar[3]{Score matching}{Huấn luyện bằng cách khớp gradient của log mật độ, \(\nabla_x\log p(x)\), thay vì khớp mật độ. Đây là nền toán của diffusion: mô hình học một trường vectơ, và lấy mẫu là thả một điểm nhiễu vào trường đó rồi để nó trôi.}
+\ar[3]{Vì sao mô hình tối ưu MSE luôn cho ảnh mờ?}{Vì nghiệm cực tiểu của bình phương trung bình là kỳ vọng có điều kiện, tức trung bình của mọi ảnh hợp lệ. Các ảnh đó lệch nhau vài pixel ở biên, nên trung bình của chúng nhoè.}
+\ar[3]{Vì sao diffusion huấn luyện ổn định hơn GAN?}{Vì hàm mất mát của nó là bình phương trung bình trên nhiễu, tức một bài hồi quy tầm thường. GAN đi tìm điểm cân bằng của một trò chơi hai người, nên không có ``hội tụ'' theo nghĩa thông thường.}
+\ar[2]{Ma trận Gram}{Tích trong giữa các kênh của một bản đồ đặc trưng, cộng dồn trên mọi vị trí không gian. Phép cộng dồn xoá hết thông tin vị trí, nên nó giữ được kết cấu và bảng màu nhưng không giữ được bố cục.}
+\ar[2]{AdaIN}{Chuẩn hoá đặc trưng của ảnh nội dung về trung bình--độ lệch chuẩn 0--1 theo từng kênh, rồi gán lại thống kê của ảnh phong cách. Cho phép một mạng duy nhất làm phong cách tuỳ ý, đổi lại chất lượng thấp hơn bản tối ưu.}
+\ar[2]{Vì sao tối ưu trên pixel lại tìm ra mẫu đối kháng?}{Vì gradient luôn chỉ về hướng dốc nhất của hàm chấm điểm, mà mạng có vô số hướng nó nhạy còn mắt người thì không. Tối ưu đi thẳng vào đúng những hướng bất đồng đó.}
+\ar[3]{Quá trình thuận}{Phép pha nhiễu Gauss dần dần, không có tham số nào để học. Nhờ tính cộng của Gauss, ta nhảy thẳng từ ảnh gốc tới bước bất kỳ --- đó là lý do kỹ thuật khiến diffusion huấn luyện được ở quy mô lớn.}
+\ar[2]{Latent diffusion}{Nén ảnh bằng một autoencoder rồi mới khuếch tán trong không gian ẩn. Với hệ số nén 8, ảnh \(512\times512\) còn \(64\times64\) vị trí --- ít hơn 64 lần. Trần chất lượng vì thế nằm ở autoencoder.}
+\ar[2]{\en{Classifier-free guidance}}{Ngoại suy giữa dự đoán có điều kiện và không điều kiện: \(\tilde\varepsilon=\varepsilon_{\text{vô đk}}+w(\varepsilon_{\text{có đk}}-\varepsilon_{\text{vô đk}})\). Hệ số lớn bám câu mô tả chặt hơn, nhưng cắt bớt đuôi phân phối nên đa dạng giảm.}
+\ar[2]{ControlNet}{Nhánh sao chép phần mã hoá của mô hình gốc, nhận điều kiện cấu trúc (cạnh, tư thế, độ sâu) và nối vào qua các tầng khởi tạo bằng 0. Chi tiết khởi tạo 0 mới là phần đáng nhớ: nó khiến huấn luyện chỉ thêm khả năng chứ không phá prior đã có.}
+\ar[2]{Vì sao ``độ mạnh'' chỉ là một chỉ số thời gian?}{Vì nó quyết định bắt đầu khử nhiễu từ nấc nào. Bắt đầu ở nấc nhiễu ít thì mô hình chỉ tô lại bề mặt; bắt đầu ở nấc nhiễu nhiều thì bố cục cũng bị viết lại.}
+\ar[3]{Ill-posed}{Bài toán có nhiều nghiệm cùng hợp lệ vì toán tử thuận đã xoá thông tin. Siêu phân giải \(\times4\) là một ràng buộc cho mười sáu ẩn; mô hình không giải mà \emph{chọn} một nghiệm, và prior quyết định chọn cái nào.}
+\ar[3]{Vì sao không thể vừa sắc nét vừa đúng từng pixel?}{Đó là đánh đổi perceptual--distortion: giảm sai lệch theo từng ảnh xuống dưới một mức thì buộc phải chấp nhận độ chân thực kém đi. Đây là kết quả \emph{có chứng minh} dưới một cách hình thức hoá cụ thể, không phải lời khuyên rút ra từ kinh nghiệm.}
+\ar[2]{FID}{Khoảng cách giữa phân phối ảnh sinh và phân phối ảnh thật, ước lượng bằng cách khớp Gauss trên đặc trưng của một mạng. Nhạy với việc phân phối bị thu hẹp, mù với lỗi ngữ nghĩa của từng ảnh, và cần hàng vạn mẫu.}
+\ar[1]{Bản GAN sắc nét hơn hẳn với mắt người nhưng PSNR thua bản mờ --- vì sao?}{Vì hai bên nằm ở hai đầu đường cong đánh đổi. Bản mờ là trung bình của mọi ảnh hợp lệ nên tối ưu sai lệch theo pixel; bản GAN chọn dứt khoát một nghiệm nên sắc nét mà lệch từng pixel. Muốn thấy khác biệt thì phải đo thêm bằng LPIPS hoặc FID.}
+\ar[1]{Ảnh sinh mất chữ nhỏ và hoa văn mịn --- chẩn đoán đầu tiên?}{Mã hoá rồi giải mã ngay ảnh gốc, bỏ qua khuếch tán. Nếu chi tiết đã chết ở đó thì thủ phạm là autoencoder, không phải mô hình khuếch tán hay số bước lấy mẫu.}
+\ar[1]{Khử nhiễu rất tốt trên bộ tổng hợp, kém hẳn trên ảnh điện thoại --- nguyên nhân?}{Nó được huấn luyện trên nhiễu Gauss trắng, còn nhiễu thật là Poisson phụ thuộc cường độ sáng cộng nhiễu đọc, rồi bị bộ xử lý ảnh làm cho có tương quan không gian. Cách chữa là mô phỏng đúng chuỗi vật lý ở miền raw.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{diffusers, k-diffusion}{Tách rời mô hình khỏi bộ lấy mẫu --- đúng phân tách của mục 17.3, và là lý do đổi sampler không cần huấn luyện lại}{Hạ tầng bền; cũng là nơi lỗi lệch lịch nhiễu hay xảy ra}
+\ud{Latent diffusion (dòng Stable Diffusion, FLUX)}{Khuếch tán trong không gian ẩn để giảm số vị trí không gian; kiến trúc transformer thay U-Net}{Trần chi tiết vẫn nằm ở autoencoder --- kiểm tra bằng phép mã hoá rồi giải mã}
+\ud{ControlNet}{Ràng buộc cấu trúc bằng nhánh sao chép nối qua tầng khởi tạo 0, để không phá prior đã học}{Chi tiết khởi tạo 0 là phần đáng học nhất, không phải phần kiến trúc}
+\ud{Classifier-free guidance}{Ngoại suy giữa nhánh có và không điều kiện; có mặt trong gần như mọi mô hình sinh ảnh hiện nay}{Cũng là cơ chế cắt đuôi phân phối được nói ở mục 17.4}
+\ud{AdaIN}{Chuẩn hoá rồi gán lại thống kê theo kênh --- vẫn được dùng lại trong nhiều mạng sinh và mạng điều kiện hoá}{Ý tưởng sống lâu hơn ứng dụng style transfer ban đầu của nó}
+\ud{clean-fid, LPIPS}{Đánh giá ở hai tầng khác nhau (phân phối và theo cặp), đúng như bảng chỉ số của mục 17.4}{Hạ tầng; tồn tại chính vì FID nhạy với chi tiết tiền xử lý}
+\end{ungdung}
+
+\begin{duan}{Khử nhiễu trước frontend: ``đẹp hơn'' có nghĩa là ``bám tốt hơn'' không?}{1--2 ngày}
+\dmt nói thẳng: đây là liên hệ \emph{gián tiếp}. Chương này về mô hình sinh, còn chỗ nó thật sự chạm vào visual SLAM là khâu tiền xử lý ảnh thiếu sáng đặt trước frontend. Mục tiêu là kiểm chứng bằng số một giả định mà hầu như ai cũng mặc nhiên tin: ảnh sau khử nhiễu trông sạch hơn thì frontend bám đặc trưng tốt hơn.
+\ddl một chuỗi EuRoC thiếu sáng và nhiều nhoè (V2\_03 hoặc MH\_04), cộng ba bản sao được làm tối và thêm nhiễu có kiểm soát để tạo một thang bốn mức nhiễu. Giữ nguyên \vn{chân trị}{ground truth} của chuỗi gốc cho cả bốn mức.
+\dbc (1) chạy ORB-SLAM3 trên từng mức nhiễu \emph{chưa} khử để lấy đường cơ sở: ATE, và số đặc trưng bám được trung bình mỗi khung hình; (2) chèn một bộ khử nhiễu nhẹ trước frontend --- BM3D hoặc một CNN khử nhiễu nhỏ chạy đủ nhanh; (3) chạy lại với cấu hình y hệt, mỗi cấu hình ít nhất năm lần vì harness không tất định; (4) với mỗi mức nhiễu ghi ba đại lượng: PSNR (hoặc LPIPS) của ảnh sau khử nhiễu, số đặc trưng bám được, và ATE trung bình cùng độ lệch chuẩn.
+\dxk bạn có một bảng ``mức nhiễu \(\times\) \{PSNR, số đặc trưng bám được, ATE\}'' và trả lời được bằng số: mức nhiễu nào thì khử nhiễu cải thiện ATE vượt độ lệch chuẩn của harness, mức nào thì không, và có tồn tại một mức mà PSNR \emph{tăng} trong khi số đặc trưng bám được \emph{giảm} hay không. Nếu có, hãy chỉ đúng chỗ đó --- đó là đánh đổi perceptual--distortion hiện ra ở dạng cụ thể nhất.
+\dnv \ptr{C/17/04} cho cơ chế: làm mượt để tối ưu sai lệch theo pixel cũng chính là xoá đi các góc mà detector cần; \ptr{A/02} cho mô hình nhiễu cảm biến thật; \ptr{E/24} và \ptr{B/07} cho cách quyết định một chênh lệch có thật hay chỉ là nhiễu của harness. Dùng lại đúng harness lặp nhiều lần mà mini project chương 16 đã buộc bạn dựng.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì nghiệm cực tiểu của bình phương trung bình là kỳ vọng có điều kiện --- trung bình của \emph{mọi} ảnh sắc nét khớp với đầu vào. Các ảnh đó lệch nhau vài pixel ở biên, nên trung bình của chúng là một ảnh mờ. Đây là nghiệm đúng của bài toán đã đặt ra, không phải dấu hiệu huấn luyện chưa đủ.}
+\tl{Vì cả hai chỉ là hai hướng đo khoảng cách giữa phân phối mô hình và phân phối dữ liệu. Hướng thuận phạt việc bỏ sót mode nên mô hình trải rộng phủ cả hai mode và đặt khối lượng vào vùng trống --- ra ảnh mờ. Hướng ngược phạt việc đặt khối lượng ở nơi dữ liệu hiếm nên mô hình co về một mode --- ra mode collapse. Một lựa chọn, hai triệu chứng.}
+\tl{Vì hàm mất mát của nó là bình phương trung bình trên nhiễu, tức một bài hồi quy tầm thường, trong khi GAN tối ưu điểm cân bằng của một trò chơi hai người. Hồi quy thì tăng quy mô là tốt lên đều đặn; trò chơi thì không có ``hội tụ'' theo nghĩa thông thường. Diffusion mua sự ổn định đó bằng số bước lấy mẫu.}
+\tl{Vì mọi núm làm ảnh đẹp hơn --- dẫn hướng mạnh, cắt ngưỡng, chọn lọc thủ công --- đều hoạt động bằng cách cắt bớt đuôi phân phối. Từng ảnh đẹp hơn nhưng tập ảnh nghèo hơn, và nếu vòng lặp lặp lại thì mỗi thế hệ học từ đuôi đã bị cắt của thế hệ trước, phương sai co dần và các mode hiếm biến mất.}
+\end{traloi}
+
+\begin{dongian}
+Tưởng tượng một cuộc thi vẽ, và ba giám khảo chấm cùng một bài. Người thứ nhất đặt bài thi chồng lên bản mẫu rồi đo xem mỗi nét lệch bao nhiêu milimét. Người thứ hai lùi ra xa ba mét, nheo mắt, và hỏi ``nhìn tổng thể nó có ra dáng không''. Người thứ ba trộn bài đó vào một chồng năm trăm bài thật rồi xem có rút nó ra được không.
+
+Ba cách chấm đó cho ba thí sinh thủ khoa hoàn toàn khác nhau, và đây mới là điều đáng nhớ: thí sinh sẽ luyện đúng theo cách mình bị chấm. Nếu bị chấm bằng thước, cách an toàn nhất là vẽ nhoè --- một nét nhoè nằm giữa mọi khả năng thì không bị trừ nhiều ở bất cứ chỗ nào. Nếu bị chấm bằng mắt từ ba mét, cách thắng là vẽ mạnh tay và tự bịa thêm chi tiết cho sống động, kể cả những chi tiết không có trong bản mẫu.
+
+Toàn bộ chương này nói rằng máy cũng vậy. Người ta không dạy máy ``vẽ đẹp hơn''; người ta chỉ chọn một cách chấm, rồi máy tự tìm cách thắng cách chấm đó. Ảnh mờ không phải vì máy kém mà vì nó đang bị chấm bằng thước. Ảnh sắc nét nhưng bịa chi tiết không phải vì máy nói dối mà vì nó đang bị chấm bằng mắt.
+
+Cái giá là bạn không thể chọn cả hai. Muốn không bao giờ bịa thì phải chấp nhận nhoè; muốn sắc nét thì phải chấp nhận rằng một phần những gì bạn thấy là do máy tự thêm vào. Trong ảnh trang trí, đó là ưu điểm. Trong ảnh y tế hay ảnh dùng làm bằng chứng, đó là sai lầm nghiêm trọng.
+
+\chuadongian{câu ``không thể chọn cả hai'' ở trên. Nói bằng lời thường thì nó nghe như một lời khuyên rút ra từ kinh nghiệm, nhưng thực chất nó là một kết quả \emph{chứng minh được} dưới một cách phát biểu chặt chẽ. Sự khác biệt đó rất quan trọng khi đọc một bài báo tuyên bố ``chúng tôi vừa chính xác hơn vừa sắc nét hơn'': với một lời khuyên kinh nghiệm thì tuyên bố ấy có thể đúng, với một định lý thì nó chỉ có thể đúng nếu bài báo đang đo hai thứ khác nhau.}
+\motcau{Mọi mô hình sinh đều là một thí sinh luyện theo cách chấm điểm, nên đổi thước đo là đổi \emph{kiểu sai lầm}, không phải đổi mức thông minh.}
+\end{dongian}
+
+\subsection*{Kết nối}
+\ptr{C/18-pretraining-va-foundation} tiếp tục câu chuyện ``tín hiệu giám sát đến từ đâu'' mà chương này chạm vào khi nói về dữ liệu sinh; \ptr{D/20-toi-uu-va-nen-mo-hinh} trình bày đầy đủ mẫu hình dời chi phí sang lúc huấn luyện; \ptr{E/25-do-tin-cay-va-van-hanh} biến ``hỏng im lặng'' của các mô hình khôi phục thành thiết kế phòng thủ cụ thể; và \ptr{C/16-thi-giac-3d} là chương song song, nơi cùng nguyên lý ``prior chọn nghiệm'' xuất hiện trong bài toán hình học.
+
+\subsection*{Tổng kết chương}
+Ta đã đi qua bốn tầng của một câu hỏi duy nhất --- khi nhiều đầu ra cùng hợp lệ thì cái gì chọn? --- và câu trả lời lặp đi lặp lại là: hàm mất mát chọn, chứ không phải kiến trúc chọn. Bốn họ mô hình sinh khác nhau vì bốn cách viết ``giống dữ liệu thật'' thành một con số, và kiểu thất bại của mỗi họ suy ra được từ chính con số đó. Tối ưu trên pixel cho thấy điều này ở dạng thuần khiết nhất: cùng một vòng lặp, đổi hàm mục tiêu là được một kỹ thuật khác hẳn, từ tác phẩm nghệ thuật tới mẫu đối kháng. Diffusion thắng không nhờ ý tưởng đẹp hơn mà nhờ biến bài toán sinh thành một bài hồi quy có thể mở rộng quy mô. Và low-level vision cho thấy khi hậu quả là thật, cùng một đánh đổi đó trở thành câu hỏi ``tôi chịu được kiểu sai nào''.
+
+Ba chỗ còn bỏ ngỏ, đáng theo dõi: thứ nhất, việc rút số bước lấy mẫu xuống một chữ số mà không mất đa dạng --- flow matching và chưng cất bộ lấy mẫu đang tiến nhanh nhưng chưa có lời giải sạch; thứ hai, đánh giá mô hình sinh, nơi mọi chỉ số hiện có đều mù ở một chỗ quan trọng và chưa ai có phương án thay thế thuyết phục; thứ ba, hệ quả dài hạn của việc dữ liệu sinh tràn vào tập huấn luyện của thế hệ mô hình sau --- cơ chế thu hẹp phân phối đã rõ, nhưng độ nghiêm trọng trong thực tế còn phụ thuộc nhiều điều kiện chưa được đo đủ.
+\begin{tukiem}
+\item Câu hỏi chung của cả chương là ``khi nhiều đầu ra cùng hợp lệ thì cái gì quyết định chọn cái nào''. Với VAE, GAN, diffusion và một mạng khôi phục ảnh huấn luyện bằng MSE, mỗi cái trả lời bằng cơ chế nào, và hai cái nào trong bốn thực ra đang đưa cùng một câu trả lời?
+\item Mọi cơ chế làm ảnh đẹp hơn đều mua độ trung thành bằng độ đa dạng --- hệ số dẫn hướng, loss cảm nhận và ma trận Gram đều thuộc họ đó. Ba cái này thu hẹp phân phối ở ba chỗ khác nhau nào trong pipeline?
+\item Đánh đổi perceptual--distortion ở mục 4 và thế lưỡng nan ba chiều ở mục 1 nghe rất giống nhau. Chúng khác nhau ở địa vị lý thuyết thế nào, và vì sao gộp nhầm hai thứ đó lại dẫn tới kết luận sai khi đọc paper?
+\item Mẫu đối kháng ở mục 2 và ảnh có FID rất tốt nhưng sai chi tiết ở mục 4 đều là ``tối ưu đúng thước đo, sai mục đích''. Điểm chung về cơ chế là gì, và cùng một cách phòng vệ có dùng được cho cả hai không?
+\item Bạn dùng đầu ra của một mô hình sinh làm dữ liệu huấn luyện cho mô hình khác. Điều kiện nào phải giữ để việc đó an toàn, và triệu chứng đầu tiên khi điều kiện bị vi phạm hiện ra ở đâu?
+\item Latent diffusion, AdaIN và mẫu hình ``dời chi phí sang lúc huấn luyện'' đều đổi chất lượng lấy tốc độ. Với ràng buộc thời gian thực trên thiết bị nhúng, cái nào bị loại đầu tiên và vì sao?
+\item Cả bốn mục đều cảnh báo về việc tin vào thứ nhìn thấy được --- ảnh mẫu đẹp, bản đồ attention, ảnh trực quan hoá lớp, ảnh khử nhiễu sắc nét. Có quy tắc chung nào rút ra được không, và nó buộc bạn đo thêm cái gì?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

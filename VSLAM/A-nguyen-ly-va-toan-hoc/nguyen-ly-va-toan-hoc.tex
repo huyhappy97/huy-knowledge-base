@@ -1,0 +1,21 @@
+\documentclass[../vslam.tex]{subfiles}
+\begin{document}
+\part{NGUYÊN LÝ VÀ TOÁN HỌC}
+\begin{tomtat}
+Phần A dựng đúng lượng nền cần thiết cho bốn phần sau: hình học của việc nhìn một cảnh từ nhiều chỗ, mô hình biến tia sáng thành pixel và chỗ mô hình đó sai, ngôn ngữ toán để tối ưu trên đa tạp, khung MAP hợp nhất SLAM với hiệu chuẩn, lý thuyết quyết định khi nào một đại lượng ước lượng được, và cuối cùng là cách sai số lan truyền từ pixel ra tới tư thế. Nếu chỉ nhớ một điều: bốn chương đầu là công cụ, chương~5 giải thích \emph{vì sao} mọi thứ hỏng, và chương~6 giải thích \emph{hỏng bao nhiêu} --- hai chương cuối bị bỏ qua nhiều nhất và có giá trị chẩn đoán cao nhất.
+\end{tomtat}
+
+Phần này tồn tại để phục vụ bốn phần sau, và nguyên tắc chi phối nó là \emph{học theo nhu cầu}: mỗi chương chỉ đi tới mức dùng được và giải thích được, không chứng minh định lý khi một suy dẫn ngắn đã đủ. Đây là lựa chọn có chủ ý. Một người dừng lại học trọn vẹn hình học xạ ảnh trước khi chạm vào hệ thống SLAM đầu tiên thường không bao giờ tới được hệ thống đầu tiên; ngược lại, một người bỏ hẳn phần nền sẽ đọc mã nguồn ORB-SLAM3 như đọc bùa chú và không đoán được nó sẽ hỏng ở đâu. Ranh giới đúng nằm ở chỗ: học đủ để \emph{tự dẫn lại được khi cần} và để \emph{nhận ra khi một giả định bị vi phạm}.
+
+Sáu chương có vai trò rất khác nhau, và mức đầu tư nên khác nhau theo. Chương~1 là hình học đa thị: nó nói hai ảnh của cùng một cảnh ràng buộc nhau thế nào, và quan trọng hơn, nó liệt kê các cấu hình mà ràng buộc ấy sụp đổ --- cảnh phẳng, xoay thuần. Chương~2 là mô hình camera: nó nói tia sáng thành pixel bằng cách nào, và nó dạy một kỹ năng chẩn đoán mà cả cây dùng lại liên tục, là phân biệt \emph{mô hình sai} với \emph{tham số sai}. Chương~3 là ngôn ngữ: không có Lie group thì mọi Jacobian trong BA, trong hiệu chuẩn, trong pose graph đều là hộp đen. Chương~4 dựng khung MAP và cấu trúc thưa của nó, tức chỗ SLAM và hiệu chuẩn gặp nhau, và chỗ phần bù Schur biến một bài toán không giải nổi thành một bài toán chạy thời gian thực. Chương~5 hỏi câu hỏi mà bốn chương trước không hỏi được: trong số các biến ta vừa đặt vào bài toán, biến nào dữ liệu thật sự nói được điều gì đó? Chương~6 hỏi câu tiếp theo, quan trọng không kém: với các biến quan sát được, ta biết chúng chính xác đến đâu, và con số bất định ta báo cáo có trung thực không?
+
+Thứ tự đọc đề xuất là tuần tự, nhưng với hai lưu ý. Chương~3 dài và dễ gây nản nếu đọc một mạch; cách tốt hơn là đọc tới hết phần \(SO(3)\) và phép nhiễu loạn, sang chương~4, rồi quay lại lấy nốt Adjoint và \(Sim(3)\) khi chương~11 cần đến. Chương~5 thì ngược lại: nên đọc kỹ ngay cả khi chưa hiểu hết chi tiết, vì nó đổi cách bạn nhìn mọi chương sau. Và nếu bạn đã đọc cây \code{../IMU\_Fusion/}, ba chương~3, 4, 5 ở đây có phần chồng lấn với chương~2, 4, 5 ở đó; phần chồng lấn được viết lại từ góc nhìn thị giác chứ không chép sang, và chỗ nào một cây đã nói kỹ hơn thì cây kia trỏ sang.
+\subfile{00-map}
+\subfile{01-hinh-hoc-da-thi/hinh-hoc-da-thi}
+\subfile{02-mo-hinh-camera/mo-hinh-camera}
+\subfile{03-lie-group-va-toi-uu-tren-da-tap/lie-group-va-toi-uu-tren-da-tap}
+\subfile{04-uoc-luong-map-va-bundle-adjustment/uoc-luong-map-va-bundle-adjustment}
+\subfile{05-observability-gauge-va-suy-bien/observability-gauge-va-suy-bien}
+\subfile{06-bat-dinh-va-lan-truyen-sai-so/bat-dinh-va-lan-truyen-sai-so}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

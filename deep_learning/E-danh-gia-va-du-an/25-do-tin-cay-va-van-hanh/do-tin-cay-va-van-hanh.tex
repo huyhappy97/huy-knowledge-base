@@ -1,0 +1,252 @@
+% ---------------------------------------------------------------------------
+% Chương 25 — Trực quan hoá, độ tin cậy và vận hành
+% Tạo: 2026-09  |  Sửa gần nhất: 2026-09-03  |  Ôn gần nhất: —
+% Phụ thuộc: C/12 (gradient theo đầu vào), B/07, B/08, E/24
+% Mức độ: cốt lõi cho vòng 3
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Trực quan hoá, độ tin cậy và vận hành (Visualization, Reliability, Operations)}
+\ptrtarget{E/25}\ptrtarget{E/25-do-tin-cay-va-van-hanh}
+\dependency{\ptr{C/12-co-che-huan-luyen/01-co-hoc-cua-gradient} (mọi công cụ ở nhóm A chỉ là gradient theo \emph{đầu vào} thay vì theo trọng số); \ptr{B/08-dich-chuyen-phan-phoi} (bất định và drift là hai mặt của cùng một hiện tượng); \ptr{E/24-thi-nghiem-va-ablation} (kỷ luật đo đạc — chương này thêm câu hỏi ``khi nào được phép tin một con số đơn lẻ'').}
+
+\begin{tomtat}
+Chương này trả lời câu hỏi vận hành: \emph{khi nào tôi được phép tin đầu ra của mô hình, và làm gì khi không tin được}. Đọc xong bạn biết vì sao một bản đồ nhiệt đẹp gần như không chứng minh điều gì và phải kiểm chứng bằng can thiệp nào; bạn hiệu chỉnh được xác suất đầu ra và đặt được ngưỡng từ chối trả lời bằng chi phí lỗi thật chứ bằng cảm tính; và bạn thiết kế được đường giám sát khi không có nhãn ở môi trường triển khai. Nếu chỉ nhớ một điều: một ước lượng bất định chỉ có giá trị khi nó nối vào một \emph{hành động khác} --- từ chối trả lời, chuyển cho người, hoặc hạ mức tự chủ; bất định không đổi hành vi là bất định trang trí.
+\end{tomtat}
+
+\begin{nentang}
+\kn{logit và softmax}{logit là vector điểm số thô mà mạng xuất ra trước bước chuẩn hoá; softmax biến nó thành các số dương cộng lại bằng 1, trông như xác suất. ``Trông như'' là chỗ mấu chốt: tổng bằng 1 không đảm bảo con số đó phản ánh tần suất đúng thật.}
+\kn{độ tin cậy (confidence)}{giá trị softmax lớn nhất của một dự đoán, tức là mức mà mô hình ``tự nhận'' mình chắc chắn.}
+\kn{hiệu chỉnh (calibration)}{tính chất mong muốn rằng trong nhóm các lần mô hình nói ``chắc 90\%'', nó đúng khoảng 90\% số lần. Đây là tính chất của \emph{một tập} dự đoán, không phải của một dự đoán đơn lẻ, và nó tách rời với độ chính xác: một mô hình có thể chính xác cao nhưng hiệu chỉnh tệ, và ngược lại.}
+\kn{ECE}{viết tắt của \emph{expected calibration error}. Nó chia các dự đoán thành từng khoảng theo độ tin cậy, rồi lấy trung bình khoảng cách giữa độ tin cậy và độ chính xác thật trong mỗi khoảng.}
+\kn{tập hiệu chuẩn (calibration set)}{một tập dữ liệu có nhãn, tách riêng khỏi train và test, dùng để học tham số hiệu chỉnh hoặc ngưỡng. Dùng lại tập test làm tập hiệu chuẩn là một dạng rò rỉ.}
+\kn{ensemble}{tập hợp \(k\) mô hình huấn luyện độc lập, dự đoán bằng cách lấy trung bình. Mức bất đồng giữa các thành viên là một ước lượng bất định rẻ về mặt khái niệm nhưng đắt về mặt tính toán.}
+\kn{conformal prediction}{họ phương pháp trả về một \emph{tập} nhãn thay vì một nhãn. Tập đó chứa nhãn đúng với xác suất đặt trước, nhờ một ngưỡng lấy từ phân vị của tập hiệu chuẩn.}
+\kn{saliency map}{bản đồ nhiệt gán cho mỗi vùng ảnh một điểm ``mức ảnh hưởng tới đầu ra'', thường tính từ gradient của điểm số theo pixel. Nó là một giả thuyết về nơi mô hình nhìn, không phải bằng chứng.}
+\kn{drift}{hiện tượng phân phối dữ liệu ở môi trường triển khai trôi khỏi phân phối lúc huấn luyện. Phân biệt hai loại: \emph{dịch chuyển đầu vào} (ảnh đổi, quan hệ ảnh--nhãn giữ nguyên) và \emph{dịch chuyển khái niệm} (ảnh trông như cũ nhưng nhãn đúng đã đổi nghĩa).}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Grad-CAM chỉ đúng vào con vật trong ảnh. Vì sao điều đó vẫn chưa chứng minh được rằng mô hình nhìn vào con vật --- và thí nghiệm một dòng nào bác bỏ được nó?}
+\h{Một mô hình đạt 94\% chính xác trong khi độ tin cậy trung bình là 0,99. Con số nào sai, và sửa nó có làm mô hình chính xác hơn không?}
+\h{Nếu bỏ sót đắt gấp một trăm lần báo động giả thì ngưỡng tối ưu là 0,01. Vì sao chính cái ngưỡng ``đúng'' ấy lại có thể khiến hệ thống không triển khai được?}
+\h{Một phương pháp hứa ``tập dự đoán chứa nhãn đúng 90\% số lần''. Vì sao lời hứa đó vẫn tương thích với việc sai 40\% ở đúng lớp bạn quan tâm nhất?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+Một mô hình phân loại luôn trả về một câu trả lời. Đó là thiết kế, không phải lỗi: hàm \en{softmax} chuẩn hoá cho tổng bằng một, nên kể cả với một ảnh không thuộc bất kỳ lớp nào nó vẫn cho ra một lớp cùng một con số trông giống xác suất. Với một hệ thống chạy trong phòng thí nghiệm, điều này vô hại vì mọi ảnh đều đến từ tập test. Với một hệ thống chạy thật, nó là chế độ hỏng nguy hiểm nhất, bởi hệ thống sai mà không phát tín hiệu nào cho biết nó đang sai.
+
+Chỗ nối với nền sẵn có của bạn nằm ngay đây. Một pipeline SLAM không hỏi ``đúng bao nhiêu phần trăm''. Nó hỏi ``khi nào tôi biết mình đang trôi''. Cả kiến trúc phòng vệ của nó tồn tại để trả lời câu ấy: số inlier, ngưỡng chi-square trên phần dư, cờ mất bám, chế độ định vị lại. Deep learning cho thị giác mang văn hoá ngược lại: tối ưu một con số tổng trên một tập test cố định, hầu như không có cơ chế tự báo sai. \emph{Học xong chương này bạn làm được ba việc mà trước đó không làm được}: đọc một bản đồ nhiệt mà không rút ra kết luận sai; biến điểm số đầu ra thành xác suất dùng được cho quyết định có chi phí bất đối xứng; và viết được tài liệu chế độ hỏng cho một hệ thống thật.
+
+\begin{trucgiac}
+Một mạng chưa hiệu chỉnh giống một đồng hồ đo áp suất mà kim đã bị lệch cữ: nó vẫn chuyển động đúng chiều khi áp suất thay đổi, nên vẫn dùng để \emph{so sánh} được, nhưng con số đọc trên mặt đồng hồ không dùng để \emph{quyết định} được. Hiệu chỉnh là chỉnh lại cữ; nó không làm cảm biến nhạy hơn, chỉ làm con số trở nên có nghĩa. Và như mọi lần chỉnh cữ, nó chỉ đúng trong dải điều kiện mà bạn đã chỉnh --- ra ngoài dải đó, kim lại lệch.
+\end{trucgiac}
+
+\section{Nhìn vào bên trong mô hình (Looking Inside the Model)}
+Cả nhóm công cụ này chia sẻ đúng một kỹ thuật: lấy \en{gradient} theo \emph{đầu vào} thay vì theo trọng số. Khi huấn luyện, ta hỏi ``đổi trọng số thế nào để mất mát giảm''; khi trực quan hoá, ta hỏi ``đổi pixel nào thì điểm số của lớp này đổi nhiều nhất''. Cùng một phép tính, khác biến được coi là tự do --- và nhận ra điều đó thì cả nhóm A trở thành một ý tưởng duy nhất thay vì một danh sách kỹ thuật rời rạc.
+
+\subsection{A. Bốn tầng công cụ}
+\begin{itemize}
+\item \textbf{Nhìn thẳng trọng số} --- filter tầng đầu của một CNN hiện ra dưới dạng bộ lọc biên và đốm màu. Chỉ tầng đầu đọc được bằng mắt; từ tầng hai trở đi, trọng số không còn sống trong không gian ảnh.
+\item \textbf{Chiếu \en{embedding}} --- \en{t-SNE} \cite{maaten2008tsne} và \en{UMAP} \cite{mcinnes2018umap} đưa đặc trưng nhiều chiều xuống hai chiều để nhìn cấu trúc cụm.
+\item \textbf{Tối ưu trên pixel} --- từ một ảnh nhiễu, đi lên theo gradient của điểm số một lớp, để xem mô hình ``muốn thấy'' gì ở lớp đó.
+\item \textbf{Quy gán} --- \en{saliency map}, \en{guided backpropagation}, và \en{Grad-CAM} \cite{selvaraju2017gradcam} trả lời câu ``mô hình đang nhìn vào đâu'' bằng cách gán điểm cho từng vùng ảnh.
+\end{itemize}
+
+\subsection{B. Vì sao một bản đồ nhiệt đẹp gần như không chứng minh gì}
+Đây là chỗ cần nói thẳng là phức tạp chứ không đơn giản hoá. Kết quả đã được công bố và có tính quyết định: một số phương pháp quy gán vẫn cho ra bản đồ trông rất hợp lý ngay cả khi trọng số của mô hình bị ngẫu nhiên hoá, hoặc khi mô hình được huấn luyện trên nhãn xáo trộn \cite{adebayo2018sanity}. Nếu bản đồ gần như không đổi khi mô hình đã bị phá hỏng, thì bản đồ đó phản ánh cấu trúc của \emph{ảnh đầu vào} và của chính thuật toán quy gán, chứ không phản ánh cái mô hình đã học. Đó là lý do phép thử tỉnh táo phải chạy trước khi tin bất kỳ bản đồ nào: so bản đồ của mô hình đã huấn luyện với bản đồ của mô hình khởi tạo ngẫu nhiên, và nếu hai bản đồ giống nhau thì phương pháp đó không nói gì về mô hình của bạn.
+
+Cùng lỗi diễn giải xảy ra với phép chiếu hai chiều: trong một bản đồ t-SNE, khoảng cách giữa các cụm và kích thước cụm gần như không mang thông tin, và cấu trúc nhìn thấy phụ thuộc mạnh vào tham số \en{perplexity}. Kết luận đúng cho cả nhóm: các công cụ này dùng để \emph{đặt giả thuyết}, không đủ để \emph{kết luận}.
+
+\subsection{C. Che một vùng rồi đo lại}
+Cách biến một giả thuyết thành bằng chứng là can thiệp thật rồi đo lại. Đó đúng là một ablation như ở chương 24, chỉ khác chỗ bạn cắt bỏ trên \emph{đầu vào} chứ không trên kiến trúc. Nếu bản đồ nhiệt nói mô hình dựa vào một vùng, hãy che vùng đó đi và đo điểm số tụt bao nhiêu; hãy che một vùng ngẫu nhiên cùng diện tích để có nhóm đối chứng; và hãy làm trên đủ mẫu để so được với sàn nhiễu. Đây là chuyển từ quan sát tương quan sang thí nghiệm can thiệp, và nó là ranh giới giữa một hình đẹp trong slide và một kết luận dùng được.
+\lk{E/24}{trường hợp riêng của}{đây đúng là một ablation, chỉ khác là ablate trên đầu vào thay vì trên kiến trúc --- nên nó cũng cần nhóm đối chứng và cũng phải vượt sàn nhiễu}
+
+\begin{table}[H]\centering\footnotesize
+\caption{Bốn công cụ nhìn vào bên trong mô hình. Cột cuối là cột quyết định: nó cho biết kết luận nào \emph{không} được phép rút ra.}
+\label{tab:cong-cu-visual}
+\begin{tabularx}{\linewidth}{@{}L{2.4cm}YYL{3.4cm}@{}}
+\toprule
+\textbf{Công cụ} & \textbf{Cơ chế} & \textbf{Nói được gì} & \textbf{Hỏng khi nào}\\
+\midrule
+Filter tầng đầu & Nhìn thẳng trọng số & Mô hình có học được bộ lọc biên/màu hợp lý không & Chỉ đọc được ở tầng đầu; im lặng về mọi thứ sâu hơn\\
+t-SNE / UMAP & Bảo toàn lân cận cục bộ & Có tồn tại cấu trúc cụm trong không gian đặc trưng không & Khoảng cách và kích thước cụm vô nghĩa; đổi perplexity đổi câu chuyện\\
+Grad-CAM & Gradient theo đặc trưng, gộp theo kênh & Một giả thuyết về vùng ảnh có ảnh hưởng & Vẫn đẹp với trọng số ngẫu nhiên \cite{adebayo2018sanity}; độ phân giải thô\\
+Che vùng + đo lại & Can thiệp thật rồi đo & Bằng chứng nhân quả trong phạm vi mô hình đó & Che tạo ảnh ngoài phân phối; cần nhóm đối chứng che ngẫu nhiên\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Bất định và hiệu chỉnh (Uncertainty and Calibration)}
+\subsection{A. Hai loại bất định, và vì sao phải phân biệt}
+Loại thứ nhất, tiếng Anh gọi là \en{aleatoric}, là phần mơ hồ nằm trong chính dữ liệu: hai chuyên gia nhìn cùng một ảnh X-quang và bất đồng, hay một vật thể bị che quá nửa. Thu thêm dữ liệu cùng loại không làm nó giảm. Loại thứ hai, tiếng Anh gọi là \en{epistemic}, là phần do mô hình chưa từng thấy vùng đầu vào này; nó \emph{giảm} khi có thêm dữ liệu đúng chỗ. Phân biệt hai loại là chuyện ngân sách, không phải chuyện học thuật. Nếu bất định ở một nhóm mẫu thuộc loại thứ nhất thì gán nhãn thêm mười nghìn ảnh không đổi được gì. Tiền nên đi chỗ khác: đổi cảm biến, siết lại định nghĩa lớp, hoặc chấp nhận nó và thiết kế đường từ chối trả lời.
+\lk{B/06}{tiền đề}{mức đồng thuận giữa người gán nhãn là thước đo trực tiếp của bất định ngẫu nhiên: nó chặn trên mọi mô hình học từ tập nhãn đó}
+
+\subsection{B. Hiệu chỉnh: mạng hiện đại tự tin quá mức}
+Kết quả đã được đo và lặp lại nhiều lần: các mạng sâu hiện đại cho xác suất cao hơn hẳn độ chính xác thật, và hiện tượng này nặng hơn ở mạng lớn hơn \cite{guo2017calibration}. Cách đo là \en{ECE}, viết tắt của \emph{expected calibration error}: chia các dự đoán thành các khoảng theo độ tin cậy, rồi lấy trung bình có trọng số của \(\lvert \text{độ chính xác} - \text{độ tin cậy} \rvert\) trên từng khoảng,
+\[
+\mathrm{ECE} \;=\; \sum_{m=1}^{M} \frac{|B_m|}{N}\,\bigl\lvert \mathrm{acc}(B_m) - \mathrm{conf}(B_m) \bigr\rvert .
+\]
+Nói bằng lời: trong nhóm những lần mô hình nói ``tôi chắc 90\%'', nó có đúng khoảng 90\% số lần không --- ECE đo khoảng cách trung bình giữa lời nói và sự thật. Ví dụ tính tay: một mô hình đạt 94\% chính xác với độ tin cậy trung bình 0,99 thì riêng khoảng tin cậy cao nhất đã đóng góp \(\lvert 0{,}99-0{,}94\rvert = 0{,}05\); mô hình này ``nói quá'' năm điểm phần trăm. Hình~\ref{fig:hieu-chinh} vẽ chính tình huống đó.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=8.4cm,height=5.2cm,xmin=0.45,xmax=1.0,ymin=0.45,ymax=1.0,
+  xlabel={độ tin cậy trung bình trong khoảng}, ylabel={độ chính xác thật},
+  xlabel style={font=\small}, ylabel style={font=\small},
+  tick label style={font=\footnotesize}, axis lines=left,
+  legend style={font=\footnotesize,draw=none,fill=none,at={(0.02,0.98)},anchor=north west}]
+\addplot[thick,tiercol,dashed,domain=0.45:1.0,samples=2] {x};
+\addlegendentry{hiệu chỉnh hoàn hảo}
+\addplot[thick,reddark,mark=*,mark size=1.6pt] coordinates {(0.55,0.52)(0.65,0.59)(0.75,0.66)(0.85,0.74)(0.95,0.86)(0.99,0.94)};
+\addlegendentry{mạng chưa hiệu chỉnh}
+\addplot[thick,steel,mark=square*,mark size=1.4pt] coordinates {(0.55,0.545)(0.65,0.64)(0.75,0.745)(0.85,0.84)(0.95,0.945)(0.99,0.975)};
+\addlegendentry{sau temperature scaling}
+\end{axis}
+\end{tikzpicture}
+\caption{Biểu đồ độ tin cậy (\emph{reliability diagram}). Đường chấm là chuẩn lý tưởng; đường đỏ nằm dưới nó có nghĩa mô hình nói chắc hơn thực tế ở mọi mức. Temperature scaling kéo đường đỏ về sát đường chuẩn mà \emph{không} đổi thứ hạng giữa các lớp --- nên độ chính xác giữ nguyên, chỉ con số xác suất trở nên dùng được. Các điểm ở đây là minh hoạ theo đúng hình dạng đã báo cáo trong tài liệu \cite{guo2017calibration}, không phải số đo của một mô hình cụ thể.}
+\label{fig:hieu-chinh}
+\end{figure}
+
+\subsection{C. Bốn cách lấy bất định, và giá của mỗi cách}
+\begin{table}[H]\centering\footnotesize
+\caption{Bốn công cụ ước lượng bất định. Không cái nào chiếm ưu thế tuyệt đối; chọn theo ngân sách suy luận và theo việc bạn cần bảo đảm loại nào.}
+\label{tab:bat-dinh}
+\begin{tabularx}{\linewidth}{@{}L{2.5cm}YL{2.2cm}L{3.3cm}@{}}
+\toprule
+\textbf{Phương pháp} & \textbf{Cơ chế} & \textbf{Chi phí} & \textbf{Hỏng khi nào}\\
+\midrule
+Temperature scaling & Chia logit cho một hằng số học trên tập validation & Gần như bằng không & Chỉ sửa hiệu chỉnh tổng thể, không phát hiện mẫu lạ; hỏng khi phân phối dịch chuyển \cite{ovadia2019can}\\
+MC dropout & Lấy mẫu nhiều lần với dropout bật lúc suy luận \cite{gal2016dropout} & \(k\) lần forward & Ước lượng phụ thuộc chỗ đặt dropout; thường hẹp hơn bất định thật\\
+Ensemble & Huấn luyện \(k\) mô hình độc lập rồi lấy trung bình \cite{lakshminarayanan2017simple} & \(k\) lần huấn luyện \emph{và} suy luận & Đắt nhất; các thành viên vẫn chia sẻ thiên lệch của dữ liệu\\
+Conformal prediction & Dùng phân vị của điểm bất phù hợp trên tập hiệu chuẩn \cite{angelopoulos2023conformal} & Một tập hiệu chuẩn & Bảo đảm là \emph{biên}, không theo từng lớp; cần tính khả hoán, hỏng dưới dịch chuyển\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Trong bốn cách trên, conformal prediction đáng dừng lại vì nó là cách duy nhất cho một \emph{bảo đảm} chứ không chỉ một ước lượng. Ý tưởng rút gọn tới mức đơn giản nhất gồm ba bước. Lấy một tập hiệu chuẩn chưa từng dùng. Với mỗi mẫu, tính một điểm ``bất phù hợp'', chẳng hạn \(1-\hat p_{y}\) với \(\hat p_y\) là xác suất mô hình gán cho nhãn đúng. Rồi lấy phân vị của tập điểm đó làm ngưỡng. Với \(n = 1000\) mẫu hiệu chuẩn và mức sai cho phép \(\alpha = 0{,}1\), ngưỡng là điểm lớn thứ \(\lceil (n+1)(1-\alpha) \rceil = \lceil 900{,}9 \rceil = 901\). Khi dự đoán, ta trả về \emph{tập} mọi nhãn có điểm bất phù hợp dưới ngưỡng đó, và tập ấy chứa nhãn đúng với xác suất ít nhất 90\%. Điều cần hiểu cho đúng là bảo đảm này mang tính biên: nó đúng trên trung bình toàn bộ phân phối, nên hoàn toàn có thể phủ 99\% ở các lớp dễ và 60\% ở một lớp khó. Và nó đòi hỏi tính khả hoán giữa tập hiệu chuẩn và dữ liệu triển khai --- một giả định mà dữ liệu chuỗi thời gian từ robot vi phạm gần như ngay lập tức, vì các khung hình liên tiếp tương quan mạnh với nhau.
+
+\subsection{D. Hai hiện tượng nối vào đây}
+\begin{itemize}
+\item \textbf{Chưa xác định đủ (\emph{underspecification})} --- nhiều mô hình có cùng điểm test nhưng hành xử rất khác ngoài đời, vì tập test không ràng buộc đủ để chọn ra một trong số chúng. Đây chính là mặt thực nghiệm của điều bạn đã thấy ở chương 24: điểm số bằng nhau không có nghĩa hai hệ thống tương đương.
+\item \textbf{Mẫu đối kháng và ảnh đánh lừa} --- vẫn là gradient theo pixel, nhưng đi ngược chiều để phá. Sự tồn tại của chúng nói một điều rất cụ thể: độ tin cậy cao tại một điểm không suy ra độ tin cậy ở lân cận điểm đó. Vì thế phép đo độ bền dưới nhiễu chuẩn hoá \cite{hendrycks2019benchmarking} phải nằm trong bộ đo mặc định, không phải một thí nghiệm thêm thắt.
+\end{itemize}
+
+\begin{cambay}
+Hai cách hiểu sai hay gặp nhất. \emph{Một}, ECE thấp không có nghĩa từng dự đoán đáng tin: một mô hình luôn trả về 0,5 trên một bài toán hai lớp cân bằng có ECE bằng không trong khi không phân biệt được gì cả --- hiệu chỉnh là tính chất của \emph{tập} dự đoán, không phải của một dự đoán. \emph{Hai}, ECE phụ thuộc cách chia khoảng: đổi số khoảng thì con số đổi, nên chỉ so ECE giữa hai mô hình khi dùng cùng cách chia. Cả hai đều dẫn tới cùng một kết luận thực hành: đọc biểu đồ độ tin cậy, đừng chỉ đọc một con số ECE.
+\end{cambay}
+
+\section{Vận hành (Operations)}
+\subsection{A. Ngưỡng quyết định đến từ chi phí, không từ cảm tính}
+Đây là chỗ mọi thứ ở trên biến thành hành động. Với một quyết định nhị phân, ngưỡng tối ưu theo chi phí kỳ vọng là
+\[
+p^{*} \;=\; \frac{c_{\mathrm{FP}}}{c_{\mathrm{FP}} + c_{\mathrm{FN}}},
+\]
+tức là bạn nên báo dương khi xác suất hậu nghiệm vượt tỉ lệ giữa chi phí báo động giả và tổng hai chi phí. Câu diễn giải: ngưỡng không phải một siêu tham số để dò, nó là \emph{tỉ số chi phí viết dưới dạng xác suất}.
+\lk{B/09}{cùng nguyên lý với}{trọng số lớp trong hàm mất mát và ngưỡng quyết định là hai chỗ khác nhau cùng mã hoá một tỉ số chi phí; đặt ở tầng nào là một lựa chọn thiết kế} Ví dụ tính tay: nếu bỏ sót đắt gấp một trăm lần báo động giả thì \(p^{*} = 1/101 \approx 0{,}01\) --- ngưỡng thấp đến mức phản trực giác. Nhưng hãy đi tiếp một bước nữa, vì đây là chỗ con số tổng nói dối. Giả sử tỉ lệ dương thật là 1\% và ở ngưỡng đó mô hình bắt được 95\% ca dương với tỉ lệ báo động giả 10\%. Trên mười nghìn mẫu: 100 ca dương thật, bắt được 95; 9900 ca âm, báo nhầm 990. Tức là trong 1085 lần báo động chỉ có 95 lần đúng, độ chính xác của cảnh báo dưới 9\%. Ngưỡng ấy \emph{vẫn} là ngưỡng đúng theo chi phí đã khai báo, nhưng nó chỉ khả thi nếu hệ thống có năng lực xử lý hơn một nghìn cảnh báo trên mười nghìn mẫu. Nếu không có năng lực đó thì bài toán thật không phải bài toán ngưỡng mà là bài toán chi phí đã khai báo sai, hoặc bài toán cần một tầng lọc thứ hai.
+
+\subsection{B. Từ chối trả lời và con người trong vòng lặp}
+Hệ quả trực tiếp là mọi hệ thống nghiêm túc cần một \textbf{đường từ chối trả lời}, và thiết kế nó là phần quan trọng nhất mà ít người học. Ba câu hỏi phải trả lời trước khi triển khai:
+
+\begin{enumerate}
+\item \textbf{Khi nào từ chối?} Một ngưỡng trên xác suất đã hiệu chỉnh, hoặc kích thước tập conformal vượt một giá trị, hoặc một tín hiệu ngoài phân phối \cite{hendrycks2017baseline}. Ngưỡng này phải chọn trên tập validation và phải được báo cáo kèm tỉ lệ từ chối, vì một hệ thống từ chối 40\% số ca thì độ chính xác trên phần còn lại là con số vô nghĩa nếu đọc tách rời.
+\item \textbf{Từ chối rồi thì ai làm tiếp?} Người, một mô hình đắt hơn, hay một hành vi an toàn mặc định. Nếu không có ai làm tiếp thì việc từ chối chỉ chuyển lỗi thành sự im lặng --- tệ hơn, vì im lặng không được đếm vào bất kỳ metric nào.
+\item \textbf{Hành vi an toàn là gì?} Với robot, câu trả lời thường là hạ mức tự chủ: giảm tốc, dừng, hoặc chuyển sang một bộ ước lượng bảo thủ hơn. Bạn đã có sẵn khuôn mẫu này từ SLAM --- mất bám thì chuyển sang định vị lại chứ không tiếp tục tích luỹ sai số --- và nó chuyển sang phía deep learning gần như nguyên vẹn.
+\lk{C/16}{cùng nguyên lý với}{hạ mức tự chủ khi mất bám trong SLAM và từ chối trả lời khi bất định cao là cùng một mẫu thiết kế: đổi hành vi thay vì đổi ước lượng}
+\end{enumerate}
+
+\subsection{C. Giám sát khi không có nhãn}
+Ở môi trường triển khai bạn gần như không bao giờ có nhãn ngay, nên không đo được độ chính xác. Thứ đo được là các tín hiệu thay thế, chia làm hai nhóm theo giá. Nhóm rẻ tính ngay từ một lần chạy: phân phối độ tin cậy đầu ra, thống kê đặc trưng ở một tầng cố định so với tập tham chiếu, và tỉ lệ từ chối trả lời. Nhóm đắt hơn nhưng nhạy hơn cần thêm hạ tầng: mức bất đồng giữa hai mô hình chạy song song, và các tín hiệu hạ nguồn như người dùng sửa lại kết quả hay robot phải dừng khẩn. Các tín hiệu này phát hiện được \emph{dịch chuyển đầu vào} nhưng gần như mù với \emph{dịch chuyển khái niệm}. Lý do nằm ở chỗ: khi ảnh trông y hệt mà nhãn đúng đã đổi nghĩa, phân phối đầu vào không nhúc nhích, nên mọi tín hiệu không nhãn đều im lặng. Cách duy nhất là gán nhãn một mẫu nhỏ định kỳ; kinh nghiệm thực hành là ngân sách gán nhãn định kỳ luôn rẻ hơn cái giá phát hiện muộn, dù không có con số phổ quát nào cho ``rẻ hơn bao nhiêu''. Vòng khép kín từ lỗi thu được ở production quay về tập dữ liệu chính là chỗ phần E nối ngược về \ptr{B/06-chat-luong-du-lieu}.
+
+\subsection{D. Ràng buộc pháp lý là ràng buộc kỹ thuật}
+Với ảnh mặt người, biển số hay dữ liệu y tế, các ràng buộc về quyền riêng tư quyết định kiến trúc chứ không chỉ quyết định thủ tục giấy tờ: dữ liệu lưu ở đâu, giữ bao lâu, có ra khỏi thiết bị không, có phải xoá theo yêu cầu không. Gắn chúng vào sau khi thiết kế xong thường buộc phải viết lại đúng hai phần đắt nhất --- thu thập dữ liệu và giám sát. Kèm theo là nghĩa vụ tài liệu: ghi rõ mô hình được huấn luyện trên dữ liệu nào và dự định dùng trong phạm vi nào \cite{mitchell2019model}.
+
+\section{Giới hạn và trường hợp hỏng}
+Giới hạn lớn nhất của cả chương: mọi thứ ở đây được hiệu chỉnh và ngưỡng hoá trên một tập hiệu chuẩn, nên chúng chỉ đúng chừng nào dữ liệu triển khai còn giống tập đó. Dưới dịch chuyển phân phối, chất lượng hiệu chỉnh xuống cấp và các phương pháp ước lượng bất định xuống cấp không đồng đều --- ensemble thường bền hơn temperature scaling, nhưng không cái nào giữ được bảo đảm ban đầu \cite{ovadia2019can}. Nói cách khác, các công cụ ở chương này quản trị được \emph{bất định đã biết dạng}, không quản trị được cái chưa từng thấy.
+
+Giới hạn thứ hai nằm ở phía diễn giải. Công cụ trực quan hoá không có tiêu chuẩn đúng/sai khách quan, nên rất khó chứng minh một bản đồ nhiệt là sai. Vì thế chúng phải luôn đi kèm can thiệp và đo lại; một bản đồ đứng một mình không được phép là bằng chứng. Giới hạn thứ ba mang tính tổ chức: đường từ chối trả lời chỉ hoạt động nếu thật sự có người và quy trình đón phần bị từ chối. Cách phát hiện sớm là tính trước số ca đẩy sang người mỗi ngày --- đúng phép nhân ở mục A --- rồi hỏi bộ phận đó xem con số ấy có khả thi không.
+
+\begin{cannho}
+Một ước lượng bất định chỉ có giá trị khi nó nối vào một \emph{hành động khác}: từ chối trả lời, chuyển cho người, hoặc hạ mức tự chủ. Nếu hệ thống làm y hệt nhau dù bất định cao hay thấp thì bạn đã tốn công tính một con số trang trí. \T{2}
+\end{cannho}
+
+\section{Thực hành}
+\begin{description}
+\item[Repo và SOTA.] \repo{pytorch/captum} (bộ quy gán đầy đủ, có sẵn cả phép kiểm tra tỉnh táo), \repo{jacobgil/pytorch-grad-cam}, \repo{lutzroeder/netron} để đọc đồ thị mô hình, TensorBoard embedding projector, \repo{ENSTA-U2IS-AI/torch-uncertainty}, \repo{gpleiss/temperature\_scaling}, \repo{Trusted-AI/adversarial-robustness-toolbox} và \repo{bethgelab/foolbox}, \repo{evidentlyai/evidently} cho giám sát drift. Danh sách này chốt tại tháng 9/2026 và sẽ cũ trong sáu đến mười hai tháng; các thư viện hạ tầng bền hơn nhiều so với tên mô hình dẫn đầu bảng.
+\item[Câu hỏi kiểm tra hiểu.] Mô hình đạt 94\% chính xác với độ tin cậy trung bình 0,99 --- điều gì sai, đo bằng chỉ số nào, và sửa bằng cách rẻ nhất nào? Grad-CAM chỉ đúng vào vật thể: điều đó chứng minh được gì và \emph{không} chứng minh được gì? Bất định ngẫu nhiên cao ở một nhóm mẫu --- thu thêm dữ liệu có giúp không, và nếu không thì tiêu tiền vào đâu? Vì sao một tập dự đoán conformal phủ 90\% vẫn có thể phủ chỉ 60\% ở lớp bạn quan tâm nhất?
+\item[Mini project.] Chạy phép kiểm tra tỉnh táo của Adebayo và cộng sự trên một phương pháp quy gán: so bản đồ của mô hình đã huấn luyện với bản đồ của mô hình khởi tạo ngẫu nhiên trên cùng ảnh. Nếu hai bản đồ giống nhau thì ghi lại kết luận đó như một kết quả âm theo đúng chuẩn ở chương 24.
+\end{description}
+
+\begin{onbai}
+\ar[2]{Saliency map}{Bản đồ nhiệt gán cho mỗi vùng ảnh một điểm ``mức ảnh hưởng tới đầu ra'', tính từ gradient của điểm số theo pixel. Nó dùng để \emph{đặt giả thuyết}; nó không đủ để kết luận.}
+\ar[3]{Vì sao bản đồ nhiệt đẹp không chứng minh gì?}{Vì nhiều phương pháp quy gán vẫn cho bản đồ trông hợp lý ngay cả khi trọng số bị ngẫu nhiên hoá. Khi đó bản đồ phản ánh cấu trúc của ảnh và của chính thuật toán, không phản ánh cái mô hình đã học.}
+\ar[3]{Che vùng, đo lại}{Phép kiểm chứng thật: che vùng mà bản đồ chỉ vào, đo điểm số tụt bao nhiêu, và so với nhóm đối chứng che một vùng ngẫu nhiên cùng diện tích. Đây là chỗ biến quan sát thành bằng chứng.}
+\ar[1]{t-SNE}{Phép chiếu đặc trưng nhiều chiều xuống hai chiều, bảo toàn lân cận cục bộ. Khoảng cách giữa các cụm và kích thước cụm gần như không mang thông tin, và hình vẽ đổi theo tham số perplexity.}
+\ar[3]{Hiệu chỉnh (calibration)}{Tính chất rằng trong nhóm những lần mô hình nói ``chắc 90\%'', nó đúng khoảng 90\% số lần. Đây là tính chất của \emph{một tập} dự đoán, và nó tách rời hoàn toàn với độ chính xác.}
+\ar[2]{ECE}{Chia dự đoán thành các khoảng theo độ tin cậy, rồi lấy trung bình có trọng số của khoảng cách giữa độ tin cậy và độ chính xác thật. Nó phụ thuộc cách chia khoảng, nên chỉ so được giữa hai mô hình khi dùng cùng cách chia.}
+\ar[3]{Accuracy 94\% mà độ tin cậy trung bình 0,99 --- sai ở đâu?}{Mô hình tự tin quá mức chừng năm điểm phần trăm. Đo bằng ECE và đọc biểu đồ độ tin cậy; sửa rẻ nhất bằng temperature scaling, và độ chính xác sẽ không đổi.}
+\ar[2]{Temperature scaling}{Chia logit cho một hằng số học trên tập hiệu chuẩn. Nó không đổi thứ hạng giữa các lớp nên độ chính xác giữ nguyên; nó cũng không phát hiện mẫu lạ và mất hiệu lực khi phân phối dịch chuyển.}
+\ar[2]{Vì sao thêm dữ liệu chỉ giảm được một loại bất định?}{Vì chỉ loại do mô hình chưa từng thấy vùng đầu vào đó mới giảm khi có thêm mẫu ở đúng chỗ. Phần mơ hồ nằm trong chính dữ liệu thì không: hai chuyên gia vẫn bất đồng trên cùng tấm ảnh.}
+\ar{Ensemble}{Huấn luyện \(k\) mô hình độc lập rồi lấy trung bình; mức bất đồng giữa chúng là ước lượng bất định. Đắt gấp \(k\) lần cả khi huấn luyện lẫn suy luận, nhưng bền nhất dưới dịch chuyển phân phối.}
+\ar[2]{Conformal prediction}{Trả về một \emph{tập} nhãn kèm bảo đảm phủ, lấy ngưỡng từ phân vị của tập hiệu chuẩn. Với 1000 mẫu và mức sai 0,1, ngưỡng là điểm bất phù hợp lớn thứ 901.}
+\ar[3]{Tập conformal phủ 90\% nhưng lớp bạn cần chỉ phủ 60\% --- vì sao?}{Vì bảo đảm là \emph{biên}: nó đúng trên trung bình toàn phân phối, nên có thể phủ dư ở lớp dễ và thiếu ở lớp khó. Muốn bảo đảm theo lớp thì phải hiệu chuẩn riêng từng lớp và trả giá bằng cỡ tập hiệu chuẩn.}
+\ar[3]{Ngưỡng theo chi phí}{Ngưỡng báo dương bằng chi phí báo động giả chia cho tổng hai chi phí. Nó là tỉ số chi phí viết dưới dạng xác suất, nên không phải một siêu tham số để dò: bỏ sót đắt gấp trăm lần thì ngưỡng khoảng 0,01.}
+\ar[3]{Vì sao ngưỡng đúng vẫn không triển khai được?}{Vì tỉ lệ dương thật thấp làm số báo động giả áp đảo. Với 1\% dương thật, độ nhạy 95\% và tỉ lệ báo động giả 10\%, mười nghìn mẫu sinh 1085 cảnh báo mà chỉ 95 cái đúng.}
+\ar[3]{Từ chối trả lời}{Nhánh xử lý riêng cho các ca mô hình không đủ chắc, kèm ngưỡng chọn trên tập validation. Nó chỉ hoạt động khi có người hoặc một hành vi an toàn đón phần bị từ chối; không thì nó chỉ đổi lỗi thành im lặng.}
+\ar{Drift}{Phân phối dữ liệu ở môi trường triển khai trôi khỏi phân phối huấn luyện. Chia hai loại: dịch chuyển đầu vào, khi ảnh đổi; và dịch chuyển khái niệm, khi ảnh trông y hệt nhưng nhãn đúng đã đổi nghĩa.}
+\ar[3]{Độ chính xác ở production tụt nhưng mọi tín hiệu giám sát vẫn bình thường --- nghi gì?}{Hai khả năng: dịch chuyển khái niệm, hoặc một thay đổi ở khâu tiền xử lý mà tín hiệu đang theo dõi không chạm tới. Phân biệt bằng cách gán nhãn một mẫu nhỏ và dựng lại đường dữ liệu từ cảm biến tới tensor đầu vào.}
+\ar[2]{Vì sao giám sát không nhãn mù với dịch chuyển khái niệm?}{Vì mọi tín hiệu thay thế đều đọc từ đầu vào hoặc từ đầu ra của mô hình. Khi ảnh không đổi mà chỉ nhãn đúng đổi nghĩa, phân phối đầu vào không nhúc nhích, nên phải gán nhãn một mẫu nhỏ định kỳ.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{\repo{pytorch/captum}}{Cài đặt gần như toàn bộ họ quy gán, và quan trọng hơn, cả các phép kiểm tra tỉnh táo đi kèm}{Hạ tầng; là nơi kết luận của Adebayo \cite{adebayo2018sanity} được đóng gói thành công cụ}
+\ud{Temperature scaling \cite{guo2017calibration}}{Bước hậu xử lý một tham số, nay là mặc định trong nhiều hệ thống có ngưỡng quyết định}{Rẻ tới mức gần như không có lý do bỏ qua}
+\ud{Deep ensembles \cite{lakshminarayanan2017simple}}{Ước lượng bất định bằng mức bất đồng giữa các mô hình độc lập}{Vẫn là chuẩn so sánh mạnh nhất dưới dịch chuyển phân phối \cite{ovadia2019can}}
+\ud{Conformal prediction \cite{angelopoulos2023conformal}}{Bảo đảm phủ dựa trên phân vị của tập hiệu chuẩn, dùng cho các hệ có ngưỡng và có đường từ chối}{Đang lan sang y tế và dự báo; mảng còn mở rộng nhanh}
+\ud{Model cards \cite{mitchell2019model}}{Ghi rõ phạm vi sử dụng dự kiến và dữ liệu huấn luyện --- phần tài liệu của mục vận hành}{Nay là thông lệ ở các nhà phát hành mô hình lớn}
+\ud{\repo{evidentlyai/evidently}}{Giám sát drift bằng các tín hiệu thay thế khi không có nhãn ở production}{Hạ tầng; nối trực tiếp vào vòng lỗi \(\rightarrow\) dữ liệu}
+\end{ungdung}
+
+\begin{duan}{Hiệu chỉnh bộ phân loại đóng vòng và đặt ngưỡng theo chi phí}{1--2 ngày}
+\dmt biến điểm số thô của tầng nhận diện lại vị trí (\en{loop closure}) thành một xác suất dùng được. Sau đó đặt ngưỡng chấp nhận vòng lặp bằng chi phí lỗi, không bằng cảm tính. Chi phí ở đây lệch hẳn về một phía: một vòng lặp sai kéo cả bản đồ về sai vị trí và hỏng vĩnh viễn, còn một vòng lặp bỏ lỡ chỉ để lại phần trôi vốn đã có.
+\ddl các ứng viên vòng lặp sinh ra khi chạy hệ của bạn trên một chuỗi EuRoC, gán nhãn đúng/sai bằng chân trị tư thế (hai khung hình cách nhau dưới một ngưỡng khoảng cách và góc thì là vòng lặp thật). Vài nghìn ứng viên là đủ; tách một nửa làm tập hiệu chuẩn.
+\dbc vẽ biểu đồ độ tin cậy cho điểm số hiện tại trên tập hiệu chuẩn; học một tham số nhiệt độ rồi vẽ lại để thấy đường cong về sát đường chuẩn; khai báo tỉ số chi phí giữa một vòng lặp sai và một vòng lặp bỏ lỡ, tính \(p^{*}=c_{\mathrm{FP}}/(c_{\mathrm{FP}}+c_{\mathrm{FN}})\); đếm số cảnh báo giả ở ngưỡng đó.
+\dxk bạn có hai biểu đồ độ tin cậy, một trước và một sau khi hiệu chỉnh. Bạn có một ngưỡng \emph{suy ra từ chi phí} chứ không chọn tay. Và bạn viết được câu này: ``ở ngưỡng đó, trên mười nghìn ứng viên có \(k\) vòng lặp sai lọt qua và \(m\) vòng lặp thật bị bỏ'', kèm nhận xét hệ thống có chịu nổi \(k\) hay không.
+\dnv \ptr{E/24} cho việc kiểm tra rằng cải thiện sau hiệu chỉnh vượt sàn nhiễu bạn đã đo ở mini project chương trước; \ptr{B/09} cho quan hệ giữa ngưỡng quyết định và trọng số lớp trong hàm mất mát.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì bản đồ có thể gần như không đổi khi trọng số bị ngẫu nhiên hoá, tức là nó phản ánh cấu trúc ảnh và thuật toán quy gán chứ không phản ánh cái mô hình đã học \cite{adebayo2018sanity}. Thí nghiệm bác bỏ: vẽ cùng bản đồ cho một mô hình khởi tạo ngẫu nhiên và so hai hình.}
+\tl{Con số sai là 0,99: mô hình nói chắc hơn thực tế khoảng năm điểm phần trăm. Sửa bằng temperature scaling thì \emph{không} làm mô hình chính xác hơn --- nó không đổi thứ hạng giữa các lớp --- nhưng làm con số xác suất trở nên dùng được để ra quyết định.}
+\tl{Vì ngưỡng thấp cộng với tỉ lệ dương thật thấp sinh ra rất nhiều báo động giả: với 1\% dương thật, độ nhạy 95\% và tỉ lệ báo động giả 10\%, trên mười nghìn mẫu có 1085 cảnh báo mà chỉ 95 đúng. Ngưỡng vẫn đúng theo chi phí đã khai báo; cái thiếu là năng lực xử lý ngần ấy cảnh báo.}
+\tl{Vì bảo đảm của conformal prediction là bảo đảm \emph{biên}: nó đúng trên trung bình toàn bộ phân phối, nên hoàn toàn có thể phủ 99\% ở các lớp dễ và 60\% ở một lớp khó. Muốn bảo đảm theo từng lớp thì phải dùng biến thể hiệu chuẩn riêng cho từng lớp, và trả giá bằng cỡ tập hiệu chuẩn.}
+\end{traloi}
+
+\begin{dongian}
+Trong bếp nhà bạn có một cái báo khói, có núm vặn độ nhạy và một dãy đèn từ một tới mười cho biết nó ``chắc'' tới đâu. Cả chương này nói về đúng ba chuyện xảy ra với cái máy ấy.
+
+Chuyện thứ nhất: dãy đèn nói dối. Chưa ai từng ngồi đếm xem trong một trăm lần nó bật tới đèn số chín thì thật sự có cháy bao nhiêu lần. Muốn con số ấy dùng được để quyết định, phải đếm rồi chỉnh lại thang đèn cho khớp. Chỉnh xong, cái máy không nhạy hơn chút nào; chỉ có con số trên đèn trở nên đọc được.
+
+Chuyện thứ hai: vặn núm độ nhạy tới đâu không phải chuyện sở thích. Nếu bỏ sót một đám cháy tệ hơn nhiều so với việc nó kêu oan lúc bạn rán trứng, thì vặn rất nhạy là đúng --- nhưng phải đếm trước xem mỗi tuần nó sẽ kêu oan bao nhiêu lần, và nhà bạn chịu nổi bấy nhiêu lần không. Máy kêu mà không ai chạy tới thì vặn kiểu gì cũng vô nghĩa.
+
+Chuyện thứ ba: cái đèn chỉ về phía bếp không chứng minh khói đến từ bếp. Muốn biết, đóng cửa bếp lại rồi xem nó còn kêu không.
+
+Cái giá phải trả: mọi thứ bạn chỉnh chỉ đúng cho căn nhà và mùa đã chỉnh; đổi bếp hay sang mùa hanh khô là phải làm lại.
+
+\motcau{Một con số ``chắc chín phần mười'' chỉ đáng tin khi đã có người ngồi đếm, và chỉ đáng tính khi có ai đó làm khác đi lúc nó báo ``không chắc''.}
+\end{dongian}
+
+\section{Kết nối}
+\ptr{C/12-co-che-huan-luyen} là tiền đề kỹ thuật: cả nhóm trực quan hoá chỉ là gradient đổi biến. \ptr{B/07-chia-du-lieu-va-danh-gia} là nơi đọc ý nghĩa của các con số đi trước hiệu chỉnh --- bốn ô của ma trận nhầm lẫn, biểu đồ độ tin cậy, ECE và phân rã điểm Brier. \ptr{B/08-dich-chuyen-phan-phoi} là giới hạn ngoài: hiệu chỉnh và ngưỡng đều mất hiệu lực khi phân phối dịch chuyển, và giám sát drift là cách phát hiện lúc đó. \ptr{E/24-thi-nghiem-va-ablation} cung cấp kỷ luật đo: cải thiện về hiệu chỉnh cũng phải vượt sàn nhiễu như mọi cải thiện khác. \ptr{B/06-chat-luong-du-lieu} là nơi vòng lặp khép lại, khi lỗi thu ở production quay về thành dữ liệu mới. \ptr{D/21-inference-va-trien-khai} là mặt song song: nó lo hệ thống có \emph{chạy kịp} không, chương này lo nó có \emph{đáng tin} không.
+
+\begin{tukiem}
+\item Vì sao một bản đồ Grad-CAM đẹp trên mô hình khởi tạo ngẫu nhiên lại đủ để bác bỏ giá trị của phương pháp đó, thay vì chỉ làm ta nghi ngờ?
+\item Nêu một mô hình có ECE bằng không nhưng hoàn toàn vô dụng. Điều đó nói gì về việc dùng ECE làm metric duy nhất?
+\item Temperature scaling không đổi độ chính xác. Vì sao, và vì sao đó vừa là ưu điểm vừa là giới hạn của nó?
+\item Chi phí bỏ sót gấp một trăm lần chi phí báo động giả, tỉ lệ dương thật là 1\%. Ngưỡng tối ưu là bao nhiêu, và vì sao con số đó có thể khiến hệ thống không triển khai được?
+\item Conformal prediction cho bảo đảm gì và \emph{không} cho bảo đảm gì? Giả định nào của nó bị dữ liệu robot vi phạm?
+\item Bạn giám sát một mô hình đã triển khai mà không có nhãn. Loại dịch chuyển nào bạn phát hiện được, loại nào không, và bạn bù bằng cách gì?
+\item Vì sao một đường từ chối trả lời không có người đón phía sau lại tệ hơn là không có đường từ chối nào?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

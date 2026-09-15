@@ -1,0 +1,267 @@
+% ---------------------------------------------------------------------------
+% Chương 12, mục 1 — Cơ học của gradient
+% Tạo: 2026-09-03  |  Sửa gần nhất: 2026-09-03  |  Ôn gần nhất: —
+% Phụ thuộc: A/01-toan-toi-thieu (Jacobian, quy tắc chuỗi)
+% Mức độ: cốt lõi — nền của cả chương 12 và của mọi chương sau trong Phần C.
+% ---------------------------------------------------------------------------
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Cơ học của gradient (Mechanics of the Gradient)}
+\ptrtarget{C/12-co-che-huan-luyen/01}\ptrtarget{C/12-co-che-huan-luyen/01-co-hoc-cua-gradient}\ptrtarget{C/12/01}\ptrtarget{C/12/01-co-hoc-cua-gradient}
+\dependency{\ptr{A/01-toan-toi-thieu} (quy tắc chuỗi, Jacobian, chuẩn ma trận); hữu ích nhưng không bắt buộc: \ptr{B/11-gioi-han-tinh-toan} nếu muốn hiểu vì sao chi phí bộ nhớ ở cuối mục này lại là ràng buộc thật chứ không phải chi tiết phụ.}
+
+\begin{tomtat}
+Mục này giải thích vì sao thứ tự áp dụng quy tắc chuỗi quyết định chi phí huấn luyện, và vì sao \vn{lan truyền ngược}{backpropagation} rẻ hơn vi phân thuận khoảng tám bậc độ lớn trên một mạng thật. Đọc xong bạn tự viết được lượt ngược cho một tầng bất kỳ. Bạn cũng tự bắt được lỗi của nó bằng kiểm tra gradient số, và ước lượng được bộ nhớ mà kiến trúc sẽ ngốn. Nếu chỉ nhớ một điều: lan truyền ngược không phải công thức riêng của mạng nơ-ron, nó là thuật toán vi phân cho mọi đồ thị khả vi, nên mọi kiến trúc lạ chỉ còn là một đồ thị mới.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mô hình (model)}{một hàm có tham số, nhận đầu vào và trả về dự đoán; ``huấn luyện'' nghĩa là đi tìm bộ tham số làm dự đoán sát nhãn nhất.}
+\kn{tham số (parameter, weight)}{các con số bên trong mô hình mà quá trình huấn luyện được phép thay đổi; một mạng thị giác cỡ vừa có hàng chục triệu con số như vậy.}
+\kn{bias --- phân biệt hai nghĩa}{trong công thức \(Wx+b\), \(b\) là \emph{tham số cộng} của một tầng. Từ ``bias'' trong thống kê lại nghĩa là \emph{độ lệch hệ thống} của một bộ ước lượng. Mục này chỉ dùng nghĩa thứ nhất.}
+\kn{hàm mất mát (loss function)}{hàm biến dự đoán và nhãn thành một số duy nhất đo mức sai; mọi thứ trong huấn luyện đều nhằm giảm số đó.}
+\kn{gradient}{vectơ đạo hàm riêng của hàm mất mát theo từng tham số; nó chỉ hướng làm mất mát TĂNG nhanh nhất, nên ta đi ngược lại.}
+\kn{Jacobian}{ma trận đạo hàm riêng của một hàm nhiều đầu vào, nhiều đầu ra; nó là dạng tổng quát của gradient và là đối tượng chính mà lượt ngược thao tác.}
+\kn{tensor}{mảng số nhiều chiều --- một ảnh RGB là tensor ba chiều, một lô ảnh là tensor bốn chiều; đây là đơn vị dữ liệu mà mọi phép toán trong mạng làm việc với.}
+\kn{batch (lô)}{nhóm mẫu được đưa qua mạng cùng lúc để tận dụng phần cứng song song; kích thước lô ảnh hưởng tới cả tốc độ lẫn chất lượng, và ta sẽ thấy vì sao ở các mục sau.}
+\kn{kích hoạt (activation)}{giá trị đầu ra của một tầng ở giữa mạng, tức dữ liệu đang trên đường đi; đừng nhầm với ``hàm kích hoạt'' là phép phi tuyến sinh ra nó.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Một mạng hiện đại là hàm hợp của vài nghìn phép toán sơ cấp. Nó phụ thuộc vào \(10^7\) đến \(10^9\) tham số vô hướng. Mỗi bước huấn luyện lại cần đạo hàm của \emph{một} số duy nhất --- giá trị \vn{hàm mất mát}{loss function} --- theo \emph{toàn bộ} chỗ tham số đó. Câu hỏi không phải ``quy tắc chuỗi có áp dụng được không'', vì nó luôn áp dụng được. Câu hỏi là: áp dụng quy tắc chuỗi \emph{theo thứ tự nào} để chi phí là một lượt đi thay vì một trăm triệu lượt. Toàn bộ nội dung của \vn{lan truyền ngược}{backpropagation} nằm trong câu hỏi thứ tự đó, chứ không nằm trong bản thân đạo hàm.
+
+Bạn đã gặp mọi nguyên liệu của bài toán này ở phía tối ưu hoá phi tuyến trong SLAM: dựng Jacobian, nhân dồn các Jacobian cục bộ, giải hệ chuẩn tắc. Nhưng hình dạng bài toán ở đó ngược hẳn. Trong bundle adjustment, số dư (\eng{residual}) rất nhiều còn tham số tương đối ít, nên việc dựng tường minh ma trận \(J\) rồi làm việc với \(J^\top J\) là hợp lý. Trong huấn luyện mạng, đầu ra chỉ có \emph{một} chiều còn đầu vào có hàng trăm triệu chiều. \en{Forward-mode autodiff} lan truyền một đạo hàm theo hướng: mỗi lượt cho bạn đạo hàm theo đúng một hướng đầu vào, nên cần \(10^8\) lượt. \en{Reverse-mode autodiff} lan truyền độ nhạy ngược từ đầu ra: mỗi lượt cho bạn đạo hàm theo \emph{tất cả} đầu vào, nên cần đúng một lượt cho mỗi đầu ra vô hướng. Tỉ số \(10^8\) giữa hai cách là lý do tồn tại của lan truyền ngược \cite{rumelhart1986}. Cùng một quy tắc chuỗi, hai thứ tự áp dụng, chi phí lệch nhau tám bậc độ lớn.
+
+Mục này cho bạn ba việc cụ thể. Bạn tự viết được lượt ngược cho một tầng chưa có trong thư viện. Bạn tự bắt được lỗi của nó bằng kiểm tra số. Và bạn ước lượng được bộ nhớ mà một kiến trúc sẽ ngốn. Trước đó cả ba đều phải tin vào framework. \begin{table}[H]\centering\small
+\caption{Hai chế độ vi phân tự động. Chúng dùng đúng cùng một quy tắc chuỗi và chỉ khác nhau ở thứ tự nhân các Jacobian, nhưng thứ tự đó quyết định toàn bộ chi phí.}
+\label{tab:fwd-rev}
+\begin{tabularx}{\linewidth}{@{}L{2.3cm}YYL{3.1cm}@{}}
+\toprule
+\textbf{Chế độ} & \textbf{Cơ chế} & \textbf{Chi phí cho \(n\) đầu vào, \(m\) đầu ra} & \textbf{Hỏng / không dùng khi}\\
+\midrule
+Forward-mode & Lan truyền đạo hàm theo một hướng đầu vào, cùng chiều lượt xuôi & \(n\) lượt; bộ nhớ hằng số & \(n\) lớn --- huấn luyện mạng có \(10^8\) tham số là bất khả thi\\
+Reverse-mode & Lan truyền độ nhạy của một đầu ra, ngược chiều lượt xuôi & \(m\) lượt; bộ nhớ tỉ lệ tổng kích hoạt & \(m\) lớn (cần cả Jacobian đầy đủ), hoặc bộ nhớ không đủ giữ kích hoạt\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng~\ref{tab:fwd-rev} nói gọn lại: huấn luyện là bài toán ``một đầu ra, rất nhiều đầu vào'', và đó chính xác là hình dạng mà reverse-mode được sinh ra để phục vụ.
+
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  nd/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,font=\small,minimum width=1.35cm,align=center},
+  fw/.style={-{Latex[length=2mm]},draw=steel,thick},
+  bw/.style={-{Latex[length=2mm]},draw=reddark,thick,dashed},
+  tg/.style={font=\scriptsize,align=center},
+  hdr/.style={font=\small\bfseries,anchor=west}]
+% --- forward mode ---
+\node[hdr,color=violetdark] at (-0.2,4.25) {Vi phân thuận: một lượt cho \emph{mỗi} hướng đầu vào};
+\node[nd] (a1) at (0.9,2.5) {\(\theta\)};
+\node[nd] (a2) at (3.2,2.5) {tầng 1};
+\node[nd] (a3) at (5.5,2.5) {tầng 2};
+\node[nd] (a4) at (7.8,2.5) {tầng 3};
+\node[nd] (a5) at (10.1,2.5) {\(L\)};
+\foreach \x/\y in {a1/a2,a2/a3,a3/a4,a4/a5} \draw[fw] (\x) -- (\y);
+\draw[fw,violetdark] (0.9,3.35) to[out=30,in=150] (10.1,3.35);
+\node[tg,color=violetdark] at (5.5,3.80) {lượt 1: nhiễu \(\theta_1\)};
+\draw[fw,violetdark,opacity=0.45] (0.9,3.08) to[out=25,in=155] (10.1,3.08);
+\node[tg,color=tiercol] at (11.9,2.5) {\ldots lặp lại\\cho \(\theta_2,\theta_3,\dots\)};
+\node[tg,color=reddark,anchor=west] at (0.2,1.75) {\textbf{Chi phí:} \(n\) lượt cho \(n\) tham số --- với \(n=10^8\) là bất khả thi. Bộ nhớ: hằng số.};
+% --- reverse mode ---
+\node[hdr,color=inkblue] at (-0.2,0.85) {Vi phân ngược: một lượt xuôi, rồi \emph{một} lượt ngược cho tất cả};
+\node[nd] (b1) at (0.9,-0.2) {\(\theta\)};
+\node[nd] (b2) at (3.2,-0.2) {tầng 1};
+\node[nd] (b3) at (5.5,-0.2) {tầng 2};
+\node[nd] (b4) at (7.8,-0.2) {tầng 3};
+\node[nd] (b5) at (10.1,-0.2) {\(L\)};
+\foreach \x/\y in {b1/b2,b2/b3,b3/b4,b4/b5} \draw[fw] (\x) -- (\y);
+\draw[bw] (10.1,-0.95) to[out=-150,in=-30] (0.9,-0.95);
+\node[tg,color=reddark] at (5.5,-1.52) {một lượt ngược duy nhất trả về \(\partial L/\partial\theta_k\) cho \emph{mọi} \(k\)};
+\node[tg,color=tiercol] at (11.9,-0.2) {mọi giá trị\\lượt xuôi phải\\được giữ lại};
+\node[tg,color=reddark,anchor=west] at (0.2,-2.25) {\textbf{Chi phí:} \(1\) lượt --- nhưng bộ nhớ tỉ lệ với tổng kích hoạt của cả mạng.};
+\end{tikzpicture}}
+\caption{Cùng một quy tắc chuỗi, hai thứ tự nhân, hai chi phí lệch nhau tám bậc độ lớn. Vi phân thuận đi cùng chiều lượt xuôi nên mỗi lượt chỉ trả lời được cho một hướng đầu vào; vi phân ngược đi ngược lại nên một lượt phủ mọi tham số. Điểm đáng nhớ nằm ở dòng cuối mỗi nửa hình: cái ta tiết kiệm được ở thời gian phải trả lại bằng bộ nhớ.}
+\label{fig:fwd-vs-rev}
+\end{figure}
+
+Hình~\ref{fig:fwd-vs-rev} cho thấy điều mà bảng không nói được: hai chế độ dùng \emph{cùng} một đồ thị và cùng các Jacobian cục bộ, chỉ khác chiều duyệt --- và chính chiều duyệt sinh ra cả lợi thế lẫn cái giá.
+
+Nhận thức then chốt cần mang ra khỏi mục này là: lan truyền ngược không phải công thức riêng của mạng nơ-ron. Nó là thuật toán chung cho \emph{mọi} đồ thị có hướng không chu trình mà mỗi nút khả vi. Khi bạn đã tin điều đó, một kiến trúc lạ không còn là một thứ phải học thuộc; nó chỉ là một đồ thị mới, và bạn đã biết cách vi phân mọi đồ thị.
+
+\begin{trucgiac}
+Hãy nghĩ về forward pass như một dây chuyền sản xuất: nguyên liệu đi qua ba mươi trạm, mỗi trạm biến đổi một chút, cuối dây chuyền ra một sản phẩm có một con số sai lệch so với chuẩn. Forward-mode giống việc rung nhẹ \emph{một} nút vặn rồi chạy lại cả dây chuyền để xem sai lệch đổi bao nhiêu. Cách đó đúng, nhưng phải lặp lại đúng bằng số nút vặn. Reverse-mode làm ngược: bắt đầu từ sản phẩm lỗi, hỏi trạm cuối ``một đơn vị sai ở đây tương ứng với bao nhiêu sai ở đầu vào của anh'', rồi chuyển đúng câu hỏi đó ngược lên trạm trước. Một lượt đi ngược duy nhất trả lời cho mọi nút vặn trên toàn dây chuyền, vì mỗi trạm chỉ cần biết \emph{quy tắc quy đổi cục bộ} của riêng nó.
+\end{trucgiac}
+
+\subsection{B. Đồ thị tính toán và tích vector-Jacobian (computational graph, VJP)}
+Hình thức hoá của ẩn dụ trên rất gọn. Biểu diễn phép tính thành một đồ thị: nút là giá trị trung gian, cạnh là phụ thuộc. Lượt xuôi duyệt đồ thị theo thứ tự tô-pô và tính giá trị; lượt ngược duyệt theo thứ tự tô-pô đảo và tính \en{adjoint} \(\bar v = \partial L/\partial v\) cho từng nút. Mỗi nút chỉ cần biết một thứ: cách biến adjoint ở đầu ra của nó thành adjoint ở đầu vào của nó. Nếu nút thực hiện \(y = g(x)\) thì quy tắc đó là
+\[
+\bar x = \left(\frac{\partial y}{\partial x}\right)^{\!\top}\bar y ,
+\]
+tức là một \vn{tích vector-Jacobian}{vector-Jacobian product, VJP}. Điểm quan trọng về mặt kỹ thuật là ta \emph{không bao giờ} dựng ma trận Jacobian ở giữa. Xét một tầng affine \(y = Wx + b\) với \(W \in \mathbb{R}^{4096\times 4096}\). Jacobian theo \(W\) là ma trận \(4096 \times 16{,}8\text{ triệu}\), khoảng \(6{,}9\cdot 10^{10}\) phần tử. Không thể lưu nổi. Nhưng VJP của nó chỉ là ba biểu thức tầm thường:
+\[
+\bar x = W^\top \bar y, \qquad \bar W = \bar y\, x^\top, \qquad \bar b = \bar y ,
+\]
+trong đó \(\bar W\) là một tích ngoài với đúng \(16{,}8\) triệu phần tử --- bằng kích thước của chính \(W\). Tỉ số \(4096\) giữa ``dựng Jacobian'' và ``áp dụng Jacobian'' là lý do mọi framework \en{autodiff} đều cài đặt VJP chứ không cài đặt đạo hàm theo nghĩa ma trận. Với một batch \(X\) xếp theo hàng, quy tắc trên trở thành \(\bar W = \bar Y^\top X\), và bạn nên coi đây là công thức phải viết lại được từ đầu bất cứ lúc nào.
+\lk{A/01}{trường hợp riêng của}{lan truyền ngược chỉ là quy tắc chuỗi của giải tích nhiều biến, áp dụng theo thứ tự làm chi phí rẻ nhất}
+\lk{C/12/02}{tiền đề}{chính tích các Jacobian cục bộ ở đây là đại lượng mà ba hướng chống gradient tiêu biến nhắm vào}
+
+\subsection{C. Ba mẫu gradient lặp lại (the three gradient patterns)}
+Nghe qua thì việc phải derive backward cho từng loại tầng là công việc vô tận. Thực tế thì không, vì gần như mọi đồ thị đều được ghép từ ba mẫu, và ba mẫu đó có tên gọi trực quan.
+
+\begin{itemize}
+\item \textbf{Cộng là bộ phân phối} (\emph{add = distributor}) --- nếu \(y = u + v\) thì \(\bar u = \bar v = \bar y\). Nói gọn: adjoint đi qua nút cộng mà không đổi giá trị, chỉ nhân bản ra mọi nhánh.
+\item \textbf{Nhân là bộ hoán đổi} (\emph{multiply = swapper}) --- nếu \(y = uv\) thì \(\bar u = v\,\bar y\) và \(\bar v = u\,\bar y\). Mỗi nhánh nhận adjoint nhân với giá trị của \emph{nhánh kia}; đây chính là lý do lượt ngược buộc phải nhớ các giá trị của lượt xuôi, và do đó là gốc rễ của chi phí bộ nhớ ở mục G.
+\item \textbf{Max là bộ định tuyến} (\emph{max = router}) --- nếu \(y = \max(u,v)\) thì toàn bộ adjoint đi về nhánh thắng, nhánh thua nhận \(0\). Nói gọn: max không trộn, nó chọn đường.
+\item \textbf{Rẽ nhánh là bộ cộng dồn} (\emph{fan-out = accumulator}) --- mẫu thứ tư, ít được nêu tên nhưng gây nhiều lỗi nhất. Nếu một giá trị được dùng ở hai chỗ trong đồ thị, adjoint của nó là \emph{tổng} các adjoint quay về từ hai chỗ đó.
+\end{itemize}
+
+Mẫu thứ tư đáng được nói thêm một câu vì hệ quả thực hành của nó rất rộng: \emph{lượt ngược của \en{broadcasting} là một phép cộng theo đúng trục đã được broadcast}. Cộng một vector bias shape \((C,)\) vào một \en{tensor} shape \((N,C,H,W)\) chính là rẽ nhánh giá trị bias ra \(N\cdot H\cdot W\) chỗ, nên \(\bar b = \sum_{n,h,w} \bar y_{n,c,h,w}\). Một mình quy tắc này giải thích phần lớn lỗi shape mà người mới gặp khi tự viết lượt ngược.
+
+Hình~\ref{fig:do-thi-gradient} chạy cả ba mẫu trên một ví dụ đủ nhỏ để tính tay. Với \(f = (a+b)\cdot\max(c,d)\) và \(a=2, b=3, c=5, d=1\), lượt xuôi cho \(s = 5\), \(m = 5\), \(f = 25\). Lượt ngược đặt \(\bar f = 1\); nút nhân hoán đổi nên \(\bar s = m = 5\) và \(\bar m = s = 5\); nút cộng phân phối nên \(\bar a = \bar b = 5\); nút max định tuyến nên \(\bar c = 5\) và \(\bar d = 0\). Kiểm tra bằng trực giác: tăng \(d\) một chút không đổi gì cả vì \(d\) đang thua, đúng như \(\bar d = 0\); nhưng nếu \(d\) vượt \(c\) thì đạo hàm nhảy bậc, và đó chính là chỗ kiểm tra gradient bằng số sẽ báo động giả ở phần sau.
+
+\begin{figure}[H]\centering
+\resizebox{0.92\linewidth}{!}{%
+\begin{tikzpicture}[
+  nd/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,font=\small},
+  op/.style={draw=violetdark,fill=violetbg,circle,inner sep=3pt,font=\small\bfseries},
+  fw/.style={-{Latex[length=2mm]},draw=steel,thick},
+  bw/.style={-{Latex[length=2mm]},draw=reddark,thick,dashed},
+  fl/.style={font=\scriptsize,color=steel},
+  bl/.style={font=\scriptsize,color=reddark}]
+\node[nd] (a) at (0,3.0) {\(a=2\)};
+\node[nd] (b) at (0,2.1) {\(b=3\)};
+\node[nd] (c) at (0,0.9) {\(c=5\)};
+\node[nd] (d) at (0,0.0) {\(d=1\)};
+\node[op] (pl) at (2.7,2.55) {\(+\)};
+\node[op] (mx) at (2.7,0.45) {\(\max\)};
+\node[op] (ml) at (5.4,1.5) {\(\times\)};
+\node[nd] (f)  at (7.7,1.5) {\(f=25\)};
+\draw[fw] (a) -- (pl); \draw[fw] (b) -- (pl);
+\draw[fw] (c) -- (mx); \draw[fw] (d) -- (mx);
+\draw[fw] (pl) -- node[fl,above,sloped] {\(s=5\)} (ml);
+\draw[fw] (mx) -- node[fl,below,sloped] {\(m=5\)} (ml);
+\draw[fw] (ml) -- node[fl,above] {} (f);
+\draw[bw] ([yshift=-3pt]f.west) -- node[bl,below] {\(\bar f = 1\)} ([yshift=-3pt]ml.east);
+\draw[bw] ([yshift=-4pt]ml.west) -- node[bl,below,sloped] {\(\bar s = m = 5\)} ([yshift=-4pt]pl.east);
+\draw[bw] ([yshift=-4pt]ml.south west) -- node[bl,below,sloped] {\(\bar m = s = 5\)} ([yshift=-4pt]mx.east);
+\draw[bw] ([yshift=-4pt]pl.north west) -- node[bl,above,sloped] {\(\bar a = 5\)} ([yshift=-4pt]a.east);
+\draw[bw] ([yshift=-4pt]pl.south west) -- node[bl,below,sloped] {\(\bar b = 5\)} ([yshift=-4pt]b.east);
+\draw[bw] ([yshift=-4pt]mx.north west) -- node[bl,above,sloped] {\(\bar c = 5\)} ([yshift=-4pt]c.east);
+\draw[bw] ([yshift=-4pt]mx.south west) -- node[bl,below,sloped] {\(\bar d = 0\)} ([yshift=-4pt]d.east);
+\end{tikzpicture}}
+\caption{Ba mẫu gradient trên một đồ thị bốn nút. Mũi tên liền là lượt xuôi, mũi tên đứt là lượt ngược. Nút cộng phân phối adjoint, nút nhân hoán đổi giá trị hai nhánh, nút max định tuyến toàn bộ adjoint về nhánh thắng và cắt nhánh thua về \(0\).}
+\label{fig:do-thi-gradient}
+\end{figure}
+
+\subsection{D. Bốn backward đáng tự viết một lần trong đời}
+Việc tự derive gradient cho vài tầng cụ thể là bài tập kiểu CS231n, và nó nằm ở tầng bán rã \T{2}--\T{3}: không phải kiến thức vĩnh cửu, nhưng cũng không phải chi tiết framework sẽ mất giá sau một năm. Giá trị của nó là sau khi làm xong, bạn đọc bất kỳ tầng mới nào cũng tự hỏi ``VJP của cái này là gì'' thay vì ``thư viện có hỗ trợ không''.
+
+Tầng affine đã nêu ở trên. \term{ReLU} là mẫu max trá hình: \(\bar x = \bar y \cdot \mathbb{1}[x>0]\), và lượt ngược chỉ cần một mặt nạ bit. \term{Softmax ghép cross-entropy} là ví dụ đẹp nhất về việc ghép hai phép toán làm backward sụp đổ: tính riêng thì Jacobian của softmax là \(\operatorname{diag}(p) - pp^\top\), một ma trận \(K\times K\) phải nhân với adjoint; ghép lại thì tất cả rút gọn thành \(\bar z = p - y\), vừa rẻ hơn vừa ổn định hơn về số học. \term{Max pooling} định tuyến adjoint về vị trí argmax nên phải lưu chỉ số argmax từ lượt xuôi --- một chi phí bộ nhớ thật --- trong khi average pooling chỉ phân phối \(1/k^2\) và không cần nhớ gì.
+
+\term{BatchNorm} là bài khó nhất và cũng bổ ích nhất, vì nó là tầng đầu tiên mà gradient của một mẫu phụ thuộc vào \emph{mọi mẫu khác trong batch}. Chuỗi phép toán là trung bình \ra phương sai \ra chuẩn hoá \ra scale-and-shift, và vì \(\mu\) lẫn \(\sigma^2\) đều là hàm của cả batch nên adjoint chạy ngược qua ba đường song song rồi cộng lại. Kết quả gọn có dạng
+\[
+\bar x_i = \frac{\gamma}{N\sigma}\left(N\,\bar{\hat x}_i - \sum_j \bar{\hat x}_j - \hat x_i \sum_j \bar{\hat x}_j\,\hat x_j\right),
+\]
+với \(\hat x\) là giá trị đã chuẩn hoá. Hai tổng trong ngoặc chính là hai đường phụ thuộc qua \(\mu\) và qua \(\sigma^2\). Công thức này giải thích luôn một câu hỏi hay bị hỏi: vì sao BatchNorm làm lượt ngược tốn thêm bộ nhớ. Vì để tính được nó, lượt xuôi phải giữ lại \(\hat x\) và \(\sigma\) cho mỗi tầng BN, chứ không thể vứt đi sau khi dùng.
+\lk{C/12/04}{ràng buộc bởi}{việc gradient một mẫu phụ thuộc cả batch là gốc của mọi rắc rối BatchNorm trong huấn luyện phân tán}
+
+\subsection{E. Kiểm tra gradient bằng số (numerical gradient check)}
+Derive tay thì sai lúc nào không biết, và điều tệ là một gradient sai \emph{vẫn làm loss giảm} --- chỉ là giảm chậm hơn hoặc hội tụ về chỗ khác. Nên cần một phép kiểm tra độc lập. Công cụ là \vn{sai phân hữu hạn}{finite difference} đối xứng
+\[
+\frac{\partial f}{\partial x_k} \approx \frac{f(x + h e_k) - f(x - h e_k)}{2h},
+\]
+chứ không phải sai phân một phía. Lý do là khai triển Taylor: sai phân một phía có sai số bậc \(O(h)\), sai phân đối xứng triệt tiêu số hạng bậc hai nên sai số bậc \(O(h^2)\). Với \(h = 10^{-5}\), đó là chênh lệch giữa sai số cỡ \(10^{-5}\) và cỡ \(10^{-10}\) --- đủ để phân biệt ``code sai'' với ``xấp xỉ số''.
+
+Tiêu chí so sánh phải là sai số tương đối \(|a-n| / \max(|a|,|n|)\) chứ không phải sai số tuyệt đối, vì độ lớn gradient thay đổi hàng chục bậc giữa các tầng. Kinh nghiệm thực hành phổ biến: dưới \(10^{-7}\) là tốt, quanh \(10^{-4}\) là đáng nghi trừ khi hàm có điểm gãy, trên \(10^{-2}\) gần như chắc chắn sai. Ba điều kiện phải thoả thì con số đó mới có nghĩa. Thứ nhất, phải tính bằng \emph{double}: với float32, epsilon máy khoảng \(1{,}2\cdot 10^{-7}\), nên phép trừ hai giá trị gần nhau ở tử số mất gần hết chữ số có nghĩa và bạn đang đo nhiễu làm tròn chứ không đo đạo hàm. Thứ hai, phải tắt mọi nguồn ngẫu nhiên --- dropout, augmentation, thứ tự batch --- hoặc cố định seed, vì \(f\) phải là một hàm tất định thì sai phân mới có nghĩa. Thứ ba, chỉ kiểm vài chục toạ độ ngẫu nhiên, không kiểm hết, vì mỗi toạ độ tốn hai lượt xuôi.
+
+Điểm gãy là cái bẫy lớn nhất. Giả sử \(x_k\) rất gần \(0\) ở đầu vào một ReLU. Khi đó \(x_k + h\) và \(x_k - h\) nằm hai bên điểm gãy. Sai phân số trả về một giá trị trung gian, còn gradient giải tích trả về \(0\) hoặc \(1\). Kiểm tra ``thất bại'' dù code hoàn toàn đúng. Cách xử lý là dùng ít điểm dữ liệu, chọn toạ độ ở xa điểm gãy, và diễn giải một vài lần thất bại cô lập một cách thận trọng thay vì lao đi viết lại backward. Kỹ năng này không hề mất giá theo thời gian: mỗi lần bạn viết một \code{autograd.Function} riêng hay một kernel CUDA cho một phép toán mới, việc đầu tiên nên làm là chạy \code{torch.autograd.gradcheck} với đầu vào double.
+
+\subsection{F. Vectorization, và vì sao nó không chỉ là chuyện tốc độ}
+Bỏ vòng lặp Python khỏi loss và gradient là bài tập kinh điển. Lợi ích hiển nhiên là tốc độ, nhưng chi phí không nằm ở FLOPs. Nó nằm ở phần trên đầu của mỗi lời gọi: thông dịch Python cộng chi phí phóng một kernel, cỡ vài micro-giây. Một nghìn phép toán tí hon vì thế tiêu tốn vài mili-giây trước khi làm phép nhân nào. Đây đúng là hiện tượng bạn đã đo khi tối ưu SLAM: nghẽn ở số lời gọi chứ không ở số phép tính. Nhưng lợi ích thứ hai mới đáng giá lâu dài: viết dạng vector buộc bạn phát biểu rõ shape của mọi thứ, do đó phát biểu rõ \emph{ai rẽ nhánh sang ai}, và khi đó backward gần như tự lộ ra từ ba mẫu ở trên. Đoạn dưới là toàn bộ forward và backward của softmax ghép cross-entropy cho một batch.
+
+\begin{lstlisting}[style=py]
+# Z: (N, K) logits, y: (N,) nhan dung
+Z = Z - Z.max(axis=1, keepdims=True)      # on dinh so: tranh exp tran
+P = np.exp(Z); P /= P.sum(axis=1, keepdims=True)
+loss = -np.log(P[np.arange(N), y]).mean()
+
+dZ = P.copy()
+dZ[np.arange(N), y] -= 1.0                # dZ = p - y
+dZ /= N                                   # vi loss lay trung binh theo batch
+dW = X.T @ dZ                             # VJP cua tang affine
+db = dZ.sum(axis=0)                       # backward cua broadcast = cong theo truc
+\end{lstlisting}
+
+Hai dòng cuối minh hoạ chính xác hai quy tắc đã nêu: tích ngoài cho ma trận trọng số, và tổng theo trục batch cho bias.
+
+\subsection{G. Cái giá của reverse mode: bộ nhớ kích hoạt}
+Reverse-mode rẻ về thời gian nhưng không miễn phí, và cái giá của nó là bộ nhớ. Mẫu nhân đòi hỏi giá trị của nhánh kia. Nên lượt ngược cần phần lớn giá trị trung gian của lượt xuôi. Bộ nhớ vì thế tăng theo tổng kích thước \vn{kích hoạt}{activation} của cả mạng, không theo số tham số. Một phép tính cụ thể cho thấy bậc độ lớn. Lấy đầu ra của một tầng conv ở batch \(32\), \(64\) kênh, độ phân giải \(112\times112\), lưu ở fp32. Nó chiếm \(32\cdot 64\cdot 112\cdot 112\cdot 4 \approx 1{,}03\cdot 10^{8}\) byte, tức khoảng \(98\) MiB cho \emph{một} tầng. Một backbone vài chục tầng nhanh chóng đưa con số này lên vài GB. Nên trong phần lớn bài huấn luyện thị giác, thứ quyết định batch size tối đa là bộ nhớ chứ không phải tính toán.
+\lk{B/11}{ràng buộc bởi}{bộ nhớ kích hoạt là đại lượng chặn batch size, và chương giới hạn tính toán đo nó cùng với băng thông trên mô hình roofline}
+
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.88\linewidth,height=5.6cm,
+  xlabel={tiến trình của một bước huấn luyện}, ylabel={bộ nhớ đang chiếm},
+  xmin=0,xmax=1.02, ymin=0, ymax=140,
+  xtick={0,0.5,1},
+  xticklabels={{bắt đầu\\lượt xuôi},{giao lượt xuôi\\--- lượt ngược},{xong bước\\cập nhật}},
+  xticklabel style={font=\scriptsize,align=center},
+  ytick=\empty,
+  tick label style={font=\scriptsize}, label style={font=\scriptsize},
+  legend style={font=\scriptsize,at={(0.98,0.97)},anchor=north east,draw=rulecol},
+  grid=major, grid style={rulecol,very thin}]
+\addplot[draw=steel,thick,fill=bluebg,fill opacity=0.75] coordinates
+ {(0,12)(0.06,24)(0.12,38)(0.19,50)(0.25,64)(0.31,76)(0.38,88)(0.44,100)(0.50,112)
+  (0.56,100)(0.62,88)(0.69,74)(0.75,60)(0.81,46)(0.88,32)(0.94,20)(1.0,12)} \closedcycle;
+\addlegendentry{không checkpointing}
+\addplot[draw=violetdark,thick,dashed] coordinates
+ {(0,12)(0.07,30)(0.14,22)(0.21,40)(0.28,30)(0.36,48)(0.43,36)(0.50,54)
+  (0.58,48)(0.66,42)(0.74,34)(0.82,28)(0.91,20)(1.0,12)};
+\addlegendentry{có gradient checkpointing}
+\draw[reddark,thick,dashed] (axis cs:0,126) -- (axis cs:1.02,126);
+\node[font=\scriptsize,color=reddark,anchor=north east] at (axis cs:1.0,126) {trần bộ nhớ GPU};
+\draw[steel,thick] (axis cs:0,12) -- (axis cs:1.02,12);
+\node[font=\scriptsize,color=steel,anchor=south west] at (axis cs:0.03,12) {trọng số \(+\) gradient \(+\) trạng thái Adam --- hằng số suốt bước};
+\node[font=\scriptsize,color=inkblue,anchor=south] at (axis cs:0.50,112) {đỉnh};
+\end{axis}
+\end{tikzpicture}
+\caption{Bộ nhớ trong \emph{một} bước huấn luyện. Phần không đổi là trọng số, gradient và trạng thái optimizer; phần dâng lên rồi rút xuống là kích hoạt, và nó đạt đỉnh đúng ở chỗ lượt xuôi giao lượt ngược --- vì đó là lúc mọi giá trị trung gian đã được sinh ra mà chưa có giá trị nào được giải phóng. Hai hệ quả đọc thẳng từ hình: batch size tối đa bị quyết định bởi \emph{một} thời điểm chứ không phải bởi mức trung bình, và checkpointing hạ đỉnh bằng cách vứt rồi tính lại, đổi lấy phần diện tích tăng thêm ở lượt ngược. Các con số là minh hoạ định tính, không phải số đo.}
+\label{fig:bo-nho-mot-buoc}
+\end{figure}
+
+Hình~\ref{fig:bo-nho-mot-buoc} giải thích một điều mà con số \(98\) MiB ở trên không nói: cái chặn bạn không phải tổng bộ nhớ trung bình mà là \emph{đỉnh tức thời} tại điểm giao giữa hai lượt. Đó cũng là lý do một mô hình chạy được ở batch \(16\) có thể sập ở batch \(17\) chứ không xuống cấp dần.
+
+Đây là một đánh đổi thời gian-bộ nhớ quen thuộc, và nó có lời giải quen thuộc. \en{Gradient checkpointing} \cite{chen2016training} chỉ lưu một tập con các nút, rồi khi lượt ngược cần một giá trị đã bị vứt thì tính lại nó từ điểm lưu gần nhất; với cách chọn điểm lưu hợp lý, bộ nhớ giảm từ \(O(L)\) xuống \(O(\sqrt{L})\) với giá khoảng một lượt xuôi phụ, tức chừng \(30\) phần trăm thời gian. Ở đầu kia của phổ, forward-mode có bộ nhớ hằng số nhưng cần một lượt cho mỗi hướng đầu vào, nên nó không dùng để huấn luyện mà dùng cho tích Jacobian-vector, chẳng hạn khi cần tích Hessian-vector trong các phương pháp bậc hai.
+
+\subsection{H. Giới hạn và trường hợp hỏng}
+Khung đồ thị có ba chỗ gãy đáng biết trước.
+
+Thứ nhất là \emph{điểm không khả vi}. ReLU tại \(0\) và max khi hai nhánh bằng nhau không có đạo hàm; framework chọn một quy ước, thường là \(0\) cho ReLU và ``nhánh chỉ số nhỏ hơn thắng'' cho max. Quy ước đó vô hại về mặt tối ưu hoá nhưng có hệ quả về tính tái lập: khi hai giá trị bằng nhau tới từng bit, việc ai thắng phụ thuộc thứ tự duyệt, và thứ tự duyệt có thể phụ thuộc lịch trình luồng. Đây đúng là loại nguồn bất định mà bạn đã truy trong hệ SLAM đa luồng, chỉ là xuất hiện ở một tầng khác.
+
+Thứ hai là \emph{đồ thị bị cắt mà không ai báo}. Một phép gán tại chỗ ghi đè giá trị mà lượt ngược cần sẽ cho gradient sai; PyTorch bắt được phần lớn trường hợp này bằng bộ đếm phiên bản tensor, nhưng một kernel tự viết thì không có ai bảo vệ và bạn nhận gradient sai một cách im lặng. Cùng loại đó là việc vô tình gọi \code{detach()} hoặc đặt một nhánh trong \code{no\_grad()}: loss vẫn giảm, chỉ có một mô-đun không bao giờ học, và triệu chứng duy nhất là một đường cong hơi tệ hơn kỳ vọng.
+
+Thứ ba là \emph{ổn định số}. \(\log(0)\), \(\exp\) tràn, chia cho phương sai gần \(0\): ba nguồn NaN kinh điển. Chúng không phải lỗi của autodiff mà là lỗi của biểu thức bạn viết ra. Cách chữa luôn là viết lại biểu thức ở dạng ổn định: trừ max trước khi lấy \(\exp\), dùng \code{logsumexp}, cộng \(\varepsilon\) vào mẫu số. Kẹp gradient sau khi nó đã thành NaN thì quá muộn. Cùng họ với nó là điều khiển luồng phụ thuộc dữ liệu: một câu lệnh rẽ nhánh theo giá trị tensor là hợp lệ, nhưng gradient chỉ chảy qua nhánh đã chọn, nên nếu bạn tưởng mình đang huấn luyện cả hai nhánh thì bạn nhầm.
+
+\begin{cambay}
+Cái bẫy sinh ra nhiều gradient sai âm thầm nhất không phải công thức khó, mà là quên rằng \emph{broadcast ở lượt xuôi là rẽ nhánh, nên lượt ngược phải cộng theo trục đã broadcast}. Nguy hiểm ở chỗ nếu bạn quên phép cộng đó, shape của kết quả nhiều khi vẫn hợp lệ nhờ chính broadcast, nên không có exception nào được ném ra; bạn chỉ nhận một gradient sai hệ số \(N\) và một quá trình huấn luyện chậm hơn đáng lẽ. Cách phòng duy nhất đáng tin là kiểm tra bằng số trên một ví dụ có \(N=3\) và \(N=1\) rồi so hai kết quả.
+\end{cambay}
+
+\begin{cannho}
+Lan truyền ngược = duyệt đồ thị theo thứ tự tô-pô đảo, mỗi nút áp một tích vector-Jacobian cục bộ, với ba mẫu cộng-nhân-max cộng thêm quy tắc ``rẽ nhánh thì cộng dồn''. Nếu bạn gọi tên được Jacobian cục bộ của một khối, bạn vi phân được khối đó --- kể cả khối bạn chưa từng thấy. \T{1}
+\end{cannho}
+
+\subsection{I. Kết nối}
+Mục này cho bạn công cụ tính gradient; mục tiếp theo, \ptr{C/12/02-lam-cho-training-chay-duoc}, hỏi câu kế: gradient tính đúng rồi thì làm sao để nó không chết hoặc nổ khi đi qua năm mươi tầng --- và câu trả lời bắt đầu chính từ tích các Jacobian cục bộ vừa nêu ở đây. Chi phí bộ nhớ kích hoạt ở cuối mục là tiền đề trực tiếp cho \ptr{B/11-gioi-han-tinh-toan} (roofline, chế độ nghẽn bộ nhớ) và cho phần huấn luyện phân tán ở \ptr{C/12/04-tong-quat-hoa-va-chan-doan}. Ý ``mọi kiến trúc chỉ là một đồ thị'' được dùng lại nguyên vẹn ở \ptr{C/13-kien-truc-backbone}: khi đọc ResNet hay Transformer, thứ đáng hỏi không phải sơ đồ khối mà là đường đi của adjoint qua sơ đồ đó.
+
+\begin{tukiem}
+\item Vì sao reverse-mode rẻ hơn forward-mode đúng bằng tỉ số giữa số đầu vào và số đầu ra, và trong tình huống nào tỉ số đó đảo chiều khiến forward-mode thắng?
+\item Vì sao không bao giờ dựng ma trận Jacobian của một tầng affine, dù về mặt toán học nó tồn tại?
+\item Kiểm tra gradient bằng số báo sai số tương đối \(3\cdot 10^{-3}\) trên một mạng có ReLU --- hai nguyên nhân khả dĩ là gì, và bạn phân biệt chúng bằng cách nào?
+\item Vì sao gradient của BatchNorm với một mẫu lại phụ thuộc vào các mẫu khác trong batch, và điều đó kéo theo hệ quả gì cho huấn luyện phân tán?
+\item Bạn viết một kernel CUDA cho một phép toán mới và lượt ngược cho gradient sai đúng hệ số bằng batch size. Chỗ nào trong code là nghi phạm số một?
+\item Gradient checkpointing đổi cái gì lấy cái gì, và khi nào phép đổi đó \emph{không} đáng?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

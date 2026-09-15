@@ -1,0 +1,240 @@
+% ---------------------------------------------------------------------------
+% Chương 19 — Lộ trình tối thiểu
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-14  |  Ôn gần nhất: —
+% Phụ thuộc: không bắt buộc — chương này là bản đồ đường đi, trỏ tới mọi chương.
+% Mức độ: ĐIỀU HƯỚNG — không dạy khái niệm mới, chỉ nói làm gì theo thứ tự nào
+%         và vì sao đúng thứ tự ấy.
+% Kiểm chứng: chương không có công thức lõi mới. Mọi con số đều là trích dẫn
+%   lại từ C/15 (bảng ngân sách, ví dụ số học) và C/16 (kết quả mô phỏng đã chạy).
+% Ghi chú trung thực: ước lượng thời gian nói theo BẬC (ngày/tuần) và là phán
+%   đoán chủ quan của tôi, không phải số đo trên dự án thật.
+% KHUNG FILE: chương điều hướng nên cố ý lược nentang, khoigoi, traloi, ungdung
+%   và mục Thực hành — theo đúng quy ước đã dùng cho Phần D của cây IMU_Fusion.
+% ---------------------------------------------------------------------------
+\documentclass[../../marker.tex]{subfiles}
+\begin{document}
+\chapter{Lộ trình tối thiểu (The Minimum Path)}
+\ptrtarget{E/19}\ptrtarget{E/19-lo-trinh-toi-thieu}
+\dependency{Không bắt buộc đọc gì trước --- chương này là bản đồ đường đi chứ không phải một chặng đường. Nếu đi tuần tự từ Phần~A thì đây là chương cuối; nếu đang có một dự án thật và cần biết bắt đầu từ đâu thì đây là chương \emph{đầu tiên}.}
+
+\begin{tomtat}
+Chương này trả lời câu hỏi thực dụng nhất: \emph{nếu tôi phải làm xong hệ thống docking này, tôi làm gì trước, làm gì sau, và vì sao đúng thứ tự ấy?} Lộ trình gồm tám bước, và điểm đáng chú ý nhất của nó là \emph{ba bước đầu không có dòng code nào} --- chúng là tính toán trên giấy, mô phỏng, và quyết định cơ khí. Điều ấy không phải một sự sắp xếp cho đẹp mà là hệ quả trực tiếp của luận điểm trung tâm: nếu phần lớn ngân sách nằm ở các dòng hệ thống và ở hình học, thì thứ tự làm việc phải phản ánh điều đó. Nếu chỉ nhớ một điều: \emph{bước đầu tiên là chạy mô phỏng cho constellation dự kiến, trước khi mua camera và trước khi đặt gia công} --- một buổi chiều ở đó quyết định phần lớn kết quả cuối cùng, và nó là buổi chiều rẻ nhất trong cả dự án.
+\end{tomtat}
+
+\section{Đặt vấn đề: ba thứ tự sai}
+\ptrtarget{E/19/01}
+
+Trước khi trình bày thứ tự được chọn, đáng dành một mục cho ba thứ tự \emph{không} được chọn. Cả ba đều là thứ tự người ta thật sự đi, cả ba đều nghe hợp lý, và nhìn rõ chúng hỏng ở đâu là cách nhanh nhất để hiểu vì sao tám bước phía sau lại xếp như thế.
+
+\textbf{Thứ tự thứ nhất: từ detector đi lên.} Chọn một họ tag, cài detector, chạy được, rồi cải thiện dần --- thử detector khác, thử tinh chỉnh góc, thử bộ lọc. Lập luận ủng hộ rất chắc: đó là chỗ dữ liệu sinh ra, và nó cho kết quả nhìn thấy được ngay trong ngày đầu.
+
+Chỗ hỏng nằm ở một con số cụ thể. Theo bảng ngân sách ví dụ ở \ptr{C/15} mục~3, ba dòng nhiễu góc cộng lại đóng góp \(1{,}18\) mm trong khi nhóm hệ thống đóng góp \(4{,}93\) mm --- tức 72\% ngân sách nằm ở những dòng mà detector không chạm tới. Người đi theo thứ tự này sẽ dành nhiều tuần cải thiện một phần nhỏ của bài toán, và --- đây mới là phần tệ --- \emph{họ sẽ thấy tiến bộ thật ở mỗi bước}, nên không có tín hiệu nào bảo họ dừng lại.
+
+\textbf{Thứ tự thứ hai: từ phần cứng đi ra.} Mua camera, gia công tấm marker theo bản vẽ, lắp lên robot, rồi mới bắt đầu làm phần mềm. Lập luận ủng hộ cũng chắc: phần cứng có thời gian đặt hàng dài, nên đặt sớm là hợp lý về tiến độ.
+
+Chỗ hỏng là chỗ tốn tiền nhất trong cả chương. Các quyết định hình học --- baseline bao nhiêu, có nghiêng tag không, mấy cỡ tag --- quyết định phần lớn sai số góc, và \ptr{C/16} mục~3E đo được rằng chênh lệch giữa một bố trí tốt và một bố trí tồi là \emph{6,7 lần}. Nếu bạn đã gia công một trăm cái dock với bố trí tồi thì không dòng code nào cứu được, và sửa thì tốn một trăm lần chi phí gia công.
+
+\textbf{Thứ tự thứ ba: từ yêu cầu đi xuống.} Nhận yêu cầu ``5\,mm và \(0{,}5^\circ\)'', rồi tìm cách đạt nó bằng cách làm mọi khâu chính xác nhất có thể. Lập luận ủng hộ nghe kỹ lưỡng và có trách nhiệm.
+
+Chỗ hỏng tinh vi hơn hai cái trên và nó là chỗ tôi cho là đắt nhất về mặt công sức: \emph{yêu cầu ấy có thể không phải yêu cầu thật}. \ptr{B/13} mục~1 chỉ ra rằng docking cần \emph{độ lặp lại} chứ không cần \emph{độ chính xác}, và \ptr{C/15} mục~5 định lượng chênh lệch: cùng một hệ thống cho 6,81\,mm ở chế độ đo tuyệt đối và 1,88\,mm ở chế độ teach-by-showing. Người đi theo thứ tự này giải một bài toán khó hơn bài toán thật 3,6 lần, và họ không bao giờ biết vì họ không đặt câu hỏi ấy.
+
+Ba chỗ hỏng có một điểm chung, và điểm chung ấy là nguyên tắc sắp xếp của lộ trình: \emph{cả ba đều bắt đầu làm trước khi biết dòng nào của ngân sách là dòng lớn}. Tám bước dưới đây được sắp để câu hỏi ấy được trả lời trước tiên.
+
+\begin{trucgiac}
+Hình dung lộ trình này như việc chuẩn bị cho một chuyến đi xa bằng ô tô.
+
+Cách sai thứ nhất: bắt đầu bằng việc đánh bóng xe. Nó cho cảm giác tiến bộ ngay, xe trông đẹp dần lên mỗi giờ, và nó hoàn toàn không liên quan tới việc bạn có tới nơi hay không.
+
+Cách sai thứ hai: mua xe trước khi biết đường đi thế nào. Nếu đường toàn đèo dốc mà bạn mua một chiếc xe thấp gầm thì không có cách nào sửa ngoài việc mua lại.
+
+Cách sai thứ ba: quyết tâm đi thật nhanh vì nghĩ rằng phải tới trong sáu tiếng, trong khi thật ra không ai yêu cầu thế --- bạn chỉ cần tới trước bữa tối.
+
+Cách đúng bắt đầu bằng một việc mà không ai coi là ``bắt đầu'': \emph{mở bản đồ ra và xem quãng đường bao xa, đường thế nào}. Nó mất mười lăm phút, nó không tạo ra tiến bộ nhìn thấy được, và nó quyết định mọi thứ còn lại --- kể cả việc bạn có cần mua xe mới hay không.
+
+Trong bài toán này, cái bản đồ ấy là bảng ngân sách sai số, và việc mở nó ra là chạy mô phỏng. Một buổi chiều, không tốn gì, và nó nói cho bạn biết dòng nào lớn --- tức việc gì đáng làm.
+\end{trucgiac}
+
+\section{Nguyên tắc sắp xếp}
+\ptrtarget{E/19/02}
+
+Một nguyên tắc duy nhất, và nó nghiêm ngặt hơn vẻ ngoài: \emph{mỗi bước chỉ được đặt vào chỗ mà tại đó nó giải quyết dòng lớn nhất còn lại của ngân sách}.
+
+Nguyên tắc ấy khác với hai nguyên tắc tự nhiên hơn. Nó \emph{không} phải từ dễ tới khó, và nó \emph{không} phải theo thứ tự của chuỗi đo. Nó theo thứ tự \emph{đòn bẩy}.
+
+Hệ quả trực tiếp là ba đảo thứ tự so với cách trình bày của cây, và chúng đáng nói rõ vì chúng là chỗ lộ trình này khác cách đọc tuần tự.
+
+\emph{Đảo thứ nhất:} \ptr{C/15} và \ptr{C/16} --- ngân sách và mô phỏng --- nằm ở Phần~C nhưng được làm ở \emph{bước 1}. Lý do: chúng là công cụ trả lời câu hỏi ``dòng nào lớn'', và mọi bước sau phụ thuộc vào câu trả lời ấy.
+
+\emph{Đảo thứ hai:} \ptr{B/13} --- điều khiển --- nằm gần cuối Phần~B nhưng được quyết định ở \emph{bước 2}. Lý do: quyết định teach-by-showing hay không thay đổi toàn bộ bảng ngân sách (\ptr{C/15} mục~5), nên nó phải được đưa ra trước khi quyết định đầu tư vào đâu.
+
+\emph{Đảo thứ ba:} \ptr{B/07} --- detector --- là chương đầu của Phần~B nhưng nằm ở \emph{bước 6}. Lý do đã nêu ở mục~1: nó có đòn bẩy thấp nhất, và \ptr{B/07} mục~1 nói thẳng điều đó.
+
+\section{Tám bước}
+\ptrtarget{E/19/03}
+
+\begin{mach}
+\item \vd{Không biết dòng nào của ngân sách là dòng lớn, nên không biết đầu tư vào đâu.}
+\gp \textbf{Bước 1 --- Lập ngân sách và chạy mô phỏng.} Đọc \ptr{A/05} và \ptr{C/15}, lập bảng với số ước lượng, rồi chạy script của \ptr{C/16} cho hai ba phương án bố trí.
+\gd bốn quan hệ tỉ lệ của \ptr{A/05} đúng, và \(\sigma\) ước lượng không sai quá một bậc.
+\gia một buổi chiều tới một ngày. Không tốn tiền.
+\hq bạn biết dòng nào lớn, và bạn có một bố trí constellation có cơ sở. \emph{Không có dòng code nào trong pipeline.}
+
+\item \vd{Bảng ngân sách nói không đạt, nhưng có thể bài toán thật dễ hơn bài toán đang giải.}
+\gp \textbf{Bước 2 --- Quyết định chế độ.} Đọc \ptr{B/13} mục~1 và~3, quyết định teach-by-showing hay đo tuyệt đối, rồi tính lại bảng cho chế độ đã chọn (\ptr{C/15} mục~5).
+\gd vị trí cập là cố định và lặp lại được --- nếu robot phải cập vào nhiều dock khác nhau thì teach-by-showing không áp dụng.
+\gia một buổi đọc và tính. Không tốn tiền.
+\hq ngân sách có thể thu nhỏ 3--4 lần, và nhiều bước sau trở nên nhẹ hơn hẳn.
+
+\item \vd{Các quyết định cơ khí không đảo ngược được và chúng quyết định phần lớn sai số góc.}
+\gp \textbf{Bước 3 --- Chốt thiết kế cơ khí.} Đọc \ptr{B/09} và \ptr{B/13} mục~7. Quyết: baseline, góc nghiêng tag, số cỡ tag, vị trí gắn camera (cánh tay đòn \(L\), \ptr{C/15} mục~4), và có côn dẫn hướng hay không.
+\gd mô phỏng ở bước 1 đã bao phủ toàn dải tư thế tiếp cận, không chỉ một điểm.
+\gia vài ngày làm việc với kỹ sư cơ khí. Đây là bước tốn tiền, và tiền tiêu ở đây rẻ hơn nhiều so với tiêu ở bước 6.
+\hq bản vẽ có nêm nghiêng, có baseline đủ, và có thể có côn dẫn hướng --- ba thứ mà thêm vào sau thì đắt gấp bội.
+
+\item \vd{Mọi phép đo phía sau là chính xác quanh một giá trị sai nếu các hằng số sai.}
+\gp \textbf{Bước 4 --- Hiệu chuẩn theo đúng thứ tự.} Đọc \ptr{B/12} và \ptr{D/18}. Chạy intrinsic, rồi BA constellation, rồi hand-eye --- \emph{kiểm sau mỗi bước} trước khi chuyển.
+\gd chế độ đã chọn ở bước 2; nếu là teach-by-showing thì yêu cầu chuyển từ \emph{độ đúng} sang \emph{độ ổn định} (\ptr{B/12} mục~7).
+\gia vài ngày, và nó đòi kỷ luật hơn kỹ năng.
+\hq các dòng hệ thống của ngân sách được định giá bằng số đo thay vì phỏng đoán.
+
+\item \vd{Ambiguity là lỗi thô: khi nó xảy ra, mọi con số trong ngân sách vô nghĩa.}
+\gp \textbf{Bước 5 --- Khử ambiguity và dựng giao diện ba trạng thái.} Đọc \ptr{A/04}, \ptr{B/10}, \ptr{D/17} mục~2. Lấy \(\rho\) ra, dẫn ngưỡng bằng mô phỏng, và trả về trạng thái ba giá trị thay vì một pose.
+\gd bước 3 đã phá tính đồng phẳng --- nếu chưa thì bước này chỉ là giảm thiểu, không phải khử.
+\gia một tới hai ngày.
+\hq hệ biết khi nào nó không biết. \emph{Đây là điều kiện để mọi con số phía sau có nghĩa.}
+
+\item \vd{Nhiễu định vị góc là dòng ngẫu nhiên lớn nhất còn lại.}
+\gp \textbf{Bước 6 --- Đo và cải thiện \(\sigma\).} Đọc \ptr{B/07}, \ptr{B/08}, \ptr{B/14}. Đo \(\sigma\) thật, vẽ đồ thị \(\sigma_N\) theo \(N\), rồi làm theo thứ tự rẻ nhất trước: trung bình nhiều khung, bật tinh chỉnh góc, cân nhắc target lai, cải thiện chiếu sáng.
+\gd đồ thị \(\sigma_N\) không bão hoà sớm --- nếu nó bão hoà thì bạn còn một dòng thiên lệch chưa tìm ra, và mọi đầu tư ở đây vô ích.
+\gia vài ngày. Đây là chỗ mà thứ tự đầu tư quan trọng hơn nỗ lực.
+\hq \(\sigma\) giảm vài lần, và quan trọng hơn: nó \emph{ổn định} qua các điều kiện.
+
+\item \vd{Robot phải đi tới đích, và cách nó đi quyết định phần nào của ngân sách thật sự tới mũi.}
+\gp \textbf{Bước 7 --- Dựng bộ điều khiển.} Đọc \ptr{B/13} đầy đủ và \ptr{B/11}. Dựng coarse-to-fine ba pha, stop-and-go ở pha cuối, đường tiếp cận thẳng trục, và tiêu chí hội tụ ba điều kiện cùng cơ chế retry có ghi log.
+\gd bước 5 đã cho giao diện ba trạng thái --- tiêu chí hội tụ cần nó.
+\gia một tới hai tuần, và phần lớn thời gian là chỉnh chứ không phải viết.
+\hq hệ cập được, và mỗi lần thất bại đều có lý do ghi lại.
+
+\item \vd{Không biết hệ thật sự đạt hay không, và không biết nó hỏng ở điều kiện nào.}
+\gp \textbf{Bước 8 --- Nghiệm thu.} Đọc \ptr{C/16} mục~4. Đo độ lặp lại của \emph{toàn chu trình} ít nhất 30 lần, vẽ bản đồ sai số theo tư thế, và thử nghiệm độ bền ở bốn điều kiện.
+\gd có một chuẩn tham chiếu --- và \ptr{C/16} mục~4A nhắc rằng chính cơ cấu cập là một chuẩn hợp lệ.
+\gia vài ngày, cộng thời gian chờ để thử ở các điều kiện khác nhau.
+\hq bạn có một con số nghiệm thu \emph{gọi đúng tên} --- độ lặp lại hay độ chính xác --- và một bản đồ chỉ ra vùng nào còn yếu.
+\end{mach}
+
+\emph{(Ước lượng thời gian nói theo bậc và là phán đoán chủ quan của tôi, không phải số đo trên một dự án thật.)}
+
+\section{Dấu hiệu đã xong mỗi bước}
+\ptrtarget{E/19/04}
+
+Một lộ trình không có tiêu chí dừng thì mỗi bước kéo dài vô hạn. Bảng dưới cho tiêu chí đủ cụ thể để tự chấm.
+
+\begin{table}[H]\centering\small
+\caption{Tám bước và dấu hiệu đã xong.}
+\label{tab:e19-xong}
+\begin{tabularx}{\linewidth}{@{}L{0.5cm}L{3.4cm}Y@{}}
+\toprule
+& \textbf{Bước} & \textbf{Xong khi}\\
+\midrule
+1 & Ngân sách và mô phỏng & Có một bảng với số, và bạn \emph{nói được tên} dòng lớn nhất mà không cần nhìn lại bảng\\
+2 & Quyết định chế độ & Có hai bảng ngân sách và một quyết định có lý do viết ra\\
+3 & Thiết kế cơ khí & Bản vẽ có nêm nghiêng và baseline theo số của bước 1, \emph{và} đã được mô phỏng lại sau khi vẽ\\
+4 & Hiệu chuẩn & Ba nhóm tham số, mỗi nhóm kèm một con số bất định, và cả ba phép kiểm sau mỗi bước đều đạt\\
+5 & Khử ambiguity & Hệ trả về ba trạng thái; \(\rho\) có trong log; và bạn biết hệ ở trạng thái không tin cậy bao nhiêu phần trăm thời gian\\
+6 & Cải thiện \(\sigma\) & Đồ thị \(\sigma_N\) theo \(N\) bám đường dốc \(-1/2\) tới \(N\) bạn dùng; \(\sigma\) đo ở sáu điều kiện ánh sáng\\
+7 & Bộ điều khiển & Cập được 20 lần liên tiếp; mỗi lần retry có lý do trong log\\
+8 & Nghiệm thu & Một con số kèm tên đúng, một bản đồ sai số, và bốn kết quả thử độ bền\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Đáng chú ý ở dòng 1: tiêu chí không phải ``có bảng'' mà là \emph{nói được tên dòng lớn nhất}. Lý do là toàn bộ giá trị của bước 1 nằm ở chỗ nó đổi cách bạn phân bổ công sức; nếu bạn có bảng mà không nhớ nó nói gì thì bạn chưa có gì.
+
+\section{Ba lộ trình cho ba tình huống}
+\ptrtarget{E/19/05}
+
+Tám bước trên giả định bạn bắt đầu từ con số không. Ba tình huống khác thường gặp hơn.
+
+\textbf{Tình huống một: đã có hệ đang chạy, sai số quanh 1--2\(^\circ\), không hiểu vì sao.}
+
+Đây là tình huống phổ biến nhất, và nó có một chẩn đoán rất khả dĩ. Đọc \ptr{A/04} trước tiên --- nếu pose của bạn \emph{nhảy} giữa hai giá trị với vị trí đứng yên, thì đó là ambiguity và bạn đang ở bước 5 chứ không phải ở đâu khác. Nếu pose \emph{không} nhảy mà lệch trơn, thì đọc \ptr{A/01} mục~5 và kiểm điểm chính, rồi \ptr{B/09} mục~5 và kiểm constellation --- hai dòng lớn nhất của bảng ví dụ.
+
+Trong cả hai nhánh, việc \emph{không} nên làm đầu tiên là đổi detector.
+
+\textbf{Tình huống hai: sắp phải đặt gia công, chưa có gì khác.}
+
+Làm bước 1, 2, 3 và dừng. Đó là ba bước không có code, chúng tốn chừng một tuần, và chúng quyết định phần lớn kết quả. Mọi thứ khác chờ được; bản vẽ thì không.
+
+\textbf{Tình huống ba: chỉ muốn hiểu, chưa có dự án.}
+
+Đọc bảy chương xương sống theo thứ tự: \ptr{A/05}, \ptr{A/04}, \ptr{C/15}, \ptr{B/09}, \ptr{B/13}, \ptr{B/12}, \ptr{C/16}. Bảy chương ấy chứa phần lớn giá trị của cây, và bốn trong bảy không nói về thuật toán xử lý ảnh --- đó là điều đáng nhớ nhất.
+
+\section{Lộ trình này cố ý bỏ gì}
+\ptrtarget{E/19/06}
+
+Một lộ trình trung thực phải nói nó bỏ gì.
+
+\emph{Nó bỏ phần lớn chiều sâu về detector.} \ptr{B/07} và \ptr{B/08} bị nén vào một bước, và một người muốn thật sự giỏi về phát hiện marker sẽ thấy điều đó không thoả đáng. Lý do là đòn bẩy, đã bàn ở mục~1 --- nhưng nếu bài toán của bạn khác (chẳng hạn marker ngoài trời, điều kiện không kiểm soát được) thì cân bằng đổi.
+
+\emph{Nó bỏ IBVS.} \ptr{B/13} mục~2 trình bày nó như một lựa chọn mạnh --- nó tránh hẳn ambiguity và bền với sai số hiệu chuẩn --- nhưng lộ trình mặc định đi theo PBVS cộng teach-by-showing vì nó dễ gỡ lỗi hơn và vì quỹ đạo dự đoán được. Nếu bước 5 hoặc bước 7 gặp khó khăn kéo dài, IBVS là hướng đáng quay lại.
+
+\emph{Nó bỏ phần fuse nhiều cảm biến.} \ptr{B/11} mục~5 nhắc tới factor graph và fuse với IMU, và lộ trình không đi vào đó vì với stop-and-go thì một phép trung bình đơn giản là đủ. Với robot phải đo khi đang di chuyển, phần ấy trở nên cần thiết.
+
+\emph{Nó giả định một dock cố định.} Toàn bộ lợi ích của bước 2 biến mất nếu robot phải cập vào nhiều dock hoặc dock di động, và khi ấy bạn quay về bài toán đo tuyệt đối với mọi yêu cầu khắt khe của nó.
+
+\section{Điều gì chứng minh lộ trình này sai}
+\ptrtarget{E/19/07}
+
+Lộ trình đứng trên một mệnh đề định lượng, và nó thừa hưởng toàn bộ tính không chắc chắn của mệnh đề ấy: \emph{trong một hệ điển hình, các dòng hệ thống và hình học chiếm phần lớn ngân sách}. Con số 72\% đến từ bảng ví dụ ở \ptr{C/15} mục~3, và \emph{mọi số trong bảng ấy là ví dụ số học do tôi đặt}, không phải số đo của một hệ thật.
+
+Lộ trình bị bác bỏ nếu trên một hệ thực, sau khi đã làm bước 3 và bước 4 cẩn thận, ngân sách vẫn bị chi phối bởi \(\sigma\). Khi ấy thứ tự đúng là đảo bước 6 lên trước bước 3, và mục~1 của chương này sai về trọng số.
+
+Cách kiểm cho hệ của bạn nằm ngay ở bước 1: nếu bảng ngân sách của bạn --- với số đo của bạn --- cho thấy nhóm ngẫu nhiên lớn hơn nhóm hệ thống, thì hãy đi theo thứ tự của bảng ấy chứ không theo thứ tự của chương này. \emph{Lộ trình phục vụ bảng, không phải ngược lại.}
+
+Một mệnh đề thứ hai, mềm hơn: \emph{ba bước đầu không có code là đúng thứ tự}. Nó bị bác bỏ nếu trong thực tế, việc dựng một nguyên mẫu chạy được sớm cung cấp thông tin mà phân tích trên giấy không cho --- và điều đó hoàn toàn có thể, đặc biệt khi các con số đầu vào của bảng còn rất không chắc chắn. Một thoả hiệp hợp lý mà tôi không loại trừ: dựng một nguyên mẫu thô \emph{song song} với bước 1, với điều kiện không để nó quyết định thiết kế cơ khí.
+
+\section{Kết nối}
+\ptrtarget{E/19/08}
+
+Chương này trỏ tới mọi chương, nên phần kết nối chỉ nói về ba chỗ đặc biệt.
+
+\ptr{C/15-ngan-sach-sai-so} và \ptr{C/16-danh-gia-va-nghiem-thu} là hai chương mà lộ trình đặt ở \emph{bước 1}, dù chúng nằm ở Phần~C. Nếu bạn chỉ theo lộ trình mà không đọc gì khác, hãy đọc hai chương ấy.
+
+\ptr{B/13-docking-control} là chương mà \emph{quyết định} ở bước 2 làm nhẹ toàn bộ các bước sau. Đây là chương có đòn bẩy cao nhất trên mỗi giờ đọc trong cả cây.
+
+\ptr{00-map} là chỗ quay về nếu lộ trình này có vẻ đi ngược trực giác: bốn hệ quả ở đó là lý do của tám bước ở đây, và nếu một bước có vẻ sai thứ tự thì câu trả lời thường nằm trong một trong bốn hệ quả ấy.
+
+\begin{dongian}
+Nếu phải làm xong cái hệ thống này, làm gì trước?
+
+Câu trả lời đi ngược với bản năng: \emph{ba việc đầu tiên không có dòng code nào}.
+
+Việc thứ nhất là ngồi tính xem cái gì đang ăn hết ngân sách. Mười lăm phút tính tay cộng một buổi chiều chạy mô phỏng, và cuối buổi bạn biết dòng nào lớn nhất. Nghe như trì hoãn, nhưng nó là việc duy nhất cho biết những việc sau có đáng làm không.
+
+Việc thứ hai là hỏi lại xem bài toán có thật sự khó như mình tưởng. Robot cần biết nó ở đâu, hay chỉ cần về đúng chỗ nó đã từng ở? Hai câu hỏi ấy khác nhau tới ba lần rưỡi về độ khó, và phần lớn người ta giải câu khó mà không nhận ra có câu dễ.
+
+Việc thứ ba là quyết mấy chuyện cơ khí: mấy tấm tag đặt cách nhau bao xa, có kê nghiêng không, camera bắt ở đâu, có làm cái phễu dẫn hướng không. Đây là mấy quyết định duy nhất trong cả dự án mà sửa sau thì tốn tiền thật.
+
+Sau ba việc đó mới tới code, và thứ tự cũng ngược với bản năng: hiệu chuẩn trước, chống nhìn nhầm sau, rồi mới tới chuyện làm cho phép đo chính xác hơn, rồi mới tới bộ điều khiển, rồi mới tới đo đạc nghiệm thu.
+
+Cái detector --- thứ mà hầu hết người ta bắt đầu từ đó --- nằm ở chỗ thứ sáu trong tám việc.
+
+Và một lời khuyên cho tình huống phổ biến nhất: bạn đã có hệ chạy rồi, sai số quanh một hai độ, không hiểu vì sao. Hãy nhìn xem con số nó \emph{nhảy} hay nó \emph{lệch đều}. Nhảy giữa hai giá trị trong khi mọi thứ đứng yên thì đó là chuyện hai câu trả lời của cái tag phẳng --- chữa bằng cái nêm nghiêng. Lệch đều và trơn thì đi kiểm cái lỗ của camera và kiểm xem mấy tấm tag có nằm đúng chỗ như bản vẽ không.
+
+Trong cả hai trường hợp, việc \emph{không} nên làm đầu tiên là đổi sang một detector khác.
+
+\chuadongian{cái thứ tự này dựa trên một con số --- rằng phần lớn ngân sách nằm ở mấy khoản cố định --- và con số đó lấy từ một bảng ví dụ chứ không phải từ đo đạc trên hệ thật. Nếu bảng của bạn nói khác thì hãy theo bảng của bạn. Lộ trình phục vụ cái bảng, không phải ngược lại.}
+\motcau{Ba việc đầu tiên không có dòng code nào, và cái detector nằm thứ sáu trong tám việc.}
+\end{dongian}
+
+\begin{tukiem}
+\item Nêu ba thứ tự sai ở mục 1, và với mỗi cái nêu con số cụ thể cho thấy nó sai ở đâu.
+\item Phát biểu nguyên tắc sắp xếp của lộ trình, và nêu ba chỗ nó đảo thứ tự so với cách trình bày của cây.
+\item Vì sao \ptr{B/07} --- chương đầu của Phần B --- lại nằm ở bước 6?
+\item Tiêu chí xong của bước 1 không phải ``có bảng'' mà là gì, và vì sao?
+\item Bạn có một hệ đang chạy với sai số 1,5\(^\circ\). Nêu phép quan sát đầu tiên phải làm, và hai nhánh chẩn đoán mà nó dẫn tới.
+\item Nêu ba thứ mà lộ trình cố ý bỏ, và với mỗi thứ nêu tình huống làm nó trở nên cần thiết.
+\item Mệnh đề định lượng nào chống đỡ toàn bộ lộ trình, nó đến từ đâu, và điều gì sẽ bác bỏ nó?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

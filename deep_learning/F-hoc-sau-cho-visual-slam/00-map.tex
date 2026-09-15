@@ -1,0 +1,25 @@
+% 00-map.tex — bản đồ Phần F: có gì, mức đầu tư, thứ tự đọc.
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: ../00-map.tex | Mức độ: điều hướng
+\documentclass[../deep_learning.tex]{subfiles}
+\begin{document}
+\begin{table}[H]\centering\small
+\caption{Bản đồ Phần F: các chương, nội dung, và nỗi đau SLAM mà chương đó chạm tới.}
+\begin{tabularx}{\linewidth}{@{}L{0.8cm}L{3.6cm}YL{2.9cm}@{}}
+\toprule
+\textbf{Ch.} & \textbf{Thư mục} & \textbf{Nội dung} & \textbf{Chạm nỗi đau}\\
+\midrule
+27 & \code{27-dat-hoc-sau-vao-dau} & Năm trụ, khung bốn cổng để quyết định có nên thay một khối cổ điển bằng mạng & cả bốn (bộ lọc)\\
+28 & \code{28-dac-trung-va-ghep-cap} & Đặc trưng và ghép cặp học được; vì sao ORB gãy và cái gì thay được & chuyển động nhanh, ảnh mờ\\
+29 & \code{29-dinh-vi-lai-va-dong-vong} & Nhận dạng lại địa điểm, định vị lại, và bốn tầng của đóng vòng & đóng vòng\\
+30 & \code{30-do-sau-dong-quang-va-mo-hinh-nen} & Độ sâu đơn ảnh, dòng quang, và mô hình nền hình học & chuyển động nhanh, tỉ lệ\\
+31 & \code{31-backend-kha-vi-va-dau-cuoi} & Tối ưu khả vi và hệ đầu-cuối; khả vi mua được gì, mất gì & backend\\
+32 & \code{32-ban-do-neural} & NeRF và 3D Gaussian Splatting làm bản đồ; đẹp ảnh không bằng đúng pose & biểu diễn bản đồ\\
+33 & \code{33-ngu-nghia-va-do-thi-canh} & Ngữ nghĩa, vật thể động, đồ thị cảnh 3D & cảnh động\\
+34 & \code{34-imu-bat-dinh-va-trien-khai} & Trọng số IMU, bất định học được, ảnh mờ, và đưa lên Orin & trọng số IMU, ảnh mờ\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent Đọc chương 27 trước, luôn luôn: nó là bộ lọc quyết định bảy chương còn lại chương nào đáng đọc kỹ với bạn. Bảy chương sau độc lập với nhau, chọn theo nỗi đau đang gặp chứ không đọc tuần tự.
+\end{document}

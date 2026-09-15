@@ -1,0 +1,21 @@
+% 00-map.tex — bản đồ Phần D: có gì, mức đầu tư, thứ tự đọc.
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: ../00-map.tex | Mức độ: điều hướng
+\documentclass[../deep_learning.tex]{subfiles}
+\begin{document}
+\begin{table}[H]\centering\small
+\caption{Bản đồ Phần D: các chương, nội dung, và mức đầu tư đề xuất.}
+\begin{tabularx}{\linewidth}{@{}L{0.8cm}L{4.0cm}YL{2.6cm}@{}}
+\toprule
+\textbf{Ch.} & \textbf{Thư mục} & \textbf{Nội dung} & \textbf{Mức}\\
+\midrule
+19 & \code{19-numpy-toi-pytorch} & Hai giai đoạn: tự viết forward và backward bằng NumPy; rồi PyTorch thành thạo & giai đoạn 1 \textbf{cốt lõi}, giai đoạn 2 công cụ\\
+20 & \code{20-toi-uu-va-nen-mo-hinh} & Quantization, pruning, distillation, chọn độ phân giải; thứ tự thử nghiệm thực dụng & công cụ\\
+21 & \code{21-inference-va-trien-khai} & Export, runtime, batching, đo latency đúng cách, ràng buộc thiết bị biên & công cụ\\
+22 & \code{22-tai-lap-va-mlops} & Seed và nguồn bất định, version hoá, theo dõi thí nghiệm, giám sát sau triển khai & cốt lõi ở mức tối thiểu\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent Giai đoạn 1 của chương 19 nên làm ngay sau chương 12, không đợi tới phần D. Ba chương còn lại đọc khi thật sự phải triển khai, vì chúng hết hạn nhanh nhất trong cây.
+\end{document}

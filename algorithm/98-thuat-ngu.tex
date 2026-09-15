@@ -1,0 +1,179 @@
+% ============================================================================
+%  98-thuat-ngu.tex — bảng thuật ngữ Việt–Anh cho toàn cây
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-07
+% ============================================================================
+\documentclass[algorithm.tex]{subfiles}
+\begin{document}
+\chapter*{Bảng thuật ngữ}
+\addcontentsline{toc}{chapter}{Bảng thuật ngữ}
+\markboth{Bảng thuật ngữ}{}
+
+\begin{tomtat}
+Bảng này gom các thuật ngữ dùng xuyên suốt quyển sách, kèm dạng tiếng Anh và một câu giải thích. Cột cuối trỏ tới chương nói kỹ nhất về khái niệm đó. Quy ước dùng trong sách: thuật ngữ xuất hiện lần đầu ở dạng \emph{tiếng Việt (English)}, sau đó dùng nhất quán một dạng; tên thuật toán và tên cấu trúc dữ liệu giữ nguyên tiếng Anh vì đó là dạng bạn gặp khi tra cứu và khi đọc mã.
+\end{tomtat}
+
+\section*{A. Tư duy và phân tích}
+\begin{center}\footnotesize
+\rowcolors{2}{white}{tblalt}
+\begin{longtable}{@{}L{3.5cm}L{3.9cm}L{6.2cm}L{1.5cm}@{}}
+\toprule
+\textbf{Tiếng Việt} & \textbf{English} & \textbf{Nghĩa ngắn} & \textbf{Chương}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Tiếng Việt} & \textbf{English} & \textbf{Nghĩa ngắn} & \textbf{Chương}\\
+\midrule
+\endhead
+heuristic & heuristic & Mẹo tìm đường, không đảm bảo thành công nhưng tăng xác suất ra ý tưởng & \ptr{A/01}\\
+tự giám sát & control / metacognition & Khả năng biết mình đang đi hướng nào và khi nào phải bỏ hướng đó & \ptr{A/01}\\
+luyện tập có chủ đích & deliberate practice & Luyện có mục tiêu hẹp, mức hơi quá sức, phản hồi ngay, có sửa sai & \ptr{A/02}\\
+upsolving & upsolving & Giải lại tới cùng những bài đã bí, sau kỳ thi & \ptr{A/02}\\
+khối tri thức & chunk & Cụm thông tin đã ghép thành một đơn vị nhớ duy nhất & \ptr{A/02}\\
+mô hình RAM & RAM model & Mô hình chi phí giả định mọi phép toán và truy cập ô nhớ tốn một đơn vị & \ptr{A/03}\\
+độ phức tạp tiệm cận & asymptotic complexity & Tốc độ tăng của chi phí khi dữ liệu lớn lên & \ptr{A/03}\\
+hệ thức truy hồi & recurrence & Phương trình mô tả chi phí đệ quy theo chi phí trên dữ liệu nhỏ hơn & \ptr{A/03}\\
+khấu hao & amortized analysis & Chi phí trung bình mỗi thao tác trên một dãy thao tác xấu nhất & \ptr{A/03}\\
+giả đa thức & pseudo-polynomial & Đa thức theo giá trị số nhưng mũ theo số bit biểu diễn & \ptr{C/16}\\
+bất biến & invariant & Mệnh đề luôn đúng tại một điểm cố định trong thuật toán & \ptr{A/04}\\
+đại lượng giảm & variant / measure & Số nguyên không âm giảm mỗi vòng, dùng chứng minh tính dừng & \ptr{A/04}\\
+lập luận đổi chỗ & exchange argument & Biến lời giải tối ưu thành lời giải tham lam mà không làm tệ đi & \ptr{A/04}\\
+lập luận cắt-dán & cut-and-paste & Chứng minh cấu trúc con tối ưu bằng phản chứng & \ptr{A/04}\\
+kỳ vọng tuyến tính & linearity of expectation & Kỳ vọng của tổng bằng tổng kỳ vọng, kể cả khi phụ thuộc & \ptr{A/05}\\
+biến chỉ báo & indicator variable & Biến 0/1 cho một sự kiện; kỳ vọng của nó bằng xác suất & \ptr{A/05}\\
+nguyên lý chuồng bồ câu & pigeonhole principle & \(n+1\) vật vào \(n\) ngăn thì có ngăn chứa từ hai vật & \ptr{A/05}\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\section*{B. Cấu trúc dữ liệu}
+\begin{center}\footnotesize
+\rowcolors{2}{white}{tblalt}
+\begin{longtable}{@{}L{3.5cm}L{3.9cm}L{6.2cm}L{1.5cm}@{}}
+\toprule
+\textbf{Tiếng Việt} & \textbf{English} & \textbf{Nghĩa ngắn} & \textbf{Chương}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Tiếng Việt} & \textbf{English} & \textbf{Nghĩa ngắn} & \textbf{Chương}\\
+\midrule
+\endhead
+tổng tiền tố & prefix sum & Mảng tổng luỹ tích cho phép lấy tổng đoạn trong \Ob{1} & \ptr{B/06}\\
+mảng hiệu & difference array & Phép ngược của tổng tiền tố; cập nhật đoạn trong \Ob{1} & \ptr{B/06}\\
+hai con trỏ & two pointers & Hai chỉ số cùng quét, mỗi cái chỉ đi một chiều & \ptr{B/06}\\
+cửa sổ trượt & sliding window & Duy trì một đoạn liên tiếp thoả điều kiện & \ptr{B/06}\\
+ngăn xếp đơn điệu & monotonic stack & Ngăn xếp giữ thứ tự đơn điệu; tìm ``phần tử lớn hơn kế tiếp'' & \ptr{B/07}\\
+hàng đợi ưu tiên & priority queue & Giao diện ``lấy phần tử ưu tiên nhất''; thường cài bằng heap & \ptr{B/07}\\
+heap nhị phân & binary heap & Cây gần đầy lưu trong mảng, mỗi nút không lớn hơn các con & \ptr{B/07}\\
+bảng băm & hash table & Ép khoá thành chỉ số mảng để tra cứu \Ob{1} trung bình & \ptr{B/08}\\
+băm phổ dụng & universal hashing & Chọn ngẫu nhiên hàm băm từ một họ, chống dữ liệu thù địch & \ptr{B/08}\\
+nghịch lý ngày sinh & birthday paradox & Va chạm đáng kể khi số phần tử đạt cỡ \(\sqrt{m}\) & \ptr{B/08}\\
+băm nhất quán & consistent hashing & Ánh xạ khoá tới máy chủ ổn định khi số máy thay đổi & \ptr{B/08}\\
+phép quay & rotation & Thao tác cục bộ giữ thứ tự nhưng đổi chiều cao cây & \ptr{B/09}\\
+tăng cường & augmentation & Lưu thêm thông tin ở mỗi nút để trả lời truy vấn mới & \ptr{B/09}\\
+treap & treap & Cây kết hợp BST theo khoá và heap theo độ ưu tiên ngẫu nhiên & \ptr{B/09}\\
+B-cây & B-tree & Cây nhiều nhánh với nút vừa một khối đĩa & \ptr{B/09}\\
+cây phân đoạn & segment tree & Cây lưu kết quả gộp của các đoạn; truy vấn và cập nhật \Ob{\log n} & \ptr{B/10}\\
+lazy propagation & lazy propagation & Hoãn đẩy cập nhật xuống con cho tới khi cần & \ptr{B/10}\\
+Fenwick & binary indexed tree & Cấu trúc tiền tố động; khuôn tổng/XOR lấy hiệu hai tiền tố để hỏi đoạn & \ptr{B/10}\\
+sparse table & sparse table & Bảng tiền xử lý cho truy vấn \Ob{1} trên mảng tĩnh, phép luỹ đẳng & \ptr{B/10}\\
+tính kết hợp & associativity & Điều kiện để gộp kết quả hai nửa thành kết quả cả đoạn & \ptr{B/10}\\
+hợp nhất tập hợp & disjoint set union & Cấu trúc trả lời ``cùng nhóm không'' và ``gộp hai nhóm'' & \ptr{B/11}\\
+nén đường & path compression & Nối mọi nút trên đường tìm lên thẳng gốc & \ptr{B/11}\\
+gộp nhỏ vào lớn & small to large & Luôn đổ tập nhỏ vào tập lớn; tổng chi phí \Ob{n\log n} & \ptr{B/11}\\
+hàm tiền tố & prefix function & \(\pi[i]\) = độ dài biên dài nhất; nền của KMP & \ptr{B/12}\\
+biên & border & Chuỗi vừa là tiền tố vừa là hậu tố thực sự & \ptr{B/12}\\
+mảng hậu tố & suffix array & Các hậu tố sắp theo thứ tự từ điển; biến bài chuỗi thành bài mảng & \ptr{B/12}\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\section*{C. Chiến lược thiết kế}
+\begin{center}\footnotesize
+\rowcolors{2}{white}{tblalt}
+\begin{longtable}{@{}L{3.5cm}L{3.9cm}L{6.2cm}L{1.5cm}@{}}
+\toprule
+\textbf{Tiếng Việt} & \textbf{English} & \textbf{Nghĩa ngắn} & \textbf{Chương}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Tiếng Việt} & \textbf{English} & \textbf{Nghĩa ngắn} & \textbf{Chương}\\
+\midrule
+\endhead
+vét cạn & brute force & Duyệt mọi khả năng; luôn đúng, thường quá chậm & \ptr{C/13}\\
+quay lui & backtracking & Xây lời giải từng bước, huỷ khi gặp ngõ cụt & \ptr{C/13}\\
+cắt tỉa & pruning & Loại cả một nhánh khi chứng minh được nó vô ích & \ptr{C/13}\\
+nhánh cận & branch and bound & Quay lui kèm cận để cắt nhánh không thể tốt hơn & \ptr{C/13}\\
+gặp nhau ở giữa & meet in the middle & Chia đôi, liệt kê mỗi nửa \(2^{n/2}\), rồi ghép & \ptr{C/13}\\
+chia để trị & divide and conquer & Chia thành bài con độc lập, giải rồi ghép & \ptr{C/14}\\
+tham lam & greedy & Lặp lại lựa chọn tốt nhất cục bộ, không xét lại & \ptr{C/15}\\
+matroid & matroid & Cấu trúc mà trên đó tham lam luôn tối ưu & \ptr{C/15}\\
+dưới mô-đun & submodular & Hàm có lợi ích biên giảm dần; tham lam đạt \(1-1/e\) & \ptr{C/15}\\
+quy hoạch động & dynamic programming & Vét cạn cộng ghi nhớ theo trạng thái & \ptr{C/16}\\
+trạng thái & state & Bản tóm tắt quá khứ, đủ để quyết định tương lai & \ptr{C/16}\\
+cấu trúc con tối ưu & optimal substructure & Lời giải tối ưu chứa lời giải tối ưu của bài con & \ptr{C/16}\\
+mảng cuộn & rolling array & Chỉ giữ vài tầng gần nhất để giảm bộ nhớ & \ptr{C/16}\\
+thứ tự tô-pô & topological order & Xếp đỉnh sao cho mọi cạnh đi từ trái sang phải & \ptr{C/17}\\
+liên thông mạnh & strongly connected component & Tập đỉnh mà từ đỉnh nào cũng tới được mọi đỉnh khác & \ptr{C/17}\\
+nhảy nhị phân & binary lifting & Bảng tổ tiên thứ \(2^k\) cho truy vấn tổ tiên chung \Ob{\log n} & \ptr{C/17}\\
+đồ thị nhiều tầng & layered graph & Nhân bản đồ thị theo số lần dùng khả năng đặc biệt & \ptr{C/17}\\
+luồng cực đại & maximum flow & Lượng lớn nhất đẩy được từ nguồn tới đích & \ptr{C/18}\\
+lát cắt nhỏ nhất & minimum cut & Cách chia đỉnh rẻ nhất để ngắt nguồn khỏi đích & \ptr{C/18}\\
+đồ thị thặng dư & residual graph & Đồ thị phụ với cạnh ngược cho phép rút lại luồng & \ptr{C/18}\\
+ghép đôi & matching & Tập cạnh đôi một không chung đỉnh & \ptr{C/18}\\
+tìm kiếm trên đáp án & binary search on answer & Đổi bài tối ưu thành bài quyết định rồi nhị phân & \ptr{C/19}\\
+vị từ đơn điệu & monotone predicate & Đúng với mọi giá trị dễ hơn; điều kiện của nhị phân trên đáp án & \ptr{C/19}\\
+tìm kiếm ba phân & ternary search & Thu hẹp khoảng cho hàm một cực trị & \ptr{C/19}\\
+mô phỏng luyện kim & simulated annealing & Tìm kiếm cục bộ có chấp nhận bước xấu với xác suất giảm dần & \ptr{C/19}\\
+Las Vegas & Las Vegas algorithm & Luôn đúng, thời gian chạy ngẫu nhiên & \ptr{C/20}\\
+Monte Carlo & Monte Carlo algorithm & Luôn nhanh, kết quả có thể sai với xác suất nhỏ & \ptr{C/20}\\
+khuếch đại xác suất & probability amplification & Lặp lại để xác suất sai giảm theo hàm mũ & \ptr{C/20}\\
+lấy mẫu hồ chứa & reservoir sampling & Chọn đều \(k\) phần tử từ dòng dữ liệu với \Ob{k} bộ nhớ & \ptr{C/20}\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\section*{D và E. Giới hạn, miền chuyên và hành nghề}
+\begin{center}\footnotesize
+\rowcolors{2}{white}{tblalt}
+\begin{longtable}{@{}L{3.5cm}L{3.9cm}L{6.2cm}L{1.5cm}@{}}
+\toprule
+\textbf{Tiếng Việt} & \textbf{English} & \textbf{Nghĩa ngắn} & \textbf{Chương}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Tiếng Việt} & \textbf{English} & \textbf{Nghĩa ngắn} & \textbf{Chương}\\
+\midrule
+\endhead
+nghịch đảo modulo & modular inverse & Số thay cho phép chia trong số học modulo & \ptr{D/21}\\
+định lý phần dư Trung Hoa & Chinese remainder theorem & Ghép các phần dư theo modulo nguyên tố cùng nhau & \ptr{D/21}\\
+biến đổi Fourier nhanh & fast Fourier transform & Tính tích chập trong \Ob{n\log n} bằng cách đổi biểu diễn & \ptr{D/21}\\
+vị từ định hướng & orientation predicate & Ba điểm quay trái, quay phải hay thẳng hàng & \ptr{D/22}\\
+bao lồi & convex hull & Đa giác lồi nhỏ nhất chứa mọi điểm & \ptr{D/22}\\
+quét đường & sweep line & Cho một đường quét qua mặt phẳng, duy trì cấu trúc theo chiều dọc & \ptr{D/22}\\
+suy biến & degenerate case & Cấu hình biên: thẳng hàng, trùng nhau, chồng nhau & \ptr{D/22}\\
+lớp P & class P & Bài toán quyết định giải được trong thời gian đa thức & \ptr{D/23}\\
+lớp NP & class NP & Bài toán mà lời giải cho sẵn kiểm chứng được nhanh & \ptr{D/23}\\
+quy dẫn & reduction & Biến bài A thành bài B; chuyển độ khó theo chiều mũi tên & \ptr{D/23}\\
+NP-đầy đủ & NP-complete & Thuộc NP và mọi bài trong NP quy dẫn về được & \ptr{D/23}\\
+xấp xỉ có bảo đảm & approximation ratio & Kết quả không tệ hơn tối ưu quá một hệ số chứng minh được & \ptr{D/23}\\
+tham số hoá & parameterized complexity & Chi phí \Ob{f(k)n^c} với \(k\) là tham số nhỏ & \ptr{D/23}\\
+cận dưới & lower bound & Mọi thuật toán trong một mô hình đều cần ít nhất chừng này & \ptr{D/24}\\
+cây quyết định & decision tree & Mô hình chỉ cho phép so sánh; nền của cận dưới sắp xếp & \ptr{D/24}\\
+lập luận đối thủ & adversary argument & Đối thủ trả lời bất lợi nhất mà vẫn nhất quán & \ptr{D/24}\\
+bộ nhớ ngoài & external memory & Mô hình đếm số lần chuyển khối thay vì số phép toán & \ptr{D/24}\\
+cache-oblivious & cache-oblivious & Tối ưu số lần chuyển khối mà không cần biết tham số phần cứng & \ptr{D/24}\\
+tỉ lệ cạnh tranh & competitive ratio & So thuật toán trực tuyến với lời giải biết trước tương lai & \ptr{D/24}\\
+công việc và chiều sâu & work and span & Tổng phép toán và chuỗi phụ thuộc dài nhất trong tính toán song song & \ptr{D/24}\\
+stress test & stress testing & Chạy lời giải nhanh và vét cạn trên dữ liệu nhỏ ngẫu nhiên, so kết quả & \ptr{E/25}\\
+thu nhỏ phản ví dụ & test case reduction & Tìm dữ liệu nhỏ nhất vẫn giữ được lỗi & \ptr{E/25}\\
+khẳng định & assertion & Kiểm điều kiện tại một điểm; dừng ngay nơi phát sinh lỗi & \ptr{E/25}\\
+độ trễ đuôi & tail latency & Thời gian phản hồi ở phân vị cao, thay vì trung bình & \ptr{E/26}\\
+ngưỡng hoà vốn & crossover point & Kích thước mà tại đó thuật toán bậc thấp hơn bắt đầu thắng & \ptr{E/26}\\
+hồ sơ hiệu năng & profiling & Đo thời gian thực sự bị tiêu ở đâu thay vì đoán & \ptr{E/26}\\
+thi ảo & virtual contest & Tự tổ chức kỳ thi từ đề cũ, đúng thời lượng và điều kiện & \ptr{E/27}\\
+ôn ngắt quãng & spaced repetition & Ôn lại ở các khoảng cách tăng dần, bằng cách tự truy xuất & \ptr{E/28}\\
+vùng luyện & training zone & Mức khó mà bạn giải được khoảng một nửa số bài & \ptr{E/28}\\
+\bottomrule
+\end{longtable}
+\end{center}
+\end{document}

@@ -1,0 +1,330 @@
+% ---------------------------------------------------------------------------
+% Chương 6 — Hiệu ứng vật lý và quang học
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-13  |  Ôn gần nhất: —
+% Phụ thuộc: A/01 (mô hình camera), A/05 (phân loại nhiễu vs thiên lệch)
+% Mức độ: QUAN TRỌNG — gom mọi thứ mà năm chương trước giả định là không có.
+%         Đọc một lượt rồi quay lại khi gặp triệu chứng cụ thể.
+% Kiểm chứng công thức lõi:
+%   (1) Rolling shutter: độ trễ giữa hàng đầu và hàng cuối = t_line * N_rows
+%       — cửa (a) định nghĩa; cửa (c) oth2013rollingshutter (cách đo t_line).
+%   (2) Motion blur: chiều dài vệt = v_image * t_exposure
+%       — cửa (a) tự dẫn; cửa (b) ví dụ số mục 3: 0,3 m/s, 20 ms, f/Z=1200 -> 7,2 px.
+%   (3) Blur gây THIÊN LỆCH góc, không chỉ nhiễu
+%       — cửa (a) dẫn ở mục 3 bằng tính bất đối xứng của profile cạnh bị nhoè
+%         khi hai cạnh kề có độ tương phản khác nhau;
+%         CHƯA qua cửa (b) và (c). NỢ KIỂM CHỨNG.
+%   (4) Giới hạn nhiễu xạ: đường kính đĩa Airy = 2.44 * lambda * N
+%       — cửa (c) goodman2005fourier, smith1997image (kiến thức chuẩn quang học);
+%         cửa (b) ví dụ số mục 5: lambda=550nm, N=8 -> 10,7 um.
+%   (5) Nyquist: tag cần >= 2 px mỗi ô bit để decode
+%       — cửa (a) định lý lấy mẫu; thực tế cần 3-5 px, đây là kinh nghiệm.
+% Ghi chú trung thực: các con số về ngưỡng thực hành (3-5 px mỗi ô bit, t_line
+%   cỡ 10-30 us) là BẬC ĐỘ LỚN kinh nghiệm, KHÔNG phải số đo có điều kiện xác định.
+% ---------------------------------------------------------------------------
+\documentclass[../../marker.tex]{subfiles}
+\begin{document}
+\chapter{Hiệu ứng vật lý và quang học (Physical and Optical Effects)}
+\ptrtarget{A/06}\ptrtarget{A/06-hieu-ung-vat-ly-va-quang-hoc}
+\dependency{\ptr{A/01-mo-hinh-camera-va-distortion} (mô hình camera --- chương này liệt kê những gì mô hình ấy bỏ qua); \ptr{A/05-lan-truyen-sai-so-pixel-sang-pose} (phân loại nguồn ngẫu nhiên và hệ thống --- chương này chủ yếu nói về loại thứ hai).}
+
+\begin{tomtat}
+Năm chương trước dựng một chuỗi toán học sạch: điểm 3D chiếu thành pixel, pixel cho pose, nhiễu pixel cho hiệp phương sai pose. Chuỗi ấy giả định camera là một thiết bị hình học lý tưởng chụp một cảnh đứng yên trong điều kiện lý tưởng. Chương này liệt kê những chỗ giả định ấy sai, và nó được tổ chức theo một tiêu chí duy nhất: \emph{hiệu ứng nào gây nhiễu và hiệu ứng nào gây thiên lệch}. Sự phân biệt ấy quyết định cách xử lý, vì nhiễu giảm theo \(1/\sqrt{N}\) khi lấy trung bình còn thiên lệch thì không. Sáu hiệu ứng được bàn: rolling shutter, motion blur, lấy mẫu và răng cưa, độ sâu trường ảnh và MTF, bias tâm ellipse, và đặc trưng quang học của vật liệu marker. Nếu chỉ nhớ một điều: \emph{gần như tất cả chúng gây thiên lệch chứ không gây nhiễu} --- và vì thế lời khuyên rẻ nhất của cả chương là dừng hẳn robot lại trước khi đo, vì bốn trong sáu hiệu ứng biến mất khi vận tốc bằng không.
+\end{tomtat}
+
+\begin{nentang}
+\kn{rolling shutter}{cách đọc cảm biến theo từng hàng nối tiếp nhau thay vì cùng lúc. Hàng cuối được phơi sáng muộn hơn hàng đầu một khoảng bằng \(t_{\text{line}}\) nhân số hàng, nên một vật chuyển động xuất hiện \emph{méo} chứ không chỉ mờ.}
+\kn{global shutter}{cách đọc mà mọi pixel bắt đầu và kết thúc phơi sáng cùng lúc. Đắt hơn, độ nhạy thường thấp hơn một chút, và --- với bài toán đo lường khi đang chuyển động --- gần như bắt buộc.}
+\kn{MTF}{\en{modulation transfer function}: hàm mô tả mức tương phản mà hệ quang học còn giữ được ở từng tần số không gian. MTF thấp ở tần số cao nghĩa là các chi tiết nhỏ bị nhoè, và cạnh tag là một chi tiết tần số cao.}
+\kn{đĩa Airy}{điểm sáng nhỏ nhất mà một hệ quang học hoàn hảo tạo ra được, giới hạn bởi nhiễu xạ chứ không bởi chất lượng chế tạo. Đường kính \(\approx 2{,}44\lambda N\) với \(\lambda\) là bước sóng và \(N\) là số f (f-number).}
+\kn{độ sâu trường ảnh (depth of field)}{khoảng khoảng cách mà trong đó ảnh còn đủ sắc nét theo một tiêu chí cho trước. Với docking, tag ở gần và tag ở xa có thể không cùng nằm trong khoảng ấy, và đó là một ràng buộc thiết kế thật.}
+\kn{răng cưa (aliasing)}{hiện tượng khi tần số không gian của cảnh vượt quá một nửa tần số lấy mẫu của cảm biến; chi tiết nhỏ hơn hai pixel không chỉ mất đi mà còn xuất hiện lại dưới dạng mẫu hình giả.}
+\kn{retroreflective}{vật liệu phản xạ ánh sáng ngược về phía nguồn thay vì tán xạ đều. Với đèn gắn cạnh camera, nó cho tương phản rất cao và gần như độc lập với ánh sáng môi trường.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Robot của bạn chạy 0,3\,m/s và camera phơi sáng 20\,ms. Vệt nhoè trên ảnh dài bao nhiêu pixel ở khoảng cách nửa mét, và vì sao con số ấy gây \emph{thiên lệch} chứ không chỉ làm mờ?}
+\h{Cùng một hệ thống, đo khi robot đang tiến và đo khi robot đang lùi qua cùng một điểm, cho hai kết quả lệch nhau có hệ thống theo hai chiều ngược nhau. Hiệu ứng nào giải thích được điều đó, và vì sao nó là một dấu hiệu chẩn đoán rất mạnh?}
+\h{Bạn tăng độ phân giải camera lên gấp bốn và sai số không cải thiện chút nào. Nêu hai cơ chế quang học hoàn toàn khác nhau có thể giải thích, và một phép thử phân biệt chúng.}
+\h{Trong sáu hiệu ứng của chương này, bốn cái biến mất khi robot dừng hẳn. Vì sao đó là lập luận mạnh nhất ủng hộ chiến lược stop-and-go, và hai cái còn lại là gì?}
+\h{Bạn khép khẩu để tăng độ sâu trường ảnh, vì cần cả tag gần lẫn tag xa đều nét. Vì sao khép quá thì ảnh lại nhoè \emph{hơn}, và giới hạn vật lý nào đang chặn bạn?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{A/06/01}
+
+Năm chương trước xây một chuỗi lập luận sạch, và độ sạch ấy có được nhờ một loạt giả định không bao giờ được nói ra: camera chụp tức thời, cảnh đứng yên trong suốt thời gian phơi sáng, ống kính phân giải được mọi chi tiết cần thiết, cảm biến lấy mẫu đủ dày, và bề mặt marker phản xạ ánh sáng một cách hiền lành. Chương này gom tất cả những giả định ấy lại và hỏi chúng sai ở đâu.
+
+Có một lý do cụ thể để làm việc này trong một chương riêng thay vì rải rác. Lý do ấy là: \emph{gần như mọi hiệu ứng vật lý trong danh sách đều gây thiên lệch chứ không gây nhiễu}, và \ptr{A/05} mục~8 đã chỉ ra rằng hai loại ấy có số phận hoàn toàn khác nhau trong một ngân sách sai số. Nhiễu chia cho \(\sqrt{N}\) khi lấy trung bình; thiên lệch thì không chia cho gì cả. Một hệ thống đã tối ưu tốt phần nhiễu --- detector tốt, subpixel tốt, trung bình nhiều khung --- sẽ thấy ngân sách của mình bị chi phối hoàn toàn bởi các dòng trong chương này.
+
+Điều làm chúng khó chịu hơn nữa là chúng \emph{phụ thuộc điều kiện vận hành}. Sai số méo ảnh ở \ptr{A/01} ít ra là cố định: đo một lần, bù một lần. Còn motion blur phụ thuộc vận tốc, rolling shutter phụ thuộc vận tốc, độ nhoè do lấy nét phụ thuộc khoảng cách, loá phụ thuộc góc chiếu sáng. Chúng đổi trong khi robot đang chạy, và chúng đổi theo những cách tương quan với chính đại lượng ta đang đo --- đó là kịch bản tệ nhất cho một phép đo, vì sai số tương quan với đại lượng đo không tách ra được bằng bất kỳ phép thống kê nào.
+
+Cách xử lý hiển nhiên là mô hình hoá từng hiệu ứng rồi bù. Cách này tồn tại và nó hoạt động: có mô hình rolling shutter dùng để \emph{ước lượng} cả pose lẫn vận tốc từ một ảnh duy nhất \cite{ait2006rollingshutter}, có cách đo \(t_{\text{line}}\) bằng một target đã biết \cite{oth2013rollingshutter}, có mô hình bù bias tâm ellipse bằng conic \cite{heikkila2000geometric}. Nhưng với bài toán docking thì có một cách rẻ hơn nhiều và nó là kết luận trung tâm của chương: \emph{bốn trong sáu hiệu ứng biến mất khi vận tốc bằng không}. Dừng robot lại một phần tư giây, chụp ba mươi khung, lấy trung bình, rồi đi tiếp --- và bạn vừa xoá bốn dòng khỏi bảng ngân sách mà không cần một dòng code mô hình hoá nào. Đó là cơ sở vật lý của chiến lược stop-and-go ở \ptr{B/13}, và nó là một ví dụ điển hình của luận điểm trung tâm của cây: bài toán này thắng bằng thiết kế chứ không bằng thuật toán.
+
+\begin{trucgiac}
+Hình dung sự khác nhau giữa nhiễu và thiên lệch bằng hình ảnh bắn bia.
+
+Nhiễu là các phát đạn tản mát quanh tâm bia. Bắn nhiều phát rồi lấy trung bình thì trung bình tiến về tâm --- càng nhiều phát càng gần. Đây là tình huống mà mọi công cụ thống kê hoạt động: lấy mẫu nhiều hơn thì biết chắc hơn.
+
+Thiên lệch là các phát đạn tản mát quanh một điểm \emph{lệch khỏi tâm}. Bắn một nghìn phát rồi lấy trung bình thì bạn có một ước lượng rất chính xác của cái điểm lệch ấy. Bạn biết chắc hơn về một con số sai. Và --- đây là phần tệ nhất --- độ tản mát của một nghìn phát nói cho bạn biết bạn ``chắc chắn'' tới đâu, nên bạn sẽ báo cáo một khoảng tin cậy rất hẹp quanh một giá trị sai.
+
+Phần lớn nội dung chương này thuộc loại thứ hai. Ống kính làm cạnh nhoè theo một cách nhất quán, nên góc lệch theo cùng một hướng ở mọi khung. Cảm biến đọc hàng dưới muộn hơn hàng trên, nên khi robot chạy thì tag bị xé theo cùng một kiểu ở mọi khung. Bề mặt marker loá về phía đèn, nên cạnh phía ấy bị ăn mất theo cùng một cách.
+
+Và bây giờ là mẹo. Với ba trong số đó, cái quyết định hướng lệch là \emph{vận tốc}. Đảo chiều chuyển động thì lệch đổi dấu. Đứng yên thì lệch bằng không. Nghĩa là có một nút bấm xoá được chúng, và nút ấy tên là ``dừng lại''.
+\end{trucgiac}
+
+\section{Rolling shutter: tag bị xé, không chỉ bị mờ}
+\ptrtarget{A/06/02}
+
+Hiệu ứng tệ nhất trong danh sách khi robot đang chuyển động, và cũng là hiệu ứng dễ phòng nhất --- bằng cách mua đúng camera.
+
+Cảm biến rolling shutter đọc từng hàng nối tiếp. Hàng thứ \(k\) được phơi sáng muộn hơn hàng đầu một khoảng \(k\,t_{\text{line}}\), với \(t_{\text{line}}\) là thời gian đọc một hàng --- thường cỡ hàng chục micro giây. Với cảm biến 960 hàng và \(t_{\text{line}} = 20\,\mu\text{s}\) \emph{(bậc độ lớn kinh nghiệm, không phải số đo của một cảm biến cụ thể)}, độ trễ giữa hàng đầu và hàng cuối là \(960 \times 20\,\mu\text{s} = 19{,}2\) ms.
+
+Hậu quả: nếu cảnh chuyển động trong khoảng thời gian ấy, các hàng khác nhau của ảnh ghi lại cảnh ở các thời điểm khác nhau. Một tag vuông chuyển động ngang trở thành một hình bình hành; một tag đang quay trở thành một hình méo phi tuyến.
+
+Điều quan trọng là \emph{đây không phải mờ}. Mờ làm cạnh nhoè nhưng giữ đúng vị trí trung bình; rolling shutter làm cạnh \emph{dịch chỗ} theo một hàm của toạ độ dọc. Detector vẫn tìm thấy một tứ giác đẹp, decode vẫn thành công, sai số tái chiếu vẫn nhỏ --- và pose thì sai. Đây là một chế độ hỏng hoàn toàn im lặng, đúng loại nguy hiểm nhất.
+
+Với robot chạy \(v = 0{,}3\) m/s ở khoảng cách \(Z = 0{,}5\) m với \(f = 600\) px, vận tốc biểu kiến trên ảnh là \(v\,f/Z = 0{,}3 \times 600/0{,}5 = 360\) px/s. Trong 19,2 ms, đó là \(360 \times 0{,}0192 = 6{,}9\) px lệch giữa hàng đầu và hàng cuối của ảnh. Với một tag chiếm 120 hàng thay vì cả 960, phần lệch trong nội bộ tag là \(6{,}9 \times 120/960 = 0{,}86\) px --- nhỏ hơn nhưng vẫn gấp bốn lần \(\sigma = 0{,}2\) px, và nó là thiên lệch.
+
+Ba cách xử lý, xếp theo thứ tự tôi khuyên.
+
+\emph{Một, dùng global shutter.} Đây là câu trả lời đúng và nó gần như bắt buộc nếu bạn phải đo trong khi di chuyển. Giá chênh lệch so với rolling shutter cùng phân khúc là nhỏ so với chi phí một tuần gỡ lỗi hiện tượng này.
+
+\emph{Hai, đo khi đứng yên.} Nếu chiến lược điều khiển là stop-and-go (\ptr{B/13}) thì rolling shutter không còn là vấn đề, và bạn tiết kiệm được tiền camera.
+
+\emph{Ba, mô hình hoá và bù.} Đưa vận tốc vào mô hình đo và giải cả pose lẫn vận tốc từ một ảnh \cite{ait2006rollingshutter}. Nó hoạt động và nó thậm chí biến một phiền toái thành một nguồn thông tin, nhưng nó đòi biết \(t_{\text{line}}\) chính xác (đo được theo \cite{oth2013rollingshutter}) và nó làm bài toán phức tạp hơn hẳn. Chỉ nên dùng khi hai cách trên bị loại vì ràng buộc ngoài.
+
+\section{Motion blur: nhoè có hướng, và nó gây thiên lệch}
+\ptrtarget{A/06/03}
+
+Hiệu ứng thứ hai của chuyển động, và nó độc lập với rolling shutter --- global shutter không cứu được nó.
+
+Trong thời gian phơi sáng \(t_e\), ảnh của tag di chuyển trên cảm biến một đoạn
+\[
+L = v_{\text{ảnh}}\,t_e = \frac{v\,f}{Z}\,t_e .
+\]
+Với các con số của Q1 --- \(v = 0{,}3\) m/s, \(f = 600\) px, \(Z = 0{,}5\) m, \(t_e = 20\) ms:
+\[
+L = \frac{0{,}3 \times 600}{0{,}5} \times 0{,}02 = 360 \times 0{,}02 = \mathbf{7{,}2 \text{ px}}.
+\]
+Bảy phẩy hai pixel. Đặt cạnh \(\sigma = 0{,}2\) px, đây là một hiệu ứng lớn hơn ba mươi lần nhiễu.
+
+Phần thứ hai của Q1 --- vì sao nó gây thiên lệch chứ không chỉ mờ --- đáng dừng lại, vì đây là chỗ trực giác thường sai. Trực giác nói: nhoè là một phép làm mượt đối xứng, nên vị trí trung bình của cạnh không đổi, nên định vị cạnh vẫn không thiên lệch. Trực giác ấy đúng trong một trường hợp lý tưởng: một cạnh cô lập, với vùng sáng và vùng tối trải dài vô hạn về hai phía.
+
+Trong thực tế nó không đúng, vì hai lý do. Thứ nhất, các cạnh của tag \emph{không cô lập} --- một ô đen rộng 5 px nằm giữa hai ô trắng, và khi nhoè 7 px thì hai cạnh của ô đen chồng lên nhau, và profile độ sáng thu được không còn đối xứng quanh vị trí cạnh thật. Thứ hai, detector không tìm cạnh bằng cách lấy trung tâm đối xứng mà bằng cách khớp một mô hình lên profile gradient có trọng số \cite{wang2016apriltag2}; khi profile bị biến dạng bất đối xứng thì mô hình khớp lệch.
+
+\emph{Ghi chú trung thực:} tôi dẫn cơ chế thiên lệch này bằng lập luận về tính bất đối xứng của profile (cửa a) và tôi tin nó đúng về cấu trúc. Tôi \emph{chưa} đo biên độ thiên lệch bằng mô phỏng (cửa b) và \emph{chưa} tìm được nguồn phát biểu tường minh đúng dạng này cho trường hợp marker (cửa c). Vì vậy phần định lượng nên coi là ước lượng của tôi. Đây là một mục trong \code{99-chua-biet.md}, và nó đo được: mô phỏng một tag, tích phân ảnh qua một đoạn dịch chuyển, chạy detector, so với chân trị.
+
+Điều làm motion blur thành một dấu hiệu chẩn đoán mạnh --- và đây là Q2 --- là \emph{nó đổi dấu khi đổi chiều chuyển động}. Nếu bạn đo cùng một điểm khi robot đang tiến và khi đang lùi, và hai kết quả lệch nhau có hệ thống theo hai chiều ngược nhau, thì bạn gần như chắc chắn đang nhìn một hiệu ứng phụ thuộc vận tốc --- blur hoặc rolling shutter. Không nguồn sai số nào khác trong cả cây có chữ ký ấy: méo ảnh không quan tâm chiều chuyển động, sai số constellation không quan tâm, hand-eye không quan tâm. Đây là một phép thử rẻ và rất thông tin, và nó nên nằm trong quy trình nghiệm thu ở \ptr{C/16}.
+
+Cách xử lý: \emph{giảm \(t_e\)}, và điều đó đòi nhiều ánh sáng hơn --- dẫn thẳng tới lập luận về marker chiếu sáng chủ động ở \ptr{B/14}. Hoặc \emph{giảm \(v\)}, tức stop-and-go. Hoặc chấp nhận và đưa vào ngân sách như một dòng phụ thuộc vận tốc --- một dòng khó chịu vì nó không phải hằng số.
+
+\section{Lấy mẫu, răng cưa, và ngưỡng kích thước tag}
+\ptrtarget{A/06/04}
+
+Cảm biến lấy mẫu ảnh quang học thành một lưới pixel rời rạc, và định lý lấy mẫu đặt ra một giới hạn cứng: chi tiết có chu kỳ nhỏ hơn hai pixel không khôi phục được, và tệ hơn, nó xuất hiện lại dưới dạng mẫu hình giả.
+
+Với marker, chi tiết nhỏ nhất là một ô bit. Một tag AprilTag họ \code{36h11} có \(6\times6\) ô dữ liệu cộng viền, tức khoảng \(8\times8\) ô trên toàn cạnh. Nếu tag chiếm \(w\) pixel thì mỗi ô chiếm \(w/8\) pixel. Theo Nyquist thì cần tối thiểu 2 px mỗi ô, tức \(w \ge 16\) px --- nhưng đó là giới hạn lý thuyết cho tín hiệu sạch, và thực tế cần nhiều hơn.
+
+Con số thực hành thường thấy là \emph{3--5 px mỗi ô bit}, tức \(w\) cỡ 24--40 px cho việc \emph{decode}. \emph{(Đây là bậc độ lớn kinh nghiệm, không phải số đo có điều kiện xác định.)} Nhưng decode được không có nghĩa là đo được: \ptr{A/02} mục~4 chỉ ra rằng số điều kiện của bài toán xấu đi khi tag nhỏ, và \ptr{A/05} chỉ ra sai số tỉ lệ \(1/w\). Ngưỡng cho \emph{đo chính xác} cao hơn ngưỡng cho decode đáng kể.
+
+Hệ quả thiết kế trực tiếp, và nó là một trong những quyết định quan trọng nhất ở giai đoạn thiết kế: \emph{chọn số ô bit ít nhất có thể}. Một họ tag với \(4\times4\) ô dữ liệu cần ít pixel hơn một họ \(6\times6\) để đọc được ở cùng khoảng cách, đổi lại số ID khả dụng ít hơn và khoảng cách Hamming nhỏ hơn. Với bài toán docking, số ID cần thiết thường rất nhỏ --- vài chục là quá đủ --- nên đánh đổi ấy gần như luôn nghiêng về phía ít ô hơn. Đây là một chỗ mà lựa chọn mặc định (dùng họ phổ biến nhất) thường không phải lựa chọn tốt nhất.
+
+\section{Quang học: MTF, nhiễu xạ, và độ sâu trường ảnh}
+\ptrtarget{A/06/05}
+
+Ba hiệu ứng quang học liên quan chặt với nhau, và chúng cùng nhau đặt một trần cứng lên \(\sigma\) mà không thuật toán nào vượt qua được.
+
+\subsection{A. MTF: cạnh không bao giờ sắc tuyệt đối}
+
+Ống kính thật không tạo ra một cạnh chuyển từ trắng sang đen trong không tới một pixel; nó tạo ra một chuyển tiếp trải qua vài pixel. Mức độ trải ấy được mô tả bởi MTF, và nó tệ hơn ở rìa ảnh, tệ hơn khi khẩu mở to, và tệ hơn ở tần số không gian cao.
+
+Ảnh hưởng lên định vị góc thì tinh tế. Một cạnh trải rộng \emph{không} nhất thiết làm định vị kém đi --- ngược lại, một cạnh trải qua vài pixel cho nhiều pixel mang thông tin gradient hơn, nên khớp đường có thể chính xác hơn một cạnh nhảy bậc trong một pixel. Điều này nghe phản trực giác nhưng nó là lý do vì sao ảnh hơi mờ đôi khi cho subpixel tốt hơn ảnh cực sắc.
+
+Chỗ MTF thật sự gây hại là khi nó \emph{không đồng đều}: nếu một cạnh của tag nằm ở vùng ảnh sắc nét và cạnh đối diện nằm ở vùng mờ hơn, hai cạnh ấy được định vị với độ chính xác khác nhau \emph{và} có thể với thiên lệch khác nhau. Đây là một nguồn cho việc \(\Sigma_i\) khác nhau giữa các góc ở \ptr{A/03} mục~6.
+
+\subsection{B. Nhiễu xạ: trần vật lý}
+
+Kể cả một ống kính hoàn hảo cũng không hội tụ ánh sáng vào một điểm, vì bản chất sóng của ánh sáng. Điểm nhỏ nhất là đĩa Airy, đường kính
+\[
+d_{\text{Airy}} \approx 2{,}44\,\lambda\,N,
+\]
+với \(\lambda\) bước sóng và \(N\) số f \cite{goodman2005fourier}. Với ánh sáng trắng (\(\lambda \approx 550\) nm) và \(N = 8\):
+\[
+d = 2{,}44 \times 0{,}55\,\mu\text{m} \times 8 = \mathbf{10{,}7\ \mu\text{m}}.
+\]
+Với pixel 3\,µm, đĩa Airy trải qua hơn ba pixel. Nghĩa là ở \(N = 8\), camera của bạn \emph{không thể} phân giải chi tiết một pixel, bất kể cảm biến có bao nhiêu megapixel.
+
+Đây là câu trả lời cho Q5 và cho một nửa của Q3. Khép khẩu làm tăng độ sâu trường ảnh --- điều bạn muốn --- nhưng nó cũng tăng \(N\) nên tăng đường kính Airy, làm ảnh nhoè đi vì nhiễu xạ. Tồn tại một khẩu độ tối ưu, và khép quá thì tệ hơn.
+
+Đây cũng là một nửa câu trả lời cho Q3: tăng độ phân giải không giúp gì nếu quang học đã là nút thắt. Nửa còn lại là nhiễu ảnh --- pixel nhỏ hơn thu ít photon hơn nên tỉ số tín hiệu trên nhiễu kém hơn. Phép thử phân biệt hai cơ chế: chụp cùng một cảnh với thời gian phơi sáng dài hơn và nhiều ánh sáng hơn. Nếu \(\sigma\) cải thiện thì nút thắt là nhiễu ảnh; nếu không thì nút thắt là quang học.
+
+\subsection{C. Độ sâu trường ảnh: ràng buộc thiết kế thật}
+
+Trong bài toán docking, robot đi từ vài mét xuống nửa mét, và constellation có tag ở các độ sâu khác nhau (theo lời khuyên của \ptr{A/04}). Không phải mọi thứ đều nét cùng lúc.
+
+Ba lựa chọn. \emph{Khoá nét ở khoảng cách cuối} --- đơn giản nhất và thường đúng, vì đó là chỗ cần chính xác nhất; ở xa thì tag hơi mờ nhưng vẫn decode được và bạn chỉ cần điều khiển thô. \emph{Khép khẩu} --- tăng độ sâu trường ảnh, giới hạn bởi nhiễu xạ như mục~B. \emph{Lấy nét tự động} --- tránh, vì nó đổi \(f\) và hệ số méo (\ptr{A/01} mục~8), làm toàn bộ hiệu chuẩn của bạn vô hiệu.
+
+\begin{cannho}
+Quang học đặt một \emph{trần cứng} lên \(\sigma\), và trần ấy không vượt qua được bằng phần mềm.
+
+Hệ quả cho việc lập ngân sách: trước khi hứa hẹn \(\sigma = 0{,}05\) px, hãy kiểm xem quang học của bạn có phân giải nổi mức đó không. Phép kiểm rẻ: chụp một cạnh sắc, vẽ profile độ sáng vuông góc cạnh, và xem chuyển tiếp trải qua bao nhiêu pixel. Nếu nó trải qua 5 px thì hy vọng định vị tới 0,05 px là lạc quan.
+
+Hệ quả cho việc mua sắm: một ống kính tốt hơn thường là đồng tiền hiệu quả hơn một cảm biến nhiều megapixel hơn, vì cảm biến chỉ giúp khi quang học chưa phải nút thắt.
+\end{cannho}
+
+\section{Vật liệu và bề mặt marker}
+\ptrtarget{A/06/06}
+
+Hiệu ứng cuối cùng, và nó là hiệu ứng duy nhất mà bạn kiểm soát hoàn toàn bằng lựa chọn vật liệu.
+
+\emph{Phản xạ gương và loá.} Một bề mặt bóng phản xạ nguồn sáng thành một vùng sáng chói. Nếu vùng ấy trùm lên một cạnh tag, cạnh bị ``ăn'' và góc lệch --- một thiên lệch phụ thuộc góc chiếu sáng, tức phụ thuộc tư thế robot. Cách chữa: vật liệu nhám (matte), và tránh bố trí sao cho có đường phản xạ gương từ đèn tới camera.
+
+\emph{Retroreflective.} Vật liệu phản xạ ngược về nguồn. Với một đèn gắn cạnh camera, nó cho tương phản rất cao và gần như độc lập với ánh sáng môi trường --- một lợi thế lớn vì nó làm \(\sigma\) ổn định. Nhược điểm: nó rất nhạy với góc, và ở góc chếch lớn thì hiệu quả giảm; ngoài ra vùng sáng có thể tràn (blooming) sang pixel lân cận, làm cạnh dịch.
+
+\emph{Backlit và IR chủ động.} Tag phát sáng từ phía sau, hoặc chiếu sáng bằng LED hồng ngoại cộng bộ lọc bandpass trên camera. Đây là cách mạnh nhất để làm \(\sigma\) ổn định, vì nó loại bỏ gần như hoàn toàn ảnh hưởng của ánh sáng môi trường. \ptr{B/14} bàn kỹ; ở đây chỉ ghi nhận rằng nó tồn tại và rằng lợi ích chính của nó là \emph{tính ổn định} chứ không phải độ chính xác đỉnh.
+
+\emph{Độ phẳng và độ cứng của nền.} Không phải quang học nhưng thuộc cùng nhóm quyết định vật liệu, và nó quan trọng hơn cả ba mục trên với ngân sách 5\,mm. Một tờ giấy in dán lên bề mặt cong lệch khỏi mặt phẳng vài milimét, và \ptr{A/02} mục~7 đã chỉ ra rằng khi ấy không có homography nào khớp được. Đây là một sai số hệ thống thuần tuý cơ khí, và nó thường là dòng lớn nhất trong bảng ngân sách của \ptr{C/15}.
+
+\section{Tổng kết: nhiễu hay thiên lệch, và cái gì biến mất khi dừng}
+\ptrtarget{A/06/07}
+
+Bảng~\ref{tab:a06-tong-ket} là thứ đáng mang ra khỏi chương nhất.
+
+\begin{table}[H]\centering\small
+\caption{Sáu hiệu ứng: loại sai số, phụ thuộc vận tốc, và cách xử lý chính.}
+\label{tab:a06-tong-ket}
+\begin{tabularx}{\linewidth}{@{}L{2.7cm}L{1.9cm}L{1.6cm}Y@{}}
+\toprule
+\textbf{Hiệu ứng} & \textbf{Loại} & \textbf{Hết khi dừng?} & \textbf{Cách xử lý chính}\\
+\midrule
+Rolling shutter & Thiên lệch & \textbf{Có} & Global shutter; hoặc stop-and-go; hoặc mô hình hoá \cite{ait2006rollingshutter}\\
+Motion blur & Thiên lệch & \textbf{Có} & Giảm \(t_e\) (cần nhiều sáng hơn); hoặc stop-and-go\\
+Loá phụ thuộc góc & Thiên lệch & Một phần & Vật liệu nhám; bố trí tránh phản xạ gương\\
+Nhoè do lấy nét & Thiên lệch & Không & Khoá nét ở khoảng cách cuối; khép khẩu vừa phải\\
+Răng cưa khi tag nhỏ & Cả hai & Không & Ngưỡng kích thước tối thiểu; nested multi-scale (\ptr{B/09})\\
+Bias tâm ellipse & Thiên lệch & Không & Hiệu chỉnh conic \cite{heikkila2000geometric}; hoặc dùng góc chessboard\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Đọc cột thứ ba là đọc được câu trả lời cho Q4. Hai hiệu ứng lớn nhất khi robot chuyển động --- rolling shutter và motion blur --- \emph{đều} biến mất hoàn toàn khi vận tốc bằng không, và loá thì giảm vì không còn đổi góc. Đây là lập luận vật lý cho stop-and-go, và nó mạnh hơn lập luận thông thường (``dừng lại để trung bình nhiều khung''): trung bình nhiều khung chỉ giảm \emph{nhiễu}, còn dừng lại thì xoá hẳn mấy dòng \emph{thiên lệch} --- thứ mà trung bình không bao giờ giảm được.
+
+Hai hiệu ứng không biến mất khi dừng là nhoè do lấy nét và bias tâm ellipse. Cả hai đều xử lý được ở tầng thiết kế: khoá nét đúng khoảng cách, và dùng target có góc thay vì target tròn cho khâu đo tinh.
+
+\section{Giới hạn và chế độ hỏng}
+\ptrtarget{A/06/08}
+
+\textbf{Chương này không đầy đủ.} Danh sách sáu hiệu ứng là danh sách những thứ tôi cho là đáng kể với bài toán docking ở mức 5\,mm; nó không phải danh sách đầy đủ các hiệu ứng vật lý trong một hệ thị giác. Không bàn tới ở đây: hiện tượng nở vệt sáng (blooming) trong trường hợp nặng, méo do khí quyển (không đáng kể ở cự ly mét), nhiễu đọc và nhiễu nhiệt của cảm biến (chúng vào \(\sigma\) và được xử lý như nhiễu ngẫu nhiên), và hiệu ứng của nén ảnh nếu camera trả về JPEG (tránh --- dùng ảnh thô).
+
+\textbf{Các con số là bậc độ lớn.} \(t_{\text{line}} = 20\,\mu\text{s}\), ngưỡng 3--5 px mỗi ô bit, \(\lambda = 550\) nm cho ánh sáng trắng --- đây là giá trị điển hình dùng để thấy bậc, không phải số đo của thiết bị cụ thể. Mọi con số milimét dẫn ra từ chúng thừa hưởng cùng mức độ tin cậy ấy.
+
+\textbf{Phân loại nhiễu/thiên lệch là đơn giản hoá.} Một số hiệu ứng có cả hai thành phần. Răng cưa chẳng hạn: nó vừa làm tăng phương sai vừa gây thiên lệch phụ thuộc pha của lưới tag so với lưới pixel. Bảng~\ref{tab:a06-tong-ket} ghi ``cả hai'' cho nó, nhưng cách xử lý đúng cho từng thành phần khác nhau và chương này không tách chúng ra.
+
+\textbf{Mệnh đề về thiên lệch do blur chưa được kiểm.} Đã ghi rõ ở mục~3. Nếu hoá ra blur chỉ gây nhiễu chứ không gây thiên lệch, thì tầm quan trọng của stop-and-go giảm đi một phần --- không hết, vì rolling shutter vẫn còn.
+
+\section{Thực hành}
+\ptrtarget{A/06/09}
+
+Bốn việc, theo thứ tự chi phí tăng dần.
+
+\emph{Một, làm phép thử đảo chiều.} Đo cùng một điểm khi tiến và khi lùi. Nếu thấy lệch có hệ thống theo hai chiều ngược nhau thì bạn có hiệu ứng phụ thuộc vận tốc, và bạn biết ngay phải nhìn vào rolling shutter và blur. Phép thử này gần như miễn phí và nó là phép thử thông tin nhất trong cả chương.
+
+\emph{Hai, đo profile cạnh.} Chụp một cạnh sắc, vẽ độ sáng dọc theo một đường vuông góc, đếm xem chuyển tiếp trải qua bao nhiêu pixel. Con số ấy cho bạn một ước lượng thực tế về trần của \(\sigma\), và nó nói cho bạn biết có nên đầu tư vào subpixel tinh vi hơn không.
+
+\emph{Ba, khoá mọi thứ khoá được.} Khoá exposure, khoá gain, khoá white balance, khoá nét --- rồi dán keo vào vòng lấy nét. Mọi tham số tự động là một nguồn thay đổi không kiểm soát được trong một hệ đo lường.
+
+\emph{Bốn, chọn global shutter ngay từ đầu} nếu có bất kỳ khả năng nào phải đo trong khi di chuyển. Đây là quyết định mua sắm chứ không phải quyết định kỹ thuật, và sửa nó về sau đắt hơn nhiều.
+
+\begin{onbai}
+\ar[3]{Nguyên tắc tổ chức của chương}{Phân loại theo \emph{nhiễu hay thiên lệch}, vì nhiễu chia cho \(\sqrt{N}\) còn thiên lệch thì không (\ptr{A/05} mục 8). Gần như mọi hiệu ứng vật lý thuộc loại thứ hai.}
+\ar[3]{Rolling shutter làm gì}{Các hàng ảnh ghi cảnh ở các thời điểm khác nhau, nên tag chuyển động bị \emph{xé} chứ không chỉ mờ. Detector vẫn thấy tứ giác đẹp, decode vẫn được, residual vẫn nhỏ --- pose sai im lặng.}
+\ar[3]{Độ lớn rolling shutter}{960 hàng \(\times\) \(t_{\text{line}}=20\,\mu\)s \(=\) 19,2 ms độ trễ. Với \(v=0{,}3\) m/s, \(f/Z = 1200\): 6,9 px trên cả ảnh, 0,86 px trong nội bộ tag 120 hàng --- gấp bốn lần \(\sigma\), và là thiên lệch.}
+\ar[3]{Chiều dài vệt motion blur}{\(L = v f t_e / Z\). Ví dụ: 0,3 m/s, \(f=600\), \(Z=0{,}5\) m, \(t_e=20\) ms \(\Rightarrow\) 7,2 px --- lớn hơn \(\sigma\) ba mươi lần.}
+\ar[2]{Vì sao blur gây thiên lệch chứ không chỉ mờ}{Vì cạnh tag \emph{không cô lập}: ô đen 5 px nhoè 7 px thì hai cạnh chồng lên nhau và profile mất đối xứng; và detector khớp mô hình lên profile gradient chứ không lấy trung tâm đối xứng. \emph{(Tôi suy ra; chưa kiểm bằng mô phỏng.)}}
+\ar[3]{Phép thử đảo chiều}{Đo cùng một điểm khi tiến và khi lùi. Lệch có hệ thống theo hai chiều ngược nhau \(\Rightarrow\) hiệu ứng phụ thuộc vận tốc. Không nguồn nào khác trong cây có chữ ký này --- méo, constellation, hand-eye đều không quan tâm chiều chuyển động.}
+\ar[3]{Bốn trong sáu hiệu ứng hết khi dừng}{Rolling shutter, motion blur hết hoàn toàn; loá giảm. Đây là lập luận vật lý cho stop-and-go, và nó mạnh hơn lập luận ``dừng để trung bình'' --- trung bình chỉ giảm nhiễu, dừng thì xoá thiên lệch.}
+\ar[2]{Ngưỡng pixel mỗi ô bit}{Nyquist cho 2 px; thực tế 3--5 px \emph{(bậc độ lớn kinh nghiệm)}. Với tag \(8\times8\) ô thì \(w\) cỡ 24--40 px để \emph{decode}. Ngưỡng để \emph{đo chính xác} cao hơn nhiều.}
+\ar[2]{Hệ quả thiết kế của ngưỡng ô bit}{Chọn họ tag ít ô nhất có thể. Docking chỉ cần vài chục ID, nên đánh đổi gần như luôn nghiêng về phía ít ô --- và lựa chọn mặc định (họ phổ biến nhất) thường không tối ưu.}
+\ar[3]{Đường kính đĩa Airy}{\(d \approx 2{,}44\lambda N\) \cite{goodman2005fourier}. Với \(\lambda=550\) nm, \(N=8\): 10,7 \(\mu\)m --- hơn ba pixel 3 \(\mu\)m. Ở khẩu ấy, không cảm biến nào phân giải nổi chi tiết một pixel.}
+\ar[2]{Đánh đổi khẩu độ}{Khép khẩu tăng độ sâu trường ảnh nhưng tăng \(N\) nên tăng đĩa Airy. Có khẩu tối ưu; khép quá thì nhoè hơn.}
+\ar[2]{Cạnh hơi mờ có thể tốt hơn cạnh sắc}{Vì cạnh trải qua vài pixel cho nhiều pixel mang thông tin gradient hơn, nên khớp đường chính xác hơn. Chỗ MTF thật sự hại là khi nó \emph{không đồng đều} giữa các cạnh của cùng một tag.}
+\ar[2]{Phân biệt nút thắt quang học với nút thắt nhiễu ảnh}{Chụp lại với nhiều sáng hơn và \(t_e\) dài hơn. \(\sigma\) cải thiện \(\Rightarrow\) nhiễu ảnh là nút thắt. Không cải thiện \(\Rightarrow\) quang học là nút thắt, và thêm megapixel vô ích.}
+\ar[1]{Vật liệu marker}{Nhám chống loá; retroreflective cho tương phản cao nhưng nhạy góc và dễ blooming; backlit/IR cho \(\sigma\) ổn định nhất (\ptr{B/14}). Và quan trọng hơn cả ba: nền phải cứng và phẳng.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{Mô hình rolling shutter \cite{ait2006rollingshutter}}{Giải cả pose lẫn vận tốc từ một ảnh, biến phiền toái thành nguồn thông tin}{Chỉ dùng khi không thể đổi camera hoặc dừng robot}
+\ud{Hiệu chuẩn \(t_{\text{line}}\) \cite{oth2013rollingshutter}}{Đo độ trễ dòng bằng một target đã biết}{Bước bắt buộc trước khi mô hình hoá rolling shutter}
+\ud{Hiệu chỉnh bias tâm \cite{heikkila2000geometric}}{Dùng đại số conic thay vì lấy tâm ellipse}{Bắt buộc nếu dùng marker tròn --- xem \ptr{A/02} mục 6}
+\ud{Marker IR chủ động cộng bandpass}{Loại ảnh hưởng ánh sáng môi trường, làm \(\sigma\) ổn định}{Lợi ích chính là \emph{ổn định}, không phải độ chính xác đỉnh --- \ptr{B/14}}
+\ud{\repo{deltille} \cite{chen2018deltille}}{Target lưới tam giác; góc saddle không chịu bias kiểu ellipse}{Lựa chọn khi cần vừa chính xác vừa không thiên lệch}
+\end{ungdung}
+
+\begin{duan}{Đo thiên lệch phụ thuộc vận tốc bằng phép thử đảo chiều}{1--2 ngày}
+\dmt tách bạch phần sai số phụ thuộc vận tốc khỏi mọi nguồn khác, bằng một phép thử mà không nguồn nào khác có thể giả mạo.
+\ddl phần cứng thật: một camera, một tag gắn cố định, và một cách di chuyển camera (hoặc tag) với vận tốc kiểm soát được --- một trục trượt, hoặc chính robot của bạn.
+\dbc chọn một điểm mốc trên đường đi; đo pose tại điểm ấy trong ba điều kiện: đứng yên (trung bình 50 khung), đang tiến qua nó với vận tốc \(v\), đang lùi qua nó với cùng \(v\); lặp cho ba giá trị \(v\) khác nhau và cho hai giá trị \(t_e\) khác nhau; vẽ sai lệch so với giá trị đứng yên theo \(v\), tách riêng cho tiến và lùi.
+\dxk bạn có một đồ thị trong đó đường ``tiến'' và đường ``lùi'' đối xứng nhau qua trục hoành và cả hai đi qua gốc --- chữ ký không thể nhầm của hiệu ứng phụ thuộc vận tốc. Độ dốc của chúng là hệ số bạn đưa vào ngân sách nếu buộc phải đo khi di chuyển. Kiểm tra chéo bắt buộc: lặp lại với \(t_e\) giảm một nửa; nếu độ dốc giảm khoảng một nửa thì thủ phạm chính là motion blur, nếu nó gần như không đổi thì thủ phạm là rolling shutter --- hai cách chữa khác nhau.
+\dnv \ptr{B/13} cho quyết định stop-and-go; \ptr{C/15} nhận độ dốc này làm một dòng phụ thuộc vận tốc trong ngân sách.
+\end{duan}
+
+\begin{traloi}
+\tl{Vệt dài \(L = vft_e/Z = 0{,}3 \times 600 \times 0{,}02/0{,}5 = 7{,}2\) px --- lớn hơn nhiễu định vị góc chừng ba mươi lần. Nó gây thiên lệch chứ không chỉ mờ vì hai lý do. Thứ nhất, các cạnh của tag không cô lập: một ô đen rộng 5 px bị nhoè 7 px thì hai cạnh của nó chồng lên nhau, và profile độ sáng thu được không còn đối xứng quanh vị trí cạnh thật. Thứ hai, detector không tìm cạnh bằng cách lấy trung tâm đối xứng mà bằng cách khớp một mô hình lên profile gradient có trọng số, nên một profile bị biến dạng bất đối xứng cho một đường khớp lệch. Hệ quả thực hành: lấy trung bình nhiều khung \emph{không} chữa được, vì mọi khung đều lệch theo cùng hướng.}
+\tl{Motion blur hoặc rolling shutter --- cả hai đều phụ thuộc vận tốc và cả hai đều đổi dấu khi đổi chiều. Đây là một dấu hiệu chẩn đoán rất mạnh vì \emph{không nguồn sai số nào khác trong cả cây có chữ ký ấy}: méo ảnh không quan tâm robot đang đi hướng nào, sai số constellation không quan tâm, sai số hand-eye không quan tâm, ambiguity thì gây nhảy chứ không gây lệch có hướng. Vì vậy nếu bạn thấy chữ ký này thì bạn đã thu hẹp không gian nguyên nhân xuống còn hai, và có một phép thử thứ hai tách hai cái đó: giảm thời gian phơi sáng một nửa --- nếu lệch giảm khoảng một nửa thì là blur, nếu gần như không đổi thì là rolling shutter.}
+\tl{Cơ chế thứ nhất: quang học đã là nút thắt. Đĩa Airy ở \(N=8\) có đường kính 10,7 \(\mu\)m, trải qua hơn ba pixel 3 \(\mu\)m, nên camera không phân giải nổi chi tiết một pixel bất kể cảm biến bao nhiêu megapixel --- pixel nhỏ hơn chỉ lấy mẫu dày hơn một hình ảnh vốn đã nhoè. Cơ chế thứ hai: nhiễu ảnh. Pixel nhỏ hơn có diện tích thu photon nhỏ hơn, nên tỉ số tín hiệu trên nhiễu kém đi, nên \(\sigma\) tính bằng pixel tăng lên đúng bằng phần mà độ phân giải cải thiện. Phép thử phân biệt: chụp lại với nhiều ánh sáng hơn và thời gian phơi sáng dài hơn. Nếu \(\sigma\) cải thiện thì nút thắt là nhiễu ảnh và bạn nên đầu tư vào chiếu sáng; nếu không cải thiện thì nút thắt là quang học và bạn nên đầu tư vào ống kính.}
+\tl{Vì hai hiệu ứng lớn nhất khi di chuyển --- rolling shutter và motion blur --- đều là \emph{thiên lệch} và đều tỉ lệ với vận tốc, nên chúng biến mất hoàn toàn ở \(v = 0\); loá phụ thuộc góc cũng ổn định hơn vì góc không đổi nữa. Lập luận này mạnh hơn lập luận thông thường ``dừng lại để trung bình nhiều khung'', vì trung bình chỉ giảm \emph{nhiễu} theo \(1/\sqrt{N}\) còn dừng lại thì xoá hẳn mấy dòng \emph{thiên lệch} --- thứ mà trung bình không bao giờ chạm tới được. Hai hiệu ứng không biến mất khi dừng là nhoè do lấy nét (xử lý bằng cách khoá nét ở khoảng cách cuối) và bias tâm ellipse (xử lý bằng hiệu chỉnh conic, hoặc bằng cách dùng góc chessboard thay cho marker tròn).}
+\tl{Vì khép khẩu tăng số f \(N\), mà đường kính đĩa Airy tỉ lệ thuận với \(N\): \(d \approx 2{,}44\lambda N\). Khép từ \(N=4\) xuống \(N=16\) làm đĩa Airy to gấp bốn, từ khoảng 5,4 \(\mu\)m lên 21,5 \(\mu\)m --- tức từ chừng hai pixel lên bảy pixel với pixel 3 \(\mu\)m. Giới hạn vật lý đang chặn bạn là \emph{nhiễu xạ}: bản chất sóng của ánh sáng, không phải chất lượng chế tạo ống kính, nên không có ống kính đắt tiền nào vượt qua được. Kết quả là tồn tại một khẩu độ tối ưu cân bằng giữa độ sâu trường ảnh và độ sắc nét do nhiễu xạ, và với bài toán docking thì một lựa chọn thường tốt hơn là bỏ hẳn cuộc đua ấy: khoá nét ở khoảng cách cuối --- nơi cần chính xác nhất --- và chấp nhận tag hơi mờ ở xa, nơi chỉ cần điều khiển thô.}
+\end{traloi}
+
+\begin{dongian}
+Mọi thứ cho tới chương này đều giả vờ rằng cái camera là một thiết bị hoàn hảo chụp một thế giới đứng yên. Chương này liệt kê những chỗ giả vờ ấy bị lộ.
+
+Thứ đáng lo nhất không phải là ảnh trông xấu. Ảnh xấu thì ai cũng thấy và ai cũng biết phải sửa. Thứ đáng lo là những sai lệch làm con số lệch đi mà không làm ảnh trông khác gì --- và tệ hơn nữa, lệch theo \emph{cùng một hướng} ở mọi lần chụp.
+
+Hãy nghĩ về chuyện bắn bia. Nếu các phát đạn tản mát quanh tâm thì bắn nhiều rồi lấy trung bình là xong. Nhưng nếu súng bị lệch ngắm thì bắn nghìn phát lấy trung bình chỉ cho bạn biết rất chính xác cái chỗ lệch ấy ở đâu --- bạn tự tin hơn về một câu trả lời sai. Gần như mọi thứ trong chương này thuộc loại lệch ngắm.
+
+Có hai thủ phạm lớn nhất, và cả hai chỉ xuất hiện khi robot đang đi. Thủ phạm thứ nhất là chuyện nhiều loại camera không chụp cả tấm ảnh cùng một lúc mà quét từ trên xuống dưới như máy scan --- nên nếu vật đang chạy ngang thì hàng dưới ghi lại nó ở chỗ khác với hàng trên, và cái hình vuông biến thành hình xiên. Đáng sợ ở chỗ cái hình xiên ấy vẫn trông rất gọn gàng, máy vẫn đọc được, không có gì báo động, và pose thì sai. Thủ phạm thứ hai là vệt nhoè: cửa chập mở hai mươi mili giây trong khi mọi thứ đang trôi, nên cạnh của tag bị kéo thành một vệt.
+
+Và đây là tin tốt, tốt hơn nhiều so với công sức bỏ ra để sửa chúng: cả hai thủ phạm ấy \emph{biến mất} nếu robot đứng yên. Không phải giảm đi, mà biến mất. Cho nên cách chữa rẻ nhất trong cả chương là: đi tới gần, dừng hẳn lại một phần tư giây, chụp mấy chục tấm, tính toán, rồi mới đi tiếp. Không cần camera đắt hơn, không cần thuật toán mới.
+
+Hai thứ còn lại không chữa được bằng cách dừng. Một là chuyện ống kính chỉ nét ở một khoảng cách --- cái này chữa bằng cách chỉnh nét đúng chỗ mà bạn cần chính xác nhất, tức chỗ sắp cập vào, rồi dán keo lại đừng cho ai vặn. Hai là chuyện cái tâm của hình tròn không nằm ở chỗ bạn tưởng --- cái này chữa bằng cách dùng loại marker có góc thay vì loại có vòng tròn.
+
+Còn một chuyện cuối, và nó là chuyện vật lý chứ không phải kỹ thuật. Ánh sáng có bản chất sóng, và vì thế không có ống kính nào --- kể cả ống kính hoàn hảo, kể cả ống kính đắt nhất --- hội tụ được ánh sáng vào một điểm. Điểm nhỏ nhất có thể là một cái đốm nhỏ, và kích thước của nó thì tính được. Nếu cái đốm ấy đã rộng ba pixel thì mua cảm biến nhiều pixel hơn không giúp gì cả --- bạn chỉ đang lấy mẫu dày hơn một cái đốm.
+
+\chuadongian{việc tách bạch xem một sai lệch cụ thể là nhiễu hay lệch ngắm thì không nhìn ra được từ một lần đo, và đôi khi một hiệu ứng có cả hai phần. Cách duy nhất là đổi một điều kiện có chủ ý --- đổi chiều đi, đổi thời gian chụp, đổi ánh sáng --- rồi xem cái gì đổi theo.}
+\motcau{Gần như mọi thứ trong chương này làm súng lệch ngắm chứ không làm tay run --- và hai cái lệch lớn nhất thì biến mất nếu bạn chịu đứng yên một phần tư giây.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{A/06/10}
+
+Mệnh đề chính --- \emph{rolling shutter và motion blur gây thiên lệch phụ thuộc vận tốc, đổi dấu khi đổi chiều} --- bị bác bỏ nếu phép thử đảo chiều ở mini project cho thấy hai đường tiến và lùi trùng nhau thay vì đối xứng. Với rolling shutter thì mệnh đề này gần như chắc chắn đúng vì nó là hệ quả trực tiếp của cơ chế đọc hàng; với blur thì nó là suy luận của tôi và chưa được kiểm.
+
+Mệnh đề thứ hai --- \emph{blur gây thiên lệch chứ không chỉ tăng phương sai} --- là mệnh đề yếu nhất về kiểm chứng trong chương, như đã ghi ở mục~3. Nó bị bác bỏ nếu mô phỏng (tích phân ảnh tag qua một đoạn dịch chuyển, chạy detector, so với chân trị) cho thấy sai lệch trung bình bằng không trong phạm vi sai số thống kê. Nếu vậy thì stop-and-go vẫn đáng làm vì rolling shutter, nhưng lập luận mất một chân.
+
+Mệnh đề thứ ba --- \emph{quang học đặt trần cứng lên \(\sigma\) mà phần mềm không vượt được} --- là mệnh đề chắc chắn nhất vì nó là vật lý cơ bản \cite{goodman2005fourier}. Nó không bị bác bỏ bởi một thuật toán tốt hơn; nó chỉ bị ``bác bỏ'' nếu ai đó chỉ ra rằng bạn tính sai số f hoặc bước sóng.
+
+Cuối cùng, một mệnh đề mềm: chương này khẳng định rằng \emph{trong một hệ đã tối ưu tốt phần nhiễu, ngân sách bị chi phối bởi các dòng trong chương này}. Điều đó bị bác bỏ nếu trong một hệ thực, sau khi đã chuyển sang stop-and-go và global shutter, sai số vẫn không cải thiện đáng kể --- khi ấy nút thắt nằm ở chỗ khác, nhiều khả năng là sai số cơ khí của constellation (\ptr{B/12}) hoặc hand-eye. \emph{(Tôi phát biểu dựa trên cấu trúc của ngân sách chứ không dựa trên thống kê hệ thực tế.)}
+
+\section{Kết nối}
+\ptrtarget{A/06/11}
+
+Chương này khép Phần~A bằng cách nói ra những gì năm chương trước im lặng bỏ qua, và nó mở đường sang những quyết định thiết kế của Phần~B.
+
+Nối lên trên. \ptr{A/01-mo-hinh-camera-va-distortion} dựng mô hình hình học; chương này liệt kê những thứ mô hình ấy không chứa. Đáng chú ý là hai chương bổ sung nhau theo một cách sạch: chương~1 nói về sai lệch \emph{tĩnh} của quang học (đo một lần, bù mãi mãi), chương này nói về sai lệch \emph{động} (đổi theo vận tốc, khoảng cách, ánh sáng). \ptr{A/02-homography-va-hinh-hoc-phang} mục~6 cấp bias tâm ellipse, một trong sáu hiệu ứng ở đây. \ptr{A/05-lan-truyen-sai-so-pixel-sang-pose} mục~8 cấp khung phân loại nhiễu/thiên lệch mà cả chương này dựa vào, và nó cũng nhận lại từ đây một cảnh báo quan trọng: công thức hiệp phương sai của chương~5 hoàn toàn mù với thiên lệch, nên một hệ chịu các hiệu ứng ở đây sẽ báo cáo một bất định nhỏ hơn sự thật.
+
+Nối xuống Phần~B. \ptr{B/08-corner-refinement} nhận từ mục~5 luận điểm rằng cạnh hơi mờ có thể tốt hơn cạnh sắc, và nhận từ mục~3 cảnh báo rằng mọi kỹ thuật subpixel tinh vi đều vô ích nếu ảnh đang bị nhoè do chuyển động. \ptr{B/13-docking-control} nhận mục~7 làm cơ sở vật lý cho stop-and-go --- đây là liên kết quan trọng nhất của chương, vì nó biến một danh sách hiệu ứng thành một quyết định kiến trúc. \ptr{B/14-dieu-kien-quan-sat-va-anh-sang} nhận toàn bộ mục~6 và mở rộng nó thành hướng dẫn về chiếu sáng, vật liệu, và cấu hình camera.
+
+Nối sang Phần~C. \ptr{C/15-ngan-sach-sai-so} có một nhóm dòng riêng cho các hiệu ứng của chương này, và chúng có một đặc điểm làm chúng khó chịu trong bảng: phần lớn \emph{không phải hằng số} mà phụ thuộc điều kiện vận hành. Cách xử lý đúng trong ngân sách là ghi chúng theo hai cột --- giá trị khi đang di chuyển và giá trị khi dừng --- và chính sự chênh lệch giữa hai cột ấy là lập luận định lượng cho stop-and-go. \ptr{C/16-danh-gia-va-nghiem-thu} nhận phép thử đảo chiều ở mục~9 làm một mục bắt buộc trong quy trình nghiệm thu.
+
+\begin{tukiem}
+\item Vì sao rolling shutter gây một chế độ hỏng ``im lặng'' trong khi motion blur thì ít nhất còn nhìn thấy được trên ảnh?
+\item Nêu chữ ký chẩn đoán phân biệt hiệu ứng phụ thuộc vận tốc với mọi nguồn sai số khác trong cây, và giải thích vì sao không nguồn nào khác giả mạo được nó.
+\item Bạn đã có chữ ký ấy. Nêu phép thử thứ hai tách motion blur khỏi rolling shutter, và dự đoán kết quả cho từng trường hợp.
+\item Vì sao một cạnh trải qua ba pixel có thể cho định vị subpixel tốt hơn một cạnh nhảy bậc trong một pixel --- và khi nào thì MTF thật sự gây hại?
+\item Với \(\lambda = 550\) nm và pixel 3\,µm, ở số f nào thì đĩa Airy bắt đầu vượt hai pixel? Tính nhẩm, rồi nói kết luận thực hành.
+\item Bốn trong sáu hiệu ứng biến mất khi dừng. Nêu hai cái còn lại, và với mỗi cái nêu cách xử lý ở tầng thiết kế chứ không ở tầng thuật toán.
+\item Một hệ đã dùng global shutter, stop-and-go, và trung bình 50 khung. Sai số vẫn 4\,mm. Chương này còn giải thích được bao nhiêu phần, và bạn chuyển sang nghi ngờ chương nào?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

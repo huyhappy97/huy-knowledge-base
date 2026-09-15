@@ -1,0 +1,219 @@
+\documentclass[../../../deep_learning.tex]{subfiles}
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: C/13/01 (conv, stride), C/14/02 (set prediction). Mức độ: cốt lõi.
+\begin{document}
+\section{Phân vùng ảnh và sự hợp nhất (Segmentation and Unification)}
+\ptrtarget{C/14-bai-toan-cv-loi/03}\ptrtarget{C/14-bai-toan-cv-loi/03-segmentation}\ptrtarget{C/14/03}\ptrtarget{C/14/03-segmentation}
+\dependency{\ptr{C/13-kien-truc-backbone/01-dong-cnn} (stride, \vn{trường tiếp nhận}{receptive field}, upsampling); \ptr{C/14-bai-toan-cv-loi/02-detection-mot-giai-doan} (dự đoán tập hợp bằng Hungarian matching --- cần cho phần Mask2Former).}
+
+\begin{tomtat}
+Mục này theo một mâu thuẫn duy nhất: mạng phân loại giỏi \emph{nhờ} vứt bỏ thông tin không gian, còn phân vùng lại cần đúng thông tin vừa bị vứt. Bốn kiến trúc lớn --- FCN, U-Net, DeepLab, SegFormer --- là bốn cách khác nhau để lấy lại thông tin đó, mỗi cách trả một loại giá khác nhau; Mask2Former thì không lấy lại mà đổi hẳn phát biểu, và nhờ vậy hợp nhất được semantic, instance và panoptic. Đọc xong bạn chọn được kiến trúc phân vùng từ ràng buộc (bộ nhớ, lượng nhãn, yêu cầu về biên) thay vì từ bảng xếp hạng, và đọc được mIoU với đúng mức hoài nghi. Nếu chỉ nhớ một điều: mọi kiến trúc segmentation đều là một câu trả lời cho ``chi tiết không gian đã mất ở đâu, lấy lại bằng cách nào'' --- và mIoU cao không hề bảo đảm biên đúng hay vật nhỏ không bị bỏ sót.
+\end{tomtat}
+
+\begin{nentang}
+\kn{semantic segmentation}{gán cho \emph{mỗi pixel} một nhãn lớp. Hai chiếc xe cạnh nhau đều là ``xe'' và không được tách ra.}
+\kn{instance segmentation}{ngoài nhãn lớp còn tách từng cá thể: xe thứ nhất và xe thứ hai là hai mask khác nhau.}
+\kn{panoptic segmentation}{gộp cả hai: các lớp đếm được thì tách cá thể, các lớp không đếm được (bầu trời, mặt đường) thì chỉ cần nhãn lớp.}
+\kn{mask}{một lưới nhị phân cùng kích thước ảnh, đánh dấu pixel nào thuộc về vùng đang nói tới. Đây là ``dạng đầu ra'' của mọi bài toán trong mục này.}
+\kn{output stride}{tỉ lệ thu nhỏ giữa ảnh và feature map. Output stride 32 nghĩa là ảnh \(1024\times1024\) còn lại lưới \(32\times32\), nên mỗi ô đại diện cho \(32\times32\) pixel và biên chỉ định vị được tới độ thô đó.}
+\kn{encoder--decoder}{encoder là phần đi xuống, thu nhỏ dần độ phân giải để lấy ngữ nghĩa; decoder là phần đi lên, khôi phục độ phân giải. \emph{Skip connection} là đường nối tắt từ một tầng encoder sang tầng decoder cùng cỡ.}
+\kn{trường tiếp nhận (receptive field)}{vùng ảnh gốc mà một ô đặc trưng ``nhìn thấy''. Muốn hiểu ngữ cảnh rộng thì cần trường tiếp nhận lớn, mà cách rẻ nhất để mở rộng nó lại là thu nhỏ độ phân giải --- đó chính là mâu thuẫn của mục này.}
+\kn{mIoU}{thước đo chuẩn của segmentation: với mỗi lớp lấy diện tích giao chia diện tích hợp giữa vùng dự đoán và vùng thật, rồi trung bình trên các lớp.}
+\end{nentang}
+
+\subsection{Đặt vấn đề}
+Detection trả lời ``có cái gì, ở khoảng nào''. Nhiều ứng dụng cần chặt hơn: một khung chữ nhật quanh một con đường không nói được đâu là mặt đường có thể đi. Segmentation đẩy độ phân giải của câu trả lời xuống tận pixel, và ngay lập tức va vào một mâu thuẫn mà cả một thập kỷ nghiên cứu xoay quanh: mạng phân loại tốt \emph{nhờ} vứt bỏ thông tin không gian --- pooling và stride là cơ chế tạo ra bất biến tịnh tiến --- trong khi segmentation lại cần đúng thông tin không gian vừa bị vứt bỏ. Ta muốn ngữ nghĩa sâu và định vị chính xác cùng lúc, còn kiến trúc phân loại được thiết kế để đánh đổi cái sau lấy cái trước.
+
+Một phép tính nhỏ cho thấy mâu thuẫn này cụ thể tới mức nào. Backbone phân loại điển hình có \en{output stride} 32: ảnh \(1024\times1024\) ra feature map \(32\times32\). Mỗi ô đặc trưng đại diện cho một mảng \(32\times32\) pixel. Dù bạn nội suy lên lại bằng phép gì, thông tin để phân biệt hai pixel kề nhau bên trong cùng một ô đã không còn tồn tại; sai số định vị biên có sàn cỡ chục pixel. Toàn bộ mạch dưới đây là các cách khác nhau để phá cái sàn đó, và mỗi cách trả một loại giá khác nhau.
+
+\textbf{Học xong mục này bạn làm được gì mà trước đó không làm được?} Cho một yêu cầu cụ thể --- ``bám mép đường tới 2 pixel'', ``chạy trên Jetson với 4\,GB'', ``chỉ có 200 ảnh gán nhãn'' --- bạn suy ra được kiến trúc nào khả thi và vì sao, trước khi chạy thí nghiệm nào.
+
+\begin{trucgiac}
+Semantic segmentation cổ điển hỏi mỗi pixel: ``bạn thuộc lớp nào?'' --- một trăm nghìn câu hỏi độc lập, và mô hình không có chỗ nào để nói ``ba nghìn pixel này cùng thuộc \emph{một} vật''. Mask2Former đảo chiều điểm danh: thay vì hỏi từng pixel, nó đưa ra một trăm cái tên (truy vấn) và bắt mỗi cái tên tự nhận ``tôi là vùng nào, và tôi là cái gì''. Đảo chiều câu hỏi là lý do duy nhất khiến semantic, instance và panoptic gộp được vào một mô hình: một vật thể trở thành một đơn vị được nói tới, thay vì một tính chất phát sinh từ hậu xử lý.
+\end{trucgiac}
+
+\subsection{A. Bốn cách phá sàn độ phân giải, rồi một lần đổi phát biểu (From FCN to Mask2Former)}
+
+
+\begin{figure}[H]\centering
+\resizebox{0.99\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  b/.style={draw=steel,fill=bluebg,rounded corners=2pt,align=center,inner sep=5pt,text width=3.0cm},
+  q/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,align=center,inner sep=5pt,text width=3.0cm},
+  e/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=violetdark,align=center,text width=2.6cm}]
+\node[b] (fcn) at (0,0) {\textbf{FCN} 2015\\ \footnotesize nội suy ngược};
+\node[b] (unet) at (4.0,1.6) {\textbf{U-Net} 2015\\ \footnotesize skip từ encoder};
+\node[b] (dl) at (4.0,-1.6) {\textbf{DeepLab} 2016--18\\ \footnotesize atrous + ASPP};
+\node[b] (sf) at (8.2,0) {\textbf{SegFormer} 2021\\ \footnotesize encoder phân cấp};
+\node[q] (m2f) at (12.4,0) {\textbf{Mask2Former} 2022\\ \footnotesize truy vấn sinh mask};
+\node[q] (sam) at (16.6,0) {\textbf{SAM} 2023--26\\ \footnotesize phân vùng theo prompt};
+\draw[e] (fcn) -- node[lb,above,sloped] {lấy lại chi tiết\\ từ tầng nông} (unet);
+\draw[e] (fcn) -- node[lb,below,sloped] {không cho mất\\ chi tiết} (dl);
+\draw[e] (unet) -- node[lb,above,sloped] {bỏ decoder nặng} (sf);
+\draw[e] (dl) -- node[lb,below,sloped] {attention thay\\ atrous thủ công} (sf);
+\draw[e] (sf) -- node[lb,above] {đổi đơn vị:\\ pixel \(\rightarrow\) mask} (m2f);
+\draw[e] (m2f) -- node[lb,above] {bỏ tập nhãn\\ cố định} (sam);
+\end{tikzpicture}}
+\caption{Dòng thời gian phân vùng ảnh, đọc theo nút thắt được gỡ ở mỗi bước. Hai nhánh giữa (U-Net và DeepLab) tấn công \emph{cùng một} vấn đề mất chi tiết từ hai phía đối lập nên có thể kết hợp; hai bước cuối không gỡ nút thắt kỹ thuật mà đổi phát biểu bài toán --- đơn vị được nói tới chuyển từ pixel sang mask, rồi tập nhãn cố định bị bỏ hẳn.}
+\label{fig:seg-timeline}
+\end{figure}
+
+Hình~\ref{fig:seg-timeline} đáng nhìn trước khi đọc mạch bên dưới, vì nó cho thấy ngay một điều mà đọc tuần tự khó thấy: bốn bước đầu là kỹ thuật, hai bước cuối là đổi phát biểu.
+
+\begin{mach}[Mạch 3 --- segmentation và sự hợp nhất]
+\item \vd{mạng phân loại không sinh được đầu ra theo pixel.} \gp FCN vứt các tầng fully connected, coi chúng như conv \(1\times1\), rồi dùng transposed conv để nâng độ phân giải trở lại kích thước ảnh \cite{long2015fcn}. \hq lần đầu tiên toàn bộ pipeline là một mạng duy nhất huấn luyện đầu-cuối. \vdm biên rất thô, vì chi tiết đã mất ở đường xuống chứ không phải ở đường lên --- nội suy không thể tạo lại thứ đã bị bỏ.
+\item \vd{chi tiết mất ở đường xuống thì phải lấy lại từ đường xuống.} \gp U-Net nối thẳng feature ở mỗi mức của encoder sang mức tương ứng của decoder \cite{ronneberger2015unet}. Feature nông giữ biên sắc, feature sâu giữ ngữ nghĩa, decoder hợp nhất hai loại. \gd biên trong ảnh nông và biên ngữ nghĩa trùng nhau --- đúng với ảnh y tế và ảnh vệ tinh, kém đúng khi vật có hoa văn mạnh bên trong. \hq đây vẫn là kiến trúc mặc định của ảnh y tế sau mười năm, và \repo{MIC-DKFZ/nnUNet} cho thấy một U-Net cấu hình tự động vẫn rất khó bị đánh bại.
+\item \vd{một hướng tấn công khác: đừng để mất chi tiết ngay từ đầu.} \gp \vn{tích chập giãn}{atrous / dilated convolution} chèn khoảng trống giữa các trọng số, mở rộng trường tiếp nhận mà không giảm độ phân giải \cite{yu2016dilated}; DeepLab dùng nó để giữ output stride ở mức 8 hoặc 16, và ghép nhiều tỉ lệ giãn song song thành \en{ASPP} \cite{chen2018deeplab}. \gia bộ nhớ và tính toán, vì kích hoạt trung gian to gấp bốn lần mỗi khi giảm output stride một nửa ở cả hai chiều. \vdm hiệu ứng lưới (gridding) khi các tỉ lệ giãn có ước chung, làm mất mẫu ở một số vị trí.
+\item \vd{decoder nặng và thiết kế đa tỉ lệ thủ công.} \gp SegFormer dùng encoder Transformer phân cấp sinh sẵn đặc trưng ở bốn tỉ lệ, rồi ghép chúng bằng một decoder chỉ gồm vài tầng MLP \cite{xie2021segformer}. \hq attention lo phần ngữ cảnh xa mà trước đây phải mua bằng atrous, nên decoder được phép rẻ. \gd đủ dữ liệu để Transformer bù lại phần inductive bias đã bỏ.
+\lk{C/13/03}{ràng buộc bởi}{bỏ bớt thiên lệch quy nạp thì phải mua lại bằng dữ liệu --- đó là lý do SegFormer đói dữ liệu hơn U-Net chứ không phải vì nó ``phức tạp hơn''.}
+\item \vd{semantic, instance và panoptic là ba bài toán với ba code base, ba loss, ba metric.} \gp Mask2Former phát biểu cả ba như \vn{phân loại mặt nạ}{mask classification}: một tập cố định \vn{truy vấn}{query}, mỗi truy vấn sinh ra một mask nhị phân cộng một nhãn lớp, ghép với ground truth bằng Hungarian matching --- đúng ý tưởng dự đoán tập hợp của DETR, chuyển sang miền mask \cite{cheng2022mask2former, kirillov2019panoptic}. \lk{C/14/02}{tiền đề}{khung truy vấn ở đây chỉ là dự đoán tập hợp của DETR chuyển sang miền mask; chưa hiểu vì sao ghép cặp một--một bỏ được NMS thì không hiểu được vì sao ba bài toán hợp nhất được.}
+Đóng góp kỹ thuật then chốt là \vn{attention có mặt nạ}{masked attention}: mỗi truy vấn chỉ chú ý vào vùng mà nó đang dự đoán, khiến hội tụ nhanh hơn nhiều so với attention toàn cục. \hq ba bài toán chỉ khác nhau ở cách hậu xử lý tập mask, không khác nhau ở mô hình. Khi ba bài toán hợp nhất được, thường là dấu hiệu ta đã tìm ra phát biểu đúng.
+\item \vd{tập nhãn cố định là ràng buộc cuối cùng.} Mọi mô hình ở trên chỉ biết những lớp có trong tập huấn luyện. \gp mô hình nền tảng nhận prompt --- SAM phân vùng theo điểm, khung hay vùng do người chỉ, không cần biết vật đó tên gì \cite{kirillov2023sam}; các hệ open-vocabulary như Grounding DINO nhận mô tả văn bản; tới 2026, SAM 3 nhận prompt ở mức khái niệm và chạy được cả trên video. \gia mô hình lớn, khó kiểm soát hành vi ở biên, và điều quan trọng với kỹ sư: đầu ra không kèm một khái niệm ``lớp'' ổn định để hệ thống phía sau dựa vào.
+\end{mach}
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  enc/.style={draw=steel,fill=bluebg,rounded corners=1.5pt,minimum height=0.55cm,align=center,inner sep=3pt},
+  dec/.style={draw=violetdark,fill=violetbg,rounded corners=1.5pt,minimum height=0.55cm,align=center,inner sep=3pt},
+  atr/.style={draw=accent,fill=amberbg,rounded corners=1.5pt,minimum height=0.55cm,align=center,inner sep=3pt},
+  e/.style={-{Latex[length=2.0mm]},draw=tiercol},
+  sk/.style={-{Latex[length=2.0mm]},draw=reddark,thick,dashed},
+  ttl/.style={font=\sffamily\bfseries\small\color{inkblue}},
+  lb/.style={font=\scriptsize\itshape,color=tiercol,align=center}]
+% ---------- U-Net ----------
+\node[ttl] at (3.0,4.6) {U-Net --- lấy lại chi tiết từ tầng nông};
+\node[enc,minimum width=3.4cm] (e1) at (0,3.6) {OS 1};
+\node[enc,minimum width=2.6cm] (e2) at (0,2.5) {OS 4};
+\node[enc,minimum width=1.8cm] (e3) at (0,1.4) {OS 16};
+\node[enc,minimum width=1.2cm] (e4) at (0,0.4) {OS 32};
+\node[dec,minimum width=1.8cm] (d3) at (6.0,1.4) {OS 16};
+\node[dec,minimum width=2.6cm] (d2) at (6.0,2.5) {OS 4};
+\node[dec,minimum width=3.4cm] (d1) at (6.0,3.6) {OS 1 --- mask};
+\draw[e] (e1)--(e2); \draw[e] (e2)--(e3); \draw[e] (e3)--(e4);
+\draw[e] (e4) -- (d3); \draw[e] (d3)--(d2); \draw[e] (d2)--(d1);
+\draw[sk] (e3)--(d3); \draw[sk] (e2)--(d2); \draw[sk] (e1)--(d1);
+\node[lb,color=reddark] at (3.0,3.05) {skip: chép biên sắc\\ từ tầng nông sang};
+\node[lb,anchor=north,text width=5.4cm] at (3.0,-0.15) {\emph{Chi tiết vẫn mất trên đường xuống --- nhưng bản sao đã kịp đi sang ngang}};
+% ---------- DeepLab ----------
+\begin{scope}[shift={(10.6,0)}]
+\node[ttl] at (3.0,4.6) {DeepLab --- không cho chi tiết mất đi};
+\node[enc,minimum width=3.4cm] (f1) at (0,3.6) {OS 1};
+\node[enc,minimum width=2.6cm] (f2) at (0,2.5) {OS 4};
+\node[atr,minimum width=2.6cm] (f3) at (0,1.4) {OS 8 --- giãn 2};
+\node[atr,minimum width=2.6cm] (f4) at (0,0.4) {OS 8 --- giãn 4};
+\node[atr,minimum width=2.2cm] (aspp) at (6.0,0.9) {ASPP\\ giãn 6/12/18 song song};
+\node[dec,minimum width=3.4cm] (o1) at (6.0,3.0) {mask, OS 8 \(\rightarrow\) 1};
+\draw[e] (f1)--(f2); \draw[e] (f2)--(f3); \draw[e] (f3)--(f4);
+\draw[e] (f4)--(aspp); \draw[e] (aspp)--(o1);
+\node[lb,color=accent,text width=3.2cm] at (3.1,1.9) {độ phân giải \emph{dừng} ở OS 8; trường tiếp nhận vẫn mở bằng giãn};
+\node[lb,anchor=north,text width=5.4cm] at (3.0,-0.15) {\emph{Trả bằng bộ nhớ: mỗi lần chia đôi OS thì kích hoạt gấp bốn}};
+\end{scope}
+\end{tikzpicture}}
+\caption{Hai lời giải đối lập cho cùng một vấn đề. U-Net chấp nhận để chi tiết mất trên đường xuống rồi chép nó sang ngang bằng skip connection; DeepLab từ chối để mất, giữ output stride (OS) ở mức 8 và mua trường tiếp nhận bằng tích chập giãn thay vì bằng thu nhỏ. Vì hai cơ chế độc lập nhau nên chúng cộng được: nhiều kiến trúc thực dụng dùng cả hai.}
+\label{fig:unet-vs-deeplab}
+\end{figure}
+
+Hình~\ref{fig:unet-vs-deeplab} là lý do nên đọc mạch trên theo trục ``chi tiết mất ở đâu'' chứ không theo trục thời gian: hai bước liền nhau trong lịch sử lại là hai hướng tấn công khác nhau, không phải cái sau thay thế cái trước.
+
+\begin{table}[H]\centering\small
+\caption{Năm cách lấy lại độ phân giải, cùng cái giá và chế độ hỏng riêng. Ba dòng đầu tấn công cùng một vấn đề từ ba phía khác nhau, nên chúng có thể kết hợp; dòng cuối đổi phát biểu chứ không đổi cơ chế.}
+\label{tab:seg-approaches}
+\begin{tabularx}{\linewidth}{@{}L{2.25cm}YYL{3.45cm}@{}}
+\toprule
+\textbf{Cách} & \textbf{Cơ chế} & \textbf{Mạnh khi nào} & \textbf{Hỏng khi nào}\\
+\midrule
+FCN & Nội suy ngược từ feature sâu & Vùng lớn, biên không quan trọng & Biên thô; vật mảnh (dây, cột) biến mất hẳn\\
+U-Net & Skip connection encoder \(\rightarrow\) decoder & Ít dữ liệu, biên rõ, ảnh y tế & Vật có kết cấu nội bộ mạnh: skip mang cả nhiễu lên\\
+Atrous / ASPP & Giữ output stride nhỏ, mở trường tiếp nhận bằng giãn & Cần ngữ cảnh xa mà vẫn cần biên & Bộ nhớ tăng mạnh; gridding nếu tỉ lệ giãn không nguyên tố cùng nhau\\
+SegFormer & Encoder phân cấp + decoder MLP & Dữ liệu nhiều, cần ngữ cảnh toàn ảnh & Dữ liệu ít; chi phí attention ở độ phân giải cao\\
+Mask2Former & Truy vấn sinh mask + Hungarian matching & Cần instance/panoptic trong một mô hình & Số truy vấn cố định; ảnh nhiều instance hơn số truy vấn thì mất im lặng\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  q/.style={draw=violetdark,fill=violetbg,rounded corners=1.5pt,minimum width=1.5cm,minimum height=0.5cm,inner sep=2pt,align=center},
+  b/.style={draw=steel,fill=bluebg,rounded corners=2pt,align=center,inner sep=4pt,text width=2.5cm},
+  o/.style={draw=accent,fill=amberbg,rounded corners=2pt,align=center,inner sep=4pt,text width=3.1cm},
+  e/.style={-{Latex[length=2.2mm]},draw=steel},
+  lb/.style={font=\scriptsize\itshape,color=tiercol,align=center}]
+\node[b] (img) at (0,1.2) {Ảnh \(\rightarrow\) backbone\\ \(\rightarrow\) feature map};
+\node[q] (q1) at (4.2,2.7) {\(q_1\)};
+\node[q] (q2) at (4.2,2.0) {\(q_2\)};
+\node[q] (qd) at (4.2,1.35) {\(\vdots\)};
+\node[q] (qn) at (4.2,0.6) {\(q_{100}\)};
+\node[b] (dec) at (7.8,1.65) {Decoder:\\ mỗi truy vấn hỏi feature map\\ (masked attention)};
+\node[o] (out) at (12.0,1.65) {Mỗi truy vấn trả về\\ \emph{một mask nhị phân}\\ \(+\) \emph{một nhãn lớp}};
+\draw[e] (img) -- (3.3,1.65);
+\draw[e] (5.1,1.65) -- (dec); \draw[e] (dec) -- (out);
+\node[o,text width=3.0cm] (t1) at (16.4,3.1) {\textbf{Semantic}: gộp mask cùng nhãn};
+\node[o,text width=3.0cm] (t2) at (16.4,1.65) {\textbf{Instance}: giữ mask của lớp đếm được};
+\node[o,text width=3.0cm] (t3) at (16.4,0.2) {\textbf{Panoptic}: giải chồng lấn rồi giữ cả hai loại};
+\draw[e,draw=accent] (out) -- (t1); \draw[e,draw=accent] (out) -- (t2); \draw[e,draw=accent] (out) -- (t3);
+\node[lb,text width=4.6cm,anchor=north] at (14.2,-0.6) {Ba bài toán \(=\) ba cách \emph{hậu xử lý cùng một tập mask}, không phải ba mô hình};
+\end{tikzpicture}}
+\caption{Khung truy vấn của Mask2Former. Mô hình không hỏi từng pixel ``bạn thuộc lớp nào'' mà đưa ra một tập cố định truy vấn, mỗi truy vấn tự nhận một vùng và một nhãn; huấn luyện ghép các truy vấn với chân trị bằng ghép cặp Hungary như DETR. Vì đơn vị được nói tới là \emph{một mask kèm một nhãn}, cả ba bài toán phân vùng chỉ còn khác nhau ở bước đọc tập mask đó, nên chúng dùng chung một mô hình và một hàm mất mát.}
+\label{fig:mask2former-query}
+\end{figure}
+
+Hình~\ref{fig:mask2former-query} làm rõ điều mà hộp trực giác ở đầu mục chỉ nói bằng lời: cái được hợp nhất không phải ba kiến trúc mà là ba \emph{cách phát biểu đầu ra}.
+
+\subsection{B. Một phép tính về cái giá của độ phân giải (The Resolution Budget)}
+Bảng~\ref{tab:seg-approaches} nói ``bộ nhớ tăng mạnh'' --- con số cụ thể đáng ghi nhớ. Với ảnh \(1024\times1024\) và một tầng đặc trưng 256 kênh: ở output stride 16, feature map là \(64\times64\times256 \approx 1{,}05\) triệu phần tử, tức \(4{,}2\) MB ở fp32. Hạ xuống output stride 8, kích thước không gian nhân đôi ở cả hai chiều nên số phần tử nhân bốn: \(16{,}8\) MB cho \emph{một} tensor. \vn{Lượt ngược}{backward pass} phải giữ kích hoạt của mọi tầng, nên hệ số bốn này nhân vào toàn bộ phần sâu của mạng. Đây là lý do rất thực tế khiến hệ thống triển khai hiếm khi chạy ở output stride 4. Nó cũng giải thích vì sao U-Net rẻ hơn nhiều so với cảm giác ban đầu: U-Net chỉ giữ đặc trưng phân giải cao ở các tầng \emph{nông}, nơi số kênh còn ít.
+
+\begin{figure}[H]\centering
+\resizebox{0.95\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  px/.style={draw=rulecol,minimum size=0.42cm,inner sep=0pt},
+  hit/.style={draw=accent,fill=amberbg,minimum size=0.42cm,inner sep=0pt},
+  lb/.style={font=\scriptsize\itshape,color=tiercol,anchor=west}]
+\node[font=\sffamily\bfseries\small\color{inkblue},anchor=west] at (-3.6,1.55) {Ba tầng cùng giãn 2};
+\foreach \i in {0,...,16}{\node[px] at (\i*0.44,1.1) {};}
+\foreach \i in {0,2,4,6,8,10,12,14,16}{\node[hit] at (\i*0.44,1.1) {};}
+\node[lb,color=reddark] at (7.9,1.1) {một nửa số pixel không bao giờ được nhìn --- hiệu ứng lưới};
+\node[font=\sffamily\bfseries\small\color{inkblue},anchor=west] at (-3.6,0.35) {Ba tầng giãn 1, 2, 3};
+\foreach \i in {0,...,16}{\node[px] at (\i*0.44,-0.1) {};}
+\foreach \i in {0,...,16}{\node[hit] at (\i*0.44,-0.1) {};}
+\node[lb,color=accent] at (7.9,-0.1) {mọi pixel đều đóng góp, cùng trường tiếp nhận};
+\node[font=\scriptsize,color=tiercol,anchor=west] at (-3.6,-0.85) {(một chiều, kernel \(3\times1\), tâm ở giữa; ô tô đậm là pixel thực sự ảnh hưởng tới đầu ra ở tâm)};
+\end{tikzpicture}}
+\caption{Hiệu ứng lưới của tích chập giãn, vẽ trên một hàng pixel. Khi mọi tầng dùng cùng tỉ lệ giãn chẵn, các vị trí lấy mẫu luôn rơi vào cùng một lớp chẵn lẻ, nên trường tiếp nhận trông thì rộng mà thực chất thưa và bỏ sót một nửa tín hiệu. Chọn dãy tỉ lệ nguyên tố cùng nhau làm các lớp dư khác nhau phủ lẫn nhau, và trường tiếp nhận trở lại đặc.}
+\label{fig:gridding}
+\end{figure}
+
+Hình~\ref{fig:gridding} là ví dụ nhỏ nhất cho thấy vì sao ``mở trường tiếp nhận'' và ``nhìn thấy mọi pixel'' là hai chuyện khác nhau.
+
+Về atrous: một kernel \(3\times3\) với tỉ lệ giãn \(r\) có trường tiếp nhận hiệu dụng \(3 + 2(r-1)\). Xếp chồng ba tầng giãn \(1, 2, 4\) cho trường tiếp nhận \(3 \to 7 \to 15\) mà không hề giảm độ phân giải. Nhưng nếu ba tầng cùng giãn \(2\), các vị trí lấy mẫu luôn rơi vào cùng một lớp chẵn lẻ. Một nửa số pixel khi đó không bao giờ được nhìn tới. Đó là hiệu ứng gridding, và cách chữa là chọn dãy tỉ lệ giãn nguyên tố cùng nhau.
+
+\subsection{C. Giới hạn và trường hợp hỏng}
+Chế độ hỏng nguy hiểm nhất của segmentation không nằm ở mô hình mà ở thước đo. \vn{giao trên hợp trung bình}{mean intersection over union, mIoU} trung bình theo \emph{lớp}, nên một lớp hiếm nhưng quan trọng (người đi bộ, vật cản nhỏ) đóng góp bằng một lớp phủ kín ảnh (bầu trời), điều này tốt; nhưng bên trong mỗi lớp, IoU trung bình theo \emph{diện tích}, nên sai vài pixel ở biên của một vùng lớn gần như không bị phạt. Hệ quả là một mô hình có mIoU \(0{,}85\) vẫn có thể cho biên răng cưa tới mức không bám nổi mép đường. Nó cũng có thể bỏ sót hoàn toàn một vật cản \(20\times20\) pixel mà chỉ mất một phần nghìn điểm. Nếu ứng dụng của bạn quan tâm tới biên hay tới vật nhỏ, mIoU là thước đo sai và phải bổ sung metric theo biên hoặc theo instance.
+\lk{B/07}{hệ quả của}{một con số tổng luôn che giấu chế độ khó; cách chữa duy nhất là báo cáo theo lát, ở đây là lát theo kích thước vật và lát theo độ dài biên.}
+
+Ba chế độ hỏng còn lại đáng nêu tên riêng:
+
+\begin{itemize}
+\item \textbf{Vật mảnh.} Dây điện, chân bàn, cột --- biến mất ở output stride lớn, và không có hậu xử lý nào lấy lại được thứ đã không được lấy mẫu. \emph{Dấu hiệu}: IoU của lớp đó gần 0 trong khi mIoU tổng vẫn cao.
+\item \textbf{Nhiều instance cùng lớp chồng lấn.} Các mô hình theo truy vấn chia sẻ một ngân sách cố định, nên phần vượt ngân sách mất im lặng --- đúng chế độ hỏng của DETR ở Mục~2, xuất hiện lại ở miền mask.
+\item \textbf{Khái niệm không ổn định ở mô hình nhận prompt.} Cùng một ảnh, hai prompt gần như đồng nghĩa cho ra hai phân vùng ở hai mức chi tiết khác nhau (cái cửa, hay tay nắm cửa?). Hệ thống hạ nguồn giả định ``một vật, một mask'' sẽ hỏng theo cách rất khó tái hiện, vì lỗi phụ thuộc câu chữ chứ không phụ thuộc ảnh.
+\end{itemize}
+
+\begin{cannho}
+Đừng nhớ danh sách kiến trúc; hãy nhớ rằng mọi kiến trúc segmentation đều là một câu trả lời cho cùng một câu hỏi ``chi tiết không gian đã mất ở đâu, và lấy lại bằng cách nào''. Skip lấy lại từ tầng nông, atrous không cho mất, attention học lại quan hệ xa, query đổi hẳn đơn vị được nói tới. \T{3}
+\end{cannho}
+
+\subsection{D. Kết nối}
+\ptr{C/14-bai-toan-cv-loi/02-detection-mot-giai-doan} là tiền đề của phần Mask2Former: nếu chưa hiểu vì sao Hungarian matching bỏ được NMS thì khung truy vấn ở đây chỉ là một kiến trúc lạ. \ptr{C/13-kien-truc-backbone/03-vit-va-inductive-bias} giải thích cái giá dữ liệu mà SegFormer phải trả. \ptr{C/18-pretraining-va-foundation} là nơi bàn kỹ về bước dịch chuyển sang mô hình nền tảng và kinh tế học của nó. \ptr{C/15-thi-giac-khong-thoi-gian/03-flow-tracking-va-rang-buoc} nối tiếp trực tiếp: một mô hình segmentation per-frame có mIoU cao vẫn cho video nhấp nháy, và lý do là mô hình này chưa hề có khái niệm thời gian.
+
+\begin{tukiem}
+\item Vì sao nội suy ngược từ feature ở output stride 32 không thể tạo lại biên sắc, dù ta dùng phép nội suy tốt đến đâu?
+\item U-Net và DeepLab tấn công cùng một vấn đề từ hai phía nào, và trong tình huống nào thì cách của U-Net tốt hơn hẳn?
+\item Ba tầng atrous cùng tỉ lệ giãn 2 gây ra chuyện gì, và vì sao chọn tỉ lệ nguyên tố cùng nhau lại chữa được?
+\item Vì sao việc semantic, instance và panoptic hợp nhất được vào một mô hình lại là bằng chứng cho thấy phát biểu bài toán đúng, chứ không chỉ là tiện lợi kỹ thuật?
+\item Mô hình của bạn đạt mIoU \(0{,}85\) nhưng bỏ sót vật cản nhỏ trên đường. Vì sao metric không phát hiện được, và bạn thay bằng metric nào?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

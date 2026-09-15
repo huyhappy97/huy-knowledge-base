@@ -1,0 +1,177 @@
+\documentclass[../../deep_learning.tex]{subfiles}
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: C/13, C/14, B/11. Mức độ: cốt lõi (đặc biệt với hệ thời gian thực).
+\begin{document}
+\chapter{Thị giác chuỗi và không-thời gian (Sequential and Spatio-Temporal Vision)}
+\ptrtarget{C/15}\ptrtarget{C/15-thi-giac-khong-thoi-gian}
+\dependency{\ptr{C/13-kien-truc-backbone} (CNN, attention); \ptr{C/14-bai-toan-cv-loi} (detection, segmentation --- tracking dựng thẳng trên detection); \ptr{B/11-gioi-han-tinh-toan} (ngân sách bộ nhớ và tính toán); \ptr{B/07-chia-du-lieu-va-danh-gia} (chọn metric, rò rỉ dữ liệu). \T{3}}
+
+\begin{tomtat}
+Chương này hỏi: thêm chiều thời gian vào ảnh thì phát sinh những vấn đề nào mà ảnh tĩnh không có? Câu trả lời là đúng ba vấn đề, và ba mục của chương tương ứng với ba vấn đề đó. Thứ nhất, đầu ra có độ dài thay đổi --- đây là nơi \en{attention} ra đời. Thứ hai, chi phí bộ nhớ nhân theo số khung hình. Thứ ba, mô hình chạy trực tuyến không được nhìn khung hình tương lai. Đọc xong bạn thiết kế được một hệ thị giác thời gian thực bắt đầu từ ràng buộc chứ không từ bảng xếp hạng: biết kiến trúc nào bị loại ngay, ngân sách bộ nhớ phải chia thế nào, và metric nào không đánh lừa. Nếu chỉ nhớ một điều: hai bài toán khó nhất của thị giác thời gian là tương ứng điểm và liên kết dữ liệu. Đó đúng là hai bài toán mà một hệ SLAM giải ở mỗi khung hình. Phần lớn chương này vì thế là dịch từ vựng, không phải học lại từ đầu.
+\end{tomtat}
+
+\begin{nentang}
+\kn{khung hình (frame) và clip}{khung hình là một ảnh tại một thời điểm; clip là một đoạn gồm \(T\) khung liên tiếp, và là đơn vị đầu vào của mô hình video --- tương đương ``một ảnh'' của mô hình ảnh.}
+\kn{trực tuyến (online / streaming)}{chế độ chạy mà dữ liệu đến dần theo thời gian và phải trả kết quả ngay, khác với chế độ ngoại tuyến được xem toàn bộ video rồi mới quyết định.}
+\kn{nhân quả (causal)}{tính chất của một mô hình chỉ dùng thông tin tới thời điểm hiện tại. Mô hình hai chiều --- nhìn cả trước lẫn sau --- không nhân quả, nên không dùng được cho hệ trực tuyến.}
+\kn{độ trễ (latency) và thông lượng (throughput)}{độ trễ là thời gian từ lúc khung hình vào tới lúc có kết quả; thông lượng là số khung xử lý được mỗi giây. Hai đại lượng này độc lập: gộp batch làm thông lượng tăng nhưng độ trễ tăng theo.}
+\kn{optical flow}{trường vector cho biết mỗi pixel dịch chuyển đi đâu giữa hai khung hình --- biểu diễn tường minh của chuyển động, và là dạng dày đặc của bài toán tương ứng điểm.}
+\kn{tracking và track ID}{tracking là giữ danh tính của từng đối tượng qua thời gian; track ID là mã số phải giữ nguyên suốt thời gian đối tượng xuất hiện. Đánh tráo mã số giữa hai đối tượng gọi là \emph{ID switch}.}
+\kn{attention}{cơ chế cho bên cần thông tin tính một bộ trọng số trên các phần của bên có thông tin rồi lấy tổ hợp có trọng số --- tức hoãn việc nén dữ liệu lại cho tới khi biết đang cần gì.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao một mô hình đạt mIoU cao trên từng khung hình vẫn cho ra video nhấp nháy, và vì sao không có thước đo phổ biến nào bắt được lỗi đó?}
+\h{\en{attention} thường được kể như một phát minh của Transformer. Vậy nó thực sự ra đời để giải quyết nút thắt nào, và vì sao nút thắt đó xuất hiện lần đầu ở bài toán mô tả ảnh chứ không ở phân loại?}
+\h{Một hệ tracking có thể đánh tráo danh tính đối tượng liên tục mà chỉ số MOTA gần như không suy chuyển. Công thức nào cho phép chuyện đó xảy ra?}
+\h{Vì sao ``thời gian là trục thứ ba của tensor'' là một câu nói sai, dù về mặt lập trình nó hoàn toàn đúng?}
+\h{Nếu bạn tăng gấp bốn độ dài clip mà giữ nguyên bộ nhớ, bạn phải trả bằng gì --- và vì sao ba cách trả giá đó không hề tương đương?}
+\end{khoigoi}
+
+Chương 14 xử lý từng ảnh như một ốc đảo. Đó là một đơn giản hoá rất tiện nhưng rất xa thực tế. Camera không sinh ra ảnh rời rạc mà sinh ra một dòng liên tục. Phần lớn thông tin hữu ích chỉ tồn tại \emph{giữa} các khung hình, không nằm trong khung nào cả. Một vật đang tiến lại gần, một người vừa ngã, cùng một chiếc xe hay hai chiếc khác nhau --- không câu nào trong số đó trả lời được từ một ảnh tĩnh.
+
+Thêm chiều thời gian không phải là thêm một chiều nữa cho tensor. Nó sinh ra đúng ba vấn đề mới, và ba vấn đề đó độc lập với nhau tới mức mỗi cái đáng một mục riêng. Thứ nhất, \textbf{đầu ra có thể có độ dài thay đổi}: mô tả một cảnh cần một câu, không phải một nhãn, và việc phải nén cả ảnh vào một vector trước khi sinh câu là nút thắt đã khai sinh ra attention trong thị giác. Thứ hai, \textbf{chi phí nhân theo số khung hình}. Ngân sách bộ nhớ của một mô hình ảnh vốn đã chật, giờ bị chia tiếp cho ba chiều: độ dài clip, độ phân giải, batch size. Mọi lựa chọn kiến trúc vì thế là lựa chọn hy sinh chiều nào. Thứ ba, \textbf{ràng buộc nhân quả}: hệ chạy trực tuyến không được nhìn khung hình tương lai, và ràng buộc đó loại bỏ nguyên một lớp kiến trúc trước khi độ chính xác kịp lên tiếng.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  src/.style={draw=inkblue,fill=bluebg,rounded corners=2pt,align=center,inner sep=5pt,text width=3.0cm,minimum height=1.1cm},
+  pb/.style={draw=reddark,fill=redbg,rounded corners=2pt,align=center,inner sep=5pt,text width=3.5cm,minimum height=1.35cm},
+  sc/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,align=center,inner sep=5pt,text width=3.5cm,minimum height=1.35cm},
+  e/.style={-{Latex[length=2.4mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=tiercol,align=center,text width=3.9cm}]
+\node[src] (t) at (0,0) {Thêm chiều\\ thời gian vào ảnh};
+\node[pb] (p1) at (5.4,3.0)  {Đầu ra có\\ \emph{độ dài thay đổi}};
+\node[pb] (p2) at (5.4,0)    {Chi phí \emph{nhân theo}\\ số khung hình};
+\node[pb] (p3) at (5.4,-3.0) {Không được nhìn\\ \emph{khung hình tương lai}};
+\node[sc] (s1) at (11.4,3.0)  {\textbf{Mục 1}\\ nghẽn cổ chai và attention};
+\node[sc] (s2) at (11.4,0)    {\textbf{Mục 2}\\ biểu diễn video và ngân sách};
+\node[sc] (s3) at (11.4,-3.0) {\textbf{Mục 3}\\ flow, tracking, nhân quả};
+\draw[e] (t) -- (p1); \draw[e] (t) -- (p2); \draw[e] (t) -- (p3);
+\draw[e] (p1) -- node[lb,above]{giải bằng một \emph{mẫu thiết kế}} (s1);
+\draw[e] (p2) -- node[lb,above]{không có lời giải, chỉ có \emph{kế toán}} (s2);
+\draw[e] (p3) -- node[lb,above]{không có lời giải, nó \emph{loại phương án}} (s3);
+\draw[-{Latex[length=2.2mm]},draw=reddark,dashed,thick] (s3) to[bend right=26] node[lb,right,color=reddark,text width=3.4cm]{ràng buộc nhân quả và ngân sách chi phối cả hai mục trên} (s2);
+\draw[-{Latex[length=2.2mm]},draw=tiercol,dashed] (s1) to[bend left=20] node[lb,left,text width=2.9cm]{attention quay lại làm nguồn chi phí bậc hai} (s2);
+\end{tikzpicture}}
+\caption{Bản đồ chương: ba mục không phải ba chủ đề rời mà là ba \emph{loại vấn đề} khác nhau mà chiều thời gian sinh ra, và ba loại câu trả lời khác nhau về bản chất. Mũi tên đứt cho thấy ba nhánh không độc lập: ràng buộc nhân quả và ngân sách bộ nhớ quyết định cách chữa nào ở mục~3 là khả thi, còn attention của mục~1 quay lại chính là nguồn chi phí bậc hai của mục~2.}
+\label{fig:map-ch15}
+\end{figure}
+
+Hình~\ref{fig:map-ch15} nên xem trước khi đọc, vì nó cho biết mục nào trả lời loại câu hỏi nào --- và vì thế mục nào đáng đọc kỹ với bài toán cụ thể của bạn.
+
+Ba mục của chương lần lượt xử lý ba vấn đề đó, theo thứ tự phụ thuộc chứ không theo thứ tự lịch sử. Mục~1 đi từ sinh mô tả ảnh kiểu CNN--RNN tới ``Show, Attend and Tell''. Nên đọc nó \emph{trước} phần Transformer của chương 13. Lý do là nó cho thấy attention ra đời để gỡ một nút thắt cụ thể, không phải để làm kiến trúc đẹp hơn. Mục~2 chuyển sang biểu diễn video và biến ngân sách bộ nhớ thành những con số tính được bằng tay, vì đó là ràng buộc mà mọi quyết định phía sau phải sống chung. Mục~3 gom ba bài toán mà một kỹ sư robot gặp hằng ngày --- optical flow, tracking, và tính nhất quán thời gian --- rồi kết thúc bằng ràng buộc nhân quả, thứ chi phối tất cả.
+
+Với người đọc đến từ hình học và SLAM, chương này gần chuyên môn hơn bất kỳ chương nào khác trong Phần C, và cách đọc hiệu quả nhất là đọc như một cuốn từ điển đối chiếu. Optical flow là bài toán tương ứng điểm ở dạng dày đặc, với đúng bài toán khẩu độ và đúng ma trận cấu trúc mà bạn dùng để chọn đặc trưng góc. Tracking là bài toán liên kết dữ liệu, với đúng bộ đôi dự đoán bằng bộ lọc trạng thái cộng gán tối ưu. Còn ràng buộc nhân quả và ngân sách mili-giây thì bạn đã sống cùng nó hằng ngày. Cái mới ở đây không phải cấu trúc bài toán mà là các thành phần học được đặt vào từng vị trí, cùng với câu hỏi quen thuộc: mỗi lần thay một khối hình học bằng một khối học được thì ta mua được độ bền gì và mất đi tính chất gì.
+
+\begin{table}[H]\centering\small
+\caption{Từ điển đối chiếu cho người đến từ SLAM. Cột giữa và cột phải là \emph{cùng một bài toán} với hai truyền thống thuật ngữ khác nhau; chỉ cột cuối là thứ thực sự mới.}
+\label{tab:slam-video-doi-chieu}
+\begin{tabularx}{\linewidth}{@{}L{2.8cm}L{4.6cm}Y@{}}
+\toprule
+\textbf{Bài toán} & \textbf{Tên trong SLAM / hình học} & \textbf{Tên trong thị giác học sâu, và cái mới}\\
+\midrule
+Tương ứng điểm & Ghép đặc trưng, KLT, tìm kiếm dọc đường epipolar & Optical flow dày đặc; cái mới là học được prior về chuyển động nên vùng không kết cấu cũng có đáp án\\
+Liên kết dữ liệu & Ghép đặc trưng với điểm bản đồ, cổng lọc Mahalanobis, RANSAC & Tracking-by-detection; cái mới là dùng thêm đặc trưng ngoại hình học được làm chi phí ghép\\
+Dự đoán trạng thái & Bộ lọc Kalman, mô hình chuyển động hằng vận tốc & Vẫn là Kalman trong đa số bộ tracker; cái mới nằm ở phần đo, không ở phần dự đoán\\
+Chọn đặc trưng tốt & Giá trị riêng nhỏ nhất của ma trận cấu trúc & Cùng ma trận đó xuất hiện trong Lucas--Kanade; mô hình học sâu thay tiêu chí này bằng khối tương quan\\
+Nhận diện nơi đã qua & Túi từ trực quan, kiểm chứng hình học & Nhúng toàn cục cộng bước quay lại đặc trưng --- đúng cấu trúc của attention\\
+Ngân sách thời gian thực & Giới hạn số vòng lặp tối ưu, kích thước cửa sổ trượt & Số bước tinh chỉnh của RAFT, độ dài clip, cửa sổ nhân quả\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng~\ref{tab:slam-video-doi-chieu} nên đọc trước cả ba mục. Nó cho biết chỗ nào bạn được phép đọc lướt vì cấu trúc bài toán đã quen. Nó cũng chỉ ra chỗ phải đọc kỹ: nơi một thành phần học được thay vào, mang theo giả định mới.
+
+\subfile{00-map}
+\subfile{01-dau-ra-do-dai-thay-doi/dau-ra-do-dai-thay-doi}
+\subfile{02-bieu-dien-video/bieu-dien-video}
+\subfile{03-flow-tracking-va-rang-buoc/flow-tracking-va-rang-buoc}
+
+\section{Thực hành}
+Chương này có một đặc điểm may mắn: mọi khẳng định trong đó đều kiểm chứng được trên một video 60 giây và một GPU tầm trung. Hãy tận dụng điều đó. Và hãy tự tay làm hỏng hệ thống: các bài dưới đây được thiết kế để bạn quan sát \emph{metric nào tụt trước}. Đó mới là thứ dạy bạn về metric.
+
+\begin{description}
+\item[Repo và tài nguyên.] Tracking: \repo{ifzhang/ByteTrack} (đơn giản, mạnh, đọc được trong một buổi), \repo{NirAharon/BoT-SORT}, và \repo{mikel-brostrom/boxmot} nếu muốn thử nhiều bộ liên kết trên cùng một detector. Phân vùng và bám trong video: SAM 3. Bám điểm dày: \repo{facebookresearch/co-tracker}. Optical flow: \repo{princeton-vl/RAFT} và \repo{autonomousvision/unimatch}. Nhận dạng hành động: \repo{open-mmlab/mmaction2}, VideoMAE-V2, InternVideo. Video qua mô hình ngôn ngữ--thị giác: Qwen3-VL (định vị trong video dài), Molmo2 (mở cả dữ liệu, theo dõi đối tượng qua khung hình). Đánh giá: \repo{JonathonLuiten/TrackEval} --- đây là thứ đáng đầu tư thời gian nhất trong danh sách, vì nó tính HOTA đúng cách và tách được lỗi phát hiện khỏi lỗi liên kết. Danh sách này chốt tại tháng 9/2026 và các tên mô hình dẫn đầu sẽ cũ trong 6--12 tháng, trong khi hạ tầng đánh giá như TrackEval thì bền hơn nhiều.
+\item[Câu hỏi kiểm tra hiểu.] Vì sao MOTA có thể cao trong khi hệ thống liên tục đổi mã số đối tượng, và HOTA sửa điều đó bằng cơ chế nào? Một mô hình phân vùng đạt mIoU \(0{,}85\) nhưng video nhấp nháy --- ba cách xử lý là gì, và mỗi cách trả giá bằng gì? Nếu bạn phải chạy trực tuyến với ngân sách 30\,ms mỗi khung hình, những họ kiến trúc nào trong chương này bị loại ngay từ đầu, và vì lý do gì?
+\item[Mini project (vài giờ đến hai ngày).] Ghép một detector với ByteTrack trên một video 60 giây, đánh giá bằng TrackEval để có cả MOTA lẫn HOTA. Sau đó \emph{cố tình làm hỏng} detector bằng cách hạ dần ngưỡng tin cậy, và ghi lại metric nào tụt trước, tụt bao nhiêu. Kết thúc bằng một đoạn giải thích vì sao thứ tự tụt lại như vậy --- đó là bài học thật của bài tập này.
+\end{description}
+
+\begin{onbai}
+\ar[3]{Nghẽn cổ chai thông tin}{Chỗ mà hệ thống nén dữ liệu có cấu trúc thành một vector cố định \emph{trước khi} biết sẽ cần phần nào. Trong sinh mô tả ảnh, đó là việc nén lưới \(14\times14\times512\) thành 512 số, tỉ lệ 196:1, xoá sạch thông tin ``đặc trưng này nằm ở đâu''.}
+\ar[3]{Attention}{Phép trung bình có trọng số trên các phần của nguồn, với trọng số phụ thuộc vào thứ đang cần. Nó vẫn nén thành một vector, nhưng nén lại một lần cho mỗi bước đầu ra. Gộp trung bình toàn cục là trường hợp riêng khi mọi trọng số bằng nhau.}
+\ar[2]{Vì sao gộp trung bình toàn cục làm hỏng sinh mô tả ảnh?}{Vì nó lấy trung bình theo không gian, nên xoá thông tin vị trí. Câu ``con chó bên trái người đàn ông'' cần đúng thông tin đó. Triệu chứng là mô hình bịa chi tiết hợp lý thay vì mô tả cái có thật.}
+\ar[3]{Kích hoạt}{Tensor giá trị trung gian mà mỗi tầng sinh ra, phải giữ trong bộ nhớ vì lượt ngược cần tới. Một clip 16 khung \(224\times224\times64\) ở fp32 chiếm khoảng 205\,MB cho \emph{một} tensor ở batch 1. Đây mới là thứ làm tràn bộ nhớ, không phải số trọng số.}
+\ar[3]{Ngân sách bộ nhớ}{Lượng kích hoạt tỉ lệ với độ dài clip \(\times\) độ phân giải\(^2\) \(\times\) batch. Vì tích của ba đại lượng bị phần cứng chặn, mọi lựa chọn kiến trúc video thực chất là chọn hy sinh chiều nào.}
+\ar[2]{(2+1)D}{Tách kernel 3D thành một kernel chỉ theo không gian rồi một kernel chỉ theo thời gian. Chọn số kênh trung gian \(M=2{,}25\,C\) thì tổng tham số bằng bản 3D. Lợi ích đến từ một hàm kích hoạt thêm vào giữa, không từ sức chứa.}
+\ar[2]{SlowFast}{Hai nhánh chạy trên cùng video: nhánh chậm ít khung nhưng nhiều kênh để nắm ngữ nghĩa, nhánh nhanh nhiều khung nhưng ít kênh để nắm chuyển động. Nhận định nền là ngữ nghĩa đổi chậm còn chuyển động đổi nhanh; nếu nhận định đó sai thì lợi thế chi phí biến mất.}
+\ar[2]{Vì sao chi phí video transformer là bậc hai theo độ dài clip?}{Vì attention tính quan hệ giữa mọi cặp token, và số token tỉ lệ với số khung. Một ảnh có 196 token cho ma trận \(3{,}8\times10^4\) ô; clip 16 khung có 3136 token cho \(9{,}8\times10^6\) ô, gấp 256 lần.}
+\ar[2]{Mô hình 3D chỉ hơn baseline một khung hình 2 điểm --- nghĩa là gì?}{Nhiều khả năng tập dữ liệu đoán đúng được từ bối cảnh một khung, tức nó không đo thông tin thời gian. Phân biệt bằng cách chạy thêm trên dữ liệu cần thứ tự, ví dụ phân biệt mở với đóng; nếu baseline sập ở đó thì phép đo mới có nghĩa.}
+\ar[3]{Dòng quang}{Trường vector cho biết mỗi pixel của khung này nằm ở đâu trong khung kia. Giả định gốc là độ sáng không đổi, nên nó hỏng khi tự động phơi sáng, đèn nhấp nháy hay bề mặt bóng làm giá trị sáng đổi.}
+\end{onbai}
+
+\begin{onbai}[Active recall --- phần 2]
+\ar[3]{Bài toán khẩu độ}{Một phương trình độ sáng nhưng hai ẩn, nên qua một cửa sổ nhỏ chỉ đo được thành phần chuyển động vuông góc với cạnh. Đây là thiếu thông tin thật, không phải lỗi thuật toán, nên mọi cách chữa đều là mượn thêm ràng buộc từ nơi khác.}
+\ar[2]{Vì sao phải chọn góc chứ không chọn cạnh để bám?}{Vì nghiệm bình phương tối thiểu của Lucas--Kanade cần ma trận \(A^{\!\top}\!A\) không suy biến, tức cửa sổ phải có gradient theo hai hướng độc lập. Trên một cạnh lý tưởng, giá trị riêng nhỏ nhất bằng 0 và flow dọc cạnh không xác định.}
+\ar[2]{RAFT}{Bộ ước lượng dòng quang dùng khối tương quan toàn cặp cộng một số vòng tinh chỉnh cố định bằng GRU. Nó bỏ được kim tự tháp nên xử lý tốt chuyển động lớn; giá là khối tương quan cỡ 190\,MB ở \(1/8\) độ phân giải, và số vòng lặp thành núm vặn độ trễ.}
+\ar[2]{Vì sao kim tự tháp thô--tới--mịn làm mất vật nhỏ chuyển động nhanh?}{Vì thu nhỏ ảnh làm vật nhỏ tụt xuống dưới một pixel ở tầng thô. Nó nhận chuyển động của nền, và các tầng mịn hơn chỉ tinh chỉnh quanh nghiệm sai đó nên không bao giờ sửa lại được.}
+\ar[3]{Liên kết dữ liệu}{Bước quyết định phép đo nào ở khung này ứng với đối tượng nào đã biết. Trong tracking là ghép hộp với track, trong SLAM là ghép đặc trưng với điểm bản đồ. Đây là chỗ hệ thống hỏng, chứ không phải bước phát hiện.}
+\ar[2]{HOTA}{Thước đo tracking tách riêng chất lượng phát hiện (DetA) và chất lượng liên kết (AssA), rồi lấy trung bình nhân \(\sqrt{\mathrm{DetA}\cdot\mathrm{AssA}}\). Vì là trung bình nhân, không thành phần nào bù đắp được cho thành phần kia.}
+\ar[2]{Vì sao MOTA che được lỗi đổi mã số?}{Vì phát hiện sót và phát hiện thừa đếm trên từng khung cho từng vật, còn mỗi lần đổi mã chỉ đếm một lần. Với 1000 vật--khung, giảm số lần đổi mã từ 40 xuống 20 chỉ nâng MOTA từ \(0{,}88\) lên \(0{,}90\).}
+\ar[3]{Cửa sổ nhân quả}{Toàn bộ dữ liệu tới thời điểm hiện tại mà một hệ trực tuyến được phép dùng. Nó loại thẳng mọi kiến trúc hai chiều và mọi phép làm mượt nhìn về phía trước. Thêm nữa, độ trễ xử lý khiến câu trả lời luôn nói về một quá khứ gần.}
+\ar[2]{mIoU từng khung cao nhưng video nhấp nháy --- nghĩa là gì?}{Mô hình chạy độc lập trên từng khung và hàm mất mát không phạt việc đổi dự đoán giữa hai khung gần giống nhau. Phân biệt với lỗi phát hiện bằng cách đo độ ổn định giữa các khung liên tiếp, không đo mIoU.}
+\ar[1]{Bám mất dấu sau khi vật bị che vài giây --- nguyên nhân?}{Độ bất định của mô hình chuyển động phình ra, nên cổng lọc hoặc quá rộng và ghép bừa, hoặc quá hẹp và mất dấu. Không có giá trị ngưỡng nào thoát khỏi đánh đổi này; chỉ thêm thông tin ngoại hình mới cứu được.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{\repo{RAFT} và các bản kế thừa}{Khối tương quan toàn cặp cộng tinh chỉnh lặp; số vòng lặp làm núm vặn độ trễ}{Vẫn là kiến trúc tham chiếu của dòng quang học sâu tính tới 9/2026}
+\ud{\repo{ByteTrack}, \repo{BoT-SORT}}{Tracking-by-detection: bộ lọc Kalman dự đoán, thuật toán Hungary ghép cặp, và ý ``đừng vứt phát hiện điểm thấp''}{Được dùng rộng rãi trong hệ đếm và giám sát thực tế}
+\ud{\repo{TrackEval}}{Hiện thực HOTA --- tách chất lượng phát hiện khỏi chất lượng liên kết thay vì gộp vào một số}{Hạ tầng đánh giá; bền hơn mọi tên mô hình trong danh sách này}
+\ud{SAM 3 (2026) cho video}{Phân vùng theo prompt cộng bám danh tính qua khung hình --- đúng bài toán liên kết dữ liệu, chỉ khác là đơn vị được liên kết là mask}{Ranh giới giữa segmentation và tracking đang mờ dần}
+\ud{\repo{co-tracker}}{Bám điểm dày qua thời gian; nối trực tiếp bài toán tương ứng điểm với bài toán giữ danh tính}{Hữu ích khi bạn cần tương ứng dài hạn chứ không chỉ giữa hai khung liên tiếp}
+\ud{Kiến trúc SlowFast và các bản kế thừa}{Ý ``ngữ nghĩa thay đổi chậm, chuyển động thay đổi nhanh nên không cần cùng tốc độ lấy mẫu''}{Vẫn xuất hiện trong nhiều mô hình video hai nhánh; tên mô hình dẫn đầu thì đổi liên tục}
+\end{ungdung}
+
+\begin{duan}{Dòng quang hay mô tả đặc trưng --- ngưỡng chuyển động nào làm mỗi bên gãy?}{1--2 ngày}
+\dmt đo trực tiếp thứ mà cả chương chỉ nói bằng lời: hai cách giải bài toán tương ứng điểm --- bám theo dòng quang và ghép theo mô tả đặc trưng --- gãy ở đâu, và ngưỡng gãy đó nằm ở độ lớn chuyển động nào. Đây chính là quyết định liên kết dữ liệu mà frontend SLAM của bạn phải đưa ra ở mỗi khung hình.
+\ddl một chuỗi EuRoC có dải chuyển động rộng (chuỗi ``khó'' như V2\_03 là lựa chọn tốt vì nó có cả đoạn chậm lẫn đoạn lắc mạnh và mờ). Chân trị tương ứng điểm không có sẵn, nên dùng \emph{kiểm tra vòng} làm thước đo thay thế: ghép từ khung \(t\) sang \(t+1\) rồi ghép ngược lại, cặp nào quay về đúng vị trí ban đầu trong ngưỡng một pixel thì tính là ghép đúng.
+\dbc (1) trích một tập đặc trưng góc chung cho cả hai phương pháp trên mỗi khung hình, để hai bên xuất phát từ cùng một tập điểm; (2) nhánh A: bám các điểm đó sang khung sau bằng dòng quang (KLT có kim tự tháp, hoặc \repo{RAFT} rồi lấy mẫu tại các điểm); nhánh B: tính mô tả đặc trưng và ghép theo khoảng cách gần nhất có kiểm tra tỉ số; (3) với mỗi cặp khung hình, tính độ lớn chuyển động trung vị (từ chân trị tư thế, hoặc từ chính trung vị dòng quang) và tỉ lệ ghép đúng theo kiểm tra vòng; (4) chia các cặp khung hình thành các nhóm theo độ lớn chuyển động và vẽ tỉ lệ ghép đúng theo nhóm cho cả hai nhánh.
+\dxk bạn có một đồ thị tỉ lệ ghép đúng theo độ lớn chuyển động, hai đường cho hai phương pháp. Bạn chỉ ra được bằng số ngưỡng mà mỗi đường bắt đầu sụt, tính bằng pixel dịch chuyển trung vị. Và bạn giải thích được cơ chế: dòng quang gãy vì khai triển bậc nhất hết hiệu lực và kim tự tháp làm mất vật nhỏ, còn mô tả đặc trưng gãy vì mờ chuyển động phá kết cấu cục bộ.
+\dnv \ptr{C/15/03} cho cơ chế của cả hai bên; \ptr{A/01} cho lý do ma trận cấu trúc quyết định điểm nào bám được; \ptr{E/24} cho cách trình bày kết quả; dùng lại đúng chuỗi và đúng harness của mini project chương 14.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì hàm mất mát của mô hình per-frame không có số hạng nào phạt việc dự đoán đổi qua đổi lại giữa hai khung gần như giống nhau; và mIoU tính độc lập trên từng khung nên trung bình của nhiều khung nhấp nháy vẫn cao. Muốn thấy lỗi đó phải đo sự ổn định \emph{giữa} các khung, thứ chưa được chuẩn hoá thành một thước đo phổ biến.}
+\tl{Nó ra đời để gỡ nghẽn cổ chai thông tin: cả ảnh bị nén vào một vector trước khi biết câu sẽ nói gì. Nút thắt này không xuất hiện ở phân loại vì ở đó đầu ra chỉ có một câu hỏi duy nhất và một vector là đủ; nó chỉ lộ ra khi đầu ra gồm nhiều bước, mỗi bước cần một phần khác nhau của ảnh.}
+\tl{Vì \(\mathrm{MOTA} = 1-(\mathrm{FN}+\mathrm{FP}+\mathrm{IDSW})/\mathrm{GT}\) đếm phát hiện sót và phát hiện thừa \emph{trên từng khung cho từng vật}, nhưng mỗi lần đổi mã số chỉ được đếm một lần. Với nghìn vật--khung, giảm một nửa số lần đổi mã chỉ nâng MOTA vài phần trăm điểm. HOTA sửa bằng trung bình nhân \(\sqrt{\mathrm{DetA}\cdot\mathrm{AssA}}\), nên không thành phần nào bù cho thành phần kia.}
+\tl{Vì trục thời gian có hướng: đảo ngược nó thì ``mở'' thành ``đóng'', trong khi lật trục \(x\) vẫn cho một ảnh hợp lệ. Nó lại còn có đơn vị khác hẳn hai trục kia. Vậy không có lý do gì để cùng một kernel \(3\times3\times3\) là kích thước hợp lý ở cả ba trục. Hai bất đối xứng đó là nguyên nhân sâu xa của mọi thiết kế tách trục.}
+\tl{Bằng độ phân giải hoặc bằng batch, theo quan hệ \(R \propto 1/\sqrt{TB}\). Ba cách không tương đương: giảm batch làm hỏng thống kê của chuẩn hoá theo batch, giảm độ phân giải làm mất vật nhỏ vĩnh viễn, còn giảm độ dài clip thì làm mất chính thông tin thời gian mà bạn đang trả tiền để có.}
+\end{traloi}
+
+\begin{dongian}
+Hãy tưởng tượng bạn ngồi trước một cái bàn nhỏ, và cứ mỗi một phần ba mươi giây lại có người đặt thêm lên bàn một tấm ảnh chụp cùng một hành lang. Nhìn một tấm ảnh, bạn nói được ``có một người'' --- nhưng để nói ``người đó đang bước tới'' hoặc ``vẫn là người lúc nãy chứ không phải người khác'', bạn buộc phải đặt vài tấm cạnh nhau và so.
+
+Mẹo thì đơn giản: so từng chỗ trên tấm này với chỗ tương ứng trên tấm kia. Hoặc so từng điểm nhỏ, để biết mọi thứ dịch đi đâu; hoặc so cả một vùng, để nối được ``cái hộp này'' ở tấm trước với ``cái hộp kia'' ở tấm sau. Việc nối đó, chứ không phải việc nhìn thấy, mới là phần khó.
+
+Cái giá gồm ba khoản, và cả ba đều đắt. Thứ nhất, mặt bàn có hạn: muốn để bốn mươi tấm thay vì mười tấm thì phải in ảnh nhỏ lại, mà ảnh nhỏ thì mất những vật bé. Thứ hai, các tấm ảnh của tương lai chưa được chụp, nên bạn chỉ được dùng những gì đã có tới lúc này --- mọi cách làm cần ``xem hết rồi mới nói'' đều bị loại ngay. Thứ ba, đến khi bạn nói xong thì người trong ảnh đã bước thêm mấy bước, nên câu trả lời của bạn luôn nói về một quá khứ gần.
+
+\chuadongian{ngưỡng chuyển động mà một cách nối bắt đầu sai phụ thuộc vào kết cấu bề mặt, độ mờ và cách phơi sáng của đúng cái camera bạn dùng, nên không có con số chung để nhớ --- chỗ này bắt buộc phải tự đo.}
+\motcau{Thêm thời gian vào ảnh không tặng bạn một chiều dữ liệu, nó gửi cho bạn ba hoá đơn: bộ nhớ nhân lên, câu trả lời luôn muộn, và phần khó nhất là nối đúng vật ở tấm này với vật ở tấm kia.}
+\end{dongian}
+
+\subsection*{Tổng kết chương}
+Ba vấn đề mà chiều thời gian sinh ra hoá ra có ba câu trả lời rất khác nhau về bản chất. Đầu ra độ dài thay đổi được giải bằng một \emph{mẫu thiết kế}: giữ nguyên nguồn thông tin và hoãn việc nén lại cho tới khi có truy vấn --- và mẫu thiết kế đó, dưới cái tên attention, sau này chiếm lĩnh cả lĩnh vực. Chi phí bộ nhớ không có lời giải, chỉ có kế toán: tích của độ dài clip, độ phân giải bình phương và batch size gần như là hằng số, nên mọi kiến trúc là một cách chọn hy sinh. Ràng buộc nhân quả cũng không có lời giải, nó chỉ đơn giản loại bỏ phương án --- và loại bỏ trước khi ta kịp bàn tới độ chính xác.
+
+Bài học chung nhất thì nằm ở phần liên kết. Trong optical flow cũng như trong tracking, phần khó không phải nhìn thấy mà là ghép cặp, và trong cả hai lĩnh vực đều tồn tại một thước đo phổ biến che giấu đúng phần khó đó. Đây là biến thể của bài học ở chương 14: chi tiết không được viết trong abstract thường quyết định kết quả. Ở đây nó xuất hiện dưới dạng thước đo, không phải dưới dạng cách gán mẫu. Thói quen cần mang theo là như nhau: trước khi tin một con số, hãy hỏi nó cộng những loại lỗi nào lại với nhau và với trọng số bao nhiêu.
+
+Còn bỏ ngỏ hai hướng. Thứ nhất, toàn chương này làm việc trên mặt phẳng ảnh; khi bài toán tương ứng điểm được nâng lên không gian ba chiều với ràng buộc epipolar và độ sâu, ta bước sang \ptr{C/16-thi-giac-3d} --- và đó là chỗ mà nền hình học của bạn phát huy trực tiếp nhất. Thứ hai, mọi mô hình ở đây đều cần nhãn thời gian đắt đỏ; \ptr{C/18-pretraining-va-foundation} bàn về việc lấy giám sát từ chính cấu trúc thời gian của video, thứ có sẵn miễn phí.
+\begin{tukiem}
+\item Ba vấn đề riêng của chiều thời gian --- đầu ra độ dài thay đổi, chi phí bộ nhớ, ràng buộc nhân quả --- có xung đột với nhau không? Chỉ ra một thiết kế mà chữa vấn đề này thì làm nặng thêm vấn đề kia.
+\item Mục 1 sinh ra attention để tránh nghẽn ``nén trước, dùng sau'', còn mục 2 cho thấy chính attention nổ chi phí trên clip dài. Hai mục vì thế đẩy về hai hướng ngược nhau; bạn hoà giải thế nào cho một mô hình chạy trực tuyến?
+\item Tương ứng điểm và liên kết dữ liệu là hai bài toán mà một hệ SLAM đã giải ở mỗi khung hình. Với mỗi bài, phần nào của từ vựng SLAM dịch thẳng sang được và phần nào không, và chỗ không dịch được bắt nguồn từ giả định nào?
+\item Nhấp nháy không xuất hiện trong mIoU, đổi danh tính gần như không xuất hiện trong MOTA, và độ trễ không xuất hiện trong ``độ chính xác trên khung \(t\)''. Ba lỗ hổng đó có chung một nguyên nhân về cách xây thước đo không, và nó là gì?
+\item Cửa sổ trượt, trạng thái hồi quy và lấy mẫu thưa theo thời gian là ba cách trả giá cho việc kéo dài clip. Chúng hỏng theo ba kiểu khác nhau nào, và loại chuyển động nào phơi bày từng kiểu?
+\item Baseline chỉ nhìn một khung hình rồi gộp lại gần bằng mô hình thời gian đắt hơn nhiều. Trước khi kết luận rằng thời gian không quan trọng, bạn kiểm ba khả năng nào ở dữ liệu và ở thước đo?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

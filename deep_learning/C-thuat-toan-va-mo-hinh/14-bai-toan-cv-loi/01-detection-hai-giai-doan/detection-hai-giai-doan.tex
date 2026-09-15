@@ -1,0 +1,203 @@
+\documentclass[../../../deep_learning.tex]{subfiles}
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: C/13 (backbone, stride), B/09 (loss), B/05 (thiết kế bài toán). Mức độ: cốt lõi.
+\begin{document}
+\section{Detection hai giai đoạn nuốt dần heuristic (Two-Stage Detection)}
+\ptrtarget{C/14-bai-toan-cv-loi/01}\ptrtarget{C/14-bai-toan-cv-loi/01-detection-hai-giai-doan}\ptrtarget{C/14/01}\ptrtarget{C/14/01-detection-hai-giai-doan}
+\dependency{\ptr{C/13-kien-truc-backbone/01-dong-cnn} (feature map, stride, \vn{trường tiếp nhận}{receptive field}); \ptr{B/09-thiet-ke-ham-mat-mat} (loss đa nhiệm); \ptr{B/05-thiet-ke-bai-toan} (bộ ba đầu vào -- đầu ra -- tín hiệu giám sát).}
+
+\begin{tomtat}
+Mục này theo dấu bốn thế hệ detection hai giai đoạn: R-CNN, Fast R-CNN, Faster R-CNN với FPN, và Mask R-CNN. Chúng không phải bốn ý tưởng rời rạc, mà là bốn lần thay một bước thủ công bằng một khối học được. Đọc xong, cầm bất kỳ paper detection nào bạn cũng chỉ ra được hai thứ: khối nào nằm trong tầm với của gradient, và khối nào là heuristic cố định. Từ đó bạn đoán được bước cải tiến hợp lý tiếp theo. Đó là kỹ năng dự đoán, không phải ghi nhớ. Nếu chỉ nhớ một điều: ranh giới ``cái gì nhận được gradient'' dịch xuống qua từng thế hệ. Hai thứ sống sót được là triệt phi cực đại và cách gán mẫu. Chúng sống sót vì lý do cấu trúc, không phải ngẫu nhiên, nên gỡ chúng đòi hỏi đổi phát biểu bài toán chứ không đổi kiến trúc.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mô hình (model)}{một hàm có tham số, ánh xạ ảnh đầu vào thành dự đoán; ``huấn luyện'' là tìm bộ tham số làm dự đoán khớp nhãn nhất có thể.}
+\kn{gradient}{vector đạo hàm của hàm mất mát theo từng tham số; nó chỉ hướng phải chỉnh tham số để lỗi giảm. Một khối ``không nhận được gradient'' là khối không tự chỉnh được, dù nó gây ra lỗi.}
+\kn{backbone}{phần mạng dùng chung để biến ảnh thành \emph{feature map} --- một lưới vector đặc trưng, mỗi ô mô tả nội dung của một vùng ảnh. Phần gắn phía trên để trả lời một bài toán cụ thể gọi là \emph{head}.}
+\kn{stride}{tỉ lệ thu nhỏ giữa ảnh và feature map. Stride 16 nghĩa là một ô đặc trưng ứng với một vùng \(16\times16\) pixel ảnh, nên mọi toạ độ tính trên feature map đều thô tới 16 pixel.}
+\kn{IoU}{diện tích giao chia diện tích hợp của hai khung chữ nhật; bằng 1 khi trùng khít, 0 khi rời nhau. Đây là thước đo ``khung dự đoán có đúng chỗ không''.}
+\kn{anchor}{một khung chữ nhật mẫu, kích thước và tỉ số cạnh định sẵn, rải đều trên mọi vị trí của feature map. Mô hình không đoán khung từ số không mà đoán \emph{độ lệch} so với anchor gần nhất --- một bài toán dễ hơn nhiều.}
+\kn{proposal (đề xuất vùng)}{một vùng ảnh ứng viên ``có thể chứa vật gì đó'', sinh ra ở giai đoạn một để giai đoạn hai chỉ phải phân loại vài trăm vùng thay vì hàng chục nghìn.}
+\kn{NMS}{bước hậu xử lý xoá các khung trùng lặp: giữ khung điểm cao nhất, xoá mọi khung có IoU với nó vượt ngưỡng, lặp lại. Nó là thuật toán viết tay, không học được.}
+\kn{mAP}{thước đo chuẩn của detection: với mỗi lớp, vẽ đường precision--recall rồi lấy diện tích dưới đường đó, sau đó trung bình trên mọi lớp và trên nhiều ngưỡng IoU.}
+\end{nentang}
+
+\subsection{Đặt vấn đề}
+Phân loại ảnh có một đặc tính dễ chịu mà ta ít khi để ý: đầu ra của nó có kích thước cố định. Một ảnh vào, một vector \(K\) chiều ra, và toàn bộ bộ máy huấn luyện bằng \en{gradient} chạy trơn tru vì \vn{hàm mất mát}{loss function} được định nghĩa trên một đối tượng có hình dạng biết trước. \vn{Phát hiện vật thể}{object detection} phá vỡ đúng đặc tính đó. Số vật thể trong ảnh thay đổi từ không tới hàng trăm, mỗi vật cần một nhãn \emph{và} một vị trí, nên đầu ra là một \vn{tập hợp}{set} có lực lượng thay đổi. Không có cách hiển nhiên nào viết một hàm mất mát khả vi trên tập hợp, và đây chính là nút thắt mà toàn bộ lịch sử detection xoay quanh.
+
+Cách né đầu tiên, và trong nhiều năm là cách duy nhất, là biến bài toán tập hợp thành nhiều bài toán phân loại: đề xuất trước một tập ứng viên vùng ảnh, rồi phân loại từng ứng viên độc lập. Mẹo này giải quyết được vấn đề hình dạng đầu ra, nhưng nó đẩy độ khó sang chỗ khác --- sang câu hỏi \emph{ai sinh ra các ứng viên đó}. Trong R-CNN, câu trả lời là một thuật toán phân đoạn thủ công tên là \en{selective search}, thứ không có tham số nào học được và không bao giờ nhận được một chút \en{gradient} nào từ lỗi cuối cùng.
+
+\textbf{Học xong mục này bạn làm được gì mà trước đó không làm được?} Bạn đọc một paper detection bất kỳ và chỉ ra ngay được ba thứ: khối nào nằm trong tầm với của gradient, khối nào là heuristic cố định, và vì thế bước cải tiến hợp lý tiếp theo là gì. Đó là một kỹ năng dự đoán, không phải kỹ năng ghi nhớ.
+
+\begin{trucgiac}
+Hãy hình dung hệ thống như một xưởng máy mà một số máy được nối vào bảng điều khiển trung tâm, còn một số thì quay tay. Máy nối vào bảng điều khiển tự chỉnh lại khi sản phẩm cuối bị lỗi; máy quay tay thì không, dù nó có gây ra lỗi hay không. ``Nuốt một heuristic vào mạng'' theo nghĩa cơ học chính xác là \emph{nối thêm một máy vào bảng điều khiển}: biến một bước không khả vi, không tham số, thành một khối khả vi nhận được gradient từ hàm mất mát detection. Vì thế mỗi lần nuốt, hệ thống không chỉ nhanh hơn (bớt một công đoạn rời) mà còn chính xác hơn (thêm một khối được tối ưu cho đúng mục tiêu cuối).
+\end{trucgiac}
+
+\subsection{A. Bốn bước nuốt}
+
+\begin{mach}[Mạch 1 --- detection hai giai đoạn]
+\item \vd{không thể chấm điểm một tập hợp có lực lượng thay đổi.} \gp R-CNN cắt khoảng hai nghìn vùng ứng viên do \en{selective search} sinh ra. Mỗi vùng được warp về kích thước cố định rồi cho qua CNN để lấy đặc trưng. Một SVM phân loại, và một bộ hồi quy riêng tinh chỉnh khung \cite{girshick2014rcnn}. \gd các vùng đáng quan tâm đều nằm trong tập ứng viên; nếu selective search bỏ sót thì không gì cứu được. \gia mỗi ảnh phải chạy CNN hai nghìn lần, huấn luyện chia làm ba pha rời rạc, và không pha nào tối ưu cho mục tiêu của pha kia.
+\item \vd{hai nghìn lượt chạy CNN cho cùng một ảnh là lãng phí gần như toàn bộ.} \gp Fast R-CNN đảo thứ tự: chạy \en{backbone} \emph{một lần} trên cả ảnh, rồi với mỗi vùng ứng viên chỉ cắt phần tương ứng trên feature map bằng \en{RoIPooling} và cho qua vài tầng \vn{kết nối đầy đủ}{fully connected} \cite{girshick2015fast}. Phân loại và hồi quy khung được gộp thành một \vn{hàm mất mát đa nhiệm}{multi-task loss} duy nhất, huấn luyện một pha.
+\lk{B/09}{ràng buộc bởi}{trọng số giữa hạng thức phân loại và hạng thức hồi quy là một siêu tham số ẩn, và chương thiết kế hàm mất mát giải thích vì sao nó không thể chọn tuỳ tiện.} \gd đặc trưng dùng chung cho mọi vùng vẫn đủ tốt cho từng vùng --- đúng khi các vùng chồng lấn nhiều, và chúng chồng lấn thật. \vdm khi phần tính toán nặng đã bị loại bỏ, selective search trở thành nút cổ chai.
+\item \vd{bộ sinh đề xuất là công đoạn quay tay cuối cùng còn nặng.} \gp Faster R-CNN thay nó bằng \vn{mạng đề xuất vùng}{region proposal network, RPN}, một mạng con trượt trên chính feature map đã có, tại mỗi vị trí dự đoán độ khách quan và độ lệch khung so với một tập \en{anchor} định sẵn \cite{ren2015faster}. Vì RPN dùng chung backbone, chi phí sinh đề xuất gần như bằng không. \gd tập anchor phủ đủ dày dải tỉ lệ và tỉ số cạnh của vật thể trong dữ liệu. \gia anchor trở thành một \vn{siêu tham số}{hyperparameter} nhạy và \emph{mang theo thống kê của tập dữ liệu gốc}; đổi miền ảnh thì phải thiết kế lại.
+\item \vd{một feature map duy nhất không phục vụ nổi mọi tỉ lệ.} Feature ở tầng sâu có ngữ nghĩa mạnh nhưng độ phân giải thô, feature nông thì ngược lại; vật nhỏ vì thế bị thiệt kép. \gp \vn{kim tự tháp đặc trưng}{feature pyramid network, FPN} dựng một kim tự tháp bằng nhánh \en{top-down} cộng với kết nối ngang, để mọi tầng đều vừa sâu về ngữ nghĩa vừa đúng độ phân giải \cite{lin2017fpn}. \hq đây là lần đầu ``đa tỉ lệ'' được đưa vào kiến trúc thay vì đưa vào pipeline dưới dạng chạy ảnh ở nhiều kích thước.
+\lk{C/13/01}{tiền đề}{stride và trường tiếp nhận của backbone chính là thứ tạo ra mâu thuẫn ngữ nghĩa--độ phân giải mà FPN sinh ra để gỡ.}
+\item \vd{RoIPooling làm tròn toạ độ, và việc làm tròn đó phá hỏng mọi bài toán cần độ chính xác dưới pixel.} \gp Mask R-CNN thay bằng \en{RoIAlign}: không làm tròn, lấy mẫu song tuyến tại các điểm có toạ độ thực, rồi thêm một nhánh dự đoán \vn{mặt nạ}{mask} nhị phân song song với nhánh phân loại \cite{he2017maskrcnn}. \hq nhánh mask gần như miễn phí về ý tưởng nhưng chỉ hoạt động tốt \emph{sau khi} lỗi lượng tử hoá được gỡ bỏ --- một minh hoạ sắc nét rằng chi tiết cài đặt có thể chặn đứng cả một bài toán mới.
+\end{mach}
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  tit/.style={font=\sffamily\bfseries\color{inkblue},align=center},
+  inb/.style={draw=steel,fill=bluebg,rounded corners=2pt,align=center,inner sep=5pt,text width=3.3cm},
+  outb/.style={draw=reddark,dashed,rounded corners=2pt,align=center,inner sep=5pt,text width=3.3cm,text=reddark},
+  eat/.style={font=\scriptsize\itshape,color=violetdark,align=center,text width=3.1cm}]
+\foreach \x/\name in {0/{R-CNN\\\footnotesize 2014}, 4.4/{Fast R-CNN\\\footnotesize 2015}, 8.8/{Faster R-CNN + FPN\\\footnotesize 2015--17}, 13.2/{Mask R-CNN\\\footnotesize 2017}}
+  \node[tit] at (\x,4.0) {\name};
+\node[inb] at (0,2.5) {\emph{trong mạng}\\ phân loại vùng};
+\node[inb] at (4.4,2.5) {\emph{trong mạng}\\ backbone dùng chung\\ RoIPooling\\ loss đa nhiệm};
+\node[inb] at (8.8,2.5) {\emph{trong mạng}\\ + RPN sinh đề xuất\\ + kim tự tháp đa tỉ lệ};
+\node[inb] at (13.2,2.5) {\emph{trong mạng}\\ + RoIAlign\\ + nhánh mask};
+\node[eat] at (2.2,0.95) {nuốt: trích đặc trưng lặp lại};
+\node[eat] at (6.6,0.95) {nuốt: sinh đề xuất, đa tỉ lệ};
+\node[eat] at (11.0,0.95) {nuốt: lượng tử hoá toạ độ};
+\node[outb] at (0,-1.15) {\emph{ngoài mạng}\\ selective search\\ warp ảnh\\ SVM\\ hồi quy khung\\ NMS};
+\node[outb] at (4.4,-1.15) {\emph{ngoài mạng}\\ selective search\\ NMS};
+\node[outb] at (8.8,-0.7) {\emph{ngoài mạng}\\ thiết kế anchor\\ gán mẫu theo IoU\\ NMS};
+\node[outb] at (13.2,-0.7) {\emph{ngoài mạng}\\ thiết kế anchor\\ gán mẫu theo IoU\\ NMS};
+\draw[-{Latex[length=3mm]},thick,color=steel] (-2.0,0.35) -- (15.4,0.35);
+\node[font=\footnotesize\itshape,color=steel,anchor=north] at (6.7,0.25) {ranh giới của gradient dịch xuống dưới qua từng thế hệ};
+\end{tikzpicture}}
+\caption{Dòng thời gian của họ hai giai đoạn, vẽ theo trục ``cái gì nhận được gradient''. Khối trên đường kẻ nằm trong tầm với của hàm mất mát detection và tự chỉnh; khối dưới đường kẻ là heuristic cố định. Nhãn tím giữa hai cột ghi rõ mỗi bước nuốt được heuristic nào. Qua bốn thế hệ, phần dưới teo dần nhưng NMS và cách gán mẫu thì ở lại --- đó là dư địa mà Mục~2 khai thác.}
+\label{fig:nuot-heuristic}
+\end{figure}
+
+Hình~\ref{fig:nuot-heuristic} cho thấy điều mà một bảng thời gian không cho thấy: cái còn sót lại sau bốn bước không phải là ngẫu nhiên. \vn{Triệt phi cực đại}{non-maximum suppression, NMS} sống sót vì nó thao tác trên \emph{quan hệ giữa các dự đoán} chứ không trên một dự đoán đơn lẻ, mà loss của kiến trúc này lại chấm điểm từng dự đoán độc lập. Cách \vn{gán mẫu}{label assignment} sống sót vì nó là một phần của \emph{định nghĩa} loss chứ không phải một khối tính toán --- không có gì để ``nuốt'' theo nghĩa thông thường. Hai chỗ đó đòi hỏi đổi phát biểu bài toán, và đó đúng là việc DETR làm ở mục sau.
+
+\subsection{B. Ba phép tính nhỏ giải thích ba bước nhảy}
+
+\begin{itemize}
+\item \textbf{Vì sao chia sẻ feature map lại nhanh hơn hai bậc.} Giả sử backbone tốn khoảng \(10^{10}\) FLOPs cho một ảnh \(224\times224\).
+  \begin{itemize}
+  \item \textbf{R-CNN} chạy nó cho từng vùng trong \(N=2000\) vùng: \(2\times10^{13}\) FLOPs mỗi ảnh.
+  \item \textbf{Fast R-CNN} chạy backbone một lần trên ảnh lớn hơn (giả sử đắt gấp mười, \(10^{11}\)), rồi mỗi vùng chỉ qua vài tầng nhẹ cỡ \(10^{8}\), tổng \(2\times10^{11}\).
+  \item \textbf{Tỉ số} khoảng \(2\times10^{13}/3\times10^{11}\approx 70\) lần, và thực tế còn lớn hơn vì R-CNN phải ghi/đọc đặc trưng ra đĩa. \emph{Ý nghĩa}: chi phí chuyển từ \(O(N)\) lượt backbone sang \(O(1)\) lượt backbone cộng \(O(N)\) lượt đầu nhẹ --- đó mới là điều cần nhớ, không phải con số.
+  \end{itemize}
+\item \begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  b/.style={draw=steel,fill=bluebg,rounded corners=2pt,align=center,inner sep=5pt,minimum height=1.0cm,text width=2.5cm},
+  hv/.style={draw=reddark,fill=redbg,rounded corners=2pt,align=center,inner sep=5pt,minimum height=1.0cm,text width=2.8cm},
+  lt/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,align=center,inner sep=5pt,minimum height=1.0cm,text width=2.8cm},
+  e/.style={-{Latex[length=2.4mm]},draw=steel,thick},
+  mul/.style={font=\footnotesize\bfseries\color{reddark}},
+  ttl/.style={font=\sffamily\bfseries\color{inkblue},anchor=east}]
+% --- R-CNN
+\node[ttl] at (-1.4,2.1) {R-CNN};
+\node[b] (i1) at (0,2.1) {Ảnh};
+\node[b] (r1) at (3.4,2.1) {2000 vùng\\ ứng viên};
+\node[hv] (c1) at (7.2,2.1) {CNN đầy đủ\\ \(\approx10^{10}\) FLOPs};
+\node[b] (h1) at (11.2,2.1) {SVM + hồi quy\\ khung};
+\draw[e] (i1)--(r1); \draw[e] (r1)--(c1); \draw[e] (c1)--(h1);
+\node[mul] at (5.3,2.65) {\(\times\,2000\)};
+\node[mul] at (9.2,2.65) {\(\times\,2000\)};
+\node[font=\footnotesize\itshape,color=reddark,anchor=west] at (13.0,2.1) {\(\approx 2\times10^{13}\) FLOPs / ảnh};
+% --- Fast R-CNN
+\node[ttl] at (-1.4,-1.3) {Fast R-CNN};
+\node[b] (i2) at (0,-1.3) {Ảnh};
+\node[hv] (c2) at (3.7,-1.3) {CNN đầy đủ\\ \emph{một lần}};
+\node[b] (f2) at (7.4,-1.3) {feature map\\ dùng chung};
+\node[lt] (roi) at (11.2,-1.3) {RoIPooling +\\ vài tầng nhẹ};
+\draw[e] (i2)--(c2); \draw[e] (c2)--(f2); \draw[e] (f2)--(roi);
+\node[mul,color=violetdark] at (9.3,-0.75) {\(\times\,2000\) (rẻ)};
+\node[mul,color=steel] at (1.85,-0.75) {\(\times\,1\)};
+\node[font=\footnotesize\itshape,color=violetdark,anchor=west] at (13.0,-1.3) {\(\approx 2\times10^{11}\) FLOPs / ảnh};
+\end{tikzpicture}}
+\caption{Cùng số vùng ứng viên, cùng backbone, khác nhau ở \emph{thứ tự} phép cắt và phép trích đặc trưng. R-CNN đặt phép cắt trước nên khối đắt nhất bị nhân với \(N\); Fast R-CNN đặt phép cắt sau nên khối đắt chỉ chạy một lần và chỉ phần nhẹ mới bị nhân. Toàn bộ khoảng cách hai bậc độ lớn nằm ở chỗ đổi chỗ hai mũi tên, không ở chỗ nào khác.}
+\label{fig:rcnn-vs-fast}
+\end{figure}
+
+Hình~\ref{fig:rcnn-vs-fast} là dạng nhìn thấy được của phép tính vừa rồi, và nó cũng là mẫu hình đáng nhớ: khi một pipeline lặp một khối đắt, hãy hỏi liệu có đẩy được khối đó ra ngoài vòng lặp hay không.
+
+\textbf{Vì sao làm tròn lại đau đến thế.} Backbone thông dụng có \en{stride} 16, nên một pixel feature ứng với ô \(16\times16\) pixel ảnh. Khung có cạnh trái tại \(x=19\) rơi vào toạ độ feature \(19/16 = 1{,}1875\); RoIPooling làm tròn xuống \(1\), tức dịch biên \(0{,}1875\times16 = 3\) pixel ảnh gốc, rồi chia ô pooling làm tròn lần thứ hai. Ba pixel là nhiễu với người cao 200 pixel, nhưng là 10\% kích thước với một vật 30 pixel. Đó là lý do RoIAlign gần như không đổi gì ở ngưỡng \vn{giao trên hợp}{intersection over union, IoU} lỏng nhưng cải thiện mạnh ở ngưỡng chặt và với nhánh mask \cite{he2017maskrcnn}.
+\item \begin{figure}[H]\centering
+\resizebox{0.92\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  fm/.style={draw=steel,fill=bluebg,rounded corners=1.5pt,align=center,inner sep=3pt,minimum height=0.62cm,font=\footnotesize},
+  pm/.style={draw=violetdark,fill=violetbg,rounded corners=1.5pt,align=center,inner sep=3pt,minimum height=0.62cm,font=\footnotesize},
+  up/.style={-{Latex[length=2.2mm]},draw=violetdark,thick},
+  lat/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  bu/.style={-{Latex[length=2.2mm]},draw=tiercol},
+  lb/.style={font=\scriptsize\itshape,color=tiercol}]
+\node[fm,minimum width=4.2cm] (c2) at (0,0)   {C2 --- stride 4, ngữ nghĩa yếu};
+\node[fm,minimum width=3.2cm] (c3) at (0,1.5) {C3 --- stride 8};
+\node[fm,minimum width=2.3cm] (c4) at (0,3.0) {C4 --- stride 16};
+\node[fm,minimum width=1.6cm] (c5) at (0,4.5) {C5 --- stride 32, ngữ nghĩa mạnh};
+\node[pm,minimum width=4.2cm] (p2) at (7.6,0)   {P2 --- vật nhỏ};
+\node[pm,minimum width=3.2cm] (p3) at (7.6,1.5) {P3};
+\node[pm,minimum width=2.3cm] (p4) at (7.6,3.0) {P4};
+\node[pm,minimum width=1.6cm] (p5) at (7.6,4.5) {P5 --- vật lớn};
+\draw[bu] (c2)--(c3); \draw[bu] (c3)--(c4); \draw[bu] (c4)--(c5);
+\node[lb,rotate=90,anchor=south] at (-2.4,2.25) {nhánh đi lên (backbone)};
+\foreach \i in {2,3,4,5}{\draw[lat] (c\i) -- node[lb,above]{\(1\times1\)} (p\i);}
+\draw[up] (p5)--(p4); \draw[up] (p4)--(p3); \draw[up] (p3)--(p2);
+\node[lb,color=violetdark,anchor=west,align=left] at (9.9,2.25) {nhánh đi xuống:\\ nội suy \(\times2\) rồi cộng};
+\node[font=\scriptsize\itshape,color=reddark,anchor=north,align=center,text width=6cm] at (3.8,-0.9)
+  {Không có FPN: vật nhỏ chỉ được nhìn ở C2 --- độ phân giải tốt nhưng ngữ nghĩa yếu nhất};
+\end{tikzpicture}}
+\caption{FPN gộp hai thứ vốn nằm ở hai đầu đối lập của backbone. Đi lên, độ phân giải giảm còn ngữ nghĩa mạnh dần; đi xuống, ngữ nghĩa của tầng sâu được nội suy trả về từng mức và cộng vào đặc trưng nông qua kết nối ngang \(1\times1\). Kết quả là mọi mức \(P_i\) đều vừa đủ sâu vừa đủ mịn, nên vật nhỏ không còn bị thiệt kép.}
+\label{fig:fpn}
+\end{figure}
+
+Hình~\ref{fig:fpn} làm rõ vì sao đây là một bước ``nuốt heuristic'': trước FPN, cách xử lý đa tỉ lệ là chạy \emph{cả ảnh} ở nhiều kích thước rồi gộp kết quả --- một vòng lặp bên ngoài mạng, tốn gấp nhiều lần. FPN đưa đúng chức năng đó vào trong một nhánh có tham số học được.
+
+\textbf{FPN gán vùng vào tầng nào.} Công thức trong bài gốc là \(k=\lfloor k_0 + \log_2(\sqrt{wh}/224)\rfloor\) với \(k_0=4\). \emph{Nó nói gì}: vật càng nhỏ thì càng được đẩy về tầng có độ phân giải cao. Khung \(112\times112\) cho \(\log_2(112/224) = -1\) nên \(k=3\); khung \(448\times448\) cho \(k=5\). Đáng chú ý là công thức này vẫn là heuristic thủ công nằm ngoài gradient --- lại một vòng nữa của cùng mẫu hình.
+\end{itemize}
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[scale=0.85,font=\footnotesize]
+\foreach \i in {0,...,5}{\draw[color=rulecol] (\i,0) -- (\i,4); \draw[color=rulecol] (0,\i*0.8) -- (5,\i*0.8);}
+\draw[thick,color=reddark,dashed] (1.1875,0.7) rectangle (4.35,3.4);
+\draw[thick,color=steel] (1,0.8) rectangle (4,3.2);
+\node[color=reddark,anchor=west,font=\footnotesize] at (5.35,3.4) {khung thật (toạ độ thực)};
+\node[color=steel,anchor=west,font=\footnotesize] at (5.35,2.6) {khung sau khi làm tròn};
+\draw[<->,color=violetdark,thick] (1,0.35) -- (1.1875,0.35);
+\node[color=violetdark,anchor=north,font=\footnotesize] at (1.1,0.2) {\(0{,}19\) ô \(=3\) px ảnh};
+\node[anchor=west,font=\footnotesize,color=tiercol] at (5.35,1.8) {mỗi ô \(=\) \(16\times16\) px ảnh (stride 16)};
+\end{tikzpicture}
+\caption{Vì sao RoIPooling làm hỏng bài toán mask. Trên lưới đặc trưng stride 16, việc làm tròn toạ độ khung về ô nguyên dịch biên đi tới vài pixel trên ảnh gốc; sai số này cố định, không giảm khi huấn luyện lâu hơn, và tỉ lệ nghịch với kích thước vật. RoIAlign lấy mẫu song tuyến tại toạ độ thực nên không sinh ra khoảng lệch màu tím.}
+\label{fig:roialign}
+\end{figure}
+
+Hình~\ref{fig:roialign} là một lời nhắc quen thuộc với người làm hình học. Đây đúng là lỗi lượng tử hoá mà mọi hệ bám đặc trưng dưới pixel đều phải xử lý. Cách chữa cũng giống hệt: nội suy thay vì làm tròn, đúng như một bộ \en{tracker} KLT tinh chỉnh vị trí đặc trưng.
+
+\subsection{C. Giới hạn và trường hợp hỏng}
+Họ hai giai đoạn hỏng theo ba kiểu rất đặc trưng, và mỗi kiểu có một triệu chứng quan sát được:
+
+\begin{itemize}
+\item \textbf{Cảnh đông đúc.} Khi hai vật cùng lớp chồng lấn nhiều hơn ngưỡng NMS, một trong hai chắc chắn bị xoá. \emph{Triệu chứng}: hạ ngưỡng thì mất vật, nâng ngưỡng thì sinh trùng lặp --- không có giá trị nào cứu được cả hai, vì vấn đề nằm ở phát biểu chứ không ở tham số.
+\item \textbf{Miền anchor lệch.} Tập anchor mã hoá phân bố tỉ lệ và tỉ số cạnh của dữ liệu huấn luyện. Đưa sang ống kính góc rộng, ảnh \en{fisheye}, hay lớp vật dài mảnh thì recall của RPN sụt trước khi bộ phân loại kịp nói gì. \emph{Triệu chứng}: recall giai đoạn đề xuất thấp trong khi độ chính xác trên các đề xuất còn lại vẫn cao.
+\item \textbf{Độ trễ không ổn định.} Số đề xuất qua ngưỡng thay đổi theo ảnh, nên thời gian giai đoạn hai dao động theo nội dung cảnh. \emph{Triệu chứng}: phân vị 99 của độ trễ cao hơn nhiều so với trung vị --- một tính chất rất khó chịu khi bạn phải cam kết ngân sách mili-giây cho mỗi khung hình, đúng kiểu ràng buộc cứng đã bàn ở \ptr{B/03-giai-phau-he-thong}.
+\end{itemize}
+
+\begin{cambay}
+Rất nhiều so sánh ``kiến trúc A tốt hơn B \(2\) mAP'' thực chất là so sánh hai công thức huấn luyện: số epoch, \vn{tăng cường dữ liệu}{data augmentation}, tỉ lệ mẫu dương/âm trong mỗi \en{batch}, ngưỡng IoU khi gán mẫu. Trước khi tin một cải tiến kiến trúc, hãy tìm xem phần gán mẫu và recipe có được giữ nguyên không --- và trong đa số paper, thông tin đó nằm trong code chứ không nằm trong bài. \lk{E/24}{hệ quả của}{muốn tách phần đóng góp của một khối khỏi phần đóng góp của recipe thì phải ablate đúng một thứ --- đó là phương pháp, không phải trực giác.}
+Công cụ như \repo{dbolya/tide} tách mAP thành các loại lỗi thành phần \cite{bolya2020tide, hoiem2012diagnosing}, và thường phát hiện rằng hai mô hình ``chênh 2 mAP'' hỏng theo hai kiểu hoàn toàn khác nhau.
+\end{cambay}
+
+\begin{cannho}
+Mỗi bước tiến của detection hai giai đoạn là một heuristic bị kéo vào trong tầm với của gradient. Muốn đoán bước tiếp theo của một dòng mô hình bất kỳ, kể cả \en{SLAM}, hãy liệt kê những gì còn nằm \emph{ngoài} vòng tối ưu. Rồi hỏi cái nào trong số đó viết lại được thành một khối khả vi. \T{3}
+\end{cannho}
+
+\subsection{D. Kết nối}
+Mục tiếp theo (\ptr{C/14-bai-toan-cv-loi/02-detection-mot-giai-doan}) là mặt đối lập: bỏ hẳn giai đoạn đề xuất để đổi lấy tốc độ, và trả giá bằng một vấn đề mất cân bằng mà mục này chưa gặp. \ptr{C/13-kien-truc-backbone/01-dong-cnn} là tiền đề: RoIPooling, stride và trường tiếp nhận chỉ hiểu được sau khi nắm cơ học của \en{convolution}. \ptr{B/09-thiet-ke-ham-mat-mat} giải thích vì sao gộp phân loại và hồi quy vào một loss đa nhiệm không hiển nhiên đúng. \ptr{E/24-thi-nghiem-va-ablation} là nơi kiểm chứng cạm bẫy vừa nêu.
+
+\begin{tukiem}
+\item Vì sao Fast R-CNN nhanh hơn R-CNN nhiều bậc trong khi cả hai dùng cùng backbone và cùng số vùng ứng viên?
+\item RoIAlign khác RoIPooling ở đúng một chỗ. Vì sao chỗ đó ảnh hưởng tới nhánh mask mạnh hơn nhiều so với nhánh phân loại?
+\item Miền ảnh cụ thể nào làm tập anchor mặc định của COCO sụt recall, và triệu chứng quan sát được ở đó là gì?
+\item Vì sao NMS và cách gán mẫu là hai thứ duy nhất sống sót qua cả bốn thế hệ? Hai lý do đó khác nhau ở điểm nào?
+\item Nếu bạn phải cam kết một ngân sách mili-giây cố định cho mỗi khung hình, kiến trúc hai giai đoạn gây khó khăn gì mà một giai đoạn không gây?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

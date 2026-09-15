@@ -1,0 +1,48 @@
+% ============================================================================
+%  E/00-map.tex — bản đồ phần E
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../algorithm.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ phần E --- Hành nghề và luyện tập}
+
+\begin{tomtat}
+Bốn chương ứng với bốn chỗ hay hỏng giữa ``hiểu thuật toán'' và ``có kết quả'': bug không tìm được (25), tối ưu sai chỗ trong hệ thống thật (26), chiến thuật kém khi có giới hạn thời gian (27), và luyện tập không có cấu trúc (28). Không có phụ thuộc bắt buộc giữa bốn chương; đọc theo nhu cầu. Chương 28 là chương dùng lại nhiều nhất về lâu dài.
+\end{tomtat}
+
+\subsection*{A. Phần này có gì}
+\begin{itemize}
+\item \textbf{\code{25-cai-dat-go-loi-kiem-thu}} --- viết code đúng ngay từ đầu, danh mục bug kinh điển, khẳng định và bất biến trong code, stress test bằng sinh test ngẫu nhiên, thu nhỏ phản ví dụ, đo thời gian.
+\item \textbf{\code{26-thuat-toan-trong-he-thong-that}} --- vì sao \Ob{n\log n} chậm hơn \Ob{n^2} ở \(n\) nhỏ, chi phí bộ nhớ và cache, đo trước khi tối ưu, thuật toán trong cơ sở dữ liệu, trình biên dịch, mạng, đồ hoạ và robot.
+\item \textbf{\code{27-phong-van-va-thi-dau}} --- quy trình 45 phút của một buổi phỏng vấn, cách nói ra suy nghĩ, chọn bài và phân bổ thời gian trong contest, xử lý lúc bí, đọc bảng điểm.
+\item \textbf{\code{28-lo-trinh-va-ngan-hang-bai-tap}} --- lộ trình 12 tuần và lộ trình 6 tháng, nguyên tắc upsolving, nhật ký lỗi, lặp lại ngắt quãng, và ngân hàng bài tập phân loại theo 27 chương trước.
+\end{itemize}
+
+\subsection*{B. Phụ thuộc và thứ tự đọc}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.6cm and 1.0cm,
+  m/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.9cm},
+  o/.style={draw=accent,fill=amberbg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.9cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  ard/.style={-{Latex[length=2.2mm]},draw=tiercol,thick,dashed},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.3cm}]
+\node[draw=rulecol,fill=codebg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,
+      text width=2.9cm] (abc) {Phần A--D\\(ý tưởng đúng)};
+\node[m,right=of abc] (c25) {\textbf{25.} Cài đặt,\\gỡ lỗi, kiểm thử};
+\node[m,right=of c25] (c27) {\textbf{27.} Phỏng vấn\\và thi đấu};
+\node[m,below=1.05cm of c25] (c26) {\textbf{26.} Thuật toán trong\\hệ thống thật};
+\node[o,below=1.05cm of c27] (c28) {\textbf{28.} Lộ trình và\\ngân hàng bài tập};
+\draw[ar] (abc) -- (c25);
+\draw[ar] (c25) -- node[lb,above=0pt] {thêm sức ép thời gian} (c27);
+\draw[ard] (c25) -- (c26);
+\draw[ar] (c27) -- (c28);
+\draw[ard] (c26) -- (c28);
+\end{tikzpicture}
+\caption{Phần E nhận đầu vào từ toàn bộ phần A--D và chia làm hai nhánh: nhánh kỹ thuật (25--26) và nhánh chiến thuật cùng luyện tập (27--28). Chương 28, tô hổ phách, là nơi mọi thứ quay về thành lịch luyện cụ thể.}
+\label{fig:map-E}
+\end{figure}
+
+\subsection*{C. Cốt lõi hay tham khảo}
+\textbf{Cốt lõi:} stress test và danh mục bug ở chương 25; nguyên tắc ``đo trước khi tối ưu'' ở chương 26; quy trình nói ra suy nghĩ ở chương 27; nguyên tắc upsolving và nhật ký lỗi ở chương 28. \textbf{Tham khảo:} các mục khảo sát thuật toán trong từng ngành công nghiệp ở chương 26 --- đọc để biết bức tranh, không cần thuộc.
+\par\medskip Phần thực hành bổ sung: \ptr{E/25} có bảng chọn lớp kiểm thử và phân biệt chia đôi với thu nhỏ phản ví dụ; \ptr{E/26} có phiếu benchmark và phép tính giới hạn tăng tốc toàn pipeline.
+\end{document}

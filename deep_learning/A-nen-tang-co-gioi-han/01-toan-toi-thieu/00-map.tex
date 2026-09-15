@@ -1,0 +1,58 @@
+% ============================================================================
+%  A/01-toan-toi-thieu/00-map.tex — bản đồ chương
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ chương --- Toán tối thiểu dùng lại suốt đời}
+
+\begin{tomtat}
+Bản đồ này nói chương 1 gồm bốn mục nào, và vì sao chia theo vai trò chứ không theo tên môn học. Nó cũng nói mục nào phụ thuộc mục nào, và phần nào là cốt lõi so với phần nào chỉ cần biết là có. Đọc xong bạn quyết định được trong một phút nên đọc mục nào trước cho nhu cầu hiện tại thay vì đọc tuần tự cả chương. Nếu chỉ nhớ một điều: đây là chương \T{1}, nên nguyên tắc là học theo nhu cầu. Chuỗi phụ thuộc bắt buộc chỉ là 1 \(\rightarrow\) 2 \(\rightarrow\) 3. Mục 4 vào được bất cứ lúc nào, và nên đọc ngay trước chương \ptr{A/02}.
+\end{tomtat}
+
+\subsection*{A. Chương này có gì}
+
+\begin{itemize}
+\item \textbf{\code{01-dai-so-tuyen-tinh}} --- không gian con, phép chiếu, phân rã trị riêng và SVD, số điều kiện, xấp xỉ hạng thấp.
+\item \textbf{\code{02-vi-phan-va-toi-uu}} --- quy tắc chuỗi dạng ma trận, Jacobian, Hessian, hạ gradient, lồi so với không lồi, điều kiện dừng, hình dạng landscape.
+\item \textbf{\code{03-xac-suat-va-thong-tin}} --- sai số lấy mẫu và khoảng tin cậy, MLE và MAP như nguồn gốc chung của mọi hàm mất mát, entropy--cross-entropy--KL và sự bất đối xứng của KL.
+\item \textbf{\code{04-hinh-hoc-va-tin-hieu}} --- toạ độ đồng nhất, \(SO(3)\) và \(SE(3)\) ở mức ba thao tác dùng được, convolution, Fourier, lấy mẫu và aliasing.
+\end{itemize}
+
+\subsection*{B. Vì sao chia như vậy}
+Cách chia thông thường theo tên môn học --- ``đại số tuyến tính, giải tích, xác suất'' --- không nói thứ nào quay lại vào lúc nào. Nó vì thế khuyến khích học tuyến tính cho đủ, rồi quên sạch. Bốn mục ở đây được đặt theo \emph{câu hỏi chúng trả lời}: mục 1 trả lời ``bài toán này suy biến ở hướng nào và tôi mất bao nhiêu chữ số''; mục 2 trả lời ``làm sao đi từ khởi tạo tới nghiệm, và cái gì làm nó chậm''; mục 3 trả lời ``hàm mất mát từ đâu ra, và con số tôi vừa đo đáng tin đến đâu''; mục 4 khác hẳn ba mục kia vì nó không nói về cách học mà về \emph{cấu trúc có sẵn trong dữ liệu ảnh trước khi mô hình nhìn thấy}.
+
+\subsection*{C. Phụ thuộc và thứ tự đọc}
+Hình~\ref{fig:map-ch1} vẽ quan hệ phụ thuộc thật giữa bốn mục.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.6cm and 1.0cm,
+  m/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.9cm},
+  o/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.9cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.6cm}]
+\node[m] (a) {\textbf{1.} Đại số\\tuyến tính};
+\node[m,right=of a] (b) {\textbf{2.} Vi phân\\và tối ưu hoá};
+\node[m,right=of b] (c) {\textbf{3.} Xác suất\\và thông tin};
+\node[o,below=1.15cm of b] (d) {\textbf{4.} Hình học\\và tín hiệu};
+\node[draw=rulecol,fill=codebg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.9cm,right=of d] (e) {Chương \ptr{A/02}\\vật lý tạo ảnh};
+\draw[ar] (a) -- node[lb,above=0pt] {phổ Hessian} (b);
+\draw[ar] (b) -- node[lb,above=0pt] {khi nào dừng} (c);
+\draw[ar] (a) -- node[lb,left=1pt,text width=1.7cm] {SVD để chiếu về \(SO(3)\)} (d);
+\draw[ar] (d) -- (e);
+\end{tikzpicture}
+\caption{Phụ thuộc giữa bốn mục của chương 1. Chuỗi ngang là chuỗi bắt buộc; mục 4 (tô khác màu) chỉ mượn một kết quả nhỏ của mục 1 nên vào được bất cứ lúc nào, và nó là cửa dẫn sang chương \ptr{A/02}.}
+\label{fig:map-ch1}
+\end{figure}
+
+\subsection*{D. Cốt lõi hay tham khảo}
+Toàn chương thuộc tầng \T{1}, tức học theo nhu cầu và không đầu tư sâu. Trong đó:
+
+\begin{itemize}
+\item \textbf{Cốt lõi --- phải nắm chắc, sẽ quay lại nhiều lần:} số điều kiện và xấp xỉ hạng thấp (mục 1); quy tắc khớp shape, chi phí bộ nhớ của lan truyền ngược, quan hệ độ cong--learning rate (mục 2); \emph{toàn bộ} mục 3; phần lấy mẫu và aliasing (mục 4).
+\item \textbf{Tham khảo --- biết là có, tra khi cần:} chi tiết các phân rã ma trận, phân tích lồi hình thức, phần Lie algebra vượt quá ba thao tác \(\exp\), \(\log\) và cập nhật trên không gian tiếp tuyến.
+\end{itemize}
+
+\subsection*{E. Riêng với người đọc đã làm SLAM}
+Bốn chỗ mà kinh nghiệm ước lượng trạng thái \emph{không} chuyển sang miễn phí, nên dừng lại kỹ: (i) số điều kiện đọc theo nghĩa tốc độ huấn luyện chứ không chỉ theo nghĩa ổn định số học; (ii) điều kiện dừng theo validation thay cho chuẩn gradient; (iii) toàn bộ mục 3, vì ước lượng trạng thái hiếm khi phải trả lời câu ``hiệu số này có ý nghĩa thống kê không''; (iv) aliasing trong kiến trúc mạng, vốn không có đối ứng trong pipeline hình học cổ điển. Ngược lại, toạ độ đồng nhất, \(SE(3)\) và bình phương tối thiểu thì đọc lướt được.
+\end{document}

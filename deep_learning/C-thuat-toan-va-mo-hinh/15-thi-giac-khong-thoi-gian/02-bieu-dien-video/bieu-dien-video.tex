@@ -1,0 +1,194 @@
+\documentclass[../../../deep_learning.tex]{subfiles}
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: C/13/01 (conv), C/13/02 (attention), B/11 (giới hạn tính toán). Mức độ: cốt lõi.
+\begin{document}
+\section{Biểu diễn video và cái giá của thời gian (Video Representation and the Cost of Time)}
+\ptrtarget{C/15-thi-giac-khong-thoi-gian/02}\ptrtarget{C/15-thi-giac-khong-thoi-gian/02-bieu-dien-video}\ptrtarget{C/15/02}\ptrtarget{C/15/02-bieu-dien-video}
+\dependency{\ptr{C/13/01-dong-cnn} (conv, số tham số, FLOPs); \ptr{C/13/02-tu-chuoi-toi-attention} (chi phí bậc hai của attention); \ptr{B/11-gioi-han-tinh-toan} (băng thông bộ nhớ, ngân sách tính toán).}
+
+\begin{tomtat}
+Mục này trả lời câu hỏi ``thêm chiều thời gian vào ảnh thì phải trả giá gì''. Câu trả lời ngắn: bộ nhớ, và nó bị chia cho ba chiều cùng lúc --- độ dài clip, độ phân giải, và \en{batch} --- nên tăng một chiều buộc phải giảm chiều khác. Bốn họ kiến trúc (gộp theo khung, hai luồng, tích chập 3D và bản tách (2+1)D, video transformer) là bốn cách khác nhau để mua thông tin thời gian với ít bộ nhớ nhất có thể. Đọc xong bạn tính được ngân sách bộ nhớ của một cấu hình video \emph{trước khi} chạy, và biết chiều nào nên hy sinh cho bài toán của mình. Nếu chỉ nhớ một điều: trước khi tin bất kỳ mô hình video nào, hãy chạy baseline ``mỗi khung một lần rồi gộp''. Trên rất nhiều tập dữ liệu, baseline đó gần bằng mô hình chuyển động. Chênh lệch còn lại mới là thứ đáng trả tiền.
+\end{tomtat}
+
+\begin{nentang}
+\kn{clip}{một đoạn video ngắn gồm \(T\) khung hình liên tiếp (hoặc lấy mẫu thưa), là đơn vị mà mô hình video nhận vào --- tương đương ``một ảnh'' của mô hình ảnh.}
+\kn{kích hoạt (activation)}{tensor giá trị trung gian mà mỗi tầng mạng sinh ra --- khác với \emph{hàm kích hoạt}, là phép phi tuyến áp lên nó. Khi huấn luyện phải giữ các tensor này trong bộ nhớ để tính gradient ở \vn{lượt ngược}{backward pass}, nên chúng --- chứ không phải tham số --- thường là thứ làm tràn bộ nhớ.}
+\kn{batch size}{số mẫu xử lý cùng lúc trong một bước cập nhật. Batch lớn cho ước lượng gradient ổn định hơn nhưng tốn bộ nhớ tỉ lệ thuận.}
+\kn{batch normalization}{phép chuẩn hoá kích hoạt bằng trung bình và phương sai \emph{tính trong batch}. Batch quá nhỏ thì hai thống kê này rất nhiễu, nên mô hình video hay phải đổi sang chuẩn hoá theo nhóm hoặc theo tầng.}
+\kn{FLOPs}{số phép tính dấu phẩy động cần cho một lần chạy; dùng để so chi phí tính toán độc lập với phần cứng. Nó không tỉ lệ chặt với thời gian chạy thật, vì bộ nhớ mới hay là nút thắt.}
+\kn{optical flow}{trường vector cho biết mỗi pixel dịch đi đâu giữa hai khung hình liên tiếp --- biểu diễn tường minh của chuyển động, dùng làm đầu vào cho nhánh chuyển động của kiến trúc hai luồng.}
+\kn{token và chi phí bậc hai}{Transformer chia đầu vào thành \(n\) token rồi tính quan hệ giữa mọi cặp, nên chi phí tỉ lệ \(n^2\). Với video, \(n\) nhân thêm số khung hình, và \(n^2\) nhân thêm bình phương số đó.}
+\kn{inductive bias}{giả định cài sẵn trong kiến trúc, ví dụ tích chập giả định tính cục bộ và \vn{đẳng biến tịnh tiến}{translation equivariance}. Bỏ bớt giả định thì mô hình linh hoạt hơn nhưng cần nhiều dữ liệu hơn để tự học lại điều đã bị bỏ.}
+\end{nentang}
+
+\subsection{Đặt vấn đề}
+Cách hiển nhiên nhất để xử lý video là coi nó như một khối ba chiều và dùng \vn{tích chập ba chiều}{3D convolution} thay cho tích chập hai chiều. Cách này đúng về mặt hình thức và sai về mặt kinh tế: số phần tử phải giữ trong bộ nhớ nhân với số khung hình, số tham số của mỗi kernel nhân với chiều dài thời gian, và ngân sách vốn đã chật của một mô hình ảnh lập tức vỡ. Vì thế toàn bộ lĩnh vực này không phải là câu chuyện ``kiến trúc nào tốt hơn'' mà là câu chuyện ``mua thông tin thời gian bằng cách nào cho rẻ''.
+
+Nhưng còn một lý do sâu hơn khiến ta không nên coi thời gian là trục không gian thứ ba. Trục thời gian có \emph{hướng}: đảo ngược nó thì ``mở cửa'' thành ``đóng cửa'', trong khi lật ngược trục \(x\) của một ảnh vẫn cho một ảnh hợp lệ của cùng một cảnh. Trục thời gian cũng có \emph{đơn vị khác}: 16 khung hình ở 30\,Hz là nửa giây, còn 16 pixel là một chi tiết nhỏ --- không có lý do gì để cùng một kernel \(3\times3\times3\) là kích thước hợp lý ở cả ba trục. Hai bất đối xứng này là nguyên nhân sâu xa của mọi thiết kế tách trục mà ta sẽ gặp.
+
+\textbf{Học xong mục này bạn làm được gì mà trước đó không làm được?} Cầm một yêu cầu như ``phân loại hành động trên clip 4 giây, chạy được trên GPU 8\,GB'', bạn suy ra ngay cấu hình khả thi và thứ phải hy sinh. Không phải thử ngẫu nhiên tới khi hết bộ nhớ.
+
+\begin{trucgiac}
+Ngân sách bộ nhớ của video giống một tấm chăn ngắn kéo theo ba hướng: độ dài clip, độ phân giải, và batch size. Tích của ba đại lượng đó gần như là một hằng số do phần cứng ấn định, nên mọi quyết định kiến trúc thực chất là quyết định kéo chăn về phía nào. Điều đáng nói là ba hướng ấy không tương đương về mặt khoa học: giảm batch làm hỏng thống kê của \vn{chuẩn hoá theo batch}{batch normalization}, giảm độ phân giải làm mất vật nhỏ, còn giảm độ dài clip làm mất chính thứ ta đang muốn học. Không có hướng nào miễn phí, và biết trước điều đó tiết kiệm hàng tuần thí nghiệm.
+\end{trucgiac}
+
+\lk{B/11}{ràng buộc bởi}{tích độ dài clip \(\times\) độ phân giải\(^2\) \(\times\) batch bị chặn bởi bộ nhớ thiết bị --- cùng một trần đã chi phối mọi lựa chọn ở chương giới hạn tính toán.}
+
+\subsection{A. Bốn họ biểu diễn, và nút thắt mà mỗi họ gỡ}
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  b/.style={draw=steel,fill=bluebg,rounded corners=2pt,align=center,inner sep=5pt,text width=3.0cm},
+  e/.style={-{Latex[length=2.4mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=violetdark,align=center,text width=3.0cm}]
+\node[b] (a) at (0,0) {\textbf{Gộp theo khung}\\ \footnotesize mô hình ảnh + trung bình};
+\node[b] (b) at (4.3,0) {\textbf{Hai luồng} 2014\\ \footnotesize nhánh ảnh + nhánh optical flow};
+\node[b] (c) at (8.6,0) {\textbf{3D conv} 2017\\ \footnotesize I3D, học chuyển động end-to-end};
+\node[b] (d) at (12.9,0) {\textbf{(2+1)D, SlowFast}\\ \footnotesize tách trục, hai tốc độ};
+\node[b] (e) at (17.2,0) {\textbf{Video transformer}\\ \footnotesize quan hệ thời gian tuỳ ý};
+\draw[e] (a)--(b); \draw[e] (b)--(c); \draw[e] (c)--(d); \draw[e] (d)--(e);
+\node[lb] at (2.15,-1.7) {không phân biệt được hành động ngược chiều};
+\node[lb] at (6.45,-1.7) {phải tính flow ngoài mạng, rất đắt};
+\node[lb] at (10.75,-1.7) {tham số và bộ nhớ tăng mạnh};
+\node[lb] at (15.05,-1.7) {vẫn chỉ thấy quan hệ thời gian cục bộ};
+\end{tikzpicture}}
+\caption{Dòng thời gian biểu diễn video, đọc theo nút thắt được gỡ. Nhãn tím dưới mỗi mũi tên là \emph{vấn đề của bước trước} --- đó là thứ khiến bước sau ra đời. Chú ý rằng đây không phải một thang chất lượng: bước đầu tiên vẫn là baseline mạnh và bắt buộc phải chạy.}
+\label{fig:video-timeline}
+\end{figure}
+
+Hình~\ref{fig:video-timeline} cho thấy mạch phát triển, còn Bảng~\ref{tab:video-repr} cho thấy cái mà mạch đó che đi: mỗi họ giả định một điều khác nhau về bản chất của chuyển động, và chính giả định --- chứ không phải số tầng --- quyết định nó hỏng ở đâu.
+
+\begin{table}[H]\centering\small
+\caption{Năm cách biểu diễn video. Cột chi phí ghi theo bậc độ lớn tương đối so với một mô hình ảnh chạy trên một khung hình, không phải số đo thực nghiệm.}
+\label{tab:video-repr}
+\begin{tabularx}{\linewidth}{@{}L{1.9cm}L{3.1cm}L{1.5cm}YL{3.0cm}@{}}
+\toprule
+\textbf{Cách} & \textbf{Giả định} & \textbf{Chi phí} & \textbf{Được} & \textbf{Hỏng khi nào}\\
+\midrule
+Mỗi khung + gộp & Thời gian không quan trọng lắm & \(\sim T\times\) & Rẻ, tái dùng nguyên mô hình ảnh & Không phân biệt được hành động ngược chiều (mở/đóng, nhặt/đặt)\\
+Hai luồng & Chuyển động tách được thành một nhánh riêng \cite{simonyan2014twostream} & \(\sim 2T\times\) + flow & Rõ ràng, hiệu quả với ít dữ liệu & Phải tính optical flow ngoài mạng; flow sai thì nhánh đó thành nhiễu\\
+3D conv & Không--thời gian đối xứng \cite{carreira2017i3d} & \(\sim 3T\times\) & Học chuyển động đầu--cuối & Tham số và bộ nhớ tăng mạnh; giả định đối xứng vốn sai\\
+(2+1)D & Trục thời gian tách được khỏi trục không gian \cite{tran2018closer} & \(\sim 1{,}5T\times\) & Cùng số tham số nhưng thêm một hàm kích hoạt, dễ tối ưu hơn & Chuyển động thực sự xoắn không--thời gian (xoáy, biến dạng nhanh)\\
+Video transformer & Quan hệ thời gian tuỳ ý, không cần cục bộ & bậc hai theo số token & Mạnh nhất khi đủ dữ liệu & Chi phí bậc hai theo \(T\); rất đói dữ liệu\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Một họ nữa nằm ngoài bảng vì nó là một ý tưởng chéo chứ không phải một loại tích chập: \textbf{SlowFast} chạy \emph{hai} nhánh trên cùng video --- một nhánh tốc độ khung thấp nhưng nhiều kênh để nắm ngữ nghĩa, một nhánh tốc độ khung cao nhưng ít kênh để nắm chuyển động \cite{feichtenhofer2019slowfast}. Ý nghĩa của thiết kế này: \emph{nội dung ngữ nghĩa thay đổi chậm, còn chuyển động thay đổi nhanh, nên hai loại thông tin không cần cùng một tốc độ lấy mẫu}. Nhánh nhanh rất mỏng: bài báo dùng khoảng một phần tám số kênh. Nó vì thế chỉ chiếm một phần nhỏ tổng chi phí. Đây là ví dụ đẹp của việc dùng cấu trúc bài toán để mua thông tin rẻ hơn.
+
+\begin{figure}[H]\centering
+\resizebox{0.95\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  fr/.style={draw=steel,fill=bluebg,minimum width=0.42cm,minimum height=0.95cm,inner sep=0pt},
+  frf/.style={draw=violetdark,fill=violetbg,minimum width=0.42cm,minimum height=0.42cm,inner sep=0pt},
+  b/.style={draw=steel,fill=bluebg,rounded corners=2pt,align=center,inner sep=4pt,text width=3.0cm},
+  bf/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,align=center,inner sep=4pt,text width=3.0cm},
+  e/.style={-{Latex[length=2.2mm]},draw=steel},
+  ef/.style={-{Latex[length=2.2mm]},draw=violetdark},
+  lb/.style={font=\scriptsize\itshape,color=tiercol,align=left,text width=4.6cm}]
+\node[font=\sffamily\bfseries\small\color{steel},anchor=east] at (-0.4,2.3) {Nhánh chậm};
+\foreach \i in {0,2,4,6}{\node[fr] at (\i*0.62,2.3) {};}
+\node[b] (slow) at (6.4,2.3) {nhiều kênh,\\ ít khung hình};
+\draw[e] (4.1,2.3) -- (slow);
+\node[font=\sffamily\bfseries\small\color{violetdark},anchor=east] at (-0.4,0.3) {Nhánh nhanh};
+\foreach \i in {0,...,7}{\node[frf] at (\i*0.62,0.3) {};}
+\node[bf] (fast) at (6.4,0.3) {ít kênh (\(\approx 1/8\)),\\ nhiều khung hình};
+\draw[ef] (4.6,0.3) -- (fast);
+\node[b] (fuse) at (11.0,1.3) {Hợp nhất\\ (kết nối ngang từ nhánh nhanh sang nhánh chậm)};
+\draw[e] (slow) -- (fuse); \draw[ef] (fast) -- (fuse);
+\node[lb,anchor=west,text width=4.4cm] at (13.4,1.3) {Vì nhánh nhanh rất mỏng, nó chỉ chiếm một phần nhỏ tổng chi phí --- \textbf{mua thông tin chuyển động với giá rẻ}};
+\node[lb,anchor=north,text width=7.4cm] at (3.2,-0.6) {\emph{Nhận định nền:} nội dung ngữ nghĩa (đây là cái gì) thay đổi chậm, còn chuyển động (nó đang làm gì) thay đổi nhanh --- nên hai loại thông tin không cần cùng một tốc độ lấy mẫu.};
+\end{tikzpicture}}
+\caption{SlowFast dùng cấu trúc của tín hiệu để mua thông tin rẻ hơn. Thay vì tăng đồng loạt tần số lấy mẫu cho toàn mạng --- cách tốn kém nhất --- nó tách thành hai nhánh có tần số và bề dày kênh ngược nhau, rồi hợp nhất. Nếu nhận định nền sai với dữ liệu của bạn (ngữ nghĩa thay đổi nhanh, chẳng hạn cảnh cắt dựng liên tục) thì lợi thế chi phí biến mất.}
+\label{fig:slowfast}
+\end{figure}
+
+Hình~\ref{fig:slowfast} đáng đặt cạnh Hình~\ref{fig:2plus1d}: cả hai đều là ví dụ của cùng một chiến lược --- đọc ra một bất đối xứng thật của bài toán rồi đưa nó vào kiến trúc, thay vì trả tiền đồng đều cho mọi chiều.
+
+\subsection{B. Ba phép tính quyết định mọi thứ}
+
+\begin{itemize}
+\item \textbf{Bộ nhớ của một tensor kích hoạt.} Một clip 16 khung, \(224\times224\), 64 kênh, fp32: \(16 \times 224 \times 224 \times 64 \times 4\,\text{byte} \approx 205\) MB --- cho \emph{một} tensor, ở \en{batch} bằng 1. Lượt ngược phải giữ kích hoạt của mọi tầng, nên con số này nhân với số tầng nông. Đây là lý do thực tế vì sao mô hình video hầu như luôn chạy ở batch nhỏ, và vì sao chuẩn hoá theo batch trở thành vấn đề (xem \ptr{C/12-co-che-huan-luyen/02-lam-cho-training-chay-duoc}).
+\item \textbf{Vì sao (2+1)D không tốn thêm tham số.} Một kernel 3D \(3\times3\times3\) từ \(C\) kênh sang \(C\) kênh có \(27C^2\) tham số. Bản tách gồm hai kernel. Kernel không gian \(1\times3\times3\) đi từ \(C\) sang \(M\) kênh, tốn \(9CM\); kernel thời gian \(3\times1\times1\) đi từ \(M\) về \(C\), tốn \(3MC\). Tổng là \(12CM\). Cho hai vế bằng nhau: \(M = 2{,}25\,C\). \emph{Ý nghĩa}: với cùng ngân sách tham số, ta mua được một hàm kích hoạt bổ sung ở giữa và một bài toán tối ưu dễ hơn --- lợi ích đến từ dạng của hàm, không từ \vn{sức chứa}{capacity} \cite{tran2018closer}.
+\begin{figure}[H]\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  k3/.style={draw=reddark,fill=redbg,rounded corners=1.5pt,align=center,inner sep=4pt,text width=2.6cm,minimum height=1.5cm},
+  ks/.style={draw=steel,fill=bluebg,rounded corners=1.5pt,align=center,inner sep=4pt,text width=2.4cm,minimum height=1.5cm},
+  kt/.style={draw=violetdark,fill=violetbg,rounded corners=1.5pt,align=center,inner sep=4pt,text width=2.4cm,minimum height=1.5cm},
+  act/.style={draw=accent,fill=amberbg,rounded corners=1.5pt,align=center,inner sep=3pt,text width=1.5cm,minimum height=1.5cm},
+  e/.style={-{Latex[length=2.4mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=tiercol,align=center,text width=5.4cm}]
+\node[font=\sffamily\bfseries\small\color{inkblue},anchor=west] at (-0.2,2.3) {Tích chập 3D};
+\node[k3] (a) at (2.2,1.0) {kernel \(3\times3\times3\)\\ \(C \rightarrow C\)};
+\node[font=\footnotesize\bfseries\color{reddark},anchor=west] at (3.8,1.0) {\(27C^2\) tham số};
+\node[font=\sffamily\bfseries\small\color{inkblue},anchor=west] at (7.6,2.3) {Bản tách (2+1)D};
+\node[ks] (b) at (9.4,1.0) {kernel không gian\\ \(1\times3\times3\)\\ \(C \rightarrow M\)};
+\node[act] (n) at (12.2,1.0) {hàm kích hoạt};
+\node[kt] (c) at (14.9,1.0) {kernel thời gian\\ \(3\times1\times1\)\\ \(M \rightarrow C\)};
+\draw[e] (b)--(n); \draw[e] (n)--(c);
+\node[font=\footnotesize\bfseries\color{steel},anchor=north] at (9.4,0.05) {\(9CM\)};
+\node[font=\footnotesize\bfseries\color{violetdark},anchor=north] at (14.9,0.05) {\(3MC\)};
+\node[font=\footnotesize\bfseries\color{inkblue},anchor=north] at (12.2,-0.35) {tổng \(12CM\); cho bằng \(27C^2\) thì \(M = 2{,}25\,C\)};
+\node[lb,anchor=north,text width=4.6cm] at (2.2,-0.35) {Một khối duy nhất trộn cả ba trục, ngầm giả định thời gian đối xứng với không gian};
+\node[lb,anchor=north,color=accent,text width=7.6cm] at (12.2,-1.1) {Cùng ngân sách tham số, nhưng mua thêm được \emph{một hàm kích hoạt ở giữa} --- lợi ích đến từ dạng của hàm, không từ sức chứa};
+\end{tikzpicture}}
+\caption{Phân rã \((2{+}1)\)D vẽ theo khối. Kernel 3D duy nhất được tách thành một kernel chỉ tác động theo không gian rồi một kernel chỉ tác động theo thời gian, với số kênh trung gian \(M\) chọn sao cho tổng tham số bằng bản gốc. Phép tách phản ánh đúng bất đối xứng của bài toán: trục thời gian có hướng và có đơn vị khác, nên không có lý do để cùng một kernel đối xứng là hợp lý ở cả ba trục.}
+\label{fig:2plus1d}
+\end{figure}
+
+Hình~\ref{fig:2plus1d} làm rõ vì sao đây không phải mẹo tiết kiệm: nếu chỉ để tiết kiệm thì người ta đã giảm số kênh, chứ không giữ nguyên tham số rồi chèn thêm một phi tuyến.
+
+\item \textbf{Vì sao attention trên video đắt tới mức đó.} Một ViT chia ảnh \(224\times224\) thành \(14\times14 = 196\) token, nên ma trận attention có \(196^2 \approx 3{,}8\times10^4\) phần tử. Với clip 16 khung, số token thành \(3136\) và ma trận thành \(9{,}8\times10^6\) --- gấp 256 lần, đúng bằng \(16^2\). \lk{C/13/03}{ràng buộc bởi}{video transformer bỏ thêm một tầng thiên lệch quy nạp nữa --- lần này theo trục thời gian --- nên nó đói dữ liệu hơn cả ViT trên ảnh.}
+\emph{Ý nghĩa}: chi phí bậc hai theo số token nghĩa là bậc hai theo độ dài clip, nên mọi video transformer thực dụng đều phải phân tách attention (theo thời gian rồi theo không gian) hoặc giới hạn cửa sổ.
+\end{itemize}
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.76\linewidth,height=5.4cm,xlabel={độ dài clip \(T\) (số khung hình)},
+  ylabel={cạnh ảnh tối đa (pixel)}, xmin=4,xmax=64,ymin=60,ymax=420,
+  legend style={font=\footnotesize,draw=rulecol}, grid=major, grid style={rulecol},
+  label style={font=\footnotesize}, tick label style={font=\footnotesize}]
+\addplot[thick,color=steel,domain=4:64,samples=80]{224*sqrt(128/(x*4))};   \addlegendentry{batch \(=4\)}
+\addplot[thick,color=violetdark,domain=4:64,samples=80]{224*sqrt(128/(x*8))}; \addlegendentry{batch \(=8\)}
+\addplot[thick,color=reddark,domain=4:64,samples=80]{224*sqrt(128/(x*16))}; \addlegendentry{batch \(=16\)}
+\addplot[only marks,mark=*,color=inkblue,mark size=2.4pt] coordinates {(16,224)};
+\end{axis}
+\end{tikzpicture}
+\caption{Đường đẳng ngân sách bộ nhớ. Vì lượng kích hoạt tỉ lệ với \(T \cdot R^2 \cdot B\), một ngân sách cố định cho \(R \propto 1/\sqrt{T B}\). Điểm xanh đậm là cấu hình tham chiếu (16 khung, 224 px, batch 8). Hình cho thấy điều mà một bảng số không cho thấy: muốn gấp đôi độ dài clip, bạn chỉ phải giảm cạnh ảnh khoảng 30\%, nhưng muốn gấp bốn thì phải giảm một nửa --- và đường cong dốc rất nhanh ở phía trái.}
+\label{fig:video-budget}
+\end{figure}
+
+Hình~\ref{fig:video-budget} nên dùng như một công cụ chứ không phải một minh hoạ: khi ai đó đề nghị ``tăng độ dài clip lên 64 khung'', hãy chỉ ngay vào đường cong và hỏi họ định trả bằng độ phân giải hay bằng batch.
+
+\subsection{C. Giới hạn và trường hợp hỏng}
+
+\begin{itemize}
+\item \textbf{Rất nhiều tập dữ liệu không thực sự cần thời gian.} Nhiều tập dữ liệu hành động phổ biến có thể đoán đúng phần lớn chỉ từ \emph{bối cảnh} của một khung hình --- thấy bể bơi thì đoán ``bơi''. Đây là quan sát được lặp lại rộng rãi trong lĩnh vực, và hệ quả là một mô hình thời gian tinh vi có thể trông tốt vì lý do hoàn toàn khác với lý do bạn nghĩ.
+\item \textbf{Optical flow là một phụ thuộc ngoài mạng.} Nhánh chuyển động của kiến trúc hai luồng đòi hỏi flow được tính trước, thường tốn hơn cả mô hình chính. Chất lượng flow khi đó thành trần cho toàn hệ thống --- đúng mẫu ``đẩy độ khó sang chỗ khác''.
+\item \textbf{Batch nhỏ phá thống kê chuẩn hoá.}\lk{C/12/02}{hệ quả của}{chuẩn hoá theo batch ước lượng trung bình và phương sai từ chính batch, nên batch nhỏ làm ước lượng nhiễu --- đúng cơ chế đã bàn ở phần làm cho huấn luyện chạy được.} Mô hình video thường chạy batch 2--8 trên mỗi GPU, nên batch norm cho ước lượng phương sai rất nhiễu; đây là lý do các kiến trúc video hay dùng chuẩn hoá theo nhóm hoặc theo tầng \cite{wu2018groupnorm}.
+\item \textbf{Lấy mẫu khung là một siêu tham số ẩn.} Lấy 16 khung liên tiếp, hay 16 khung rải đều trên 4 giây, là hai bài toán khác nhau; và cách lấy mẫu lúc đánh giá thường khác lúc huấn luyện, nên số công bố phụ thuộc vào một chi tiết ít khi được nêu rõ.
+\end{itemize}
+
+\begin{cambay}
+Trước khi so sánh bất kỳ hai kiến trúc video nào, hãy chạy baseline rẻ nhất: lấy một khung hình ngẫu nhiên, chạy mô hình ảnh, rồi trung bình dự đoán trên vài khung. Nếu baseline này đạt gần bằng mô hình thời gian, thì tập dữ liệu của bạn không đo cái bạn tưởng nó đo, và mọi so sánh giữa các mô hình thời gian phía trên đều là nhiễu. Đây là bài kiểm tra rẻ nhất và bị bỏ qua nhiều nhất trong cả lĩnh vực.
+\end{cambay}
+
+\begin{cannho}
+Ngân sách bộ nhớ của video chia cho ba chiều nhân với nhau: độ dài clip \(\times\) độ phân giải\(^2\) \(\times\) batch. Mọi lựa chọn kiến trúc vì thế là lựa chọn hy sinh chiều nào. Và trước khi trả tiền cho chiều thời gian, hãy chứng minh rằng bài toán của bạn thật sự cần nó, bằng baseline một khung hình. \T{2}
+\end{cannho}
+
+\subsection{D. Kết nối}
+\ptr{B/11-gioi-han-tinh-toan} là nơi ngân sách bộ nhớ và băng thông được xử lý tổng quát; mục này chỉ là trường hợp riêng nhưng khắc nghiệt nhất. \ptr{C/13-kien-truc-backbone/03-vit-va-inductive-bias} giải thích vì sao video transformer đói dữ liệu: bỏ inductive bias theo trục thời gian còn tốn dữ liệu hơn bỏ theo trục không gian. \ptr{C/15-thi-giac-khong-thoi-gian/03-flow-tracking-va-rang-buoc} tiếp nối trực tiếp bằng nhánh optical flow --- thứ mà kiến trúc hai luồng dựa vào --- và bằng ràng buộc nhân quả, thứ loại bỏ phần lớn các kiến trúc trong bảng trên khi bạn phải chạy streaming.
+
+\begin{tukiem}
+\item Vì sao coi thời gian như trục không gian thứ ba là một giả định sai, và sai đó biểu hiện thành lỗi gì trong thực tế?
+\item Tính lượng bộ nhớ cho một tensor kích hoạt clip 32 khung, \(112\times112\), 128 kênh, fp16. Nếu vượt ngân sách, bạn cắt chiều nào trước và vì sao?
+\item (2+1)D có cùng số tham số với 3D conv nhưng thường tốt hơn. Lợi ích đó đến từ đâu, nếu không phải từ sức chứa của mô hình?
+\item Vì sao chi phí attention trên clip 16 khung gấp 256 lần trên một ảnh, chứ không phải 16 lần?
+\item SlowFast dựa trên nhận định nào về bản chất của tín hiệu? Nếu nhận định đó sai với dữ liệu của bạn thì kiến trúc hỏng thế nào?
+\item Baseline ``một khung hình rồi gộp'' đạt 92\% so với mô hình 3D đạt 94\%. Bạn kết luận gì, và bước tiếp theo là gì?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

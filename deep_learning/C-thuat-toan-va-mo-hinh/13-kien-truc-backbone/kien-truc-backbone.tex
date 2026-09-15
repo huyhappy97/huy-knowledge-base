@@ -1,0 +1,154 @@
+% ---------------------------------------------------------------------------
+% Chương 13 — Các họ kiến trúc backbone  (file chương, có 3 mục con)
+% Tạo: 2026-09-03  |  Sửa gần nhất: 2026-09-03  |  Ôn gần nhất: —
+% Phụ thuộc: C/12 (toàn chương), B/10-thiet-ke-kien-truc
+% Mức độ: cốt lõi
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Các họ kiến trúc backbone (Backbone Architecture Families)}
+\ptrtarget{C/13}\ptrtarget{C/13-kien-truc-backbone}
+\dependency{\ptr{C/12-co-che-huan-luyen} (toàn chương --- không có nó thì mọi kiến trúc ở đây chỉ là sơ đồ khối); \ptr{B/10-thiet-ke-kien-truc} (trục đánh đổi giả định--dữ liệu); \ptr{B/11-gioi-han-tinh-toan} (FLOPs không phải độ trễ).}
+
+\begin{tomtat}
+Chương này đọc lịch sử kiến trúc như \emph{một cuộc tranh luận kéo dài về việc nên cài bao nhiêu giả định vào mô hình}. Mỗi thế hệ trả lời khác nhau, vì lượng dữ liệu sẵn có ở thời điểm đó khác nhau. Đọc xong bạn chọn được \en{backbone} theo ràng buộc thật của mình --- dữ liệu, độ trễ, độ phân giải --- thay vì theo bảng xếp hạng, và đọc được cấu trúc một repo thị giác lạ trong mười phút. Nếu chỉ nhớ một điều: mọi kiến trúc trong chương là một điểm trên cùng một trục. Một đầu là ``cài sẵn nhiều giả định, cần ít dữ liệu'', đầu kia là ``cài ít giả định, cần nhiều dữ liệu''. Bài học đắt nhất: phần lớn chênh lệch từng được gán cho kiến trúc hoá ra thuộc về công thức huấn luyện.
+\end{tomtat}
+
+\begin{nentang}
+\kn{backbone}{phần mạng làm nhiệm vụ trích đặc trưng từ ảnh, dùng chung được cho nhiều bài toán; phần sinh đầu ra cụ thể được lắp thêm phía sau.}
+\kn{inductive bias}{tập giả định mà mô hình mang sẵn trước khi nhìn dữ liệu; nhiều giả định đúng thì học nhanh với ít mẫu, giả định sai thì chặn luôn nghiệm đúng.}
+\kn{convolution}{phép nhân một cửa sổ trọng số nhỏ trượt khắp ảnh; vì cùng bộ trọng số dùng cho mọi vị trí, nó cài sẵn hai giả định --- quan hệ gần là quan trọng, và mẫu hình có ý nghĩa như nhau ở mọi vị trí.}
+\kn{trường tiếp nhận (receptive field)}{vùng pixel đầu vào ảnh hưởng tới một giá trị đầu ra; nó lớn dần theo chiều sâu trong CNN và bằng toàn ảnh ngay từ tầng đầu trong attention toàn cục.}
+\kn{attention}{cơ chế cho mỗi vị trí tự chọn lấy thông tin từ mọi vị trí khác bằng trọng số học được, thay vì chờ thông tin lan dần qua từng tầng.}
+\kn{FLOPs}{số phép nhân-cộng mà mô hình thực hiện; nó là chỉ số đại diện phổ biến cho chi phí, nhưng \emph{không} tỉ lệ với độ trễ thật vì còn phụ thuộc băng thông bộ nhớ.}
+\kn{pretraining}{huấn luyện trước trên một tập rất lớn để học đặc trưng chung, rồi mới huấn luyện tiếp trên tập nhỏ của bài toán đích.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Nếu \en{attention} cho mọi vị trí nói chuyện trực tiếp với nhau ngay từ tầng đầu tiên, vì sao suốt mười năm người ta vẫn dùng \en{convolution} --- thứ cố tình chỉ cho phép nhìn một cửa sổ \(3\times3\)?}
+\h{Một mạng phẳng \(56\) tầng có sai số \emph{huấn luyện} cao hơn mạng \(20\) tầng, dù nó thừa sức chứa để bắt chước mạng nông bằng cách để các tầng thừa làm ánh xạ đồng nhất. Chuyện gì đã xảy ra?}
+\h{MobileNet giảm số phép nhân khoảng \(8{,}7\) lần. Vì sao độ trễ đo được trên GPU lại không giảm \(8{,}7\) lần?}
+\h{Nếu ConvNeXt cho thấy CNN vẫn ngang ViT khi dùng cùng công thức huấn luyện, thì mười năm ``cải tiến kiến trúc'' đã thực sự cải tiến cái gì?}
+\h{Vì sao cùng một kiến trúc lại thua CNN khi có một triệu ảnh và thắng khi có ba trăm triệu ảnh --- điều gì trong mô hình thay đổi theo lượng dữ liệu?}
+\end{khoigoi}
+
+\section{Vì sao chương này chia làm ba mạch}
+Ba mục của chương không phải ba họ kiến trúc song song mà là ba lần trả lời cùng một câu hỏi, trên ba loại dữ liệu và ở ba thời điểm khác nhau. Đọc theo thứ tự này thì mục sau luôn có sẵn khái niệm mà mục trước dựng lên.
+
+\begin{enumerate}
+\item \textbf{Mạch 1 --- dòng CNN.} Bắt đầu từ câu trả lời ``cài nhiều giả định'', rồi theo dõi mười lăm năm gỡ từng nút thắt. Mục này dựng lên các khái niệm nền của cả chương: trường tiếp nhận, chi phí tính toán, kết nối tắt, và bài học ConvNeXt về recipe.
+\item \textbf{Mạch 2 --- từ chuỗi tới attention.} Chuyển sang loại dữ liệu mà convolution không phục vụ được --- dữ liệu có thứ tự và quan hệ xa --- và theo dõi chuỗi RNN, LSTM, attention, transformer, rồi các cách chống chi phí bậc hai. Đây là mục cung cấp cơ chế cho mạch 3.
+\item \textbf{Mạch 3 --- ViT và inductive bias.} Mang attention vào ảnh, tức chọn câu trả lời ``cài rất ít giả định'', rồi đo cái giá. Mục này chỉ đọc được sau hai mục trước, vì nó liên tục so sánh với cả hai.
+\end{enumerate}
+
+Hình~\ref{fig:truc-gia-dinh} đặt cả ba mạch lên một trục duy nhất. Điều đáng chú ý là trục này không có điểm ``tốt nhất'': vị trí đúng phụ thuộc vào lượng dữ liệu bạn có, và đó chính là nội dung của cuộc tranh luận.
+
+\begin{figure}[H]\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[
+  nd/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,font=\small,align=center,text width=2.5cm},
+  ax/.style={-{Latex[length=2.6mm]},draw=inkblue,very thick},
+  lb/.style={font=\scriptsize,color=steel,align=center},
+  hd/.style={font=\small\bfseries,color=inkblue}]
+\draw[ax] (0,0) -- (15.2,0);
+\node[hd,anchor=west] at (0,0.55) {nhiều giả định cài sẵn};
+\node[hd,anchor=east] at (15.2,0.55) {ít giả định cài sẵn};
+\node[nd] at (1.6,-1.5)  {CNN cổ điển\\\scriptsize cục bộ, đẳng biến, phân cấp};
+\node[nd] at (5.4,-1.5)  {CNN hiện đại\\\scriptsize ConvNeXt, kernel lớn};
+\node[nd] at (9.2,-1.5)  {ViT phân cấp\\\scriptsize Swin, PVT, lai conv};
+\node[nd] at (13.4,-1.5) {ViT phẳng\\\scriptsize patch \(+\) attention toàn cục};
+\foreach \x in {1.6,5.4,9.2,13.4}{\draw[steel,thick] (\x,0) -- (\x,-0.65);}
+\draw[{Latex[length=2.4mm]}-{Latex[length=2.4mm]},draw=reddark,thick] (1.6,-2.9) -- (13.4,-2.9);
+\node[lb,color=reddark] at (7.5,-3.35) {\textbf{cái giá đi kèm:} càng sang phải càng cần nhiều dữ liệu, nhiều augmentation, hoặc một mô hình thầy để chưng cất};
+\end{tikzpicture}}
+\caption{Bốn họ kiến trúc đặt trên trục ``lượng giả định cài sẵn''. Trục này không có điểm tối ưu tuyệt đối: vị trí đúng phụ thuộc lượng dữ liệu có nhãn mà bạn nắm trong tay, nên cùng một bài toán có thể đổi câu trả lời khi tập dữ liệu lớn lên.}
+\label{fig:truc-gia-dinh}
+\end{figure}
+
+\subfile{00-map}
+\subfile{01-dong-cnn/dong-cnn}
+\subfile{02-tu-chuoi-toi-attention/tu-chuoi-toi-attention}
+\subfile{03-vit-va-inductive-bias/vit-va-inductive-bias}
+
+\section{Thực hành}
+Chương này dễ đọc thụ động và khó nhớ, vì phần lớn nội dung là tên riêng. Hai mục dưới đây là phần đọc và phần tự vấn; phần chuyển nó thành thứ dùng được nằm ở khối mini project cuối chương, nơi bạn tự tạo ra bảng đo của chính mình thay vì tin bảng của người khác.
+
+\begin{description}
+\item[Repo và SOTA (chốt tháng 9/2026).] Backbone dùng thật: \repo{facebookresearch/dinov3} phủ dải từ khoảng \(21\) triệu tới vài tỉ tham số nhưng có giấy phép riêng, nên nếu cần điều khoản thoáng thì DINOv2 (Apache 2.0) là lựa chọn thay thế \cite{oquab2024dinov2}; ConvNeXt-V2 và Swin lấy qua \repo{timm}; ngoài ra EVA-02 và SigLIP. Cài đặt tối giản để \emph{đọc} chứ không để chạy production: \repo{lucidrains/vit-pytorch} và \repo{karpathy/nanoGPT}. Attention nhanh: \repo{Dao-AILab/flash-attention}. Mô hình không gian trạng thái: \repo{state-spaces/mamba}. Danh sách tên mô hình này chốt tại tháng 9/2026 và sẽ cũ trong sáu tới mười hai tháng; ngược lại, các repo hạ tầng như \repo{timm} hay COLMAP bền hơn nhiều, nên hãy phân bổ thời gian học theo đúng tỉ lệ đó.
+\item[Câu hỏi kiểm tra hiểu.] Vì sao ViT cần nhiều dữ liệu hơn CNN, và ba cách bù lại --- pretraining, augmentation mạnh, lai ghép --- trả giá bằng loại tài nguyên nào? FlashAttention không giảm FLOPs, vậy nó nhanh hơn nhờ đâu, và trên phần cứng nào lợi ích của nó thu hẹp lại? Nếu ConvNeXt cho thấy recipe quan trọng hơn kiến trúc, điều đó thay đổi thứ tự bạn đọc một paper kiến trúc như thế nào?
+\end{description}
+
+\begin{onbai}
+\ar[3]{Ba giả định của convolution}{Tính cục bộ: chỉ pixel lân cận liên quan trực tiếp. Chia sẻ trọng số, tức đẳng biến tịnh tiến. Và phân cấp: đặc trưng phức tạp ghép từ đặc trưng đơn giản. Cả chương là chuyện thêm hoặc bớt ba giả định này.}
+\ar[2]{Trường tiếp nhận}{Vùng pixel đầu vào ảnh hưởng tới một giá trị đầu ra. Trong CNN nó lớn dần theo chiều sâu; trong attention toàn cục nó bằng cả ảnh ngay từ tầng đầu.}
+\ar[2]{Vì sao xếp chồng hai tầng \(3\times3\) thay một tầng \(5\times5\)?}{Cùng trường tiếp nhận, nhưng tốn \(18C^2\) tham số thay vì \(25C^2\), và có thêm một lần phi tuyến ở giữa. Một trong ít phép đổi tốt ở cả ba mặt.}
+\ar[2]{Vì sao nút thắt \(1\times1\) rẻ hơn gần chín lần?}{Vì phần đắt nhất của conv là tích của kênh vào, kênh ra và diện tích cửa sổ. Giảm kênh xuống \(64\) rồi mới làm \(3\times3\) thì \(k^2\) chỉ nhân với một số nhỏ: \(589\,824\) phép nhân còn \(69\,632\).}
+\ar[3]{Kết nối tắt}{Đường cộng \(y = x + F(x)\) đưa ánh xạ đồng nhất thành phương án mặc định. Jacobian thành \(I + \partial F/\partial x\), nên tích qua nhiều khối luôn còn một thành phần bằng \(1\). Giá phải trả: phải giữ \(x\) sống tới điểm cộng, nên tốn thêm bộ nhớ.}
+\ar[2]{Depthwise separable}{Tách conv thành một bước không gian chạy riêng từng kênh, rồi một bước \(1\times1\) trộn kênh. Chi phí còn \(1/C_{\text{out}} + 1/k^2\) lần, khoảng \(0{,}115\) với \(k=3\) và \(C_{\text{out}}=256\).}
+\ar[3]{Giảm \(8{,}7\) lần FLOPs mà độ trễ gần như không đổi --- nguyên nhân?}{Bước depthwise đọc mỗi phần tử để làm vỏn vẹn chín phép nhân, nên nó nghẽn ở băng thông chứ không ở khả năng tính toán. Phân biệt với nghẽn tính toán: đo thông lượng bộ nhớ, nếu đã sát trần thì giảm FLOPs vô ích.}
+\ar[1]{Dilated convolution}{Giãn khoảng cách giữa các điểm lấy mẫu, nên trường tiếp nhận tăng mà không phải giảm độ phân giải. Sinh ra cho segmentation; hỏng thành hoa văn răng lược nếu xếp chồng nhiều tầng cùng hệ số giãn.}
+\ar[2]{Cổng của LSTM}{Cơ chế cho trạng thái ô đi qua theo dạng cộng: \(c_t = f_t \odot c_{t-1} + \dots\). Khi cổng quên mở gần \(1\), gradient chảy qua mà không bị nhân với ma trận trọng số --- đúng mẹo của kết nối tắt, chỉ khác là hệ số học được.}
+\ar[3]{Attention}{Mỗi vị trí sinh truy vấn, mọi vị trí sinh khoá và giá trị; đầu ra là tổ hợp có trọng số của mọi vị trí. Đường đi thông tin bằng \(1\) thay vì \(T\), đổi lại chi phí và bộ nhớ \(O(T^2)\).}
+\ar[3]{Vì sao attention chia cho \(\sqrt{d}\)?}{Tích vô hướng \(d\) chiều có độ lệch chuẩn \(\sqrt{d}\), tức \(8\) khi \(d = 64\). Softmax trên logit lệch chuẩn \(8\) bão hoà thành gần one-hot, và ở vùng đó đạo hàm bằng \(0\).}
+\ar[2]{Mã hoá vị trí}{Thông tin vị trí được cấp từ bên ngoài, vì phép attention bất biến với hoán vị. Bốn họ: sin tuyệt đối, học được, tương đối, và RoPE. Loại tuyệt đối ngoại suy kém ra ngoài độ dài đã thấy khi huấn luyện.}
+\ar[2]{Window attention}{Chỉ cho attention trong một cửa sổ cố định, rồi dịch cửa sổ ở tầng sau để thông tin rò qua ranh giới. Chi phí thành tuyến tính theo \(T\); giá phải trả là quan hệ xa cần nhiều tầng mới nối được.}
+\ar[1]{FlashAttention}{Chia ô và tính softmax trực tuyến để không bao giờ dựng ma trận \(T\times T\) trong HBM. Số FLOPs không đổi và độ phức tạp tiệm cận cũng không đổi; cái giảm là số vòng đọc ghi bộ nhớ ngoài.}
+\ar[3]{ViT}{Cắt ảnh thành patch, coi mỗi patch là một token, rồi đưa vào transformer chuẩn. Nó vứt bỏ tính cục bộ và đẳng biến tịnh tiến, nên thua CNN khi dữ liệu ít và vượt khi dữ liệu rất nhiều.}
+\ar[3]{Vì sao ViT cần nhiều dữ liệu hơn CNN?}{Vì giả định không cài vào kiến trúc thì phải mua bằng mẫu. Ba cách trả: pretrain trên tập rất lớn, chưng cất từ thầy CNN cộng augmentation mạnh, hoặc lắp lại giả định bằng kiến trúc phân cấp.}
+\ar[2]{Đổi độ phân giải đầu vào rồi ViT tệ hẳn --- nguyên nhân?}{Quên nội suy bảng mã hoá vị trí: số token đổi nhưng bảng vẫn kích thước cũ. Phân biệt với thiếu fine-tune: lỗi này làm điểm tụt ngay cả khi bạn fine-tune lại đủ lâu.}
+\ar[2]{ViT phẳng hết bộ nhớ ở dự đoán dày stride \(4\) --- nguyên nhân?}{Số token là \(128^2 = 16\,384\), nên ma trận attention chiếm khoảng \(537\) MB cho \emph{một} đầu, một tầng. Lời sửa là chuyển sang biến thể cửa sổ hoặc phân cấp.}
+\ar[3]{ConvNeXt}{Một CNN được hiện đại hoá bằng chính công thức huấn luyện của ViT, và nó bắt kịp ViT cùng hạng. Bài học: phần lớn chênh lệch từng được gán cho kiến trúc thực ra thuộc về recipe.}
+\ar[3]{Backbone, neck, head}{Backbone trích đặc trưng ở nhiều stride, neck hợp nhất chúng theo chiều từ sâu về nông, head sinh đầu ra của bài toán. Đây là cách đọc một repo detection nhanh nhất, và là lý do ViT phẳng khó lắp: nó chỉ sinh một mức đặc trưng.}
+\end{onbai}
+
+
+\begin{ungdung}
+\ud{\repo{timm}}{Kho backbone chuẩn của ngành: ConvNeXt, Swin, EVA, ResNet hiện đại hoá --- và là nơi thấy rõ nhất rằng cùng kiến trúc với recipe khác nhau cho điểm số khác nhau}{Hạ tầng bền; đáng đầu tư hơn bất kỳ tên mô hình nào}
+\ud{DINOv2 và DINOv3}{Backbone ViT trả khoản nợ giả định bằng pretraining tự giám sát ở quy mô rất lớn --- đúng cách thứ nhất trong ba cách ở mạch 3}{DINOv2 giấy phép Apache 2.0; DINOv3 giấy phép riêng, chốt 9/2026}
+\ud{Swin và các biến thể phân cấp}{Lắp lại tính cục bộ và đa tỉ lệ mà ViT phẳng đánh mất, để sinh ra bốn mức đặc trưng mà FPN cần}{Vẫn là backbone mặc định cho nhiều hệ dự đoán dày}
+\ud{\repo{flash-attention}}{Tấn công chi phí bậc hai ở tầng hệ thống: không dựng ma trận \(T\times T\) trong HBM, giữ nguyên FLOPs}{Đã thành mặc định trong phần lớn thư viện transformer}
+\ud{ConvNeXt-V2}{Bằng chứng đang sống rằng convolution vẫn cạnh tranh khi được huấn luyện bằng recipe hiện đại}{Đọc kèm bảng ablation của nó là cách nhanh nhất để thấy từng thành phần recipe đáng bao nhiêu}
+\end{ungdung}
+
+\begin{duan}{Chọn backbone cho bộ mô tả đặc trưng dưới ngân sách độ trễ của Orin}{1--2 ngày}
+\dmt biến câu hỏi ``backbone nào tốt hơn'' thành một quyết định có bằng chứng, dưới đúng ràng buộc của bạn. Và thấy tận mắt rằng thứ hạng theo FLOPs có thể ngược thứ hạng theo độ trễ thật.
+\ddl dùng lại tập cặp ghép đã gán nhãn từ mini project chương 12, nhưng thay đầu vào thủ công bằng miếng ảnh \(32\times32\) cắt quanh mỗi góc ORB trên EuRoC. Ba backbone cùng hạng lấy từ \repo{timm}: một CNN cổ điển (ResNet-18), một CNN hiện đại hoặc hướng thiết bị nhúng (ConvNeXt-T hoặc MobileNetV3), và một ViT phân cấp (Swin-T).
+\dbc fine-tune cả ba ở \emph{cùng} ngân sách epoch và cùng công thức huấn luyện --- đây là điều kiện bắt buộc, nếu không thì bạn đang đo recipe chứ không đo kiến trúc; đo trên Jetson Orin ở batch bằng \(1\), tức đúng chế độ mà SLAM chạy, sau khi khoá xung nhịp, lấy cả trung vị lẫn phân vị \(95\); lập bảng sáu cột gồm độ chính xác ghép, số tham số, FLOPs, độ trễ trung vị, độ trễ \(p_{95}\), bộ nhớ đỉnh.
+\dxk bạn chỉ ra được backbone nào thắng ở một ngân sách cụ thể, chẳng hạn \(8\) ms mỗi khung hình. Bạn giải thích thứ hạng bằng hai đại lượng: trường tiếp nhận so với kích thước miếng ảnh, và cường độ số học so với ngưỡng roofline của Orin. Và bạn chỉ ra được ít nhất một cặp trong bảng có thứ hạng FLOPs ngược thứ hạng độ trễ.
+\dnv \ptr{B/11} cho mô hình roofline dùng để giải thích cột độ trễ; \ptr{C/12/03} cho việc giữ công thức huấn luyện ngang nhau giữa ba lần chạy; \ptr{C/14} cho bước tiếp theo là lắp backbone đã chọn vào một head thật.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì cửa sổ \(3\times3\) không phải một giới hạn mà là một \emph{giả định}: quan hệ gần quan trọng hơn quan hệ xa, và mẫu hình có ý nghĩa như nhau ở mọi vị trí. Giả định đó đúng với ảnh tự nhiên, nên nó thay thế cho dữ liệu. Attention toàn cục không giả định gì về khoảng cách, nên phải học quan hệ đó từ mẫu và trả thêm chi phí \(O(T^2)\).}
+\tl{Gradient descent không tìm ra nghiệm ``các tầng thừa làm ánh xạ đồng nhất'', dù nghiệm đó tồn tại. Đây là vấn đề tối ưu hoá, không phải sức chứa --- và kết nối tắt sửa nó bằng cách biến ánh xạ đồng nhất thành phương án mặc định, đồng thời để lại một thành phần bằng \(1\) trong tích các Jacobian.}
+\tl{Vì phần depthwise đọc mỗi phần tử đầu vào để làm vỏn vẹn \(k^2 = 9\) phép nhân, nên cường độ số học của nó rất thấp và kernel rơi vào phía nghẽn băng thông bộ nhớ. Giảm FLOPs của một kernel vốn đã nghẽn ở bộ nhớ thì gần như không giảm thời gian.}
+\tl{Cải tiến công thức huấn luyện --- optimizer, lịch học, số epoch, augmentation --- nhiều hơn là cải tiến kiến trúc. Điều đó không xoá bỏ tiến bộ về kiến trúc, nhưng nó nói rằng mọi bảng so sánh không kiểm soát recipe đều không tách được hai nguồn ấy, nên câu hỏi đầu tiên khi đọc bảng phải là câu hỏi về recipe.}
+\tl{Không có gì trong mô hình thay đổi --- thứ thay đổi là \emph{ai trả tiền cho các giả định}. Với ít dữ liệu, giả định cài sẵn của convolution là món quà miễn phí; với rất nhiều dữ liệu, chính giả định đó thành trần, còn mô hình ít giả định thì học ra được các quan hệ mà convolution cấm nó biểu diễn.}
+\end{traloi}
+
+\begin{dongian}
+Giả sử bạn thuê một người thợ mới và giao việc phân loại đồ vật qua ảnh. Bạn có hai cách. Cách thứ nhất là dặn trước thật nhiều quy tắc: hai chỗ cạnh nhau trong ảnh thường liên quan tới nhau; một cái cốc vẫn là cái cốc dù nó nằm ở góc nào của bàn; nhìn nét nhỏ trước rồi mới ghép thành hình lớn. Cách thứ hai là không dặn gì cả, chỉ đưa cho họ thật nhiều ví dụ và để họ tự rút ra.
+
+Cả chương là câu chuyện về việc chọn giữa hai cách đó, và phát hiện quan trọng nhất là chúng thay thế được cho nhau. Ai chỉ có vài nghìn tấm ảnh thì dặn trước nhiều quy tắc là món hời, vì quy tắc làm thay phần việc mà ví dụ đáng ra phải làm. Ai có hàng trăm triệu tấm thì chính những quy tắc ấy lại thành xiềng: chúng cấm người thợ nhận ra các mối liên hệ mà bạn không nghĩ tới khi dặn.
+
+Có hai cái giá phải nhớ. Một là bỏ bớt quy tắc thì phải trả bằng ví dụ, hoặc bằng việc mượn một người thợ đã được luyện sẵn ở nơi khác. Hai là ``rẻ hơn trên giấy'' không có nghĩa là ``nhanh hơn trong xưởng'': một cách làm cắt được tám phần chín số phép tính vẫn có thể chạy chậm y như cũ, vì thời gian thật đi vào việc lấy vật liệu ra khỏi kho chứ không vào việc gia công. Và bất ngờ cuối cùng: phần lớn khác biệt giữa hai người thợ hoá ra không nằm ở quy tắc họ được dặn, mà ở cách họ được luyện tập.
+\motcau{Quy tắc dặn trước là khoản vay trả trước cho ví dụ --- ít ví dụ thì nên dặn nhiều, nhiều ví dụ thì chính lời dặn thành xiềng, và phần lớn chênh lệch bạn thấy trên bảng xếp hạng lại đến từ cách luyện tập chứ không từ lời dặn.}
+\end{dongian}
+
+\section{Kết nối}
+Chương này nhận đầu vào từ \ptr{C/12-co-che-huan-luyen}: không có bộ máy huấn luyện thì các kiến trúc ở đây chỉ là sơ đồ khối. Nó cũng nhận từ \ptr{B/10-thiet-ke-kien-truc}, nơi trục đánh đổi giả định--dữ liệu được phát biểu lần đầu. Xuôi xuống, nó cấp backbone cho \ptr{C/14-bai-toan-cv-loi}, \ptr{C/16-thi-giac-3d} và \ptr{C/17-mo-hinh-sinh}, và đặt sẵn câu hỏi mà \ptr{C/18-pretraining-va-foundation} trả lời: nếu giả định phải mua bằng dữ liệu, thì mua ở đâu cho rẻ nhất. Hai nhánh ngang nên đọc ngay sau chương này. Thứ nhất là \ptr{B/11-gioi-han-tinh-toan}, để biến các phép tính FLOPs ở đây thành dự đoán độ trễ có căn cứ. Thứ hai là \ptr{E/24-thi-nghiem-va-ablation}, để không bị chính các bảng so sánh trong chương này dẫn tới kết luận quá mạnh.
+
+\subsection*{Tổng kết chương}
+Ta đã đi qua ba mạch và về cùng một chỗ. Mạch 1 cho thấy dòng CNN là một chuỗi gỡ nút thắt, mỗi bước đẩy độ khó sang một trục khác, và mắt xích cuối --- ConvNeXt --- buộc ta xét lại toàn bộ các so sánh trước đó. Mạch 2 cho thấy attention mua được đường đi thông tin ngắn nhất có thể bằng chi phí bậc hai, và ba hướng chống chi phí đó nằm ở ba tầng trừu tượng khác nhau. Mạch 3 cho thấy khi vứt bỏ giả định thị giác, cái giá hiện ra rất sạch dưới dạng lượng dữ liệu cần có --- và có ít nhất ba loại tiền để trả khoản đó.
+
+Còn bỏ ngỏ ba chỗ. Thứ nhất, chương này chỉ nói về \emph{trích đặc trưng}; việc biến đặc trưng thành đầu ra của một bài toán cụ thể --- hộp, mặt nạ, khoảng cách --- là nội dung của \ptr{C/14-bai-toan-cv-loi}. Thứ hai, cách rẻ nhất để trả khoản nợ giả định là dùng một mô hình đã pretrain, và toàn bộ chủ đề đó nằm ở \ptr{C/18-pretraining-va-foundation}. Thứ ba, mô hình không gian trạng thái là hướng đang chuyển động nhanh nhất trong ba mạch. Chương này đánh giá rằng nó chưa thay thế attention trong thị giác. Đó là đánh giá tính tới tháng 9/2026, không phải một kết luận bền. Đọc tiếp \ptr{C/14-bai-toan-cv-loi} với câu hỏi: khi lắp một head cụ thể lên các backbone này, ràng buộc nào của backbone sẽ trở thành ràng buộc của cả hệ thống?
+\begin{tukiem}
+\item Trục duy nhất của chương là ``cài sẵn nhiều giả định, cần ít dữ liệu'' đối lại ``cài ít giả định, cần nhiều dữ liệu''. Hãy đặt ResNet, Swin và ViT phẳng lên trục đó, rồi nói cái gì trong mô hình thực sự thay đổi khi dữ liệu tăng, khiến thứ hạng đảo chiều?
+\item Kết nối tắt của ResNet, cổng của LSTM và chuẩn hoá theo tầng cùng phục vụ một mục tiêu đã đặt ra ở \ptr{C/12-co-che-huan-luyen}. Mục tiêu đó là gì, và vì sao attention giải quyết nó theo một cách khác hẳn ba thứ kia?
+\item Nếu ConvNeXt đúng khi nói recipe quan trọng hơn kiến trúc, thì các bảng so sánh trong chính chương này còn đọc được ở mức nào, và bạn đòi thêm cột nào trước khi tin một dòng?
+\item FLOPs xuất hiện ở cả ba mục nhưng không mục nào coi nó là độ trễ. MobileNet, FlashAttention và attention cửa sổ mỗi cái phá vỡ quan hệ FLOPs--độ trễ theo kiểu riêng nào, và đại lượng chung nào giải thích được cả ba?
+\item Bạn cần một backbone cho ảnh rất lớn, vật thể chỉ vài chục pixel, và ngân sách bộ nhớ chặt. Ràng buộc nào loại bớt phương án trước, và vì sao câu trả lời đổi khi bạn có hay không có một mô hình pretrain?
+\item Cả ba mục đều kể lịch sử như một chuỗi gỡ nút thắt. Nếu bạn tin nút thắt hiện tại nằm ở dữ liệu chứ không ở kiến trúc, thì quan sát nào trong chính chương này ủng hộ niềm tin đó, và quan sát nào phản bác?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

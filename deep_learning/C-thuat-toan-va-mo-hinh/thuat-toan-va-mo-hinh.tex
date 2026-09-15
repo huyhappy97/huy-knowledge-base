@@ -1,0 +1,22 @@
+\documentclass[../deep_learning.tex]{subfiles}
+\begin{document}
+\part{THUẬT TOÁN VÀ MÔ HÌNH}
+\begin{tomtat}
+Phần C đi qua bảy họ thuật toán và mô hình, mỗi họ đọc như một chuỗi kỹ thuật ra đời đúng theo thứ tự để gỡ nút thắt của nhau: cơ chế huấn luyện, các họ backbone, ba bài toán thị giác lõi, thị giác chuỗi và video, thị giác 3D, mô hình sinh, và pretraining. Đọc xong bạn đoán được một kiến trúc lạ sẽ hỏng ở đâu mà không cần chạy thử. Nếu chỉ nhớ một điều: đừng đọc phần này như danh mục kiến trúc --- hãy đọc như chuỗi vấn đề, vì chuỗi vấn đề còn giá trị lâu sau khi tên mô hình đã cũ.
+\end{tomtat}
+
+Đây là phần dài nhất của cây, và cũng là phần dễ đọc sai nhất. Đọc sai nghĩa là đọc nó như một danh mục: một danh sách kiến trúc kèm năm ra đời và điểm số trên bảng xếp hạng. Đọc như vậy thì kiến thức hết hạn cùng lúc với bảng xếp hạng. Cách đọc đúng là coi mỗi họ mô hình như \emph{một chuỗi kỹ thuật ra đời theo đúng thứ tự để gỡ nút thắt của nhau}: mỗi bước giải quyết một khiếm khuyết cụ thể của bước trước và gần như luôn tạo ra một vấn đề mới, và chính chuỗi vấn đề đó mới là thứ còn giá trị sau mười năm.
+
+Bảy chương được sắp theo thứ tự phụ thuộc chứ không theo độ hấp dẫn. Chương~12 là cơ chế huấn luyện, đi từ vi mô tới vĩ mô, và là chương quyết định nhiều nhất tới năng lực thực hành: nếu không hiểu vì sao gradient chết và vì sao learning rate là siêu tham số quan trọng nhất thì mọi kiến trúc phía sau chỉ là hộp đen. Chương~13 là các họ backbone, đọc như ba mạch song song --- dòng CNN, dòng chuỗi tới attention, và ViT cùng bài học của nó về inductive bias. Chương~14 và~15 áp các backbone đó vào các lớp bài toán thật, trước là ảnh tĩnh rồi tới chuỗi và video, nơi thời gian thêm vào một chiều ràng buộc mới. Chương~16 là thị giác 3D, nơi hình học cổ điển và học sâu gặp nhau trên cùng một bài toán qua bốn thế hệ. Chương~17 là các mô hình sinh và low-level vision, chứa một trong vài kết quả \emph{có tính lý thuyết} hiếm hoi của cả cây là trade-off giữa perceptual và distortion. Chương~18 khép lại bằng câu chuyện thống nhất phía sau mười năm qua: nguồn giám sát ngày càng rẻ, từ nhãn người gán tới chính bức ảnh, tới văn bản đi kèm, tới việc ghép thị giác vào một mô hình ngôn ngữ đã biết suy luận.
+
+Xuyên suốt bảy chương, hãy giữ hai câu hỏi trong đầu ở mỗi kỹ thuật mới: \emph{nó giả định gì}, và \emph{độ khó đã bị đẩy đi đâu}. Khi một phương pháp trông như bữa trưa miễn phí thì gần như chắc chắn là bạn chưa tìm ra chỗ trả giá.
+\subfile{00-map}
+\subfile{12-co-che-huan-luyen/co-che-huan-luyen}
+\subfile{13-kien-truc-backbone/kien-truc-backbone}
+\subfile{14-bai-toan-cv-loi/bai-toan-cv-loi}
+\subfile{15-thi-giac-khong-thoi-gian/thi-giac-khong-thoi-gian}
+\subfile{16-thi-giac-3d/thi-giac-3d}
+\subfile{17-mo-hinh-sinh/mo-hinh-sinh}
+\subfile{18-pretraining-va-foundation/pretraining-va-foundation}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

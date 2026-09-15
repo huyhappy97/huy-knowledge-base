@@ -1,0 +1,74 @@
+% ============================================================================
+%  GIẢI THUẬT VÀ TƯ DUY GIẢI BÀI — master gộp toàn cây thành một PDF liền mạch.
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+%  Dependency: không (gốc cây). Mức độ: cốt lõi.
+%  Build: ./build.sh          (chỉ master)
+%         ./build.sh all      (thêm PDF riêng cho từng phần/chương)
+% ============================================================================
+\documentclass[11pt,a4paper,oneside]{report}
+\usepackage{subfiles}
+\input{\subfix{preamble/common}}
+\addbibresource{\subfix{refs.bib}}
+\hypersetup{pdftitle={Giải thuật và tư duy giải bài — cây tri thức},
+            pdfsubject={Algorithms, problem solving, và kinh nghiệm luyện tập của những người giỏi nhất}}
+\begin{document}
+
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture, overlay]
+  \fill[inkblue] (current page.north west) rectangle ++(1.5cm,-\paperheight);
+  \fill[accent]  ($(current page.north west)+(1.5cm,0)$) rectangle ++(0.22cm,-\paperheight);
+  \node[anchor=north east, inner sep=0pt]
+    at ($(current page.north east)+(-1.6cm,-2.3cm)$)
+    {\fontsize{190}{190}\selectfont\sffamily\bfseries\color{inkblue!7}ALG};
+\end{tikzpicture}
+
+\vspace*{4.2cm}
+\begin{flushleft}
+{\sffamily\bfseries\color{accent}\large THUẬT TOÁN, TƯ DUY GIẢI BÀI VÀ KỶ LUẬT LUYỆN TẬP\par}
+\vspace{0.5cm}
+{\sffamily\bfseries\color{inkblue}\fontsize{40}{45}\selectfont
+CÂY TRI THỨC\\[0.12em] GIẢI THUẬT\par}
+\vspace{0.9cm}
+{\color{accent}\rule{7cm}{2.4pt}}\par
+\vspace{0.9cm}
+{\large\color{inkblue!85}
+Trình bày theo mạch\\[0.25em]
+\textbf{bài toán} \(\rightarrow\) \textbf{ý tưởng} \(\rightarrow\) \textbf{bất biến} \(\rightarrow\) \textbf{chi phí} \(\rightarrow\) \textbf{chỗ hỏng}\par}
+\end{flushleft}
+
+\vfill
+\begin{flushleft}
+{\itshape\color{tiercol}``Thuật toán tốt không phải thuật toán thông minh nhất,\\
+mà là thuật toán khai thác đúng cấu trúc mà bài toán vô tình để lộ ra.''\par}
+{\footnotesize\sffamily\color{tiercol}luận điểm xuyên suốt cả quyển, xem Chương 1 và Chương 13\par}
+\vspace{1.1cm}
+{\footnotesize\sffamily\color{inkblue}\textbf{Năm phần}\quad
+A · Tư duy và nền tảng \quad B · Cấu trúc dữ liệu \quad C · Chiến lược thiết kế\\[0.25em]
+\phantom{\textbf{Năm phần}}\quad D · Giới hạn và miền chuyên \quad E · Hành nghề và luyện tập\par}
+\vspace{0.5em}
+{\footnotesize\sffamily\color{tiercol}Bản gộp toàn cây --- \today\par}
+\end{flushleft}
+\end{titlepage}
+
+\pagenumbering{roman}
+\hypersetup{pageanchor=true}
+\subfile{00-map}
+\cleardoublepage
+\tableofcontents
+\cleardoublepage
+\pagenumbering{arabic}
+
+\subfile{A-tu-duy-va-nen-tang/tu-duy-va-nen-tang}
+\subfile{B-cau-truc-du-lieu/cau-truc-du-lieu}
+\subfile{C-chien-luoc-thiet-ke/chien-luoc-thiet-ke}
+\subfile{D-gioi-han-va-mien-chuyen/gioi-han-va-mien-chuyen}
+\subfile{E-hanh-nghe/hanh-nghe}
+
+\subfile{97-doc-them}
+\subfile{98-thuat-ngu}
+\subfile{99-ket-luan}
+
+\printbibliography[title={Nguồn}]
+\end{document}

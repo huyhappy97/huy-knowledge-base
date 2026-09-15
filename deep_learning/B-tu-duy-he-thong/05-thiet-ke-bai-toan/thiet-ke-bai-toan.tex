@@ -1,0 +1,259 @@
+% ---------------------------------------------------------------------------
+% Chương 5 — Thiết kế bài toán và định nghĩa dữ liệu
+% Tạo: 2026-09  |  Sửa gần nhất: 2026-09-03  |  Ôn gần nhất: —
+% Phụ thuộc: B/03-giai-phau-he-thong, B/04-nen-tang-hoc-tu-du-lieu
+% Mức độ: cốt lõi — sai lầm ở chương này không sửa được ở các chương sau.
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Thiết kế bài toán và định nghĩa dữ liệu (Problem Framing and Data Definition)}
+\ptrtarget{B/05}\ptrtarget{B/05-thiet-ke-bai-toan}
+\dependency{\ptr{B/03-giai-phau-he-thong} (bộ ba đầu vào / đầu ra / tín hiệu giám sát); \ptr{B/04-nen-tang-hoc-tu-du-lieu} (identifiability và ba đòn bẩy --- chương này biến đòn bẩy ``thêm dữ liệu'' thành một quyết định có con số).}
+
+\begin{tomtat}
+Chương này nói về những quyết định bạn phải ra \emph{trước khi} có mô hình nào chạy: một mẫu là gì, nhãn được định nghĩa thế nào ở các ca biên, gộp hay tách lớp, dùng \en{bbox} hay \en{mask}, lấy mẫu từ đâu, và nên đầu tư tiếp vào dữ liệu hay vào mô hình. Đọc xong bạn tự chẩn đoán được nguyên nhân của phần lớn thất bại triển khai, kể cả những nguyên nhân không hiện lên trên bất kỳ metric nội bộ nào. Bạn cũng trả lời được câu ``gán nhãn thêm bao nhiêu thì đáng'' bằng một phép tính hai dòng trên \en{learning curve}, thay vì bằng cảm tính. Nếu chỉ nhớ một điều: \vn{đơn vị phân tích}{unit of analysis} và dạng đầu ra khoá chặt mọi thứ phía sau, còn thiên lệch sinh ra ở khâu thu thập thì không hàm mất mát nào sửa được --- chỉ có thu thập lại.
+\end{tomtat}
+
+\begin{nentang}
+\kn{nhãn (label) và tập dữ liệu}{nhãn là câu trả lời đúng gắn với một ảnh --- tên lớp, toạ độ hộp, hay mask. Tập dữ liệu là tập các cặp (ảnh, nhãn) dùng để dạy và để đánh giá mô hình. Cả chương này nói về việc \emph{định nghĩa} nhãn chứ không về việc học từ nó.}
+\kn{mẫu (sample) --- hai nghĩa}{(a) một điểm dữ liệu đơn lẻ, ``một mẫu ảnh''; (b) trong thống kê, cả tập được rút ra từ một quần thể, ``mẫu gồm 500 ảnh''. Chương này dùng nghĩa (a) khi nói ``số mẫu'' và nghĩa (b) khi nói ``lấy mẫu''; ngữ cảnh phân biệt được.}
+\kn{tập huấn luyện và tập kiểm thử}{tập dữ liệu được chia làm ít nhất hai phần: phần dùng để điều chỉnh tham số (huấn luyện) và phần giữ riêng, không cho mô hình nhìn thấy, dùng để ước lượng chất lượng trên dữ liệu mới (kiểm thử). Nếu một mẫu lọt vào cả hai phần thì con số kiểm thử lạc quan giả --- hiện tượng gọi là rò rỉ dữ liệu.}
+\kn{các dạng nhãn không gian}{\emph{bounding box} (bbox) là hình chữ nhật bao quanh vật, ghi bằng bốn số; \emph{mask} là nhãn cho từng pixel, nói pixel đó thuộc vật nào; \emph{polygon} là đường bao đa giác, xấp xỉ rẻ hơn của mask; \emph{keypoint} là một tập điểm có ý nghĩa cố định (khớp vai, khuỷu tay); \emph{hộp 3D} là hộp trong không gian ba chiều, cần thêm thông tin hình học.}
+\kn{lớp (class) và taxonomy}{lớp là một phạm trù mà nhãn có thể nhận (``xe'', ``người''). Taxonomy là toàn bộ danh sách lớp cùng cách chúng gộp hay tách khỏi nhau --- ``xe'' hay là ``ô tô / xe tải / xe buýt''. Đây là một quyết định thiết kế, không phải một sự thật có sẵn trong thế giới.}
+\kn{quần thể và khung lấy mẫu}{quần thể (\emph{population}) là toàn bộ tình huống hệ thống sẽ gặp khi chạy thật. Khung lấy mẫu (\emph{sampling frame}) là phần của quần thể đó mà bạn thực sự chụp được. Hai thứ này gần như không bao giờ trùng nhau, và chênh lệch giữa chúng là chủ đề trung tâm của chương.}
+\kn{learning curve --- hai nghĩa}{(a) đường cong sai số theo \emph{số vòng huấn luyện} (epoch), dùng để xem mô hình đã hội tụ chưa; (b) đường cong sai số theo \emph{kích thước tập dữ liệu}, dùng để quyết định có nên thu thập thêm dữ liệu không. Chương này chỉ dùng nghĩa (b), và đó là nghĩa ít người vẽ hơn hẳn.}
+\kn{IoU và mAP}{IoU (\emph{intersection over union}) đo mức chồng lấn giữa dự đoán và nhãn: diện tích phần giao chia cho diện tích phần hợp, bằng \(1\) khi trùng khít. mAP là điểm tổng hợp cho bài toán phát hiện, dựng trên IoU. Ở chương này chỉ cần biết chúng là các thước đo phụ thuộc vào dạng đầu ra bạn đã chọn.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao hai người gán nhãn giỏi, cùng đọc một guideline, vẫn cho ra hai tập nhãn khác nhau --- và vì sao con số bất đồng đó lại là trần hiệu năng của mô hình?}
+\h{Một mô hình ổn định qua năm lần chia tập rồi sập ngay tuần đầu triển khai. Nếu không phải overfitting thì là gì?}
+\h{Đổi từ bbox sang mask nghe như một thay đổi kiến trúc; vì sao nó thực ra là quyết định đắt nhất của cả dự án?}
+\h{Câu hỏi ``nên gán nhãn thêm hay nên đổi mô hình'' có trả lời được bằng một con số thay vì bằng thâm niên không?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+Trước khi có mô hình, bạn phải biến một nhu cầu mơ hồ thành một bài toán học máy. Mọi sai lầm ở bước này không sửa được ở bước sau --- đó là điều làm cho chương này khác hẳn mọi chương kỹ thuật khác trong cây. Một \vn{hàm mất mát}{loss function} chọn sai thì đổi loss; một kiến trúc chọn sai thì huấn luyện lại; nhưng một đơn vị phân tích chọn sai, hay một dạng đầu ra chọn sai, thì phải gán nhãn lại từ đầu, và trong hầu hết dự án điều đó đồng nghĩa với việc dự án dừng.
+
+Người mới thường coi phần này là ``việc chuẩn bị'' và muốn đi nhanh qua để tới phần thú vị. Quan sát lặp lại --- và cũng là quan sát chung trong kỹ thuật hệ thống học máy \cite{sculley2015hidden} --- là điều ngược lại: khi một dự án thị giác thất bại, nguyên nhân hiếm khi nằm ở kiến trúc. Nó thường nằm ở một trong hai chỗ: nhãn được định nghĩa không nhất quán, hoặc dữ liệu được thu thập từ một quần thể khác với quần thể sẽ dùng hệ thống. Cả hai nguyên nhân này đều \emph{vô hình} đối với mọi metric nội bộ: bạn có thể đạt \en{mAP} rất cao trên tập kiểm thử của chính mình và vẫn thất bại hoàn toàn khi triển khai, mà không con số nào trong bảng cảnh báo bạn.
+
+Nếu bạn đã làm \en{benchmark} SLAM thì bạn có sẵn trực giác đúng cho chương này, chỉ là dưới tên khác. Một quỹ đạo \vn{chân trị}{ground truth} trên EuRoC được định nghĩa trong một hệ quy chiếu cụ thể; nếu bạn đánh giá quỹ đạo camera bằng chân trị của thân máy bay, mọi con số đều ra, đều đẹp, và đều sai. Sai lầm không nằm ở thuật toán mà nằm ở định nghĩa của đại lượng được đo. Chương này là phiên bản tổng quát của bài học đó, áp cho toàn bộ khâu thiết kế bài toán.
+
+\begin{trucgiac}
+Định nghĩa bài toán giống việc đúc một cái khuôn: mọi thứ đổ vào sau đó đều mang hình dạng của nó. Chọn đơn vị phân tích là chọn kích thước khuôn; chọn dạng đầu ra là chọn hình dạng khoang; định nghĩa nhãn kèm ca biên là mài các cạnh cho hai người thợ khác nhau đúc ra cùng một chi tiết. Bạn có thể đổi kim loại đổ vào --- đổi kiến trúc, đổi loss, đổi \vn{bộ tối ưu}{optimizer} --- bao nhiêu lần tuỳ thích, nhưng đổi khuôn thì phải phá cả mẻ đã đúc.
+\end{trucgiac}
+
+\section{Tám quyết định theo thứ tự ràng buộc (Eight Decisions, Ordered by Reach)}
+
+\subsection{A. Quyết định nào khoá cái gì}
+Thứ tự của mạch dưới đây đi từ quyết định ràng buộc nhiều thứ nhất tới quyết định ràng buộc ít nhất. Đảo ngược thứ tự là sai lầm phổ biến: chọn dạng đầu ra trước khi biết đơn vị phân tích là gì thì bạn sẽ phát hiện mâu thuẫn sau khi đã gán vài nghìn ảnh. Hình~\ref{fig:khoa-cai-gi} cho thấy tầm với của từng quyết định --- đọc nó trước sẽ tiết kiệm cho bạn cả mạch phía sau.
+
+\begin{figure}[H]\centering
+\resizebox{0.96\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.42cm and 2.2cm,
+  d/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=5pt,align=left,font=\small,text width=3.5cm},
+  c/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=5pt,align=left,font=\small,text width=4.0cm},
+  ar/.style={-{Latex[length=2.0mm]},draw=steel,thick}]
+\node[d] (d1) {1. Đơn vị phân tích};
+\node[d,below=of d1] (d2) {2. Định nghĩa nhãn + ca biên};
+\node[d,below=of d2] (d3) {4. Dạng đầu ra};
+\node[d,below=of d3] (d4) {5--6. Khung lấy mẫu};
+\node[c,right=of d1] (c1) {Cách chia dữ liệu; số mẫu hiệu dụng};
+\node[c,right=of d2] (c2) {Trần hiệu năng của cả hệ thống};
+\node[c,right=of d3] (c3) {Kiến trúc, metric, chi phí gán nhãn};
+\node[c,right=of d4] (c4) {Danh sách chế độ hỏng khi triển khai};
+\draw[ar] (d1) -- (c1);
+\draw[ar] (d2) -- (c2);
+\draw[ar] (d3) -- (c3);
+\draw[ar] (d4) -- (c4);
+\draw[ar] (d1.south west) .. controls +(-0.9,-1.4) .. (d3.north west);
+\end{tikzpicture}}
+\caption{Bốn quyết định có tầm với xa nhất và thứ mà mỗi cái khoá lại. Mũi tên cong bên trái nhắc rằng đơn vị phân tích còn ràng buộc cả dạng đầu ra: chọn video làm đơn vị thì nhãn theo khung hình mất phần lớn ý nghĩa.}
+\label{fig:khoa-cai-gi}
+\end{figure}
+
+\subsection{B. Tám bước}
+
+\begin{mach}[Mạch thiết kế một bài toán thị giác]
+\item \vd{``một mẫu'' là gì, câu hỏi tưởng như không cần hỏi.} \gp chọn đơn vị phân tích một cách có ý thức --- một khung hình, một video, một bệnh nhân, một ca chụp, một chuyến đi. \hq nó quyết định luôn cách chia dữ liệu ở chương 7: chọn khung hình làm đơn vị rồi chia ngẫu nhiên là công thức tạo \vn{rò rỉ dữ liệu}{data leakage}. Hai khung hình cách nhau \(33\) ms gần như là cùng một ảnh, nên chúng sẽ nằm ở cả tập huấn luyện lẫn tập kiểm thử. \gia chọn đơn vị lớn hơn làm số mẫu hiệu dụng giảm mạnh, và bạn phải chấp nhận con số đó thay vì con số đẹp hơn nhưng vô nghĩa. \lk{B/07}{tiền đề}{quy tắc chia dữ liệu ở chương đánh giá chỉ đúng khi đơn vị phân tích đã được chọn đúng ở đây}
+\item \vd{nhãn nghe có vẻ hiển nhiên nhưng không phải.} \gd phần lớn cái ta gọi là ``mô hình kém'' thực ra là nhãn được định nghĩa không nhất quán: biên của mask đặt ở đâu khi vật nhoè, che khuất bao nhiêu phần trăm thì vẫn gán, vật nhỏ tới mức nào thì bỏ qua. \gp viết định nghĩa nhãn kèm các \term{ca biên} \emph{trước khi} gán mẫu đầu tiên, rồi thử nghiệm nó trên vài chục ảnh với hai người gán nhãn độc lập. \hq \vn{mức đồng thuận giữa người gán nhãn}{inter-annotator agreement} là trần hiệu năng thực tế của hệ thống; không mô hình nào vượt qua độ nhất quán của dữ liệu dạy nó một cách đáng tin.
+\item \vd{chia lớp thế nào cho đúng.} \gp thiết kế \en{taxonomy}, tức quyết định gộp hay tách. \gia gộp làm bài toán dễ và metric đẹp nhưng đầu ra kém hữu ích; tách làm đầu ra hữu ích hơn nhưng đẩy chi phí gán nhãn lên và làm các lớp hiếm quá thưa để học. \hq quy tắc thực dụng: tách khi và chỉ khi hai lớp dẫn tới hai \emph{hành động} khác nhau ở phía sau hệ thống; nếu hệ thống phản ứng như nhau thì việc tách chỉ tạo công gán nhãn và bất đồng giữa người gán nhãn.
+\item \vd{chọn dạng đầu ra nào.} \gp cân nhắc giữa nhãn ảnh, bbox, mask, \en{polygon}, \en{keypoint}, \vn{hộp 3D}{3D box} --- xem Bảng~\ref{tab:dang-dau-ra}. \gia đây là quyết định đắt nhất trong cả dự án, vì nó ràng buộc \emph{đồng thời} kiến trúc, metric và chi phí gán nhãn. Đổi từ bbox sang mask giữa chừng nghĩa là gán lại từ đầu. \hq nên trả giá suy nghĩ ở đây bằng một thử nghiệm nhỏ, đừng trả giá bằng nửa ngân sách gán nhãn.
+\item \vd{bạn huấn luyện trên tập nào và triển khai cho ai?} \gp phân biệt rành mạch \vn{quần thể}{population} --- toàn bộ tình huống hệ thống sẽ gặp khi chạy thật --- với \vn{khung lấy mẫu}{sampling frame}, phần của quần thể đó mà bạn thực sự lấy mẫu được. \gd hai thứ trùng nhau, một giả định gần như luôn sai. \hq khoảng cách giữa chúng là nguồn thất bại số một khi triển khai, và nó không hiện lên trên bất kỳ metric nội bộ nào vì tập kiểm thử của bạn cũng rút từ chính khung lấy mẫu.
+\item \vd{thiên lệch được cài vào ngay từ khâu đầu.} \gd \en{selection bias} khi thu thập: bạn chụp ban ngày vì tiện, dùng ba thiết bị vì chỉ có ba, lấy ảnh ở những địa điểm cho phép quay. \gp nguyên tắc cứng --- thiên lệch sinh ra ở khâu thu thập thì không mô hình, loss, hay \en{reweighting} nào sửa được ở khâu cuối. Reweighting chỉ sửa được lệch \emph{tỉ lệ} giữa các nhóm đã có mặt; nó không tạo ra được nhóm chưa từng xuất hiện. \hq chỉ có thu thập lại, nên chi phí của một quyết định lấy mẫu cẩu thả là toàn bộ ngân sách dữ liệu.
+\item \vd{nên đầu tư vào dữ liệu hay vào mô hình?} \gp một phép đo thay cho tranh luận --- vẽ learning curve theo kích thước dữ liệu: huấn luyện cùng một cấu hình ở \(10\%\), \(25\%\), \(50\%\), \(100\%\) dữ liệu và nhìn hình dạng đường cong. \hq curve còn dốc thì thu thập tiếp; curve đã phẳng thì tiền gán nhãn tiếp theo gần như bị đốt, và bạn phải đổi mô hình, đổi dạng đầu ra, hoặc đổi bài toán. Đây chính là đòn bẩy ``thêm dữ liệu'' của chương 4, lần này có quy trình đo cụ thể. \lk{B/04}{hệ quả của}{bảng ba đòn bẩy nói \emph{có} ba lựa chọn; learning curve nói \emph{chọn cái nào}}
+\item \vd{dữ liệu không miễn phí, mà thảo luận về nó thường không có đơn vị.} \gp so \emph{chi phí thu thập} với \emph{giá trị biên mỗi mẫu} đọc từ chính đường cong ở bước trên. \hq nó biến một quyết định kỹ thuật thành quyết định kinh tế phát biểu được bằng con số --- cách nghĩ dùng được ở mọi dự án thật, kể cả khi con số chỉ chính xác tới một bậc độ lớn.
+\end{mach}
+
+\section{Chọn dạng đầu ra (Choosing the Output Representation)}
+Trong tám bước trên, bước bốn đáng được mở rộng vì nó là bước duy nhất mà sai lầm không có đường lùi rẻ. Cột chi phí trong Bảng~\ref{tab:dang-dau-ra} là \emph{tương đối} và chỉ nên đọc ở mức bậc độ lớn: các con số này phản ánh kinh nghiệm thực hành lưu truyền trong cộng đồng gán nhãn, không phải một phép đo có kiểm soát. Chúng còn thay đổi mạnh khi có trợ lý gán nhãn bằng mô hình nền tảng.
+
+\begin{table}[H]\centering\small
+\caption{Chọn dạng đầu ra. Cột ``hỏng khi nào'' là cột quyết định: nó cho biết loại lỗi bạn tự nguyện chấp nhận vĩnh viễn khi chọn dạng đó.}
+\label{tab:dang-dau-ra}
+\begin{tabularx}{\linewidth}{@{}L{1.7cm}YL{1.8cm}Y@{}}
+\toprule
+\textbf{Dạng} & \textbf{Giả định về bài toán} & \textbf{Chi phí nhãn (tương đối)} & \textbf{Hỏng khi nào}\\
+\midrule
+Nhãn ảnh & Chỉ cần biết trong ảnh có gì & \(1\times\) & Khi hệ thống cần định vị hoặc đếm\\
+Bbox & Vật tách rời, hình chữ nhật đủ mô tả nó & \(5\)--\(10\times\) & Vật dài, cong, hoặc chồng lấn: hộp chứa chủ yếu là nền\\
+Mask & Cần biên chính xác tới mức pixel & \(20\)--\(50\times\) & Biên mơ hồ (tóc, khói, kính) gây bất đồng lớn giữa người gán nhãn\\
+Polygon & Cần biên nhưng chấp nhận xấp xỉ đa giác & \(10\)--\(30\times\) & Biên phức tạp bị làm trơn quá mức\\
+Keypoint & Vật có cấu trúc cố định đã biết trước & \(10\)--\(20\times\) & Vật không có cấu trúc chung, hoặc bị che một phần\\
+Hộp 3D & Có hình học hoặc cảm biến phụ đồng bộ & \(50\times\) trở lên & Lệch \vn{hiệu chuẩn}{calibration} hoặc lệch thời gian giữa các cảm biến\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Cách chọn đúng không phải là ``chọn dạng giàu thông tin nhất mà ngân sách cho phép'', mà là đi ngược từ hành động phía sau: hệ thống của bạn \emph{làm gì} với đầu ra? Nếu robot chỉ cần biết ``có chướng ngại trong hành lang bên trái hay không'' thì mask là lãng phí nhiều chục lần và còn làm chậm cả pipeline. Nếu nó phải bám theo mép một vật dài và cong thì bbox \emph{sai về nguyên tắc}, không chỉ kém chính xác. Hình chữ nhật bao quanh một vật nằm chéo chứa phần lớn diện tích là nền. Hậu quả kép: bộ điều khiển phía sau không dùng được dự đoán đó, còn mọi metric dựa trên \en{IoU} thì vẫn khen nó. \lk{B/03}{tiền đề}{đây chính là câu hỏi ``đầu ra là gì của quy trình bảy câu hỏi, lần này phải trả lời cho hệ thống của chính bạn} Một dấu hiệu nhận biết mình chọn sai dạng đầu ra: bạn phải viết ngày càng nhiều luật hậu xử lý để dịch đầu ra của mô hình thành thứ hệ thống thật cần.
+
+\section{Quần thể và khung lấy mẫu (Population vs Sampling Frame)}
+Bước năm và sáu nói cùng một chuyện từ hai phía, và đáng được tách ra vì chúng là nguồn thất bại triển khai hay gặp nhất. Nói gọn thì có ba tập lồng nhau, không phải hai: quần thể là tập tất cả tình huống hệ thống sẽ gặp; khung lấy mẫu là tập tình huống bạn có khả năng chụp được; tập dữ liệu là một mẫu rút từ khung lấy mẫu, \emph{không phải} từ quần thể. Tập kiểm thử của bạn cũng rút từ khung lấy mẫu, nên nó đo được sai số trong khung và mù hoàn toàn với phần quần thể nằm ngoài khung.
+
+Điều này giải thích một hiện tượng gây bối rối: mô hình đạt kết quả tốt và ổn định qua nhiều lần chia tập, rồi sập khi triển khai. Không có gì mâu thuẫn --- mọi phép chia đều nằm trong cùng một khung lấy mẫu, nên chúng đo lại cùng một thứ nhiều lần thay vì đo thêm thứ mới. Các benchmark có kiểm soát về dịch chuyển phân phối được xây dựng chính vì lý do này \cite{recht2019imagenet,koh2021wilds}. Bài học chung từ chúng: độ chính xác trong phân phối không dự đoán tốt độ chính xác ngoài phân phối. \lk{B/08}{tiền đề}{chênh lệch quần thể \(\leftrightarrow\) khung lấy mẫu là dạng tĩnh của dịch chuyển phân phối, chỉ khác ở chỗ nó có mặt ngay từ ngày đầu}
+
+Hệ quả hành động thì đơn giản và không dễ chịu. Trước khi thu thập, hãy viết ra bằng lời quần thể mục tiêu và liệt kê các trục biến thiên của nó: thiết bị, ánh sáng, mùa, địa điểm, người dùng. Sau đó đánh dấu trục nào khung lấy mẫu của bạn không phủ. Danh sách đó chính là danh sách chế độ hỏng đã biết trước của hệ thống, và nó nên nằm trong \en{datasheet} của tập dữ liệu \cite{gebru2021datasheets} chứ không nằm trong đầu một người. Nếu một trục quan trọng không phủ được, quyết định đúng là thu hẹp phạm vi cam kết của sản phẩm, chứ không phải hy vọng mô hình tự tổng quát hoá.
+
+\section{Đường cong học theo kích thước dữ liệu (Data-Size Learning Curve)}
+
+\subsection{A. Hai hình dạng, hai quyết định trái ngược}
+Câu hỏi ``nên gán nhãn thêm hay nên đổi mô hình'' thường được tranh luận bằng trực giác và thâm niên. Nó không cần phải như vậy: một buổi huấn luyện ở bốn tỉ lệ dữ liệu cho bạn câu trả lời kiểm chứng được. Điều quan trọng là bạn phân biệt hai trường hợp bằng \emph{hình dạng} đường cong chứ không bằng một con số đơn lẻ (Hình~\ref{fig:learning-curve}).
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.92\linewidth,height=5.4cm, xmode=log, log basis x=10,
+  xlabel={Số mẫu huấn luyện (thang log)}, ylabel={Sai số kiểm thử (\%)},
+  xmin=300, xmax=40000, ymin=6, ymax=35,
+  axis lines=left, grid=major, grid style={rulecol,very thin},
+  legend style={font=\footnotesize,draw=rulecol,at={(0.98,0.97)},anchor=north east},
+  label style={font=\footnotesize}, tick label style={font=\footnotesize}]
+\addplot[violetdark,thick,mark=*,mark size=1.6] coordinates {(400,32)(1000,24)(2000,19)(4000,16)};
+\addlegendentry{A --- còn dốc: nên gán nhãn tiếp}
+\addplot[violetdark,dashed,thick,forget plot] coordinates {(4000,16)(8000,13)(16000,10.6)(32000,8.6)};
+\addplot[steel,thick,mark=square*,mark size=1.5] coordinates {(400,31)(1000,22)(2000,18.5)(4000,18)};
+\addlegendentry{B --- đã phẳng: đổi mô hình hoặc đổi bài toán}
+\addplot[steel,dashed,thick,forget plot] coordinates {(4000,18)(8000,17.9)(16000,17.8)(32000,17.8)};
+\end{axis}
+\end{tikzpicture}
+\caption{Hai hình dạng learning curve theo kích thước dữ liệu, vẽ trên trục log. Đường liền là bốn điểm đo được ở \(10\%\), \(25\%\), \(50\%\), \(100\%\) dữ liệu; đường đứt là ngoại suy. Đường A gần thẳng trên trục log --- dấu hiệu quy luật luỹ thừa còn hiệu lực; đường B đã chạm trần, và trần đó thường là mức nhất quán của nhãn chứ không phải giới hạn của mô hình. Số liệu là minh hoạ, không phải phép đo trên một tập cụ thể.}
+\label{fig:learning-curve}
+\end{figure}
+
+\subsection{B. Phép tính hai dòng biến nó thành quyết định kinh tế}
+Với đường A, sai số giảm từ \(24\%\) ở \(1000\) mẫu xuống \(16\%\) ở \(4000\) mẫu. Giả sử dạng luỹ thừa \(e(n) \approx a\,n^{-b}\), lấy tỉ số hai điểm ta có
+\[
+b \;=\; \frac{\log(24/16)}{\log(4000/1000)} \;=\; \frac{\log 1{,}5}{\log 4} \;\approx\; \frac{0{,}405}{1{,}386} \;\approx\; 0{,}29 .
+\]
+Số mũ \(b\) nói một điều duy nhất: \emph{mỗi lần nhân đôi dữ liệu thì sai số nhân với} \(2^{-b}\). Với \(b \approx 0{,}29\), nhân tư số mẫu lên \(16{,}000\) cho \(e \approx 16 \cdot 4^{-0{,}29} \approx 10{,}6\%\), nghĩa là \(12{,}000\) ảnh gán nhãn thêm mua được khoảng \(5{,}4\) điểm. Nếu chi phí gán một ảnh là \(c\) thì bạn đang cân nhắc bỏ \(12{,}000\,c\) để đổi lấy \(5{,}4\) điểm, và bạn so nó với các phương án khác --- thuê thêm một kỹ sư trong một tháng để thử kiến trúc mới, hay giảm \(c\) bằng trợ lý gán nhãn tự động. Với đường B thì phép tính không cần làm: \(b\) gần \(0\), nên mọi khoản đầu tư dữ liệu đều trả về gần \(0\).
+
+Hai cảnh báo về công cụ này. Thứ nhất, ngoại suy quy luật luỹ thừa ra ngoài dải đã đo là suy đoán và thường lạc quan quá mức, vì đường cong thật cuối cùng cũng phải chạm trần nhãn; hãy coi \(10{,}6\%\) là cận trên của kỳ vọng chứ không phải một dự báo. Thứ hai, mỗi điểm phải được huấn luyện với cùng một quy trình \emph{và} có phương sai được ước lượng, nếu không bạn đang đọc nhiễu như đọc xu hướng --- đây chính là bài học từ benchmark có thành phần ngẫu nhiên mà bạn đã gặp ở phía SLAM.
+
+\section{Thực hành}
+Chương này chỉ chuyển thành kỹ năng khi bạn tự chịu hậu quả của một định nghĩa nhãn lỏng lẻo. Vì vậy cả hai bài tập đều xoay quanh một phép đo: mức bất đồng giữa hai người gán nhãn. Đó là con số hầu như không dự án nào đo, mà hầu như dự án nào cũng bị nó chặn.
+
+\begin{description}
+\item[Repo và tài nguyên.] Ba nhóm công cụ:
+  \begin{itemize}
+  \item \textbf{Gán nhãn} --- \repo{HumanSignal/label-studio}, \repo{cvat-ai/cvat}, Roboflow Annotate.
+  \item \textbf{Trợ lý gán nhãn bằng mô hình nền tảng} --- dòng SAM cho mask theo \en{prompt} \cite{kirillov2023sam} và dòng Grounding DINO cho box theo mô tả văn bản. Chúng làm dịch chuyển đáng kể cột chi phí trong Bảng~\ref{tab:dang-dau-ra}, nhưng \emph{không} làm dịch chuyển vấn đề nhất quán của định nghĩa nhãn.
+  \item \textbf{Soát và tài liệu hoá dữ liệu} --- \repo{voxel51/fiftyone} để khám phá; datasheets \cite{gebru2021datasheets} và \en{model cards} \cite{mitchell2019model} để viết tài liệu kèm.
+  \end{itemize}
+  Danh sách tên mô hình chốt tại tháng 9/2026 và sẽ cũ trong sáu đến mười hai tháng; CVAT và FiftyOne bền hơn nhiều.
+\item[Câu hỏi kiểm tra hiểu.] Trong bài toán của bạn, hai người gán nhãn giỏi sẽ bất đồng ở đâu --- và bạn xử lý bằng cách siết guideline hay bằng cách đổi định nghĩa nhãn? Nếu chuyển đơn vị phân tích từ khung hình sang video thì tập kiểm thử phải chia lại thế nào, và số mẫu hiệu dụng thay đổi bao nhiêu lần? Quần thể mục tiêu của bạn có trục biến thiên nào mà khung lấy mẫu hiện tại không phủ?
+\item[Bài tập phụ.] Nếu bài toán của bạn không phải SLAM, phiên bản tổng quát của bài tập này là: viết \en{annotation guideline} hai trang, tự gán \(200\) ảnh, rồi nhờ một người khác gán \(50\) ảnh trong số đó. Đo mức bất đồng bằng \vn{hệ số kappa của Cohen}{Cohen's kappa} \cite{cohen1960kappa} nếu là bài toán phân loại, hoặc bằng tỉ lệ khớp ở một ngưỡng IoU cố định nếu là phát hiện. Mini project SLAM ở cuối chương là phiên bản gắn với hệ thống của bạn.
+\end{description}
+
+\section{Giới hạn và trường hợp hỏng}
+
+\begin{itemize}
+\item \textbf{Khung này giả định bạn \emph{có} quyền quyết định về dữ liệu.} Rất nhiều dự án bắt đầu từ một tập đã tồn tại với nhãn đã gán; khi đó phần lớn tám bước trở thành công việc khảo cổ --- đọc ngược từ dữ liệu ra định nghĩa nhãn ngầm mà người trước đã dùng. Việc này vẫn đáng làm và thường phát hiện những mâu thuẫn giải thích được vì sao mô hình kém, nhưng nó không thay thế được quyền thiết kế.
+\item \textbf{Nó giả định quần thể mục tiêu đứng yên đủ lâu.} Có những hệ thống mà môi trường đổi theo mùa, theo phiên bản phần cứng, hay theo hành vi người dùng. Ở đó ``quần thể'' là một mục tiêu di động. Bài toán đúng không phải thiết kế một lần cho tốt, mà là dựng một vòng lặp thu thập lại; đó là nội dung của \ptr{B/08-dich-chuyen-phan-phoi}.
+\item \textbf{Mức đồng thuận là trần \emph{thực dụng}, không phải trần lý thuyết.} Có trường hợp mô hình vượt từng người gán nhãn đơn lẻ vì nó học phần tín hiệu chung và trung bình hoá phần nhiễu riêng của mỗi người; ngược lại, có những tập dữ liệu nổi tiếng mà chính nhãn kiểm thử chứa lượng lỗi đủ lớn để làm sai lệch bảng xếp hạng \cite{northcutt2021pervasive}. Hãy dùng nó như tín hiệu chẩn đoán mạnh, đừng dùng như hằng số vật lý.
+\end{itemize}
+
+\begin{cambay}
+Cạm bẫy tốn kém nhất trong chương này là tin rằng một thiên lệch thu thập có thể sửa được ở khâu huấn luyện. Reweighting, \en{resampling} hay các hàm mất mát cân bằng nhóm chỉ điều chỉnh được \emph{tỉ lệ} giữa những nhóm đã có mặt trong dữ liệu. Giả sử hệ thống sẽ gặp điều kiện ban đêm mà tập dữ liệu không có một ảnh ban đêm nào. Không trọng số nào tạo ra được thông tin đó. Mô hình sẽ đưa ra dự đoán tự tin và sai, còn tập kiểm thử của bạn thì không hé một lời. Dấu hiệu nhận biết: cuộc thảo luận về ``xử lý mất cân bằng dữ liệu'' diễn ra hoàn toàn bằng ngôn ngữ hàm mất mát, không ai nhắc tới việc đi chụp thêm.
+\end{cambay}
+
+\begin{cannho}
+Đơn vị phân tích và dạng đầu ra là hai quyết định khoá chặt mọi thứ phía sau: sai ở đó thì phải gán nhãn lại từ đầu. Thiên lệch sinh ra ở khâu thu thập chỉ sửa được bằng cách thu thập lại --- không loss nào, không trọng số nào chạm tới nó. Và trước khi tranh luận ``thêm dữ liệu hay đổi mô hình'', hãy vẽ learning curve: số mũ \(b\) trả lời câu hỏi đó bằng một con số. \T{1}
+\end{cannho}
+
+
+\begin{onbai}
+\ar[3]{Đơn vị phân tích}{Thứ được tính là ``một mẫu'': một khung hình, một video, một bệnh nhân, một chuyến đi. Nó quyết định luôn cách chia dữ liệu và số mẫu hiệu dụng, nên chọn sai là phải làm lại từ đầu.}
+\ar[3]{Rò rỉ dữ liệu}{Cùng một thông tin có mặt ở cả tập huấn luyện lẫn tập kiểm thử, làm con số kiểm thử lạc quan giả. Chọn khung hình làm đơn vị rồi chia ngẫu nhiên là công thức tạo ra nó.}
+\ar[3]{Ca biên}{Các trường hợp lấp lửng trong định nghĩa nhãn: biên vật nhoè, mức che khuất, kích thước tối thiểu. Phải viết ra giấy trước khi gán mẫu đầu tiên, vì sau đó sửa nghĩa là gán lại.}
+\ar[3]{Mức đồng thuận giữa người gán nhãn}{Tỉ lệ hai người gán độc lập cho ra cùng một nhãn. Đây là trần hiệu năng thực tế của hệ thống, vì mô hình chỉ học được từ những nhãn họ tạo ra.}
+\ar[2]{Khi nào mô hình vượt được trần đó?}{Khi mỗi người nhầm theo một kiểu riêng. Mô hình học phần tín hiệu chung và trung bình hoá phần nhiễu riêng của từng người, nên nhỉnh hơn từng người đơn lẻ.}
+\ar[2]{Taxonomy}{Danh sách lớp cùng cách chúng gộp hay tách. Quy tắc thực dụng: chỉ tách khi hai lớp dẫn tới hai hành động khác nhau ở phía sau hệ thống.}
+\ar[3]{Dạng đầu ra}{Nhãn ảnh, bbox, mask, polygon, keypoint, hay hộp 3D. Đây là quyết định đắt nhất dự án vì nó ràng buộc đồng thời kiến trúc, metric và chi phí gán nhãn.}
+\ar[3]{Vì sao đổi dạng đầu ra giữa chừng lại đắt tới vậy?}{Kiến trúc thì huấn luyện lại là xong, nhưng nhãn phải gán lại toàn bộ từ đầu. Đổi từ bbox sang mask là nhân chi phí gán nhãn lên vài lần.}
+\ar[2]{Bbox}{Hình chữ nhật bao quanh vật, ghi bằng bốn số. Nó sai về nguyên tắc với vật dài và cong, vì hộp bao một vật nằm chéo chứa phần lớn diện tích là nền.}
+\ar[2]{Bạn phải viết ngày càng nhiều luật hậu xử lý. Triệu chứng của gì?}{Dạng đầu ra chọn sai: bạn đang dịch đầu ra của mô hình thành thứ hệ thống thật cần. Phép phân biệt là hỏi hệ thống làm gì với đầu ra, rồi chọn dạng đi ngược từ đó.}
+\ar[3]{Quần thể}{Toàn bộ tình huống hệ thống sẽ gặp khi chạy thật. Đây là thứ bạn cam kết phục vụ, không phải thứ bạn đo được.}
+\ar[3]{Khung lấy mẫu}{Phần của quần thể mà bạn thực sự chụp được. Tập kiểm thử cũng rút từ đây, nên nó mù hoàn toàn với phần quần thể nằm ngoài khung.}
+\ar[3]{Ổn định qua năm lần chia tập rồi sập khi triển khai. Nguyên nhân?}{Chênh lệch giữa quần thể và khung lấy mẫu, không phải overfitting. Cả năm phép chia đều nằm trong cùng một khung nên chúng đo lại cùng một thứ; phép phân biệt là dựng một tập kiểm thử từ ngoài khung.}
+\ar[3]{Selection bias}{Thiên lệch cài vào ngay khâu thu thập: chụp ban ngày vì tiện, dùng ba thiết bị vì chỉ có ba. Nó không sửa được ở khâu cuối, chỉ có thu thập lại.}
+\ar[3]{Vì sao reweighting không sửa được selection bias?}{Reweighting chỉ chỉnh tỉ lệ giữa những nhóm đã có mặt trong dữ liệu. Nó không tạo ra được nhóm chưa từng xuất hiện, ví dụ ảnh ban đêm khi tập dữ liệu không có tấm nào.}
+\ar[2]{Cả nhóm bàn ``mất cân bằng dữ liệu'' hoàn toàn bằng ngôn ngữ hàm mất mát}{Dấu hiệu đang rơi vào bẫy reweighting. Phép kiểm tra: hỏi trong dữ liệu có bao nhiêu mẫu của nhóm thiếu; nếu là không thì việc phải làm là đi chụp thêm.}
+\ar[3]{Learning curve theo kích thước dữ liệu}{Sai số kiểm thử vẽ theo số mẫu huấn luyện, đo ở 10, 25, 50 và 100 phần trăm dữ liệu. Nó biến câu ``dữ liệu hay mô hình'' thành một con số thay vì một cuộc tranh luận theo thâm niên.}
+\ar[2]{Số mũ b của learning curve}{Độ dốc trên trục log: mỗi lần nhân đôi dữ liệu thì sai số nhân với hai mũ trừ b. Với b khoảng 0,29 thì nhân tư dữ liệu mua được vài điểm; với b gần không thì mọi khoản đầu tư dữ liệu trả về gần không.}
+\ar[2]{Datasheet của tập dữ liệu}{Tài liệu ghi nguồn, quần thể mục tiêu, khung lấy mẫu, quy trình gán nhãn, mức đồng thuận và các lớp bị thiếu. Danh sách trục không phủ được chính là danh sách chế độ hỏng đã biết trước.}
+\end{onbai}
+
+
+\begin{ungdung}
+\ud{Datasheets for datasets, model cards}{Chuẩn hoá đúng việc chương này yêu cầu: ghi lại quần thể mục tiêu, khung lấy mẫu, quy trình gán nhãn và các lớp bị thiếu}{Thông lệ ở nhiều nhóm lớn từ 2019, ít hết hạn}
+\ud{Dòng SAM và Grounding DINO trong quy trình gán nhãn}{Kéo chi phí của mask và bbox xuống một bậc, tức dịch chuyển trực tiếp cột chi phí trong bảng chọn dạng đầu ra}{Đã thành mặc định tính tới 9/2026}
+\ud{\repo{voxel51/fiftyone}}{Công cụ soi chênh lệch giữa khung lấy mẫu và quần thể bằng cách lát cắt dữ liệu theo thiết bị, ánh sáng, địa điểm}{Hạ tầng, bền}
+\ud{ImageNet-v2 và WILDS}{Bằng chứng đo được rằng độ chính xác trong khung lấy mẫu không dự đoán tốt độ chính xác ngoài nó}{Kết quả đã công bố}
+\end{ungdung}
+
+\begin{duan}{Biến ``có nên làm keyframe không'' thành một bài toán học máy}{1--2 ngày}
+\dmt đi hết tám quyết định của chương trên một bài toán bạn đã có sẵn trực giác kỹ thuật. Mục đích là thấy rõ chỗ nào trực giác đó \emph{không} đủ để thay một định nghĩa viết ra giấy.
+\ddl hai chuỗi EuRoC, một dễ và một khó (ví dụ một chuỗi \code{MH} và một chuỗi \code{V2}), cùng nhật ký của ORB-SLAM3 ghi lại từng khung hình và quyết định keyframe hiện tại của heuristic có sẵn.
+\dbc viết một tài liệu định nghĩa bài toán gồm sáu phần --- (1) đơn vị phân tích: một khung hình, một đoạn, hay một cặp khung hình so với keyframe gần nhất, và hệ quả của lựa chọn đó lên cách chia dữ liệu; (2) định nghĩa nhãn dương/âm kèm ít nhất năm ca biên viết rõ (khung hình mờ nhưng nhiều đặc trưng, camera đứng yên, quay nhanh tại chỗ, vừa mất bám xong, vùng đã lập bản đồ dày); (3) taxonomy: nhị phân hay ba mức, và mỗi mức dẫn tới hành động khác nhau nào trong hệ; (4) dạng đầu ra và metric đi kèm; (5) khung lấy mẫu so với quần thể thật của bạn, ghi rõ trục nào EuRoC không phủ; (6) giao thức chia dữ liệu chống rò rỉ theo chuỗi. Sau đó tự gán \(300\) khung hình và nhờ một người khác gán \(80\) khung hình trong số đó theo đúng tài liệu, không được hỏi lại.
+\dxk hai người gán độc lập theo tài liệu của bạn mà không hỏi thêm một câu nào, và bạn báo cáo được mức đồng thuận trên \(80\) khung hình chung bằng một con số (kappa hoặc tỉ lệ khớp). Ngưỡng để coi là đạt: sau một vòng sửa tài liệu, mức đồng thuận phải tăng, và bạn liệt kê được ít nhất ba ca biên mà vòng đầu không nghĩ ra.
+\dnv \ptr{B/03} cho biết keyframe nằm ở khối nào trong luồng dữ liệu và độ khó bị đẩy đi đâu khi bạn thay heuristic bằng mô hình; \ptr{B/06} biến quy trình gán nhãn này thành một quy trình có ngân sách; \ptr{B/07} kiểm tra giao thức chia dữ liệu ở phần (6); \ptr{B/04} dùng chính tập nhãn này để vẽ learning curve và quyết định có đáng gán tiếp không.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì nhãn không phải một sự thật có sẵn mà là kết quả của một định nghĩa, và mọi định nghĩa đều để hở các ca biên: biên vật nhoè, mức che khuất, kích thước tối thiểu. Mô hình học từ tập nhãn đó nên không thể nhất quán hơn chính dữ liệu dạy nó một cách đáng tin.}
+\tl{Là chênh lệch giữa quần thể và khung lấy mẫu. Cả năm lần chia tập đều nằm trong cùng một khung lấy mẫu, nên chúng đo lại cùng một thứ năm lần thay vì đo thêm thứ mới; phần quần thể nằm ngoài khung không xuất hiện trong bất kỳ phép chia nào.}
+\tl{Vì nó đổi \emph{đồng thời} kiến trúc, metric và toàn bộ nhãn đã gán. Kiến trúc thì huấn luyện lại là xong; nhãn thì phải làm lại từ đầu với chi phí lớn hơn nhiều lần, và đó là thứ thường giết dự án.}
+\tl{Có: huấn luyện cùng một cấu hình ở bốn tỉ lệ dữ liệu, khớp \(e(n)\approx a\,n^{-b}\) và đọc số mũ \(b\). Với \(b\approx0{,}29\), nhân tư dữ liệu mua được vài điểm; với \(b\) gần \(0\), mọi khoản đầu tư dữ liệu tiếp theo đều trả về gần không.}
+\end{traloi}
+
+\begin{dongian}
+Bạn nhờ người khác đi chợ hộ. Nếu mẩu giấy chỉ ghi ``mua ít rau'', bạn sẽ nhận về thứ khác với thứ mình hình dung; nhờ người khác thì lại nhận về thứ thứ ba. Không ai sai cả --- mẩu giấy sai.
+
+Bài toán gốc của chương này đúng như vậy, chỉ khác là người đi chợ là một cái máy. Trước khi có cái máy nào chạy, bạn phải viết mẩu giấy đó: mỗi lần nó nhìn vào cái gì, cái gì được coi là đúng, và những trường hợp lấp lửng thì tính sao. Rau hơi héo có mua không? Bó to gấp đôi thì tính là một hay hai?
+
+Mẹo gồm ba việc. Một, viết các trường hợp lấp lửng ra giấy trước khi bắt đầu chứ không phải sau. Hai, nhờ hai người cùng đi chợ với cùng mẩu giấy rồi xem họ mua khác nhau bao nhiêu; chênh lệch đó chính là mức tốt nhất cái máy có thể đạt, vì nó chỉ học được từ những gì hai người kia mang về. Ba, nhớ rằng bạn chỉ nhờ mua ở chợ đầu ngõ nên sẽ không bao giờ biết chợ khác bán gì; nếu nhà sắp chuyển đi nơi khác thì việc phải làm là đi chợ mới, chứ không phải viết lại mẩu giấy cho hay hơn.
+
+Cái giá phải trả là viết mẩu giấy vừa tốn thời gian vừa nhàm chán, và phải làm xong trước khi được chạm vào phần thú vị.
+
+\chuadongian{câu ``cái máy không bao giờ giỏi hơn hai người đi chợ'' gần đúng nhưng không đúng hẳn. Nếu mỗi người nhầm theo một kiểu riêng, cái máy học từ cả hai có thể trung bình hoá được phần nhầm và nhỉnh hơn từng người. Nói gọn hơn nữa là sai.}
+\motcau{Cái máy chỉ làm được đúng cái mẩu giấy bạn viết, nên phần khó nhất của dự án nằm ở tờ giấy chứ không nằm ở cái máy.}
+\end{dongian}
+
+\section{Kết nối}
+
+\begin{itemize}
+\item \textbf{Ngược lên} --- ba câu hỏi đầu của \ptr{B/03-giai-phau-he-thong} (đầu vào, đầu ra, giám sát) ở đây được trả lời cho \emph{bài toán của bạn} thay vì cho bài toán của người khác; và đòn bẩy ``thêm dữ liệu'' trong bảng ba đòn bẩy của \ptr{B/04-nen-tang-hoc-tu-du-lieu} ở đây có được quy trình đo cụ thể.
+\item \textbf{Đi tiếp} --- \ptr{B/06-chat-luong-du-lieu} nhận vấn đề nhất quán nhãn ở bước hai và biến nó thành quy trình có ngân sách; \ptr{B/07-chia-du-lieu-va-danh-gia} nhận đơn vị phân tích ở bước một và cho thấy chọn sai nó sinh ra rò rỉ thế nào; \ptr{B/08-dich-chuyen-phan-phoi} xử lý phần quần thể nằm ngoài khung lấy mẫu.
+\item \textbf{Sang ngang} --- việc chọn dạng đầu ra ràng buộc luôn thước đo, nên Phần E về đánh giá đọc dễ hơn nhiều nếu bạn quay lại Bảng~\ref{tab:dang-dau-ra} khi đọc nó.
+\end{itemize}
+
+\begin{tukiem}
+\item Vì sao chọn khung hình làm đơn vị phân tích rồi chia dữ liệu ngẫu nhiên lại tạo ra rò rỉ, và triệu chứng của rò rỉ đó hiện ra ở con số nào?
+\item Vì sao mức bất đồng giữa hai người gán nhãn lại là trần hiệu năng thực tế, và trong hoàn cảnh nào mô hình vượt được trần đó?
+\item Đưa ra một bài toán mà bbox không chỉ kém chính xác hơn mask mà còn sai về nguyên tắc. Sai ở đâu, và metric nào che giấu cái sai đó?
+\item Một mô hình đạt kết quả ổn định qua năm lần chia tập rồi sập khi triển khai --- cặp khái niệm quần thể / khung lấy mẫu giải thích hiện tượng đó thế nào, mà không cần dùng tới từ ``overfitting''?
+\item Vì sao reweighting không sửa được selection bias, và chính xác thì nó sửa được loại lệch nào, không sửa được loại nào?
+\item Learning curve của bạn có số mũ \(b \approx 0{,}05\). Kết luận gì, và bước tiếp theo là gì?
+\item Trong bốn quyết định --- đơn vị phân tích, taxonomy, dạng đầu ra, ngưỡng của metric --- cái nào rẻ nhất để đổi sau khi đã gán nhãn xong, và vì sao?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

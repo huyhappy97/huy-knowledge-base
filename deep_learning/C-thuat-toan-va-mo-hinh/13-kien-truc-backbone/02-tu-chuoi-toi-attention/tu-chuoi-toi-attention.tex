@@ -1,0 +1,221 @@
+% ---------------------------------------------------------------------------
+% Chương 13, mục 2 — Từ chuỗi tới attention
+% Tạo: 2026-09-03  |  Sửa gần nhất: 2026-09-03  |  Ôn gần nhất: —
+% Phụ thuộc: C/12/01, C/12/02, C/13/01
+% Mức độ: cốt lõi
+% ---------------------------------------------------------------------------
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Từ chuỗi tới attention (From Sequences to Attention)}
+\ptrtarget{C/13-kien-truc-backbone/02}\ptrtarget{C/13-kien-truc-backbone/02-tu-chuoi-toi-attention}\ptrtarget{C/13/02}\ptrtarget{C/13/02-tu-chuoi-toi-attention}
+\dependency{\ptr{C/12/02-lam-cho-training-chay-duoc} (tích các Jacobian --- vanishing gradient ở đây là đúng hiện tượng đó, chỉ trải theo thời gian); \ptr{C/13/01-dong-cnn} (khái niệm trường tiếp nhận và inductive bias).}
+
+\begin{tomtat}
+Mục này đi từ mạng hồi quy tới \en{attention} và tới các mô hình không gian trạng thái, đọc như một chuỗi gỡ nút thắt chứ không như một danh sách kiến trúc. Đọc xong bạn giải thích được vì sao \en{transformer} bỏ được tính tuần tự, và vì sao nó phải trả bằng chi phí bậc hai. Bạn cũng nói được ba hướng tấn công chi phí đó khác nhau ở tầng nào: toán, kiến trúc, hay hệ thống. Nếu chỉ nhớ một điều: LSTM và ResNet giải cùng một bài toán bằng cùng một mẹo. Cả hai tạo một \emph{đường cộng} để gradient đi qua mà không bị nhân dồn. Nhận ra điều đó thì hai kiến trúc trông rất khác nhau trở thành một ý tưởng duy nhất.
+\end{tomtat}
+
+\begin{nentang}
+\kn{chuỗi (sequence)}{dữ liệu có thứ tự, ví dụ một câu gồm nhiều từ hoặc một video gồm nhiều khung hình; ``thứ tự là thông tin'' nghĩa là hoán vị các phần tử sẽ đổi ý nghĩa.}
+\kn{token}{một phần tử của chuỗi sau khi đã được cắt và mã hoá thành vectơ số --- một từ, một mảnh từ, hoặc với ảnh là một ô vuông \(16\times16\) pixel.}
+\kn{embedding}{vectơ số biểu diễn một token; các token có nghĩa gần nhau được đặt gần nhau trong không gian này, và toàn bộ mô hình chỉ làm việc với vectơ chứ không với ký tự.}
+\kn{trạng thái ẩn (hidden state)}{vectơ mà mạng hồi quy mang theo từ bước thời gian này sang bước sau; nó là toàn bộ ``trí nhớ'' của mạng, nên mọi thứ không nhét được vào nó là mất.}
+\kn{BPTT (backpropagation through time)}{cách áp lan truyền ngược cho mạng hồi quy: trải mạng ra thành \(T\) bản sao theo thời gian rồi lan truyền ngược qua cả \(T\) bước, nên một chuỗi dài \(100\) hành xử như một mạng sâu \(100\) tầng.}
+\kn{attention}{cơ chế cho mỗi vị trí tự chọn lấy thông tin từ mọi vị trí khác bằng một trọng số học được, thay vì phải chờ thông tin truyền dần qua từng bước.}
+\kn{độ phức tạp bậc hai}{chi phí tỉ lệ với \(T^2\) khi độ dài chuỗi là \(T\); gấp đôi độ dài thì chi phí gấp bốn, nên đây là rào cản chính khi mang attention sang ảnh độ phân giải cao.}
+\kn{HBM}{bộ nhớ băng thông cao gắn ngoài chip GPU --- rất lớn nhưng chậm hơn nhiều so với bộ nhớ trên chip; số lần đọc ghi HBM thường quyết định tốc độ hơn cả số phép nhân.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Convolution giả định dữ liệu nằm trên một lưới đều và quan hệ quan trọng là quan hệ gần. Nhưng nhiều dữ liệu có \emph{thứ tự} chứ không có lưới, và quan hệ quan trọng có thể ở rất xa: từ đầu câu quyết định nghĩa từ cuối câu, khung hình đầu video quyết định cách hiểu khung hình cuối. Câu hỏi của mục này là: cấu trúc nào xử lý được loại quan hệ đó, và mỗi câu trả lời phải trả giá bằng gì?
+
+Giá trị cụ thể của mục: nhìn một kiến trúc xử lý chuỗi, bạn trả lời được ba câu. Thông tin đi từ vị trí \(i\) tới vị trí \(j\) qua bao nhiêu bước? Chi phí tăng theo độ dài như thế nào? Và cái gì trong kiến trúc đang giữ vai trò ``biết thứ tự''? Ba câu đó đủ để phân loại mọi biến thể mà bạn sẽ gặp.
+
+\begin{trucgiac}
+Hãy đo mọi kiến trúc trong mục này bằng một đại lượng duy nhất: \emph{độ dài đường đi của thông tin} giữa hai vị trí xa nhau. Trong mạng hồi quy, thông tin phải đi qua \(T\) trạm nối tiếp, và mỗi trạm nhân nó với một ma trận. Giống như truyền một tin nhắn qua dây chuyền thì thầm dài \(100\) người. Trong attention, mọi vị trí nói chuyện trực tiếp với mọi vị trí, đường đi bằng \(1\) --- giống như thay dây chuyền thì thầm bằng một phòng họp mà ai cũng nghe thấy ai. Toàn bộ ưu điểm lẫn toàn bộ chi phí của transformer nằm gọn trong phép đổi đó: phòng họp không tam sao thất bản, nhưng số cặp người phải nghe nhau tăng theo bình phương sĩ số.
+\end{trucgiac}
+
+\subsection{B. Mạch từ RNN tới state space model}
+Sáu bước dưới đây là một chuỗi liên tục, và mỗi bước chỉ hiểu được khi đã thấy vấn đề mà bước trước để lại.
+
+\begin{mach}[Mạch 2 --- từ chuỗi tới attention]
+\item \vd{dữ liệu có thứ tự, nhưng mạng dày đặc và convolution đều không có khái niệm ``bước trước''.} \gp \vn{mạng hồi quy}{recurrent neural network, RNN}: giữ một trạng thái ẩn \(h_t = f(Wh_{t-1} + Ux_t)\) và cập nhật nó theo từng bước, nên cùng một bộ trọng số dùng lại cho mọi độ dài chuỗi. \vdm huấn luyện bằng BPTT nghĩa là lan truyền ngược qua \(T\) tầng dùng chung trọng số. Gradient vì thế tỉ lệ với luỹ thừa \(T\) của cùng một ma trận. Đó đúng là hiện tượng vanishing và exploding của mục \ptr{C/12/02}, nhưng tệ hơn: thừa số lặp lại y hệt nhau nên không có triệt tiêu ngẫu nhiên nào cứu.
+\item \vd{trí nhớ dài không tồn tại: sau vài chục bước tín hiệu đã tắt.} \gp \en{LSTM} \cite{hochreiter1997lstm} và GRU dùng \vn{cổng}{gate} để tạo một trạng thái ô \(c_t = f_t \odot c_{t-1} + i_t \odot g_t\). \hq đạo hàm \(\partial c_t/\partial c_{t-1} = f_t\), nên khi cổng quên mở gần \(1\) thì gradient chảy qua mà \emph{không} bị nhân với ma trận trọng số. Đây chính xác là mẹo của kết nối tắt trong ResNet, chỉ khác là hệ số của đường cộng ở đây học được thay vì cố định bằng \(1\). \vdm tính tuần tự vẫn còn nguyên: \(h_t\) cần \(h_{t-1}\), nên không song song hoá được theo thời gian, và độ dài dùng được vẫn giới hạn.
+\item \vd{tuần tự nghĩa là không tận dụng được GPU, và thông tin xa vẫn phải đi qua mọi trạm trung gian.} \gp \en{attention}. Mỗi vị trí sinh một truy vấn \(q\); mọi vị trí sinh khoá \(k\) và giá trị \(v\). Đầu ra là tổ hợp \(\operatorname{softmax}(qK^\top/\sqrt{d})V\), tức truy cập trực tiếp mọi vị trí trong một bước. \term{Transformer} \cite{vaswani2017attention} bỏ hẳn phần hồi quy và chỉ giữ attention cộng mạng truyền thẳng theo vị trí, nên toàn bộ chuỗi được xử lý song song. \gia chi phí và bộ nhớ bậc hai theo độ dài, và mất hoàn toàn khái niệm thứ tự vì phép tính bất biến với hoán vị.
+\item \vd{mô hình không còn biết token nào đứng trước token nào.} \gp \vn{mã hoá vị trí}{positional encoding}: cộng hoặc trộn thêm thông tin vị trí vào embedding. \gd vị trí có thể mã hoá thành một vectơ mà mô hình học cách dùng. \hq bốn họ với đánh đổi khác nhau --- tuyệt đối dạng sin, tuyệt đối học được, tương đối, và RoPE quay embedding theo góc tỉ lệ vị trí \cite{su2024roformer}. Tuyệt đối đơn giản nhưng ngoại suy kém ra ngoài độ dài đã thấy khi huấn luyện; tương đối và RoPE ngoại suy tốt hơn vì chúng mã hoá \emph{khoảng cách} chứ không mã hoá chỉ số. Với ảnh còn cần biến thể hai chiều, vì vị trí là một cặp \((x,y)\) chứ không phải một số.
+\item \vd{chi phí bậc hai chặn đường tới ảnh độ phân giải cao.} \gp ba hướng tấn công ở ba tầng khác nhau --- xấp xỉ toán học, giới hạn phạm vi kiến trúc, và tối ưu truy cập bộ nhớ --- xem Bảng~\ref{tab:bac-hai}. \hq đây là một bài tập rất tốt về việc \emph{cùng một vấn đề có thể tấn công ở nhiều tầng trừu tượng}, và ba lời giải không loại trừ nhau: người ta dùng FlashAttention \emph{bên trong} Swin.
+\item \vd{cả ba hướng trên đều vá chứ không xoá được bậc hai.} \gp \vn{mô hình không gian trạng thái}{state space model, SSM} như Mamba \cite{gu2023mamba} quay lại dạng hồi quy tuyến tính, với tham số phụ thuộc đầu vào. Nó tính được bằng phép quét song song. Nhờ vậy chi phí tuyến tính theo độ dài mà vẫn huấn luyện song song được. \gia đây là hướng đang lên, chưa phải kết luận: tính tới thời điểm viết, SSM chưa thay thế attention trong thị giác, và phần lớn kết quả mạnh nhất vẫn thuộc về các kiến trúc dựa trên attention.
+\end{mach}
+
+\lk{C/13/01}{cùng nguyên lý với}{cổng của LSTM và kết nối tắt của ResNet là cùng một mẹo --- tạo một đường cộng để gradient không bị nhân dồn}
+
+
+\begin{figure}[H]\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[
+  tk/.style={draw=steel,fill=bluebg,rounded corners=1.5pt,minimum size=0.75cm,inner sep=0pt,font=\scriptsize},
+  hi/.style={draw=reddark,fill=redbg,rounded corners=1.5pt,minimum size=0.75cm,inner sep=0pt,font=\scriptsize},
+  ar/.style={-{Latex[length=1.8mm]},draw=steel},
+  hot/.style={-{Latex[length=2.2mm]},draw=reddark,very thick},
+  fai/.style={-{Latex[length=1.4mm]},draw=steel,opacity=0.22},
+  hd/.style={font=\small\bfseries,color=inkblue,anchor=west},
+  nt/.style={font=\scriptsize,color=reddark,align=left}]
+% --- RNN ---
+\node[hd] at (-0.3,2.2) {Mạng hồi quy: thông tin bò từng bước};
+\foreach \i [count=\c from 0] in {1,2,3,4,5,6,7,8}{
+  \ifnum\i=1 \node[hi] (r\i) at (1.55*\c,1.1) {\(x_{\i}\)};
+  \else\ifnum\i=8 \node[hi] (r\i) at (1.55*\c,1.1) {\(x_{\i}\)};
+  \else \node[tk] (r\i) at (1.55*\c,1.1) {\(x_{\i}\)};\fi\fi}
+\foreach \a/\b in {r1/r2,r2/r3,r3/r4,r4/r5,r5/r6,r6/r7,r7/r8} \draw[hot] (\a) -- (\b);
+\node[nt,anchor=west] at (11.4,1.1) {\(7\) bước để \(x_1\) tới được \(x_8\);\\mỗi bước nhân thêm một ma trận\\\(\Rightarrow\) tín hiệu tắt dần theo độ dài};
+% --- Attention ---
+\node[hd] at (-0.3,-0.9) {Attention: mọi vị trí nói chuyện trực tiếp};
+\foreach \i [count=\c from 0] in {1,2,3,4,5,6,7,8}{
+  \ifnum\i=1 \node[hi] (a\i) at (1.55*\c,-2.0) {\(x_{\i}\)};
+  \else\ifnum\i=8 \node[hi] (a\i) at (1.55*\c,-2.0) {\(x_{\i}\)};
+  \else \node[tk] (a\i) at (1.55*\c,-2.0) {\(x_{\i}\)};\fi\fi}
+\foreach \a in {a2,a3,a4,a5,a6,a7}{\draw[fai] (a1) to[bend left=28] (\a);}
+\foreach \a in {a2,a3,a4,a5,a6}{\draw[fai] (\a) to[bend left=25] (a7);}
+\draw[hot] (a1) to[bend left=34] (a8);
+\node[nt,anchor=west] at (11.4,-2.0) {\(1\) bước duy nhất;\\đổi lại phải tính và lưu\\\(T^2\) trọng số cho mọi cặp};
+\end{tikzpicture}}
+\caption{Đại lượng đáng dùng để so mọi kiến trúc chuỗi: \emph{độ dài đường đi của thông tin} giữa hai vị trí xa nhau. Ở mạng hồi quy nó bằng khoảng cách giữa hai vị trí, nên tín hiệu phải sống sót qua từng ấy phép nhân ma trận --- đây chính là vanishing gradient của mục \ptr{C/12/02}, trải theo trục thời gian. Ở attention nó luôn bằng \(1\), và cái giá là các cạnh mờ trong hình: mọi cặp đều phải có một trọng số, nên số cạnh tăng theo \(T^2\). LSTM nằm giữa hai thái cực: đường đi vẫn dài, nhưng cổng quên tạo một đường cộng nên tín hiệu không bị nhân dồn.}
+\label{fig:duong-di-thong-tin}
+\end{figure}
+
+Hình~\ref{fig:duong-di-thong-tin} là dạng hình học của ẩn dụ ở đầu mục, và nó cũng cho thấy vì sao ba bước đầu của mạch phải đi theo đúng thứ tự đó.
+
+\subsection{C. Vì sao chia cho \(\sqrt{d}\) --- một phép tính hai dòng}
+Chi tiết \(\sqrt{d}\) trong công thức attention trông như một hệ số làm đẹp. Nhưng bỏ nó đi thì mô hình không huấn luyện được, và lý do tính ra được. Giả sử các thành phần của \(q\) và \(k\) độc lập, trung bình \(0\), phương sai \(1\). Tích vô hướng \(q\cdot k = \sum_{i=1}^{d} q_i k_i\) là tổng của \(d\) số hạng độc lập, mỗi số hạng trung bình \(0\) và phương sai \(1\). Nên nó có phương sai \(d\), tức độ lệch chuẩn \(\sqrt{d}\). Với \(d = 64\), độ lệch chuẩn của các logit là \(8\).
+
+Ý nghĩa của con số đó: softmax trên một tập logit có độ lệch chuẩn \(8\) gần như luôn dồn toàn bộ khối lượng vào một phần tử, tức nó bão hoà thành một vectơ gần one-hot. Mà đạo hàm của softmax ở vùng bão hoà xấp xỉ \(0\) --- đúng hiện tượng đã gặp với sigmoid ở \ptr{C/12/02}. Chia cho \(\sqrt{d}\) đưa độ lệch chuẩn về \(1\), giữ softmax ở vùng có gradient. Nói gọn: \(\sqrt{d}\) không phải chuẩn hoá cho đẹp, nó là điều kiện để attention có gradient khi \(d\) lớn.
+\lk{C/12/02}{trường hợp riêng của}{đây đúng là hiện tượng bão hoà của sigmoid, chỉ khác là xảy ra ở softmax và nguyên nhân là thang của tích vô hướng}
+
+\subsection{D. Chi phí bậc hai: con số cụ thể trước, giải pháp sau}
+Trước khi bàn giải pháp, hãy làm phép tính để biết vấn đề nghiêm trọng tới mức nào. Ma trận attention có kích thước \(T \times T\) cho mỗi đầu và mỗi tầng.
+
+\begin{itemize}
+\item \textbf{Phân loại ảnh, ViT-B/16 ở \(224\times224\):} \(T = (224/16)^2 = 196\) token, nên ma trận có \(196^2 = 38\,416\) phần tử --- không đáng kể.
+\item \textbf{Ảnh \(512\times512\), patch \(16\):} \(T = 1024\), ma trận có hơn một triệu phần tử. Vẫn chạy được.
+\item \textbf{Dự đoán dày ở stride \(4\) trên ảnh \(512\times512\):} \(T = 128^2 = 16\,384\), ma trận có \(2{,}68\cdot 10^{8}\) phần tử, tức khoảng \(537\) MB ở fp16 --- \emph{cho một đầu, một tầng}. Nhân với \(12\) đầu là \(6{,}4\) GB chỉ để chứa các trọng số attention của một tầng.
+\end{itemize}
+
+Con số cuối là toàn bộ lý do các biến thể ở Bảng~\ref{tab:bac-hai} tồn tại, và cũng là lý do ViT phẳng không dùng trực tiếp được cho segmentation. Hình~\ref{fig:bac-hai} vẽ cùng ba mốc đó trên trục log để thấy chỗ đường cong bẻ gãy ngân sách.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.82\linewidth,height=5.4cm,xmode=log,ymode=log,
+  xlabel={số token \(T\)}, ylabel={bộ nhớ (MB, fp16, một đầu)},
+  xmin=100,xmax=40000, ymin=0.01, ymax=5000,
+  legend style={font=\scriptsize,at={(0.02,0.98)},anchor=north west,draw=rulecol},
+  tick label style={font=\scriptsize}, label style={font=\scriptsize},
+  grid=major, grid style={rulecol,very thin}]
+\addplot[reddark,thick,domain=100:40000,samples=120]{2*x^2/1e6};
+\addlegendentry{attention dày đặc: \(O(T^2)\)}
+\addplot[steel,thick,dashed,domain=100:40000,samples=60]{2*64*x/1e6};
+\addlegendentry{FlashAttention / SSM: \(O(T)\)}
+\addplot[only marks,mark=*,violetdark,mark size=1.6pt] coordinates {(196,0.077) (1024,2.1) (16384,537)};
+\node[font=\scriptsize,color=violetdark,anchor=south west] at (axis cs:215,0.11) {ViT-B/16, \(224^2\)};
+\node[font=\scriptsize,color=violetdark,anchor=west] at (axis cs:1150,1.3) {ảnh \(512^2\), patch \(16\)};
+\node[font=\scriptsize,color=violetdark,anchor=east] at (axis cs:15000,1400) {dự đoán dày, stride \(4\)};
+\end{axis}
+\end{tikzpicture}
+\caption{Bộ nhớ cần để chứa ma trận attention theo số token, thang log hai chiều. Ba chấm là ba chế độ dùng thật. Khoảng cách giữa hai đường là lý do tồn tại của cả ba hướng tấn công ở Bảng~\ref{tab:bac-hai}; lưu ý FlashAttention nằm trên đường tuyến tính về \emph{bộ nhớ} nhưng vẫn làm đủ \(O(T^2)\) phép tính.}
+\label{fig:bac-hai}
+\end{figure}
+
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[scale=0.40,
+  cel/.style={draw=rulecol,line width=0.3pt},
+  on/.style={draw=rulecol,line width=0.3pt,fill=inkblue},
+  mid/.style={draw=rulecol,line width=0.3pt,fill=steel},
+  ttl/.style={font=\scriptsize\bfseries,color=inkblue,align=center},
+  sub/.style={font=\scriptsize,color=tiercol,align=center,text width=5.2cm}]
+% ---- (1) convolution: bang hep ----
+\begin{scope}
+\foreach \i in {0,...,9}\foreach \j in {0,...,9}{
+  \pgfmathparse{abs(\i-\j)<=1 ? 1 : 0}\ifnum\pgfmathresult=1
+    \node[on,minimum size=0.5cm,inner sep=0pt] at (\j,-\i) {};
+  \else
+    \node[cel,minimum size=0.5cm,inner sep=0pt] at (\j,-\i) {};
+  \fi}
+\node[ttl] at (4.5,1.4) {convolution \(k=3\)};
+\node[sub] at (4.5,-11.6) {Chỉ các cặp lân cận được nối. Chi phí \(O(kT)\), nhưng thông tin xa cần nhiều tầng mới tới nơi.};
+\end{scope}
+% ---- (2) window attention: khoi ----
+\begin{scope}[xshift=13cm]
+\foreach \i in {0,...,9}\foreach \j in {0,...,9}{
+  \pgfmathparse{int(floor(\i/5))==int(floor(\j/5)) ? 1 : 0}\ifnum\pgfmathresult=1
+    \node[mid,minimum size=0.5cm,inner sep=0pt] at (\j,-\i) {};
+  \else
+    \node[cel,minimum size=0.5cm,inner sep=0pt] at (\j,-\i) {};
+  \fi}
+\node[ttl] at (4.5,1.4) {window attention (Swin)};
+\node[sub] at (4.5,-11.6) {Mọi cặp \emph{trong} một cửa sổ. Chi phí tuyến tính theo \(T\); cửa sổ được dịch ở tầng sau để thông tin rò qua ranh giới.};
+\end{scope}
+% ---- (3) full attention ----
+\begin{scope}[xshift=26cm]
+\foreach \i in {0,...,9}\foreach \j in {0,...,9}{
+  \node[on,minimum size=0.5cm,inner sep=0pt] at (\j,-\i) {};}
+\node[ttl] at (4.5,1.4) {attention toàn cục};
+\node[sub] at (4.5,-11.6) {Mọi cặp \((i,j)\) đều có một trọng số. Đường đi thông tin bằng \(1\), nhưng chi phí và bộ nhớ là \(O(T^2)\).};
+\end{scope}
+\node[font=\scriptsize,color=tiercol,rotate=90] at (-1.6,-4.5) {vị trí truy vấn \(i\)};
+\node[font=\scriptsize,color=tiercol] at (4.5,-10.4) {vị trí bị nhìn \(j\)};
+\end{tikzpicture}}
+\caption{Ba kiến trúc, cùng một cách nhìn: ô \((i,j)\) được tô nghĩa là vị trí \(i\) được phép lấy thông tin trực tiếp từ vị trí \(j\). Convolution là một dải hẹp quanh đường chéo --- đó chính là ``tính cục bộ'' phát biểu dưới dạng ma trận. Window attention là các khối trên đường chéo, tức một thoả hiệp: dày đặc trong cửa sổ, rỗng ngoài cửa sổ. Attention toàn cục tô kín, và diện tích phần tô chính là chi phí phải trả. Nhìn ba lưới cạnh nhau thì ``inductive bias'' thôi không còn là một khái niệm trừu tượng: nó chính là các ô \emph{bị bỏ trắng} vì kiến trúc quyết định trước rằng chúng không đáng quan tâm.}
+\label{fig:ma-tran-attention}
+\end{figure}
+
+Hình~\ref{fig:ma-tran-attention} nên được xem trước khi đọc Bảng~\ref{tab:bac-hai}: hai trong ba hướng tấn công ở đó chính là hai cách khác nhau để \emph{bớt tô} lưới bên phải, còn hướng thứ ba giữ nguyên lưới nhưng đổi cách nó được tính.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Ba hướng tấn công chi phí bậc hai, ở ba tầng trừu tượng khác nhau. Chúng không loại trừ nhau và trên thực tế hay được dùng chồng lên nhau.}
+\label{tab:bac-hai}
+\begin{tabularx}{\linewidth}{@{}L{2.3cm}L{2.5cm}YY@{}}
+\toprule
+\textbf{Tầng tấn công} & \textbf{Đại diện} & \textbf{Cơ chế} & \textbf{Mất gì / hỏng khi nào}\\
+\midrule
+Toán học & Linear attention & Đổi thứ tự nhân ma trận nhờ một xấp xỉ của softmax, biến \(O(T^2 d)\) thành \(O(T d^2)\) & Chất lượng giảm ở tác vụ cần attention ``sắc'', tức cần chọn đúng một vị trí trong nhiều vị trí giống nhau\\
+Kiến trúc & Swin, window attention \cite{liu2021swin} & Chỉ cho attention trong cửa sổ cố định, rồi dịch cửa sổ giữa các tầng để thông tin rò qua & Quan hệ xa cần nhiều tầng mới nối được; xuất hiện lại một dạng ``đường đi dài'' mà attention sinh ra để xoá\\
+Hệ thống & FlashAttention \cite{dao2022flashattention} & Chia ô và tính softmax trực tuyến để không bao giờ dựng ma trận \(T\times T\) trong HBM & Không giảm FLOPs và không giảm độ phức tạp tiệm cận; lợi ích phụ thuộc kích thước SRAM của GPU cụ thể\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng~\ref{tab:bac-hai} đáng đọc kỹ vì nó dạy một thói quen chung hơn cả nội dung: khi gặp một rào cản, hãy hỏi nó có thể bị tấn công ở tầng nào. FlashAttention là ví dụ sạch nhất --- nó không sửa thuật toán, nó sửa \emph{cách thuật toán chạm vào bộ nhớ}, và với người đã tối ưu kernel CUDA thì đây là câu chuyện quen thuộc: tăng cường độ số học bằng cách giữ dữ liệu trên chip và giảm số vòng đọc ghi ra bộ nhớ ngoài.
+\lk{B/11}{ràng buộc bởi}{FlashAttention chỉ có ý nghĩa trong mô hình roofline: nó dời kernel từ phía nghẽn băng thông sang phía nghẽn tính toán}
+
+\subsection{E. Giới hạn và trường hợp hỏng}
+Attention không phải luôn thắng, và ba chỗ nó thua đáng nhớ.
+
+Thứ nhất, \emph{với chuỗi ngắn và dữ liệu ít, mạng hồi quy vẫn cạnh tranh}. Chi phí bậc hai chỉ là vấn đề khi \(T\) lớn; khi \(T\) nhỏ, phần chi phí thật nằm ở mạng truyền thẳng chứ không ở attention, còn transformer thì lại cần nhiều dữ liệu hơn vì nó cài ít giả định hơn.
+
+Thứ hai, \emph{mã hoá vị trí là chỗ rò rỉ giả định}. Mọi phép ngoại suy ra độ dài chưa từng thấy khi huấn luyện đều là ngoại suy, và mô hình có thể xuống cấp lặng lẽ. Với ảnh, đổi độ phân giải đầu vào mà không nội suy lại positional embedding là một lỗi phổ biến, cho ra kết quả tệ mà không báo lỗi.
+
+Thứ ba, \emph{linear attention và window attention đánh đổi ở hai chỗ khác nhau}, nên đừng coi chúng thay thế được nhau. Linear attention mất khả năng chọn sắc; window attention giữ được độ sắc trong cửa sổ nhưng mất quan hệ xa. Nếu tác vụ của bạn cần cả hai --- ví dụ theo vết một đối tượng nhỏ qua toàn ảnh --- thì cả hai đều không đủ và bạn phải quay lại kiến trúc phân cấp.
+
+Về mức độ tin cậy: các con số bộ nhớ ở mục D là số học thuần tuý nên chắc chắn. Còn phát biểu ``SSM chưa thay thế attention trong thị giác'' chỉ là đánh giá của tôi tính tới tháng 9/2026. Nó dựa trên việc các kết quả dẫn đầu vẫn dùng attention, và có thể sai trong vòng một năm.
+
+\begin{cambay}
+Cạm bẫy thực hành hay gặp nhất khi mang một ViT sang bài toán của mình: đổi kích thước ảnh đầu vào mà quên nội suy positional embedding. Số token thay đổi, nhưng bảng vị trí đã học vẫn có kích thước cũ; tuỳ cài đặt mà bạn nhận một exception --- trường hợp may mắn --- hoặc một phép cắt/đệm âm thầm cho ra một mô hình hoạt động nhưng kém hẳn. Dấu hiệu nhận biết: điểm số tụt đúng một bậc ngay khi đổi độ phân giải, trong khi mọi thứ khác giữ nguyên.
+\end{cambay}
+
+\begin{cannho}
+Đo mọi kiến trúc chuỗi bằng ba câu: thông tin đi từ \(i\) tới \(j\) qua bao nhiêu bước, chi phí tăng theo \(T\) như thế nào, và cái gì đang giữ vai trò ``biết thứ tự''. RNN cho đường đi \(O(T)\) và chi phí \(O(T)\); attention cho đường đi \(O(1)\) và chi phí \(O(T^2)\); mọi biến thể là một điểm nằm giữa hai thái cực đó. \T{2}
+\end{cannho}
+
+\subsection{F. Kết nối}
+Bước hai của mạch --- cổng tạo đường cộng --- là cùng một ý tưởng với kết nối tắt ở \ptr{C/13/01-dong-cnn}, và cả hai đều là hệ quả của lập luận tích Jacobian ở \ptr{C/12/02-lam-cho-training-chay-duoc}; nếu chỉ nhớ một liên kết trong cả chương 13 thì nên nhớ liên kết này. Mục tiếp theo, \ptr{C/13/03-vit-va-inductive-bias}, mang attention vào ảnh và hỏi cái giá của việc vứt bỏ tính cục bộ. Phần FlashAttention nối trực tiếp sang \ptr{B/11-gioi-han-tinh-toan} (cường độ số học, roofline) và sang \ptr{D/20-toi-uu-va-nen-mo-hinh}. Còn attention với vai trò cơ chế lựa chọn trong bài toán thị giác cụ thể xuất hiện lại ở \ptr{C/14-bai-toan-cv-loi} qua DETR \cite{carion2020detr}.
+
+\begin{tukiem}
+\item Vì sao vanishing gradient trong RNN tệ hơn trong một mạng truyền thẳng cùng độ sâu, dù cơ chế là như nhau?
+\item Cổng của LSTM và kết nối tắt của ResNet giống nhau ở điểm cốt lõi nào, và khác nhau ở điểm nào?
+\item Nếu bỏ hệ số \(1/\sqrt{d}\) trong attention thì hỏng ở đâu, và vì sao hậu quả nặng hơn khi \(d\) lớn?
+\item FlashAttention không giảm FLOPs --- vậy nó nhanh hơn nhờ đâu, và trên phần cứng nào lợi ích của nó nhỏ đi?
+\item Ba hướng tấn công chi phí bậc hai nằm ở ba tầng khác nhau; với bài toán segmentation ảnh \(1024\times1024\) thì bạn chọn hướng nào trước, và vì sao?
+\item Bạn fine-tune một ViT ở độ phân giải gấp đôi lúc pretrain và kết quả tệ đi. Nghi phạm số một là gì?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

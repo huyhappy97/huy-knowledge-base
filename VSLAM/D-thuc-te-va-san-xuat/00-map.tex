@@ -1,0 +1,19 @@
+% 00-map.tex — bản đồ Phần D. Ngày tạo: 2026-09-13 | Dependency: ../00-map.tex | Mức độ: điều hướng
+\documentclass[../vslam.tex]{subfiles}
+\begin{document}
+\begin{table}[H]\centering\small
+\caption{Bản đồ Phần D: các chương, nội dung, và mức đầu tư đề xuất.}
+\begin{tabularx}{\linewidth}{@{}L{0.8cm}L{3.5cm}YL{1.6cm}@{}}
+\toprule
+\textbf{Ch.} & \textbf{Thư mục} & \textbf{Nội dung} & \textbf{Mức}\\
+\midrule
+19 & \code{19-ben-vung-trong-the-gioi-thuc} & Vật động và masking; môi trường nghèo vân; thay đổi ánh sáng; motion blur; kính và gương; vân lặp lại; ngoài trời; suy giảm cảm biến; phát hiện thất bại và suy giảm có kiểm soát & \muc{3}\\
+20 & \code{20-toi-uu-hieu-nang-va-he-thong} & Đa luồng và hàng đợi; xử lý độ trễ và mất khung; SIMD và lượng tử hoá; GPU/NPU; ngân sách bộ nhớ; bộ giải thưa tối ưu; tính tất định; điện năng và nhiệt & \muc{2}\\
+21 & \code{21-tu-prototype-len-mass-production} & Hiệu chuẩn quy mô sản xuất; độ tin cậy và giám sát sức khoẻ; kiểm thử và regression; ràng buộc sản phẩm; fleet analytics; OTA; quyền riêng tư & \muc{3}\\
+22 & \code{22-huong-nghien-cuu-con-trong} & Tám hướng còn khoảng trống, với đánh giá mức chắc chắn và cách kiểm mỗi hướng có thật là khoảng trống không & \muc{2}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent Chương 19 và 21 là xương sống của phần này. Đọc 19 trước ngay cả khi bạn còn đang làm nguyên mẫu --- danh mục các chế độ hỏng ở đó nên được dùng làm danh mục kiểm khi thiết kế, không phải khi gỡ lỗi. Chương 20 đọc khi bạn bắt đầu chạm vào phần cứng mục tiêu; trước đó nó là kiến thức không dùng tới. Chương 21 là chương nên đọc \emph{trước khi chốt thiết kế cơ khí}, vì vài quyết định nó bàn --- dung sai lắp ráp, chọn global shutter, chỗ đặt cảm biến nhiệt --- không sửa được sau khi mở khuôn. Chương 22 đọc cuối, và đọc với thái độ hoài nghi: nó là danh sách các chỗ tôi \emph{cho là} còn trống, không phải kết quả của một khảo sát có hệ thống, và chương đó nói rõ điều này ngay từ đầu.
+\end{document}

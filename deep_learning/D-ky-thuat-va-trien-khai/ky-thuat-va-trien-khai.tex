@@ -1,0 +1,19 @@
+\documentclass[../deep_learning.tex]{subfiles}
+\begin{document}
+\part{KỸ THUẬT, TỐI ƯU VÀ TRIỂN KHAI}
+\begin{tomtat}
+Phần D là tầng công cụ: tự viết forward và backward bằng NumPy để hiểu, rồi PyTorch để làm việc, rồi nén mô hình, triển khai, và mức MLOps tối thiểu đủ để sáu tháng sau dựng lại được kết quả của mình. Đọc xong bạn đưa được một mô hình từ notebook ra thiết bị thật với ngân sách latency cho trước. Nếu chỉ nhớ một điều: đây là phần hết hạn nhanh nhất của cây, trừ một ngoại lệ --- việc tự viết backward pass thuộc tầng bền vững và nên làm ngay sau chương 12, không đợi tới đây.
+\end{tomtat}
+
+Phần này là tầng công cụ, và nó được đặt sau phần C có chủ ý: đây là phần hết hạn nhanh nhất của cây, nên đầu tư vào nó trước khi có nền của phần B và C là đầu tư vào thứ sẽ cũ. Nguyên tắc chi phối là học đủ để làm việc, không đầu tư sâu, và tra cứu khi cần thay vì ghi nhớ.
+
+Có một ngoại lệ quan trọng, và nó nằm ngay ở chương đầu. Việc tự viết forward và backward pass bằng NumPy, tự chạy kiểm tra gradient bằng sai phân hữu hạn, trông giống một bài tập công cụ nhưng thực ra thuộc tầng \T{2}--\T{3}. Nó xây trực giác về đồ thị tính toán, về nơi gradient chết, và về cái giá bộ nhớ của activation --- ba thứ không hết hạn và không thể học được bằng cách gọi một hàm có sẵn. Vì vậy chương~19 chia làm hai giai đoạn rõ rệt: giai đoạn tự viết để hiểu, rồi mới tới giai đoạn dùng framework để làm việc.
+
+Ba chương còn lại đi theo trình tự của một hệ thống thật rời khỏi máy nghiên cứu. Chương~20 là tối ưu và nén mô hình, với một thứ tự thử nghiệm thực dụng và lý do của thứ tự đó, vì phần lớn người mới bắt đầu từ kỹ thuật hào nhoáng nhất thay vì từ kỹ thuật rẻ nhất. Chương~21 là inference và triển khai, nơi những con số đo được trong notebook thường không sống sót, và nơi cách đo latency sai là một trong những lỗi phổ biến nhất. Chương~22 là tái lập và mức MLOps tối thiểu: đủ để sáu tháng sau còn dựng lại được đúng kết quả của mình, không hơn.
+\subfile{00-map}
+\subfile{19-numpy-toi-pytorch/numpy-toi-pytorch}
+\subfile{20-toi-uu-va-nen-mo-hinh/toi-uu-va-nen-mo-hinh}
+\subfile{21-inference-va-trien-khai/inference-va-trien-khai}
+\subfile{22-tai-lap-va-mlops/tai-lap-va-mlops}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

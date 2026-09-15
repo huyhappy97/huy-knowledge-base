@@ -1,0 +1,19 @@
+% 00-map.tex — bản đồ Phần D: có gì, mức đầu tư, thứ tự đọc.
+% Ngày tạo: 2026-09-13 | Sửa gần nhất: 2026-09-13 | Ôn gần nhất: chưa
+% Dependency: ../00-map.tex | Mức độ: điều hướng
+\documentclass[../marker.tex]{subfiles}
+\begin{document}
+\begin{table}[H]\centering\small
+\caption{Bản đồ Phần D: hai chương và ranh giới giữa chúng.}
+\begin{tabularx}{\linewidth}{@{}L{0.8cm}L{3.7cm}YL{1.6cm}@{}}
+\toprule
+\textbf{Ch.} & \textbf{Thư mục} & \textbf{Nội dung} & \textbf{Mức}\\
+\midrule
+17 & \code{17-thu-vien-va-detector} & Thứ chạy mỗi khung hình: \repo{apriltag} (và \code{apriltag\_pose.c}), \repo{OpenCV} \code{objdetect}/ArUco/ChArUco, các cờ \code{SOLVEPNP\_*} và \code{solvePnPGeneric}, \code{solvePnPRefineLM}; các họ tag khác (STag, ArUco3, CCTag, WhyCon, TopoTag, ChromaTag); detector học sâu; ROS wrapper & \muc{2}\\
+18 & \code{18-cong-cu-calib-servo-va-do-dac} & Thứ chạy một lần: hiệu chuẩn (OpenCV, \repo{Kalibr}, \repo{deltille}), hand-eye (\code{calibrateHandEye}, \repo{easy\_handeye}), BA (\repo{Ceres}, \repo{GTSAM}, \repo{tagslam}), photogrammetry (\repo{COLMAP}, Metashape), servoing (\repo{ViSP}), đánh giá (\repo{evo}) & \muc{2}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent Chốt tại tháng 9/2026, rà lại mỗi sáu tháng. Chỉ ba thứ đáng đọc mã chứ không chỉ dùng: \code{apriltag\_pose.c} (chương 4 và 10 thành code), \repo{OpenCV} \code{objdetect} (chương 7 và 8), và \repo{ViSP} phần IBVS (chương 13). Ba thứ đáng dùng mà không cần đọc: \repo{Kalibr}, \repo{COLMAP}, \repo{Ceres}.
+\end{document}

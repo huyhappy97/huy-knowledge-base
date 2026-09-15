@@ -1,0 +1,100 @@
+% ============================================================================
+%  08-thuc-nghiem-cv — Thực nghiệm trong CV/ML: cách tự lừa mình bằng số
+%  Ngày tạo: 2026-09-09 | Sửa gần nhất: 2026-09-09 | Ôn gần nhất: chưa
+%  Dependency: 01, 02, 05. Mức độ: CỐT LÕI (chương đặc thù ngành).
+% ============================================================================
+\documentclass[../hieu-suat.tex]{subfiles}
+\begin{document}
+\chapter{Thực nghiệm trong thị giác máy tính: sáu cách tự lừa mình bằng số}
+\ptrtarget{08}\ptrtarget{08-thuc-nghiem-cv}
+\dependency{\ptr{01} (cỡ hiệu ứng, bậc tự do của người nghiên cứu), \ptr{02} (tử tế hoá môi trường), \ptr{05} (nghi thức trước khi tin một kết quả).}
+
+\begin{tomtat}
+Chương này là phần đặc thù ngành, và cũng là chỗ mà mọi thứ ở các chương trước quy về một việc rất cụ thể: làm cho con số mình đo được trở thành phản hồi đáng tin. Bằng chứng trong lĩnh vực học máy khá phũ phàng --- khi một mảng con được kiểm lại bằng so sánh công bằng, tiến bộ nhiều năm gần như biến mất; khi các kiến trúc mới được so với kiến trúc cũ ở cùng ngân sách tinh chỉnh, kiến trúc cũ thắng; và phương sai giữa các lần chạy đủ lớn để nuốt trọn phần lớn các ``cải tiến'' được công bố. Chương liệt kê sáu cơ chế tự lừa cụ thể, mỗi cơ chế kèm bằng chứng và cách chặn.
+\end{tomtat}
+
+\begin{khoigoi}
+\h{Một mảng con báo cáo cải thiện gấp đôi sau mười năm --- điều gì xảy ra khi có người kiểm lại bằng so sánh công bằng?}
+\h{Chạy bao nhiêu lần thì đủ để tin rằng phương pháp mới tốt hơn?}
+\h{Bài được nhận ở hội nghị hàng đầu thì đáng tin tới mức nào?}
+\end{khoigoi}
+
+\section{Cơ chế 1 --- so sánh không công bằng}
+
+Musgrave, Belongie và Lim \cite{musgrave2020} lấy các công trình học đo khoảng cách (\emph{metric learning}) của nhiều năm, vốn liên tục tuyên bố tiến bộ lớn và có nơi tuyên bố tăng gấp đôi so với phương pháp cả thập kỷ trước, rồi đánh giá lại tất cả trong cùng một khung: cùng kiến trúc nền, cùng quy trình tinh chỉnh, cùng cách chia dữ liệu. Kết luận: nhiều bài có khiếm khuyết về phương pháp thí nghiệm, và tiến bộ thật theo thời gian là nhỏ \nD{}.
+
+\textbf{Chặn} \nM{}: mọi so sánh phải cố định mọi thứ trừ đúng một biến. Nếu phương pháp mới dùng backbone khác, augmentation khác, hoặc số epoch khác so với baseline, thì thí nghiệm không đo cái mình nghĩ nó đang đo.
+
+\section{Cơ chế 2 --- tinh chỉnh bất đối xứng}
+
+Đây là dạng tinh vi hơn của cơ chế 1, và là dạng tôi dễ mắc nhất, vì nó xảy ra một cách tự nhiên: tôi dành hai tuần tinh chỉnh phương pháp của mình và hai giờ chạy baseline. Melis, Dyer và Blunsom \cite{melis2018} kiểm định điều này ở mô hình ngôn ngữ: khi mọi kiến trúc được tinh chỉnh siêu tham số ở quy mô lớn và bằng cùng một quy trình tự động, kiến trúc LSTM tiêu chuẩn --- được chỉnh chuẩn hoá cho tử tế --- \emph{vượt} các kiến trúc mới hơn từng được công bố là tốt hơn \nD{}.
+
+\textbf{Chặn} \nM{}: ghi lại ngân sách tinh chỉnh (số cấu hình đã thử, thời gian máy) cho \emph{cả hai} nhánh và báo cáo nó cùng kết quả. Nếu ngân sách lệch, kết quả không diễn giải được.
+
+\section{Cơ chế 3 --- phương sai lớn hơn hiệu ứng}
+
+Bouthillier và cộng sự \cite{bouthillier2021} phân tích các nguồn dao động trong benchmark học máy --- lấy mẫu dữ liệu, khởi tạo tham số, lựa chọn siêu tham số --- và chỉ ra rằng chúng ảnh hưởng đáng kể tới kết quả; họ cũng chỉ ra một điều ngược trực giác và rất hữu ích: \emph{ngẫu nhiên hoá thêm nhiều nguồn dao động} cho ước lượng gần với ước lượng lý tưởng hơn, với chi phí tính toán nhỏ hơn tới 51 lần so với cách làm lý tưởng \nD{}.
+
+Trong công việc của chính tôi, cùng hiện tượng này đã được đo trực tiếp: trên benchmark EuRoC, dao động giữa các \emph{đợt} chạy vào khoảng 3,5\%, lớn hơn chính khoảng cách CPU--GPU mà tôi đang định đo \nD{} (phép đo riêng, 2026-09-09). Bài học rút ra không phải là ``chạy nhiều lần hơn'' một cách chung chung mà là: \emph{biết mức nhiễu nền trước khi tuyên bố bất cứ điều gì}, vì mọi chênh lệch nhỏ hơn nó đều là tiếng ồn.
+
+\textbf{Chặn}: đo nhiễu nền trước (cùng cấu hình, đổi seed và thứ tự dữ liệu), báo cáo phân phối chứ không báo cáo lần chạy tốt nhất, và coi mọi khác biệt nhỏ hơn nhiễu nền là chưa kết luận được.
+
+\section{Cơ chế 4 --- các bậc tự do của người nghiên cứu}
+
+Simmons, Nelson và Simonsohn \cite{simmons2011} trình bày trong tâm lý học cách mà những lựa chọn nhỏ, hợp lý từng cái một --- dừng thu dữ liệu khi kết quả đã đẹp, chọn biến kiểm soát, chọn cách mã hoá --- gộp lại đủ để tạo bằng chứng ``có ý nghĩa'' cho một giả thuyết sai \nD{}. Bản dịch sang thị giác máy tính rất trực tiếp \nM{}: chọn checkpoint nào để báo cáo, dừng huấn luyện ở epoch nào, chọn ngưỡng nào, chọn tập con nào của dữ liệu kiểm thử, chọn chỉ số nào trong năm chỉ số cùng đo một thứ, chọn seed nào ``đại diện''.
+
+\textbf{Chặn}: cố định các quyết định đó \emph{trước} khi nhìn kết quả và ghi vào tệp giả thuyết của thí nghiệm (\code{hypothesis.md} trong \code{../research-rules.md} mục 7), rồi công bố mọi lựa chọn đã thử chứ không chỉ lựa chọn cuối.
+
+\section{Cơ chế 5 --- giải thích trá hình thành suy đoán}
+
+Lipton và Steinhardt \cite{lipton2019} liệt kê các khuynh hướng đang lan trong học thuật học máy, trong đó hai khuynh hướng liên quan trực tiếp tới việc tự lừa: không phân biệt \emph{giải thích} với \emph{suy đoán}, và không xác định được \emph{nguồn thật của cải thiện thực nghiệm} --- ví dụ nhấn mạnh vào một thay đổi kiến trúc trong khi phần lớn cải thiện đến từ tinh chỉnh siêu tham số \nT{}. Sculley và cộng sự \cite{sculley2018} đặt vấn đề ở tầng văn hoá: nhịp độ tiến bộ thực nghiệm không đi kèm mức độ chặt chẽ tương ứng, vì hệ thống khen thưởng dựa trên việc \emph{thắng} benchmark --- và họ nhắc lại rằng mục tiêu của khoa học không phải chiến thắng mà là tri thức \nT{}.
+
+\textbf{Chặn}: trong bài viết của mình, mỗi câu giải thích cơ chế phải kèm nhãn --- đo được, hay suy đoán. Đây đúng là hệ thống nhãn \nD{}/\nT{}/\nM{} mà bài học này đang dùng.
+
+\section{Cơ chế 6 --- lấy kết quả phản biện làm thước đo sự thật}
+
+Thí nghiệm nhất quán của NeurIPS gửi một phần bài cho hai hội đồng độc lập chấm song song. Phân tích lại dữ liệu đó, Cortes và Lawrence \cite{cortes2021} ước tính khoảng một nửa phương sai của điểm chất lượng là chủ quan, và trong số bài được nhận, chỉ khoảng một nửa sẽ sống sót nếu được hội đồng độc lập chấm lại \nD{}.
+
+\textbf{Hệ quả} \nM{}: phản biện là phản hồi rất nhiễu, nên không được dùng làm tín hiệu chính để học. Một bài bị từ chối không chứng minh ý tưởng sai, và một bài được nhận không chứng minh nó đúng --- thứ duy nhất chứng minh được là kết quả tái lập được. Cũng vì vậy, chương trình tái lập của NeurIPS \cite{pineau2021} và các danh mục kiểm tra kèm theo đáng dùng như tiêu chuẩn tự áp cho chính mình, chứ không đợi hội nghị bắt buộc --- cùng tinh thần với bộ khuyến nghị chung về phương pháp, báo cáo và khuyến khích trong \cite{munafo2017} \nT{}.
+
+\section{Danh mục kiểm tra trước khi tuyên bố ``X tốt hơn Y''}
+
+\begin{enumerate}
+\item Nhiễu nền đã đo chưa? Chênh lệch quan sát được có lớn hơn nó không \cite{bouthillier2021}?
+\item Hai nhánh có cùng backbone, cùng dữ liệu, cùng tiền xử lý, cùng số epoch không \cite{musgrave2020}?
+\item Ngân sách tinh chỉnh hai bên có ngang nhau không, và tôi có báo cáo nó không \cite{melis2018}?
+\item Baseline của tôi có đạt đúng con số đã công bố trong bài gốc không? Nếu thấp hơn, sửa baseline trước.
+\item Mọi lựa chọn (chỉ số, ngưỡng, checkpoint, tập con) đã được cố định trước khi nhìn kết quả chưa \cite{simmons2011}?
+\item Tôi đã chạy nghi thức tự phản biện của \ptr{05} chưa --- đặc biệt bước ``nếu số ngược lại thì tôi giải thích thế nào''?
+\item Có ai ngoài tôi chạy lại được không, từ commit nào, với lệnh nào \cite{pineau2021}?
+\item Trong bài viết, mỗi khẳng định cơ chế có được đánh dấu là đo được hay suy đoán không \cite{lipton2019}?
+\end{enumerate}
+
+\begin{cannho}
+Ba con số cần biết trước mọi tuyên bố: \textbf{nhiễu nền} giữa các lần chạy, \textbf{ngân sách tinh chỉnh} của cả hai nhánh, và \textbf{con số gốc} của baseline trong bài công bố. Thiếu một trong ba thì chênh lệch đo được không diễn giải được \nM{}.
+\end{cannho}
+
+\begin{traloi}
+\tl{Tiến bộ thật hoá ra nhỏ; phần lớn ``cải thiện'' đến từ so sánh không công bằng \cite{musgrave2020}.}
+\tl{Không có con số cố định --- đủ để chênh lệch vượt nhiễu nền đã đo, và tốt nhất là ngẫu nhiên hoá nhiều nguồn dao động thay vì lặp lại cùng một cấu hình \cite{bouthillier2021}.}
+\tl{Ít hơn ta tưởng: khoảng một nửa phương sai điểm phản biện là chủ quan, và chỉ khoảng một nửa bài được nhận sẽ sống sót ở một hội đồng độc lập khác \cite{cortes2021}.}
+\end{traloi}
+
+\begin{tukiem}
+\item Nêu sáu cơ chế tự lừa và cách chặn từng cái, không nhìn bài.
+\item Trong thí nghiệm gần nhất của bạn, ngân sách tinh chỉnh hai nhánh lệch nhau bao nhiêu lần?
+\item Vì sao ``chạy thêm nhiều lần cùng một cấu hình'' không phải cách tốt nhất để giảm phương sai của kết luận \cite{bouthillier2021}?
+\item Liệt kê năm bậc tự do của người nghiên cứu trong quy trình benchmark của chính bạn, và nói bạn cố định chúng ở bước nào.
+\end{tukiem}
+
+\begin{onbai}
+\ar[3]{So sánh không công bằng}{Đánh giá lại trong cùng khung: tiến bộ nhiều năm gần như biến mất \cite{musgrave2020}.}
+\ar[3]{Tinh chỉnh bất đối xứng}{Cùng ngân sách tinh chỉnh, LSTM cũ vượt kiến trúc mới \cite{melis2018}.}
+\ar[3]{Nhiễu nền}{Phải đo trước; mọi chênh lệch nhỏ hơn nó là tiếng ồn \cite{bouthillier2021}.}
+\ar[3]{Bậc tự do của người nghiên cứu}{Checkpoint, ngưỡng, chỉ số, tập con, seed --- cố định trước khi nhìn kết quả \cite{simmons2011}.}
+\ar[2]{Giải thích vs suy đoán}{Phải gắn nhãn; và phải chỉ ra nguồn thật của cải thiện \cite{lipton2019,sculley2018}.}
+\ar[2]{Phản biện là tín hiệu nhiễu}{\(\approx\)50\% phương sai điểm là chủ quan; \(\approx\)50\% bài được nhận không sống sót ở hội đồng khác \cite{cortes2021}.}
+\ar[1]{Danh mục tái lập}{Commit, seed, config, phần cứng, lệnh chạy \cite{pineau2021}.}
+\end{onbai}
+
+\end{document}

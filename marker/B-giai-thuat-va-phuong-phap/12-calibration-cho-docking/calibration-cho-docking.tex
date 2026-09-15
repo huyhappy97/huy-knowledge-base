@@ -1,0 +1,360 @@
+% ---------------------------------------------------------------------------
+% Chương 12 — Calibration cho bài toán docking
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-13  |  Ôn gần nhất: —
+% Phụ thuộc: A/01 (mô hình méo, điểm chính), B/09 (đo constellation bằng BA)
+% Mức độ: XƯƠNG SỐNG — nhưng mức độ này GIẢM nếu dùng teach-by-showing (B/13).
+%         Đây là chương duy nhất trong cây mà tầm quan trọng phụ thuộc vào
+%         một quyết định kiến trúc ở chương khác.
+% Kiểm chứng công thức lõi:
+%   (1) Chuỗi biến đổi T_dock^base = T_cam^base * T_tag^cam * T_dock^tag
+%       — cửa (a) định nghĩa phép hợp thành; kiến thức chuẩn.
+%   (2) Hand-eye AX = XB — cửa (c) tsai1989handeye, park1994robot, daniilidis1999handeye
+%       (ba nhóm độc lập, ba cách tiếp cận khác nhau).
+%   (3) Điều kiện kích thích cho hand-eye: cần xoay quanh ít nhất hai trục
+%       — cửa (c) tsai1989handeye (§IV bàn điều kiện); cửa (a) lập luận ở mục 5.
+%   (4) Thứ tự bắt buộc: intrinsic -> constellation -> hand-eye
+%       — cửa (a) lập luận phụ thuộc ở mục 2; CHƯA qua cửa (b) hay (c).
+% Ghi chú trung thực: không có số đo thực nghiệm. Các con số về số ảnh tối thiểu
+%   (30 ảnh, 20 tư thế) là KHUYẾN NGHỊ THỰC HÀNH phổ biến, không phải kết quả
+%   tối ưu hoá đã kiểm.
+% ---------------------------------------------------------------------------
+\documentclass[../../marker.tex]{subfiles}
+\begin{document}
+\chapter{Calibration cho bài toán docking (Calibration for Docking)}
+\ptrtarget{B/12}\ptrtarget{B/12-calibration-cho-docking}
+\dependency{\ptr{A/01-mo-hinh-camera-va-distortion} (mô hình méo, vì sao điểm chính khó ước lượng, và phép thử residual có cấu trúc); \ptr{B/09-multi-marker-constellation} (mục~5, đo constellation bằng bundle adjustment --- chương này đặt nó vào đúng vị trí trong chuỗi).}
+
+\begin{tomtat}
+Chương này bàn ba phép hiệu chuẩn mà bài toán docking cần, và điều quan trọng nhất là \emph{thứ tự} của chúng: intrinsic trước, constellation sau, hand-eye cuối --- vì mỗi bước dùng kết quả của bước trước làm hằng số. Nội dung kỹ thuật gồm: hiệu chuẩn intrinsic chất lượng cao với yêu cầu về độ phủ dữ liệu, phép thử residual có cấu trúc để phân biệt sai số mô hình với sai số tham số, đo constellation bằng BA, và hand-eye qua bài toán \(AX = XB\). Chương cũng có một đặc điểm hiếm trong cây: \emph{tầm quan trọng của nó phụ thuộc vào một quyết định ở chương khác}. Nếu bạn dùng teach-by-showing (\ptr{B/13} mục~3), phần lớn sai số hiệu chuẩn là nguồn hệ thống và chúng triệt tiêu --- yêu cầu chuyển từ \emph{độ đúng} sang \emph{độ ổn định}, một yêu cầu dễ hơn nhiều. Nếu chỉ nhớ một điều: \emph{pose bạn thực sự cần là dock frame so với base frame; marker chỉ là một mắt xích, và mọi extrinsic trên chuỗi đều cộng sai số}.
+\end{tomtat}
+
+\begin{nentang}
+\kn{intrinsic}{các tham số nội của camera: \(f_x, f_y, c_x, c_y\) và các hệ số méo (\ptr{A/01}). Chúng mô tả camera biến tia nhìn thành pixel thế nào, và chúng không phụ thuộc camera đặt ở đâu.}
+\kn{extrinsic}{phép biến đổi cứng giữa hai hệ toạ độ. Trong bài toán này có ít nhất ba: camera so với thân robot, tag so với hệ dock, và hệ dock so với điểm cập chuẩn.}
+\kn{hand-eye calibration}{tìm phép biến đổi giữa camera và cơ cấu mang nó, từ một tập các cặp chuyển động tương ứng. Bài toán chuẩn có dạng \(AX = XB\) với \(X\) là ẩn \cite{tsai1989handeye}.}
+\kn{base frame}{hệ toạ độ gắn với thân robot, thường ở tâm trục bánh hoặc ở điểm điều khiển. Đây là hệ mà bộ điều khiển làm việc, và mọi phép đo cuối cùng phải quy về nó.}
+\kn{dock frame}{hệ toạ độ gắn với dock, đặt sao cho vị trí cập chuẩn có một toạ độ đơn giản trong nó.}
+\kn{điều kiện kích thích}{yêu cầu rằng dữ liệu hiệu chuẩn phải chứa đủ thông tin để tách các tham số khỏi nhau. Thiếu nó thì bài toán suy biến và nghiệm trôi tự do theo một hướng --- một dạng của bài toán khả quan sát.}
+\kn{residual có cấu trúc}{phần dư sau khi khớp mà không giống nhiễu trắng mà tạo thành mẫu hình không gian. Đây là dấu hiệu của sai số mô hình chứ không phải sai số tham số (\ptr{A/01} mục~6).}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Ba phép hiệu chuẩn --- intrinsic, constellation, hand-eye --- phải làm theo một thứ tự nhất định. Thứ tự nào, và điều gì hỏng nếu bạn đảo hai bước cuối?}
+\h{Bạn hiệu chuẩn camera với 50 ảnh, target luôn ở giữa khung hình và luôn gần vuông góc. Residual trung bình 0,2\,px. Nêu hai tham số mà bạn gần như chắc chắn đã ước lượng sai, và giải thích vì sao residual không phát hiện được.}
+\h{Bài toán hand-eye \(AX = XB\) có một điều kiện về chuyển động mà nếu vi phạm thì nghiệm không xác định. Điều kiện ấy là gì, và vì sao một robot vi sai trên sàn phẳng lại đặc biệt dễ vi phạm nó?}
+\h{Pose bạn thực sự cần không phải pose của tag so với camera. Nó là gì, chuỗi biến đổi gồm mấy khâu, và khâu nào thường bị bỏ quên?}
+\h{Nếu bạn dùng teach-by-showing, chương này trở nên ít quan trọng hơn nhiều. Nhưng \emph{một} yêu cầu vẫn còn nguyên và thậm chí quan trọng hơn. Yêu cầu nào?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{B/12/01}
+
+Có một câu hỏi mà người mới làm docking hiếm khi đặt ra, và nó là câu hỏi quyết định kiến trúc của cả hệ thống: \emph{pose bạn thực sự cần là pose gì?}
+
+Câu trả lời tự nhiên --- pose của tag so với camera --- là sai, hoặc chính xác hơn là chưa đủ. Cái bộ điều khiển cần là vị trí của \emph{điểm cập chuẩn trên dock} so với \emph{thân robot}. Viết ra chuỗi biến đổi:
+\begin{equation}
+T^{\text{base}}_{\text{dock}} = T^{\text{base}}_{\text{cam}} \cdot T^{\text{cam}}_{\text{tag}} \cdot T^{\text{tag}}_{\text{dock}} .
+\label{eq:b12-chuoi}
+\end{equation}
+Ba khâu, và chỉ khâu giữa là thứ mà thị giác đo được. Hai khâu còn lại là \emph{hằng số phải hiệu chuẩn}, và sai số của chúng cộng thẳng vào kết quả.
+
+Đây là câu trả lời cho Q4, và khâu thường bị bỏ quên là khâu cuối --- \(T^{\text{tag}}_{\text{dock}}\), quan hệ giữa hệ toạ độ của constellation và điểm cập chuẩn thật. Người ta hay đo cẩn thận vị trí các tag với nhau (\ptr{B/09} mục~5) rồi quên rằng còn phải biết cái cụm tag ấy nằm ở đâu so với cái lỗ cắm sạc. Và khâu ấy thường được lấy từ bản vẽ --- với chính những vấn đề mà \ptr{B/09} mục~5A đã liệt kê.
+
+Bài toán hiệu chuẩn cho robot có một lịch sử riêng, tách khỏi hiệu chuẩn camera thuần. Bài toán hand-eye được đặt ra và giải trong những năm 1980--1990 với ba cách tiếp cận độc lập: tách xoay khỏi tịnh tiến \cite{tsai1989handeye}, dùng cấu trúc nhóm Euclid \cite{park1994robot}, và giải đồng thời bằng quaternion đối ngẫu \cite{daniilidis1999handeye}. Ba nguồn độc lập cho cùng một bài toán là một mức kiểm chứng tốt, và tôi dùng nó ở mục~5.
+
+Điều làm chương này khác một chương hiệu chuẩn thông thường --- và lý do nó thuộc về cây này chứ không chỉ là một trỏ sang tài liệu OpenCV --- nằm ở hai chỗ.
+
+\emph{Chỗ thứ nhất: thứ tự.} Ba phép hiệu chuẩn không độc lập. Đo constellation cần intrinsic đúng (\ptr{B/09} mục~5B). Hand-eye cần cả hai cái trước. Làm sai thứ tự thì sai số của bước trước bị hấp thụ vào bước sau theo cách không kiểm soát được, và --- đây là phần tệ --- residual vẫn nhỏ nên không có tín hiệu. Mục~2 dành cho chuyện này.
+
+\emph{Chỗ thứ hai, và nó là chỗ đặc biệt nhất của chương: tầm quan trọng của toàn bộ chương phụ thuộc vào một quyết định ở \ptr{B/13}.} Nếu hệ dùng teach-by-showing, thì sai số của cả ba phép hiệu chuẩn là nguồn \emph{hệ thống}, và chúng triệt tiêu (\ptr{B/13} mục~3B). Yêu cầu chuyển từ ``hiệu chuẩn phải \emph{đúng}'' thành ``hiệu chuẩn phải \emph{không đổi}'' --- một yêu cầu dễ hơn nhiều và đòi những biện pháp khác hẳn. Mục~7 bàn kỹ, và đây là câu trả lời cho Q5.
+
+\begin{trucgiac}
+Hình dung chuỗi biến đổi như một chuỗi người chuyền tin.
+
+Người thứ nhất biết cái lỗ cắm sạc nằm đâu so với cụm tag --- đó là bản vẽ cơ khí của dock. Người thứ hai là camera: nó nhìn thấy cụm tag và biết cụm tag nằm đâu so với chính nó. Người thứ ba biết camera được bắt ở đâu trên thân robot. Ghép ba lời lại thì ra câu trả lời: cái lỗ cắm nằm đâu so với robot.
+
+Nếu người nào nói sai một chút, câu trả lời cuối sai một chút --- và ba cái ``một chút'' cộng lại chứ không triệt tiêu nhau.
+
+Bây giờ đến chỗ hay. Người thứ hai --- camera --- được kiểm tra liên tục: mỗi khung hình là một lần đo mới, nhiễu trung bình đi, và nếu nó sai thì có cách phát hiện. Người thứ nhất và người thứ ba thì nói \emph{một lần} lúc lắp đặt rồi im lặng mãi mãi. Không ai kiểm lại họ, và nếu họ nói sai thì cái sai ấy nằm trong hệ thống suốt vòng đời của nó.
+
+Đó là lý do hai khâu hiệu chuẩn đáng lo hơn khâu đo, dù khâu đo mới là khâu người ta dành thời gian cho.
+
+Và đây là mẹo của \ptr{B/13}: nếu thay vì hỏi ``cái lỗ ở đâu'', ta hỏi ``lúc này ba người nói khác gì so với lúc robot đang cắm đúng'', thì mọi lời nói sai cố định đều xuất hiện ở cả hai lần và trừ đi nhau. Ta không cần ba người nói đúng; ta chỉ cần họ nói \emph{giống nhau} ở hai thời điểm.
+\end{trucgiac}
+
+\section{Thứ tự bắt buộc}
+\ptrtarget{B/12/02}
+
+Mục này trả lời Q1, và nó là nội dung có giá trị thực hành cao nhất của chương.
+
+\begin{table}[H]\centering\small
+\caption{Ba bước hiệu chuẩn: đầu vào, đầu ra, và điều gì hỏng nếu làm sớm.}
+\label{tab:b12-thutu}
+\begin{tabularx}{\linewidth}{@{}L{0.5cm}L{2.4cm}L{2.6cm}Y@{}}
+\toprule
+& \textbf{Bước} & \textbf{Cần trước} & \textbf{Hỏng thế nào nếu làm sai thứ tự}\\
+\midrule
+1 & Intrinsic (\(K\), méo) & Không gì & ---\\
+2 & Constellation (\(T^{\text{tag}}_{\text{dock}}\) và toạ độ góc) & Intrinsic đúng & \(K\) sai \(\Rightarrow\) cấu trúc 3D thu được sai có hệ thống, thường là sai tỉ lệ hoặc ``cong'' toàn cục\\
+3 & Hand-eye (\(T^{\text{base}}_{\text{cam}}\)) & Cả 1 và 2 & Constellation sai \(\Rightarrow\) pose đo được sai \(\Rightarrow\) \(X\) hấp thụ sai lệch ấy, và residual vẫn nhỏ\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Cột cuối là phần đáng đọc kỹ, và nó có một điểm chung: \emph{sai số của bước trước bị hấp thụ vào bước sau mà không làm residual tăng đáng kể}. Đây là chế độ hỏng im lặng, đúng loại nguy hiểm nhất.
+
+Giải thích cơ chế cho bước 3, vì nó rõ nhất. Hand-eye giải \(X\) từ các cặp \((A_i, B_i)\), trong đó \(A_i\) là chuyển động của camera (đo bằng thị giác) và \(B_i\) là chuyển động của thân robot (đo bằng odometry hoặc encoder). Nếu constellation sai, thì \(A_i\) sai một cách có hệ thống --- chẳng hạn mọi chuyển động camera được đo lớn hơn thực tế 0,5\%. Bộ giải sẽ tìm một \(X\) làm phương trình khớp tốt nhất, và cái \(X\) ấy hấp thụ một phần sai lệch tỉ lệ. Kết quả là một \(X\) sai, một residual nhỏ, và không có cách nào biết.
+
+Một hệ quả thực hành cụ thể của bảng này: \emph{khi bạn đổi ống kính hoặc chỉnh lại nét, bạn phải làm lại cả ba bước}, không chỉ bước 1. Đổi intrinsic làm vô hiệu constellation đã đo, và constellation mới làm vô hiệu hand-eye. Đây là lý do nữa để khoá nét bằng keo (\ptr{A/01} mục~8).
+
+\section{Hiệu chuẩn intrinsic chất lượng cao}
+\ptrtarget{B/12/03}
+
+Bước một, và nó trả lời Q2.
+
+\subsection{A. Yêu cầu về dữ liệu, không phải về thuật toán}
+
+Thuật toán hiệu chuẩn là kiến thức chuẩn và các cài đặt sẵn có đều tốt \cite{zhang2000flexible}. Chất lượng kết quả được quyết định gần như hoàn toàn bởi \emph{dữ liệu}, và ba yêu cầu sau đây là ba yêu cầu mà một bộ ảnh ``trông đẹp'' thường vi phạm.
+
+\emph{Yêu cầu một: phủ kín khung hình, đặc biệt là bốn góc.} Các hệ số méo bậc cao chỉ có tác dụng ở bán kính lớn, nên nếu target không bao giờ chạm tới rìa thì chúng không được ràng buộc và bộ tối ưu gán cho chúng giá trị tuỳ tiện. Hậu quả: mô hình ngoại suy sai ở rìa --- đúng chỗ mà tag của robot có thể nằm.
+
+\emph{Yêu cầu hai: nhiều tư thế nghiêng mạnh.} Đây là yêu cầu bị vi phạm nhiều nhất và nó là câu trả lời cho Q2. Với target luôn gần vuông góc, \(c_x\) và \(c_y\) \emph{không tách được} khỏi vị trí của target: ``điểm chính lệch sang trái'' và ``target dịch sang phải'' tạo ra cùng một ảnh. Chỉ khi target nghiêng mạnh thì hai giả thuyết ấy cho hai ảnh khác nhau, vì biến dạng phối cảnh phụ thuộc vào vị trí so với trục quang. Đây chính là lý do \ptr{A/01} mục~5 gọi điểm chính là tham số nguy hiểm nhất.
+
+Và đây là phần thứ hai của Q2 --- vì sao residual không phát hiện được: bộ tối ưu tìm bộ tham số khớp tốt nhất với \emph{dữ liệu đã cho}. Nếu dữ liệu không chứa thông tin phân biệt hai giả thuyết, thì cả hai đều cho residual nhỏ như nhau, và bộ tối ưu chọn một trong hai theo điểm khởi đầu. Residual đo độ khớp, không đo độ đúng.
+
+\emph{Yêu cầu ba: đủ số ảnh và đủ đa dạng.} Con số thường dùng là khoảng 20--30 ảnh \emph{(khuyến nghị thực hành phổ biến, không phải kết quả tối ưu hoá)}, nhưng số lượng ít quan trọng hơn tính đa dạng: 30 ảnh giống nhau không bằng 15 ảnh khác nhau.
+
+\subsection{B. Ba phép kiểm sau khi hiệu chuẩn}
+
+Đừng dừng ở con số RMS. Ba phép kiểm, theo thứ tự giá trị.
+
+\emph{Một, vẽ bản đồ residual theo vị trí ảnh} (\ptr{A/01} mục~6). Cấu trúc xuyên tâm hoặc xoáy ở góc nghĩa là mô hình sai dạng, và thêm ảnh không cứu được --- phải đổi mô hình méo.
+
+\emph{Hai, hiệu chuẩn lại với các tập con ảnh khác nhau và so các tham số.} Nếu \(c_x\) nhảy hàng chục pixel giữa các tập con thì nó chưa được xác định, và con số bạn đang dùng là ngẫu nhiên. \(f_x\) thường ổn định --- sự tương phản giữa hai tham số là một chẩn đoán tốt.
+
+\emph{Ba, kiểm bằng một target độc lập.} Chụp một target chưa dùng để hiệu chuẩn, ở tư thế và khoảng cách giống điều kiện vận hành, và xem residual có tương đương không. Đây là kiểm chéo thật sự, và nó bắt được việc khớp quá mức.
+
+\subsection{C. Chọn target}
+
+Với intrinsic chất lượng cao, chọn target theo \ptr{B/08} mục~3: chessboard hoặc ChArUco cho góc saddle point, hoặc deltille nếu cần cao nhất \cite{chen2018deltille}. Không dùng target tròn trừ khi bạn cài hiệu chỉnh conic đúng cách (\ptr{A/02} mục~6).
+
+Một chi tiết dễ quên và tốn kém: \emph{target phải phẳng và kích thước phải đúng}. In trên giấy dán lên bìa cứng thì không đủ --- giấy cong, và máy in có sai số tỉ lệ vài phần nghìn. Với hiệu chuẩn intrinsic thì sai tỉ lệ của target không ảnh hưởng tới \(f\) tính bằng pixel (nó chỉ đổi thang của các pose), nhưng độ \emph{không phẳng} thì ảnh hưởng trực tiếp và nó vi phạm chính giả thiết của phương pháp.
+
+\section{Đo constellation}
+\ptrtarget{B/12/04}
+
+Bước hai. Nội dung kỹ thuật đã nằm ở \ptr{B/09} mục~5 và tôi không lặp lại; mục này chỉ bổ sung ba điểm thuộc về chuỗi hiệu chuẩn.
+
+\emph{Điểm một: nó phải chạy sau intrinsic.} Đã bàn ở mục~2.
+
+\emph{Điểm hai, và đây là điểm mà \ptr{B/09} chưa bàn: còn một khâu nữa sau nó.} BA cho bạn toạ độ các góc tag trong một hệ toạ độ chung, nhưng hệ ấy là hệ \emph{tuỳ ý} do BA chọn (thường gắn với tag đầu tiên). Bạn còn phải xác định quan hệ giữa hệ ấy và \emph{điểm cập chuẩn thật} --- tức khâu \(T^{\text{tag}}_{\text{dock}}\) của công thức~\eqref{eq:b12-chuoi}.
+
+Cách đo khâu này, và nó là chỗ đẹp nhất trong chương: \emph{dùng chính lần cập chuẩn}. Đưa robot vào vị trí cập đúng (bằng tay, bằng đồ gá, hoặc để cơ cấu tự khớp), rồi đo pose của constellation từ đó. Pose ấy \emph{định nghĩa} điểm cập chuẩn trong hệ constellation --- bạn không cần đo bằng thước gì cả.
+
+Để ý rằng đây chính là teach-by-showing của \ptr{B/13} mục~3, nhìn từ góc hiệu chuẩn. Hai chương mô tả cùng một hành động: một chương gọi nó là ``ghi lại trạng thái đích'', chương này gọi nó là ``hiệu chuẩn khâu cuối của chuỗi''. Sự trùng khớp ấy không ngẫu nhiên, và nó là lý do teach-by-showing triệt tiêu được sai số: nó \emph{định nghĩa} đích bằng chính chuỗi đo, nên mọi sai lệch của chuỗi đã nằm sẵn trong định nghĩa.
+
+\emph{Điểm ba: kiểm định kỳ.} Chỉ báo ở \ptr{B/09} mục~2 --- so sai số tái chiếu hợp nhất với từng tag riêng --- nên chạy định kỳ và so với giá trị lúc lắp đặt. Constellation thay đổi vì va chạm, vít lỏng, và giãn nở nhiệt.
+
+\section{Hand-eye}
+\ptrtarget{B/12/05}
+
+Bước ba, và nó trả lời Q3.
+
+\subsection{A. Bài toán}
+
+Cần tìm \(X = T^{\text{base}}_{\text{cam}}\). Quy trình: di chuyển robot tới nhiều tư thế; ở mỗi tư thế, đo pose của constellation bằng thị giác và đọc pose của thân robot bằng odometry. Với hai tư thế \(i\) và \(j\), gọi \(A\) là chuyển động của camera (suy từ hai lần đo thị giác) và \(B\) là chuyển động của thân robot (suy từ odometry). Quan hệ là
+\[
+A X = X B,
+\]
+và đây là bài toán hand-eye kinh điển. Ba cách giải độc lập, ba nhóm khác nhau: Tsai và Lenz tách xoay khỏi tịnh tiến rồi giải tuần tự \cite{tsai1989handeye}; Park và Martin dùng cấu trúc nhóm Euclid \cite{park1994robot}; Daniilidis giải đồng thời cả hai bằng quaternion đối ngẫu \cite{daniilidis1999handeye}. Việc ba nhóm độc lập cho cùng kết quả là một mức kiểm chứng tốt cho tính đúng của công thức hoá.
+
+Sau lời giải dạng đóng, nên tinh chỉnh phi tuyến --- cùng lý do như ở \ptr{A/03} mục~4: lời giải dạng đóng cực tiểu một sai số đại số, không phải sai số có ý nghĩa. Có các công thức hoá dùng trọng số theo bất định \cite{strobl2006optimal}.
+
+\subsection{B. Điều kiện kích thích, và vì sao robot vi sai vi phạm}
+
+Đây là phần quan trọng nhất và nó trả lời Q3.
+
+Bài toán \(AX = XB\) không xác định \(X\) duy nhất từ một cặp chuyển động. Cụ thể, \emph{phần tịnh tiến của \(X\) chỉ xác định được nếu tập chuyển động chứa các phép xoay quanh ít nhất hai trục độc lập} \cite[§IV]{tsai1989handeye}.
+
+Trực giác của điều kiện này: phần tịnh tiến của \(X\) --- tức camera cách tâm robot bao xa --- chỉ lộ ra qua hiệu ứng đòn bẩy khi robot \emph{xoay}. Nếu robot chỉ tịnh tiến, camera và thân di chuyển giống hệt nhau và không có thông tin nào về khoảng cách giữa chúng. Nếu robot chỉ xoay quanh \emph{một} trục, thì thành phần của véctơ tịnh tiến dọc theo trục ấy không gây hiệu ứng gì --- nó nằm trong nhân của phép quay --- nên nó không xác định được.
+
+Và đây là chỗ robot vi sai đặc biệt dễ vi phạm: \emph{nó chỉ xoay được quanh một trục}, trục thẳng đứng. Một robot vi sai trên sàn phẳng không bao giờ tạo ra phép xoay quanh trục ngang, nên thành phần \emph{độ cao} của véctơ tịnh tiến trong \(X\) là không quan sát được.
+
+Ba cách xử lý.
+
+\emph{Một, đo độ cao bằng thước.} Nghe thô nhưng nó đúng: đây là một tham số mà thị giác không đo được, và đo cơ khí là cách hợp lệ. Cố định nó rồi giải phần còn lại.
+
+\emph{Hai, nghiêng robot có chủ ý.} Nếu có cách cho robot lên một cái dốc nhẹ trong quá trình hiệu chuẩn, bạn tạo ra xoay quanh trục ngang và điều kiện được thoả. Không phải lúc nào cũng làm được.
+
+\emph{Ba, nhận ra rằng bạn có thể không cần nó.} Nếu bài toán là docking trên sàn phẳng và robot luôn ở cùng độ cao, thì thành phần độ cao của \(X\) \emph{không ảnh hưởng} tới kết quả --- nó là một hằng số cộng vào cả pose hiện tại lẫn pose đích và nó triệt tiêu. Đây lại là lập luận teach-by-showing xuất hiện dưới một hình thức khác, và nó là lý do thực dụng nhất: \emph{không quan sát được và không cần thiết thường đi với nhau}, vì cả hai đều xuất phát từ cùng một sự bất biến của bài toán.
+
+\begin{cannho}
+Điều kiện kích thích của hand-eye là một trường hợp cụ thể của một nguyên lý tổng quát: \emph{một tham số chỉ ước lượng được nếu dữ liệu chứa thông tin về nó}, và ``thêm tham số vào mô hình'' không tạo ra thông tin.
+
+Triệu chứng khi vi phạm: bộ giải vẫn trả về một con số, residual vẫn nhỏ, nhưng con số ấy đổi mạnh khi bạn chạy lại với dữ liệu khác --- vì nó đang được quyết định bởi nhiễu và bởi điểm khởi đầu chứ không bởi dữ liệu.
+
+Phép thử: chạy lại hiệu chuẩn với các tập con dữ liệu khác nhau và xem tham số nào ổn định, tham số nào nhảy. Đây là cùng phép thử đã dùng cho \(c_x\) ở mục~3B, và nó là phép thử chẩn đoán có giá trị nhất trong cả chương.
+
+Và một an ủi thực dụng: các tham số không quan sát được thường cũng là các tham số không ảnh hưởng tới kết quả, vì cả hai tính chất đều bắt nguồn từ cùng một sự bất biến của bài toán.
+\end{cannho}
+
+\section{Trôi theo thời gian}
+\ptrtarget{B/12/06}
+
+Hiệu chuẩn không phải một trạng thái vĩnh viễn, và mục này liệt kê những gì đổi.
+
+\emph{Nhiệt độ.} Ống kính và thân máy giãn nở; tiêu cự đổi và điểm chính dịch. Với ống kính nhựa và chênh lệch vài chục độ, hiệu ứng có thể ở mức pixel. Với hệ đặt trong nhà và nhiệt độ ổn định thì ít quan trọng; với hệ ngoài trời hoặc gần nguồn nhiệt thì đáng đo.
+
+\emph{Rung và va chạm.} Vít lỏng, giá đỡ camera lệch, tấm marker bị va. Đây là nguồn đổi đột ngột chứ không trôi dần, nên nó cần một cơ chế phát hiện chứ không phải một mô hình.
+
+\emph{Mài mòn và bẩn.} Tag bị xước, bị bám bụi, bị phai màu. Nó không đổi hình học nhưng nó đổi \(\sigma\) và có thể gây thiên lệch cục bộ.
+
+Ba biện pháp, theo thứ tự chi phí.
+
+\emph{Một, chỉ báo liên tục.} Sai số tái chiếu của PnP hợp nhất, và tỉ số giữa nó với sai số khi giải từng tag riêng (\ptr{B/09} mục~2). Ghi vào log và theo dõi xu hướng. Đây là cách phát hiện rẻ nhất và nó bắt được cả ba loại đổi.
+
+\emph{Hai, hiệu chuẩn lại định kỳ.} Với intrinsic thì tốn công; với constellation và hand-eye thì nhanh hơn.
+
+\emph{Ba, tự hiệu chuẩn trực tuyến.} Đưa một số tham số vào trạng thái của bộ ước lượng và để chúng được cập nhật cùng pose. Nghe hấp dẫn và nó hoạt động trong một số hệ, nhưng nó mang theo nguyên tắc ở mục~5B: \emph{mở rộng trạng thái không tạo ra thông tin}. Nếu chuyển động không kích thích một tham số thì đưa nó vào trạng thái chỉ làm nó trôi tự do và hấp thụ sai số từ chỗ khác --- làm residual nhỏ đi trong khi pose tệ đi. Với docking, nơi chuyển động rất hạn chế (thẳng trục, một trục xoay), tôi khuyên \emph{không} tự hiệu chuẩn trực tuyến trừ khi bạn đã phân tích kích thích cẩn thận.
+
+\section{Nếu dùng teach-by-showing thì khác gì}
+\ptrtarget{B/12/07}
+
+Mục này trả lời Q5, và nó là mục làm chương này khác mọi chương khác trong cây.
+
+\ptr{B/13} mục~3 chỉ ra rằng nếu điều khiển theo sai lệch tương đối so với một trạng thái đích đã ghi, thì mọi sai số \emph{hệ thống} triệt tiêu. Sai số của cả ba phép hiệu chuẩn trong chương này đều thuộc loại đó. Hệ quả: yêu cầu đổi bản chất.
+
+\emph{Không còn cần: độ đúng tuyệt đối.} Một \(K\) sai 2\%, một constellation sai 1\,mm, một \(X\) sai vài milimét --- tất cả xuất hiện ở cả hai vế và trừ đi nhau. Bạn không cần biết chúng đúng.
+
+\emph{Vẫn cần, và cần hơn: độ ổn định.} Đây là câu trả lời cho Q5. Triệt tiêu chỉ hoạt động khi hàm sai lệch \emph{không đổi} giữa lần dạy và lần chạy. Mọi thứ ở mục~6 --- trôi nhiệt, va chạm, mài mòn --- phá đúng điều kiện ấy. Nên trong chế độ teach-by-showing, chương này vẫn quan trọng nhưng nó chuyển trọng tâm: từ ``hiệu chuẩn cho đúng'' sang ``giữ cho không đổi, và phát hiện khi nó đổi''.
+
+Ba việc thay đổi cụ thể.
+
+\emph{Việc bỏ bớt:} yêu cầu về độ phủ dữ liệu và tư thế nghiêng ở mục~3A nới lỏng. Bạn vẫn cần một \(K\) hợp lý --- vì méo quá lớn làm cạnh cong và phá detector (\ptr{A/01} mục~4), và vì hàm sai lệch phải đủ trơn để triệt tiêu bậc nhất hoạt động --- nhưng bạn không cần \(c_x\) chính xác tới pixel.
+
+\emph{Việc giữ nguyên:} phép thử ổn định ở mục~3B và mục~5B trở thành phép thử chính chứ không phải phép kiểm phụ.
+
+\emph{Việc thêm vào:} một quy trình \emph{dạy lại} định kỳ, và một cơ chế phát hiện khi cần dạy lại. Dạy lại rẻ hơn hiệu chuẩn lại rất nhiều --- nó chỉ là đưa robot vào vị trí cập chuẩn một lần và ghi lại --- nên tần suất có thể cao.
+
+Và một cảnh báo: triệt tiêu chỉ ở \emph{bậc nhất} và chỉ trong lân cận tư thế dạy (\ptr{B/13} mục~3C). Nếu robot phải làm việc trên một dải tư thế rộng, phần dư bậc hai không triệt tiêu, và khi đó độ đúng của hiệu chuẩn lại quan trọng trở lại. Cách xử lý: dùng coarse-to-fine (\ptr{B/13} mục~5) để đảm bảo pha cuối luôn ở gần tư thế dạy.
+
+\section{Giới hạn và chế độ hỏng}
+\ptrtarget{B/12/08}
+
+\textbf{Residual nhỏ không chứng minh tham số đúng.} Đây là chủ đề xuyên suốt chương và nó đáng lặp lại: residual đo độ khớp với dữ liệu đã cho, không đo độ đúng. Với dữ liệu nghèo, một mô hình sai vẫn cho residual nhỏ.
+
+\textbf{Sai số bước trước bị hấp thụ vào bước sau im lặng.} Mục~2. Không có chỉ báo tự nhiên nào bắt được, nên thứ tự phải được tuân thủ bằng kỷ luật.
+
+\textbf{Điều kiện kích thích không thể lách bằng thuật toán.} Mục~5B. Nếu chuyển động không chứa thông tin về một tham số, không bộ giải nào tìm ra nó.
+
+\textbf{Odometry là một nguồn sai số trong hand-eye.} Mục~5 giả định \(B\) --- chuyển động của thân robot --- được đo chính xác. Với odometry bánh xe, nó không: trượt bánh, sai bán kính bánh, sai khoảng cách trục. Sai số ấy đi thẳng vào \(X\). Với đoạn hiệu chuẩn ngắn thì chấp nhận được; với đoạn dài thì cần một nguồn tốt hơn.
+
+\textbf{Các con số khuyến nghị chưa được kiểm.} 20--30 ảnh, ``nghiêng mạnh'' là bao nhiêu độ --- đây là thực hành phổ biến chứ không phải kết quả tối ưu hoá.
+
+\section{Thực hành}
+\ptrtarget{B/12/09}
+
+Năm việc.
+
+\emph{Một, quyết định chế độ trước:} teach-by-showing hay accuracy tuyệt đối. Nó quyết định bạn cần chương này ở mức nào.
+
+\emph{Hai, tuân thủ thứ tự} intrinsic \(\rightarrow\) constellation \(\rightarrow\) hand-eye, và làm lại cả chuỗi khi đổi bất kỳ thành phần quang học nào.
+
+\emph{Ba, với intrinsic, đầu tư vào dữ liệu chứ không vào thuật toán:} phủ tới bốn góc, nhiều tư thế nghiêng, và ba phép kiểm ở mục~3B.
+
+\emph{Bốn, đo khâu \(T^{\text{tag}}_{\text{dock}}\) bằng chính lần cập chuẩn} thay vì bằng thước. Nó chính xác hơn và nó miễn phí.
+
+\emph{Năm, bật chỉ báo liên tục} ở mục~6 và theo dõi xu hướng của nó theo tuần, không chỉ theo khung.
+
+\begin{onbai}
+\ar[3]{Pose thực sự cần}{\(T^{\text{base}}_{\text{dock}} = T^{\text{base}}_{\text{cam}} \cdot T^{\text{cam}}_{\text{tag}} \cdot T^{\text{tag}}_{\text{dock}}\). Ba khâu, chỉ khâu giữa là thứ thị giác đo. Hai khâu kia là hằng số phải hiệu chuẩn, và sai số của chúng cộng thẳng.}
+\ar[3]{Khâu thường bị bỏ quên}{\(T^{\text{tag}}_{\text{dock}}\) --- quan hệ giữa hệ constellation và \emph{điểm cập chuẩn thật}. Người ta đo kỹ vị trí các tag với nhau rồi quên rằng còn phải biết cụm ấy ở đâu so với cái lỗ cắm.}
+\ar[3]{Thứ tự bắt buộc}{Intrinsic \(\rightarrow\) constellation \(\rightarrow\) hand-eye. Mỗi bước dùng kết quả bước trước làm hằng số. Đảo thứ tự \(\Rightarrow\) sai số bị hấp thụ vào bước sau \emph{mà residual vẫn nhỏ}.}
+\ar[3]{Hệ quả của thứ tự}{Đổi ống kính hoặc chỉnh nét \(\Rightarrow\) phải làm lại \emph{cả ba} bước, không chỉ bước 1. Lý do nữa để khoá nét bằng keo.}
+\ar[3]{Vì sao \(c_x, c_y\) khó ước lượng}{Với target gần vuông góc, ``điểm chính lệch trái'' và ``target dịch phải'' cho \emph{cùng một ảnh}. Chỉ tư thế nghiêng mạnh mới tách được hai giả thuyết. \(f_x\) thì ổn định --- sự tương phản ấy là một chẩn đoán tốt.}
+\ar[3]{Vì sao residual không phát hiện được}{Bộ tối ưu tìm bộ tham số khớp tốt nhất với \emph{dữ liệu đã cho}. Dữ liệu không chứa thông tin phân biệt hai giả thuyết \(\Rightarrow\) cả hai cho residual nhỏ như nhau. \emph{Residual đo độ khớp, không đo độ đúng.}}
+\ar[3]{Ba phép kiểm sau hiệu chuẩn}{Bản đồ residual theo vị trí ảnh (cấu trúc \(\Rightarrow\) mô hình sai dạng); hiệu chuẩn lại với các tập con và xem tham số nào nhảy; kiểm bằng target độc lập chưa dùng để hiệu chuẩn.}
+\ar[2]{Hand-eye \(AX = XB\)}{\(A\) là chuyển động camera (đo bằng thị giác), \(B\) là chuyển động thân robot (odometry), \(X\) là ẩn. Ba cách giải độc lập: tách xoay/tịnh tiến \cite{tsai1989handeye}, nhóm Euclid \cite{park1994robot}, quaternion đối ngẫu \cite{daniilidis1999handeye}.}
+\ar[3]{Điều kiện kích thích của hand-eye}{Phần tịnh tiến của \(X\) chỉ xác định được nếu có xoay quanh \emph{ít nhất hai trục độc lập} \cite[§IV]{tsai1989handeye}. Thành phần dọc theo trục xoay nằm trong nhân nên không quan sát được.}
+\ar[3]{Vì sao robot vi sai vi phạm}{Nó chỉ xoay quanh \emph{một} trục (thẳng đứng), nên thành phần \emph{độ cao} của véctơ tịnh tiến trong \(X\) không quan sát được. Ba cách: đo bằng thước, nghiêng robot có chủ ý, hoặc nhận ra rằng không cần.}
+\ar[3]{An ủi thực dụng}{Tham số không quan sát được thường cũng là tham số không ảnh hưởng kết quả --- cả hai tính chất bắt nguồn từ cùng một sự bất biến của bài toán.}
+\ar[3]{Đo \(T^{\text{tag}}_{\text{dock}}\) thế nào}{Bằng \emph{chính lần cập chuẩn}: đưa robot vào vị trí cập đúng rồi đo pose constellation từ đó. Pose ấy \emph{định nghĩa} điểm cập chuẩn --- không cần thước. Đây chính là teach-by-showing nhìn từ góc hiệu chuẩn.}
+\ar[3]{Teach-by-showing đổi gì}{Bỏ yêu cầu về \emph{độ đúng} (sai số hệ thống triệt tiêu); giữ và tăng yêu cầu về \emph{độ ổn định} (triệt tiêu chỉ hoạt động khi hàm sai lệch không đổi giữa dạy và chạy). Thêm: quy trình dạy lại định kỳ, rẻ hơn hiệu chuẩn lại nhiều.}
+\ar[2]{Cảnh báo về tự hiệu chuẩn trực tuyến}{Mở rộng trạng thái \emph{không tạo ra thông tin}. Chuyển động docking rất hạn chế (thẳng trục, một trục xoay), nên tham số không kích thích sẽ trôi tự do và hấp thụ sai số --- residual nhỏ đi trong khi pose tệ đi.}
+\ar[2]{Odometry là nguồn sai số trong hand-eye}{Mục 5 giả định \(B\) đo chính xác. Trượt bánh, sai bán kính, sai khoảng cách trục đi thẳng vào \(X\). Đoạn hiệu chuẩn ngắn thì chấp nhận được.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{\repo{OpenCV} \code{calibrateCamera}, \code{calibrateHandEye}}{Cài Zhang và các phương pháp hand-eye kinh điển}{\code{calibrateHandEye} có nhiều phương pháp chọn được --- thử vài cái và so kết quả}
+\ud{\repo{Kalibr} \cite{furgale2013unified}}{Hiệu chuẩn nhiều cảm biến, báo cáo residual theo vị trí ảnh}{Công cụ duy nhất mặc định cho bạn bản đồ residual ở mục 3B}
+\ud{\repo{easy\_handeye}}{Wrapper ROS cho hand-eye với quy trình thu thập dữ liệu}{Tiện, nhưng vẫn phải tự lo điều kiện kích thích ở mục 5B}
+\ud{\repo{COLMAP} \cite{schoenberger2016colmap}}{Photogrammetry để đo constellation nếu không muốn tự viết BA}{Đường tắt cho bước 2; nhớ neo tỉ lệ}
+\ud{\repo{deltille} \cite{chen2018deltille}}{Target lưới tam giác cho intrinsic chất lượng cao nhất}{Dùng khi chế độ accuracy tuyệt đối và ngân sách chặt}
+\end{ungdung}
+
+\begin{duan}{Kiểm tính ổn định của ba phép hiệu chuẩn, và tìm tham số không quan sát được}{2--3 ngày}
+\dmt phân biệt các tham số \emph{đã được xác định} khỏi các tham số \emph{trông như đã được xác định}, bằng một phép thử không cần chân trị nào.
+\ddl dữ liệu hiệu chuẩn thật của chính hệ bạn: một bộ ảnh target cho intrinsic, một bộ ảnh constellation cho BA, một bộ cặp pose cho hand-eye.
+\dbc với mỗi trong ba phép hiệu chuẩn, chạy nó \(M = 20\) lần trên \(M\) tập con ngẫu nhiên của dữ liệu (mỗi tập con chứa khoảng 70\% dữ liệu); ghi lại mọi tham số của mỗi lần; tính độ lệch chuẩn của từng tham số qua \(M\) lần; xếp các tham số theo độ lệch chuẩn tương đối. Phần hai: với intrinsic, lặp lại nhưng chia dữ liệu theo \emph{tư thế} --- một tập chỉ gồm ảnh gần vuông góc, một tập gồm cả ảnh nghiêng mạnh --- và so \(c_x, c_y\) giữa hai tập.
+\dxk bạn có một bảng xếp hạng các tham số theo mức độ được xác định. Dự đoán của chương: \(f_x, f_y\) rất ổn định; \(c_x, c_y\) kém ổn định hơn nhiều và \emph{đặc biệt} kém trong tập chỉ có ảnh vuông góc; và trong hand-eye, thành phần độ cao của \(X\) sẽ nhảy nhiều nhất nếu robot của bạn chỉ xoay quanh trục đứng. Kiểm tra chéo bắt buộc: nếu \emph{mọi} tham số đều ổn định thì hoặc dữ liệu của bạn rất tốt (đáng mừng), hoặc các tập con của bạn quá giống nhau --- hãy kiểm bằng cách thử một tập con chỉ 30\% dữ liệu.
+\dnv \ptr{C/15} nhận độ lệch chuẩn này làm ước lượng bất định cho các dòng hiệu chuẩn trong ngân sách; \ptr{B/13} dùng nó để quyết định có cần chế độ accuracy tuyệt đối không.
+\end{duan}
+
+\begin{traloi}
+\tl{Thứ tự: intrinsic \(\rightarrow\) constellation \(\rightarrow\) hand-eye, vì mỗi bước dùng kết quả bước trước làm hằng số đã biết. Nếu đảo hai bước cuối --- làm hand-eye trước khi đo constellation --- thì bài toán \(AX=XB\) nhận các chuyển động camera \(A\) được đo dựa trên một mô hình constellation sai, nên \(A\) sai một cách có hệ thống (chẳng hạn mọi chuyển động được đo lớn hơn thực tế một tỉ lệ cố định). Bộ giải sẽ tìm một \(X\) làm phương trình khớp tốt nhất, và cái \(X\) ấy \emph{hấp thụ} một phần sai lệch. Kết quả là một \(X\) sai, một residual nhỏ, và không có chỉ báo nào --- đây là chế độ hỏng im lặng, loại nguy hiểm nhất. Hệ quả thực hành đi kèm: khi đổi ống kính hoặc chỉnh lại nét, phải làm lại cả ba bước chứ không chỉ bước một.}
+\tl{Hai tham số gần như chắc chắn sai là \(c_x\) và \(c_y\) --- điểm chính. Lý do: với target luôn gần vuông góc, giả thuyết ``điểm chính lệch sang trái'' và giả thuyết ``target dịch sang phải'' tạo ra \emph{cùng một ảnh}, nên dữ liệu không tách được chúng. Chỉ khi target nghiêng mạnh thì hai giả thuyết mới cho hai ảnh khác nhau, vì biến dạng phối cảnh phụ thuộc vào vị trí so với trục quang. Residual không phát hiện được vì bộ tối ưu làm đúng việc nó được giao: tìm bộ tham số khớp tốt nhất với dữ liệu đã cho. Nếu dữ liệu không chứa thông tin phân biệt hai giả thuyết thì cả hai đều cho residual nhỏ như nhau, và bộ tối ưu chọn một trong hai theo điểm khởi đầu. Nguyên tắc chung: residual đo độ \emph{khớp}, không đo độ \emph{đúng}. Phép thử đúng là hiệu chuẩn lại với các tập con dữ liệu khác nhau và xem tham số nào nhảy.}
+\tl{Điều kiện: tập chuyển động phải chứa các phép xoay quanh \emph{ít nhất hai trục độc lập} \cite[§IV]{tsai1989handeye}. Trực giác: phần tịnh tiến của \(X\) --- camera cách tâm robot bao xa --- chỉ lộ ra qua hiệu ứng đòn bẩy khi robot xoay; tịnh tiến thuần thì camera và thân di chuyển giống hệt nhau và không mang thông tin nào về khoảng cách giữa chúng. Và nếu chỉ xoay quanh một trục, thì thành phần của véctơ tịnh tiến \emph{dọc theo} trục ấy nằm trong nhân của phép quay nên không gây hiệu ứng gì. Robot vi sai trên sàn phẳng đặc biệt dễ vi phạm vì nó chỉ xoay được quanh \emph{một} trục --- trục thẳng đứng --- nên thành phần độ cao của \(X\) không quan sát được. Ba cách xử lý: đo độ cao bằng thước rồi cố định nó; cho robot lên dốc nhẹ để tạo xoay quanh trục ngang; hoặc nhận ra rằng với docking trên sàn phẳng, độ cao là một hằng số cộng vào cả pose hiện tại lẫn pose đích nên nó triệt tiêu và bạn không cần nó.}
+\tl{Pose cần là \(T^{\text{base}}_{\text{dock}}\) --- điểm cập chuẩn trên dock so với thân robot --- và chuỗi gồm ba khâu: \(T^{\text{base}}_{\text{cam}} \cdot T^{\text{cam}}_{\text{tag}} \cdot T^{\text{tag}}_{\text{dock}}\). Chỉ khâu giữa là thứ thị giác đo mỗi khung; hai khâu ngoài là hằng số phải hiệu chuẩn một lần và sai số của chúng cộng thẳng vào kết quả. Khâu thường bị bỏ quên là khâu cuối, \(T^{\text{tag}}_{\text{dock}}\): người ta đo rất cẩn thận vị trí các tag với nhau bằng bundle adjustment rồi quên rằng còn phải biết cả cụm tag ấy nằm ở đâu so với cái lỗ cắm sạc --- và khâu ấy thường được lấy từ bản vẽ CAD với đúng những vấn đề mà \ptr{B/09} mục 5 đã cảnh báo. Cách đo đúng và rẻ nhất: đưa robot vào vị trí cập chuẩn rồi đo pose constellation từ đó; pose ấy \emph{định nghĩa} điểm cập chuẩn trong hệ constellation, không cần thước.}
+\tl{Yêu cầu về \emph{độ ổn định} --- và nó thậm chí quan trọng hơn trong chế độ này. Teach-by-showing triệt tiêu sai số hệ thống vì cùng một hàm sai lệch tác động lên cả pose hiện tại lẫn pose đích; nhưng triệt tiêu chỉ hoạt động khi hàm ấy \emph{không đổi} giữa lần dạy và lần chạy. Mọi thứ ở mục 6 --- trôi nhiệt của ống kính, va chạm làm lệch giá camera, vít lỏng, tag mài mòn --- phá đúng điều kiện ấy, và khi đó bạn mất toàn bộ lợi ích mà không có tín hiệu nào. Nên trọng tâm chuyển từ ``hiệu chuẩn cho đúng'' sang ``giữ cho không đổi, và phát hiện khi nó đổi''. Cụ thể: các phép thử ổn định ở mục 3B và 5B trở thành phép thử \emph{chính} chứ không phải phép kiểm phụ; chỉ báo liên tục ở mục 6 phải được bật và theo dõi theo tuần; và cần một quy trình \emph{dạy lại} định kỳ --- may là dạy lại rẻ hơn hiệu chuẩn lại rất nhiều nên tần suất có thể cao.}
+\end{traloi}
+
+\begin{dongian}
+Cái mà robot thật sự cần biết không phải ``tấm tag ở đâu so với camera'' mà là ``cái lỗ cắm sạc ở đâu so với thân tôi''. Giữa hai câu ấy có một chuỗi ba khâu, và camera chỉ lo được một khâu ở giữa.
+
+Khâu thứ nhất: cái lỗ cắm nằm đâu so với cụm tag. Khâu thứ ba: camera được bắt ở đâu trên thân robot. Hai khâu này được xác định \emph{một lần} lúc lắp đặt rồi không ai kiểm lại nữa. Nếu chúng sai thì cái sai ấy nằm im trong hệ thống suốt đời, và nó không bao giờ lộ ra ở con số nào.
+
+Chuyện thứ tự thì đơn giản mà hay bị làm sai: phải đo camera trước, rồi đo cụm tag, rồi mới đo chỗ bắt camera. Lý do là mỗi bước sau dựa vào kết quả bước trước. Làm ngược thì sai số của bước sau sẽ ``nuốt'' sai số của bước trước --- mọi con số trông vẫn hợp lý, chỉ có điều tất cả đều sai.
+
+Có một cái bẫy đáng nói riêng. Khi hiệu chuẩn camera, người ta hay chụp mấy chục tấm ảnh tấm bảng cờ vua, và ai cũng muốn chụp cho \emph{đẹp}: bảng nằm giữa khung hình, nhìn thẳng, sáng đều. Đó chính là bộ ảnh tệ nhất. Vì với bảng nhìn thẳng thì máy không phân biệt được ``ống kính hơi lệch tâm'' với ``bảng hơi dịch sang bên'' --- hai chuyện khác nhau nhưng cho ra cùng một tấm ảnh. Phải chụp bảng nghiêng nhiều, phải cho nó chạm vào bốn góc khung hình, thì máy mới tách được hai chuyện đó. Bộ ảnh \emph{xấu xí} mới là bộ ảnh tốt.
+
+Và cái con số ``sai lệch trung bình'' mà phần mềm in ra cuối cùng thì đừng tin. Nó chỉ nói mô hình khớp với đúng mấy tấm ảnh bạn đưa vào, không nói mô hình có đúng hay không. Cách kiểm thật: chạy hiệu chuẩn nhiều lần với các nhóm ảnh khác nhau, rồi xem con số nào giữ nguyên và con số nào nhảy. Cái nào nhảy thì cái đó chưa được xác định, dù phần mềm có in nó ra với năm chữ số thập phân.
+
+Cuối cùng, tin tốt. Nếu bạn dùng mẹo ở chương sau --- chụp một tấm ảnh mẫu lúc robot đang cắm đúng, rồi về sau chỉ cần lái sao cho ảnh trùng với ảnh mẫu --- thì phần lớn chương này bớt quan trọng hẳn. Mọi sai lệch cố định đều xuất hiện ở cả hai lần và trừ đi nhau. Bạn không cần mấy con số \emph{đúng}; bạn chỉ cần chúng \emph{đừng thay đổi}. Và ``đừng thay đổi'' thì dễ hơn ``đúng'' nhiều --- chỉ cần dán keo vào vòng lấy nét, siết chặt mấy con vít, và thỉnh thoảng chụp lại ảnh mẫu.
+
+\chuadongian{việc phân biệt một tham số ``đã được xác định'' với một tham số ``trông như đã được xác định'' thì không có cách nào nhìn từ kết quả một lần chạy. Phải chạy nhiều lần với dữ liệu khác nhau rồi so --- và đó là việc tốn một buổi nhưng đáng, vì nó cho biết bạn đang tin vào cái gì.}
+\motcau{Bộ ảnh hiệu chuẩn đẹp là bộ ảnh tệ; và nếu dùng mẹo chụp ảnh mẫu thì bạn cần các con số đừng đổi hơn là cần chúng đúng.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{B/12/10}
+
+Mệnh đề chính --- \emph{thứ tự intrinsic \(\rightarrow\) constellation \(\rightarrow\) hand-eye là bắt buộc, và đảo thứ tự gây sai số im lặng} --- bị bác bỏ nếu mô phỏng cho thấy hand-eye giải với constellation sai vẫn cho \(X\) đúng trong phạm vi sai số. Tôi dẫn nó bằng lập luận về sự hấp thụ (cửa a) và nó chưa qua cửa (b). Đây là mệnh đề có hậu quả quy trình lớn nhất trong chương.
+
+Mệnh đề thứ hai --- \emph{\(c_x, c_y\) không tách được khi target luôn gần vuông góc} --- là mệnh đề dễ kiểm nhất, và phần hai của mini project chính là phép kiểm. Nó được ủng hộ bởi cấu trúc của bài toán (\ptr{A/01} mục~5) và bởi thực hành phổ biến trong cộng đồng hiệu chuẩn, nhưng tôi chưa tự đo.
+
+Mệnh đề thứ ba --- \emph{robot vi sai không quan sát được thành phần độ cao của \(X\)} --- bắt nguồn trực tiếp từ điều kiện kích thích đã công bố \cite{tsai1989handeye}, nên cửa (c) đã qua cho phần lý thuyết. Phần áp dụng cho robot vi sai là suy luận của tôi, và nó bị bác bỏ nếu hand-eye trên một robot vi sai cho thành phần độ cao ổn định qua nhiều tập con dữ liệu.
+
+Cuối cùng, mệnh đề mềm: \emph{tham số không quan sát được thường cũng không ảnh hưởng kết quả}. Đây là một quan sát về cấu trúc chứ không phải một định luật, và nó có ngoại lệ --- một tham số có thể không quan sát được trong dữ liệu hiệu chuẩn nhưng lại ảnh hưởng trong điều kiện vận hành khác. Cách kiểm: mô phỏng ảnh hưởng của nó lên pose ở dải tư thế vận hành thật.
+
+\section{Kết nối}
+\ptrtarget{B/12/11}
+
+Chương này nối chuỗi đo với thế giới thật, và nó có một quan hệ đặc biệt với \ptr{B/13}.
+
+Nối lên trên. \ptr{A/01-mo-hinh-camera-va-distortion} cấp toàn bộ nội dung của mục~3: mô hình méo, vì sao điểm chính khó, và phép thử residual có cấu trúc. Hai chương gắn chặt: chương~1 giải thích cơ chế, chương này biến nó thành quy trình. \ptr{A/05-lan-truyen-sai-so-pixel-sang-pose} mục~8 cấp phân loại làm cho mục~7 có nghĩa.
+
+Nối ngang. \ptr{B/09-multi-marker-constellation} mục~5 là bước 2 của chuỗi; chương này bổ sung hai điều mà chương ấy chưa bàn: vị trí của nó trong thứ tự, và khâu \(T^{\text{tag}}_{\text{dock}}\) còn lại sau BA. \ptr{B/13-docking-control} là chương quyết định tầm quan trọng của cả chương này --- một quan hệ hiếm và đáng chú ý. Mục~7 mô tả nó, và kết luận thực hành là: \emph{đọc \ptr{B/13} trước khi quyết định đầu tư bao nhiêu vào chương này}.
+
+Nối xuống. \ptr{C/15-ngan-sach-sai-so} nhận các dòng ``sai số intrinsic'', ``sai số constellation'', ``sai số hand-eye'' --- và mini project của chương này là cách định giá chúng bằng số. Đáng chú ý là cả ba dòng ấy thuộc loại \emph{hệ thống}, nên chúng cộng thẳng và không chia cho \(\sqrt{N}\) --- trong chế độ accuracy tuyệt đối, chúng thường chiếm phần lớn ngân sách. \ptr{C/16-danh-gia-va-nghiem-thu} nhận phép thử ổn định ở mục~3B và~5B làm một mục trong quy trình nghiệm thu định kỳ.
+
+\begin{tukiem}
+\item Viết chuỗi biến đổi đầy đủ từ điểm cập chuẩn tới thân robot, và chỉ ra khâu nào đo mỗi khung, khâu nào hiệu chuẩn một lần.
+\item Vì sao đảo thứ tự constellation và hand-eye gây sai số im lặng? Mô tả cơ chế hấp thụ.
+\item Bộ ảnh hiệu chuẩn ``đẹp'' là bộ ảnh tệ. Giải thích, và nêu chính xác tham số nào bị ảnh hưởng.
+\item Nêu phép thử phân biệt tham số ``đã được xác định'' với tham số ``trông như đã được xác định'', và giải thích vì sao residual không làm được việc đó.
+\item Điều kiện kích thích của hand-eye là gì, và vì sao robot vi sai trên sàn phẳng vi phạm nó? Nêu ba cách xử lý.
+\item Bạn chuyển sang teach-by-showing. Yêu cầu nào của chương này biến mất, yêu cầu nào ở lại và tăng lên?
+\item Vì sao tự hiệu chuẩn trực tuyến nguy hiểm trong bài toán docking, và nguyên lý nào ở mục 5B giải thích điều đó?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

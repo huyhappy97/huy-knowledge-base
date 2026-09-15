@@ -1,0 +1,240 @@
+% ---------------------------------------------------------------------------
+% Chương 15 — Hợp nhất đa cảm biến
+% Tạo: 2026-09-13 | Phụ thuộc: A/04 (đồ thị nhân tử), A/06 (hiệp phương sai), C/14 (ngoại)
+% Mức độ: QUAN TRỌNG. Chương NGẮN có chủ ý — phần lớn chi tiết nằm ở ../IMU_Fusion/ và ../marker/.
+% Kiểm chứng:
+%   (1) Thêm nguồn = thêm nhân tử; không đổi bộ giải — cửa (a) từ A/04 mục 3.
+%   (2) Nonholonomic constraint cho robot mặt đất — cửa (a) từ hình học bánh xe.
+%   (3) Mỗi nguồn cần cổng outlier RIÊNG — cửa (a) lập luận: outlier của mỗi nguồn có
+%       phân bố khác nhau, một cổng chung không bắt được.
+%   (4) GNSS: cần căn chỉnh local <-> global frame, thêm 4 DoF (3 tịnh tiến + yaw).
+% Ghi chú trung thực: chương này chủ yếu là NGUYÊN TẮC + BẢNG TRA; chi tiết trỏ sang cây khác.
+% ---------------------------------------------------------------------------
+\documentclass[../../vslam.tex]{subfiles}
+\begin{document}
+\chapter{Hợp nhất đa cảm biến (Multi-Sensor Fusion)}
+\ptrtarget{C/15}\ptrtarget{C/15-hop-nhat-da-cam-bien}
+\dependency{\ptr{A/04-uoc-luong-map-va-bundle-adjustment} (đồ thị nhân tử --- thêm cảm biến là thêm loại nhân tử); \ptr{A/06-bat-dinh-va-lan-truyen-sai-so} (hiệp phương sai đúng là điều kiện bắt buộc chứ không phải điều tốt nên có); \ptr{C/14-hieu-chuan-nhu-mot-nhanh-cua-slam} (không ghép được hai cảm biến mà không biết chúng đặt ở đâu so với nhau). Chi tiết về IMU nằm ở \code{../IMU\_Fusion/}, về marker ở \code{../marker/}.}
+
+\begin{tomtat}
+Chương này ngắn có chủ ý. Phần lớn nội dung chi tiết về từng loại cảm biến đã nằm ở các cây khác, và lặp lại nó ở đây sẽ vi phạm quy tắc một nguồn duy nhất của kho. Cái chương này đóng góp là \emph{nguyên tắc chung} --- một nguyên tắc gọn tới mức đáng ngạc nhiên --- cộng một bảng tra về việc mỗi cảm biến cho gì và đòi gì. Nguyên tắc: \emph{thêm một nguồn thông tin là thêm một loại nhân tử vào đồ thị, với hiệp phương sai đúng và cổng loại outlier riêng cho từng nguồn}. Ba vế của câu đó đều quan trọng và vế thứ ba hay bị bỏ. Nội dung gồm: nguyên tắc và ba điều kiện của nó; bảng tra sáu nhóm cảm biến với cái chúng cho, điều kiện để cái đó quan sát được, và chế độ hỏng riêng; hai trường hợp đáng nói kỹ hơn vì chúng hay bị làm sai --- odometry bánh xe và GNSS; và cuối cùng là một cách nhìn về việc chọn cấu hình cảm biến như một bài toán phá gauge. Nếu chỉ nhớ một điều: \emph{giá trị lớn nhất của một cảm biến phụ không phải độ chính xác cao hơn khi mọi thứ chạy tốt, mà là một chỗ đứng để phục hồi khi thị giác thất bại}.
+\end{tomtat}
+
+\begin{nentang}
+\kn{nhân tử (factor)}{một số hạng của hàm mục tiêu, nối các biến mà phần dư của nó phụ thuộc vào (\ptr{A/04}). Thêm một cảm biến nghĩa là định nghĩa một loại nhân tử mới.}
+\kn{ràng buộc nonholonomic}{ràng buộc lên \emph{vận tốc} chứ không lên vị trí. Với robot bánh xe không trượt ngang, vận tốc theo phương ngang thân xe bằng không --- một ràng buộc miễn phí và rất hữu ích.}
+\kn{odometry bánh xe}{ước lượng chuyển động từ số vòng quay bánh xe. Cho tỉ lệ metric, rẻ, tần số cao; hỏng khi trượt.}
+\kn{de-skew}{hiệu chỉnh méo của một lượt quét LiDAR do cảm biến di chuyển trong lúc quét. Cùng bản chất với vấn đề rolling shutter ở \ptr{A/02}.}
+\kn{hệ toàn cục so với hệ cục bộ}{SLAM làm việc trong một hệ tuỳ ý do nó tự chọn (gauge); GNSS cho toạ độ trong một hệ toàn cục cố định. Ghép hai hệ đòi một phép biến đổi có bốn bậc tự do phải ước lượng.}
+\kn{cổng loại outlier (outlier gating)}{cơ chế từ chối một phép đo trước khi đưa vào bộ giải. Mỗi nguồn cần cổng riêng vì phân bố outlier của chúng khác nhau.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Thêm một cảm biến vào đồ thị là thêm một loại nhân tử --- nghe như một việc cơ học. Nêu ba điều kiện phải thoả, và nói điều kiện nào hay bị bỏ nhất.}
+\h{Một GNSS rẻ tiền có sai số vài mét. Thị giác của bạn chính xác tới centimet trong ngắn hạn. Nêu lý do vẫn đáng thêm GNSS, và nói lý do đó không phải ``để chính xác hơn''.}
+\h{Odometry bánh xe cho tỉ lệ metric miễn phí, chính xác, tần số cao. Vì sao nó vẫn không thay thế được IMU trong hầu hết hệ thống, và chế độ hỏng của nó khác IMU thế nào?}
+\h{Bạn dùng chung một ngưỡng Mahalanobis cho mọi loại nhân tử --- cách làm gọn gàng và thống nhất. Nêu vì sao đó là một sai lầm, với một ví dụ cụ thể.}
+\h{Chọn cấu hình cảm biến cho một robot mặt đất. Nêu cách đặt câu hỏi này sao cho nó trở thành một bài toán có tiêu chí thay vì một cuộc tranh luận về sở thích.}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{C/15/01}
+
+Thị giác một mình có ba điểm yếu cố hữu mà không thuật toán nào chữa được, vì chúng là tính chất của phép đo chứ không của cách xử lý.
+
+\emph{Một --- không có tỉ lệ với mono} (\ptr{A/05} mục~3). \emph{Hai --- hỏng khi không có vân}: hành lang trắng, sương mù, bóng tối, camera bị che. \emph{Ba --- tần số thấp và độ trễ cao}: ba mươi khung mỗi giây với vài chục mili giây xử lý là quá chậm cho một vòng điều khiển bay.
+
+Ba điểm yếu ấy được chữa bởi ba loại cảm biến khác nhau, và đó là lý do gần như mọi hệ thống thật đều có nhiều hơn một cảm biến.
+
+Bài toán gốc: \emph{ghép chúng lại thế nào cho đúng?} Câu hỏi này nghe mở, và lịch sử của lĩnh vực có nhiều câu trả lời phức tạp --- các sơ đồ lọc phân tầng, các cơ chế trọng số thủ công, các máy trạng thái chuyển đổi giữa các nguồn. Phần lớn chúng đã lỗi thời.
+
+Câu trả lời hiện đại gọn tới mức đáng ngạc nhiên, và nó là hệ quả trực tiếp của \ptr{A/04}: \emph{đồ thị nhân tử không quan tâm nhân tử đến từ đâu}. Một nhân tử là một hàm phần dư cộng một hiệp phương sai. Bộ giải nhìn thấy một tập nhân tử và một tập biến; nó không biết và không cần biết nhân tử nào đến từ camera, nhân tử nào từ IMU, nhân tử nào từ GNSS.
+
+Hệ quả là việc thêm một cảm biến trở thành một việc \emph{cục bộ}: định nghĩa biến mới nếu cần, định nghĩa phần dư, cung cấp Jacobian và hiệp phương sai. Không có gì trong bộ giải thay đổi. Đây là lý do kiến trúc đồ thị nhân tử thắng, và nó là một lợi thế lớn so với bộ lọc, nơi thêm một cảm biến nghĩa là sửa vector trạng thái và mọi ma trận liên quan.
+
+Nhưng --- và đây là toàn bộ nội dung còn lại của chương --- sự gọn gàng ấy che mất ba điều kiện. Bỏ qua chúng thì việc thêm cảm biến làm hệ thống \emph{tệ đi}, và tệ theo cách khó chẩn đoán.
+
+\begin{trucgiac}
+Hình dung một cuộc họp mà mọi người cùng ước lượng một con số --- giá của một ngôi nhà chẳng hạn.
+
+Mỗi người đưa ra một con số kèm một mức tự tin: ``khoảng ba tỉ, tôi khá chắc'' hoặc ``khoảng bốn tỉ, nhưng tôi chỉ đoán''. Cách hợp lý để tổng hợp là trung bình có trọng số, với trọng số theo mức tự tin.
+
+Đó chính xác là điều đồ thị nhân tử làm, và nó giải thích cả ba điều kiện.
+
+\emph{Điều kiện một --- mức tự tin phải trung thực.} Nếu một người nói ``tôi rất chắc'' trong khi thực ra chỉ đoán, ý kiến của người đó sẽ lấn át cả phòng. Và điều tệ nhất: cuộc họp sẽ kết luận rằng \emph{những người khác đang sai}, chứ không phải người kia đang nói quá.
+
+\emph{Điều kiện hai --- phải biết mọi người đang nói về cùng một thứ.} Nếu một người nói giá tính bằng đồng và người khác tính bằng đô la, việc trung bình hoá là vô nghĩa. Trong cảm biến, ``cùng một thứ'' nghĩa là cùng hệ quy chiếu và cùng mốc thời gian --- tức hiệu chuẩn ngoại và đồng bộ thời gian.
+
+\emph{Điều kiện ba --- phải loại người nói nhảm, và mỗi người nói nhảm theo kiểu khác nhau.} Một người thỉnh thoảng nhầm một chữ số; một người khác đôi khi nói về một ngôi nhà hoàn toàn khác. Hai kiểu sai ấy cần hai cách phát hiện, và một quy tắc chung ``loại ai lệch quá xa'' sẽ bắt được kiểu thứ hai mà bỏ sót kiểu thứ nhất.
+
+Và một điều nữa, quan trọng nhất cho thực tế. Giá trị lớn nhất của việc có nhiều người trong phòng không phải là trung bình chính xác hơn khi mọi người đều tỉnh táo. Đó là khi \emph{một người ngất xỉu} --- cuộc họp vẫn tiếp tục được.
+\end{trucgiac}
+
+\section{Nguyên tắc và ba điều kiện}
+\ptrtarget{C/15/02}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ nhất.
+
+Nguyên tắc: \emph{thêm một nguồn thông tin là thêm một loại nhân tử vào đồ thị}. Ba điều kiện:
+
+\subsection{A. Hiệp phương sai phải trung thực}
+
+Trọng số \(\Omega = \Sigma^{-1}\) quyết định nguồn này được tin bao nhiêu \emph{so với} mọi nguồn khác. Khai \(\Sigma\) quá nhỏ nghĩa là ra lệnh cho bộ giải tin nguồn này hơn tất cả.
+
+Hậu quả khi sai, và nó đã được nêu ở \ptr{B/08} khối \emph{Cạm bẫy}: nếu nguồn ấy có sai lệch có hệ thống, sai lệch đó chảy vào toàn bộ nghiệm, kéo theo cả những phần vốn được ước lượng tốt. Và \emph{không có gì cảnh báo} --- phần dư của các nguồn khác tăng lên, nhưng bộ giải diễn giải điều đó là ``các nguồn kia kém chính xác''.
+
+Quy tắc thực hành: trước khi thêm một loại nhân tử, trả lời được \emph{hiệp phương sai của nó từ đâu ra}. Ba câu trả lời hợp lệ: từ datasheet của cảm biến (đã kiểm bằng đo đạc); từ một phép đo bạn tự làm (như đo \(\sigma\) subpixel ở \ptr{B/07} mục~4B); hoặc từ một mô hình có cơ sở vật lý. Câu trả lời \emph{không} hợp lệ: ``tôi chỉnh cho tới khi nó chạy''.
+
+\subsection{B. Hệ quy chiếu và thời gian phải đúng}
+
+Hai cảm biến đặt ở hai chỗ khác nhau trên cùng thiết bị đo hai thứ khác nhau, và quan hệ giữa chúng là phép biến đổi ngoại (\ptr{C/14}). Sai ngoại thì mọi phần dư mang một sai lệch có hệ thống.
+
+Sai lệch thời gian còn nguy hiểm hơn vì nó \emph{phụ thuộc chuyển động}: một \(t_d\) sai không gây hại gì khi thiết bị đứng yên và gây hại lớn khi nó chuyển động nhanh. Hệ quả chẩn đoán đáng nhớ: nếu hệ thống của bạn chính xác khi đi chậm và tệ khi đi nhanh, nghi ngờ \(t_d\) trước khi nghi ngờ thuật toán.
+
+Cả hai đều nên được \emph{thả ra làm biến} theo \ptr{C/14}, với cổng observability.
+
+\subsection{C. Cổng loại outlier riêng cho từng nguồn}
+
+Đây là điều kiện hay bị bỏ nhất, và là câu trả lời cho câu hỏi mở đầu thứ tư.
+
+Mỗi nguồn có \emph{phân bố outlier riêng}, và một cổng chung không bắt được cả hai.
+
+Ví dụ cụ thể. Outlier thị giác là các khớp sai: chúng rải rác, độc lập, và thường có phần dư rất lớn --- một cổng Mahalanobis đơn giản bắt tốt. Outlier odometry bánh xe là trượt: nó \emph{kéo dài} (cả một đoạn đường), \emph{tương quan} (mọi phép đo trong đoạn đó đều sai cùng chiều), và phần dư của mỗi phép đo riêng lẻ có thể \emph{nhỏ}. Một cổng Mahalanobis trên từng phép đo sẽ không bắt được nó, vì không phép đo nào lệch đủ xa --- nhưng tổng của chúng thì lệch rất xa.
+
+Phát hiện trượt cần một cơ chế khác: so tích luỹ odometry với tích luỹ từ một nguồn độc lập (IMU hoặc thị giác) trên một cửa sổ, và cảnh báo khi chúng phân kỳ. Đây là một cổng ở \emph{mức chuỗi} chứ không ở mức phép đo, và nó không thể suy ra từ cổng thị giác.
+
+Bài học tổng quát: \emph{cổng phải được thiết kế theo cơ chế hỏng của từng nguồn}, không theo một công thức thống nhất. Một hệ thống có \(n\) loại cảm biến cần \(n\) cơ chế phát hiện, và đó là chi phí kỹ thuật thật của việc hợp nhất.
+
+\section{Bảng tra: mỗi cảm biến cho gì, đòi gì}
+\ptrtarget{C/15/03}
+
+\begin{table}[H]\centering\small
+\caption{Sáu nhóm cảm biến. Cột ``cho gì'' nên đọc theo ngôn ngữ gauge của \ptr{A/05}; cột ``chế độ hỏng riêng'' là cột quyết định thiết kế cổng ở mục 2C.}
+\label{tab:c15-sensors}
+\begin{tabularx}{\linewidth}{@{}L{2.1cm}L{3.0cm}L{3.1cm}Y@{}}
+\toprule
+\textbf{Cảm biến} & \textbf{Cho gì} & \textbf{Điều kiện} & \textbf{Chế độ hỏng riêng}\\
+\midrule
+IMU & Tỉ lệ metric, hướng trọng lực (roll, pitch), chuyển động tần số cao & Gia tốc phải \emph{thay đổi} để tỉ lệ quan sát được & Trôi độ lệch; bão hoà khi va đập; nhiễu rung\\
+Odometry bánh xe & Tỉ lệ metric, chuyển động phẳng, ràng buộc nonholonomic & Bánh không trượt; đường kính bánh đã hiệu chuẩn & \textbf{Trượt} --- kéo dài, tương quan, phần dư từng phép đo nhỏ\\
+Stereo & Tỉ lệ metric ngay từ khung đầu & Trong tầm hữu ích; đường cơ sở ổn định & Ngoài tầm thì thoái hoá về mono; trôi đường cơ sở theo nhiệt\\
+LiDAR & Cấu trúc metric dày, không cần ánh sáng & Bề mặt phản xạ đủ; de-skew đúng & Hành lang dài (suy biến dọc trục); mưa, bụi, kính\\
+GNSS & Vị trí \emph{tuyệt đối} trong hệ toàn cục & Thấy trời; ít đa đường & Đa đường trong phố; mất tín hiệu trong nhà; sai lệch tương quan\\
+Marker / UWB & Vị trí tuyệt đối trong hệ đã thiết lập & Trong tầm nhìn / tầm sóng; đã lắp đặt & Ngoài tầm; marker bị che, bẩn, tháo mất\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng này nên đọc cùng với Bảng ở \ptr{00-map}: mỗi cảm biến trong cột ``cho gì'' thực chất là \emph{phá một gauge}. IMU và odometry và stereo phá gauge tỉ lệ; IMU còn ghim roll với pitch; GNSS và marker phá cả gauge tịnh tiến lẫn yaw. Nhìn theo cách đó, việc chọn cấu hình cảm biến trở thành một câu hỏi có tiêu chí --- đó là câu trả lời cho câu hỏi mở đầu thứ năm.
+
+\section{Hai trường hợp hay bị làm sai}
+\ptrtarget{C/15/04}
+
+\subsection{A. Odometry bánh xe}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ ba, và odometry bánh xe đáng một mục riêng vì nó là cảm biến \emph{bị đánh giá thấp nhất} cho robot mặt đất.
+
+Cái nó cho, và ba thứ này đều đáng giá. \emph{Tỉ lệ metric} --- đường kính bánh đã biết cho một thước đo, giống đường cơ sở stereo. \emph{Tần số cao và độ trễ thấp} --- thường vài trăm Hz, tốt cho vòng điều khiển. \emph{Ràng buộc nonholonomic} --- và đây là phần miễn phí ít người khai thác: với robot bánh xe không trượt ngang, vận tốc theo phương ngang thân xe \emph{bằng không}, và với robot chạy trên sàn phẳng, vận tốc thẳng đứng cũng bằng không. Đó là hai ràng buộc không cần cảm biến nào cả --- chỉ cần biết loại robot.
+
+Vì sao nó vẫn không thay thế IMU? Vì chế độ hỏng của hai cảm biến \emph{bù nhau} chứ không trùng nhau. IMU trôi nhưng không bao giờ ``nói dối'' --- nó luôn đo đúng cái nó đo, chỉ là có độ lệch. Odometry không trôi khi mọi thứ bình thường, nhưng khi bánh trượt thì nó nói dối một cách tự tin: nó báo robot đã đi ba mét trong khi robot đứng yên quay bánh.
+
+Hai kiểu sai ấy đòi hai cách xử lý ngược nhau. Với IMU, ta \emph{mô hình hoá} độ lệch và ước lượng nó. Với odometry, ta phải \emph{phát hiện và loại} --- không có mô hình nào cho việc trượt. Và như mục~2C đã nói, việc phát hiện ấy cần một cổng ở mức chuỗi chứ không ở mức phép đo.
+
+Kết luận thực dụng cho robot mặt đất: \emph{dùng cả hai}. IMU cho hướng và cho chuyển động ngắn hạn khi bánh trượt; odometry cho tỉ lệ và cho chuyển động khi IMU trôi. Chúng kiểm chéo lẫn nhau, và chính việc kiểm chéo ấy là cơ chế phát hiện trượt.
+
+\subsection{B. GNSS và hai hệ quy chiếu}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ hai.
+
+Vấn đề đầu tiên khi thêm GNSS không phải độ chính xác mà là \emph{hệ quy chiếu}. SLAM làm việc trong một hệ tuỳ ý mà nó tự chọn khi khởi tạo --- đó chính là gauge ở \ptr{A/05}. GNSS cho toạ độ trong một hệ toàn cục cố định. Hai hệ liên hệ qua một phép biến đổi \emph{chưa biết} với bốn bậc tự do: ba tịnh tiến và một yaw (roll và pitch đã bị trọng lực ghim nếu có IMU).
+
+Phép biến đổi ấy phải được \emph{ước lượng}, và nó là một biến trong đồ thị như mọi biến khác. Điều kiện để nó quan sát được: quỹ đạo phải đủ dài và đủ cong --- một đoạn thẳng không xác định được yaw của phép căn chỉnh.
+
+Vì sao vẫn đáng thêm GNSS dù nó kém chính xác hơn thị giác? Lý do \emph{không} phải độ chính xác mà là \emph{bản chất sai số}. Sai số thị giác \emph{tích luỹ} --- nó nhỏ ở ngắn hạn và lớn vô hạn ở dài hạn. Sai số GNSS \emph{bị chặn} --- nó vài mét ở mọi thời điểm, hôm nay cũng như một năm sau. Hai đặc tính ấy bù nhau hoàn hảo: thị giác cho độ chính xác cục bộ, GNSS cho việc không trôi.
+
+Đây là một ví dụ của một nguyên tắc chung đáng nhớ: \emph{khi ghép cảm biến, hãy tìm nguồn có đặc tính sai số bù nhau, không phải nguồn chính xác nhất}. Hai cảm biến cùng trôi theo cùng kiểu không giúp được nhau; một cảm biến kém chính xác nhưng không trôi lại vô giá.
+
+Cảnh báo về cổng, đúng theo mục~2C: sai số GNSS trong phố có \emph{đa đường} --- tín hiệu phản xạ từ toà nhà --- và nó gây sai lệch \emph{tương quan theo thời gian}, có thể hàng chục mét và kéo dài nhiều giây. Một cổng dựa trên từng phép đo sẽ không bắt được, vì hiệp phương sai mà máy thu báo cũng lạc quan trong tình huống ấy. Cần một cổng so với dự đoán từ thị giác trên một cửa sổ.
+
+\begin{cannho}
+\textbf{Giá trị lớn nhất của một cảm biến phụ không phải độ chính xác cao hơn khi mọi thứ chạy tốt, mà là một chỗ đứng để phục hồi khi nguồn chính thất bại.}
+
+Đây là điều mà các bảng so sánh độ chính xác không nắm bắt được, và nó là lý do quan trọng nhất để hợp nhất cảm biến trong sản phẩm.
+
+Ba biểu hiện cụ thể, đã xuất hiện rải rác trong cây. \emph{Một}: khi thị giác mất bám, odometry và IMU giữ cho hệ thống có một ước lượng thô --- đủ để tiếp tục vòng điều khiển, và đủ để thu hẹp không gian tìm kiếm khi relocalize (\ptr{B/12} mục 2C). \emph{Hai}: tiên nghiệm chuyển động từ cảm biến phụ cải thiện chính front-end thị giác, theo ba đường cùng lúc (\ptr{B/07} mục 5C). \emph{Ba}: khi hai nguồn bất đồng, đó là một tín hiệu chẩn đoán --- và một hệ chỉ có một nguồn thì không bao giờ có tín hiệu ấy.
+
+Hệ quả cho việc đánh giá: đo một hệ hợp nhất bằng ATE trung bình trên một chuỗi sạch sẽ \emph{bỏ sót phần lớn giá trị của nó}. Phải đo trên các chuỗi có sự cố --- che camera, tắt đèn, bánh trượt --- và đo \emph{tỉ lệ sống sót} chứ không chỉ độ chính xác. \ptr{C/18} bàn cách thiết kế phép đo đó.
+\end{cannho}
+
+\begin{ungdung}
+\ud{VINS-Fusion \cite{qin2018vinsmono}}{Camera \(+\) IMU \(+\) GNSS tuỳ chọn; căn chỉnh hệ cục bộ với hệ toàn cục}{Mục 4B trong một hệ thật; mã ngắn dễ đọc}
+\ud{GTSAM \cite{dellaert2017factorgraphs}}{Thư viện nhân tử cho nhiều loại cảm biến; dễ thêm loại mới}{Hiện thân của nguyên tắc ở mục 2 --- thêm cảm biến là viết một lớp nhân tử}
+\ud{Kimera \cite{rosinol2020kimera}}{Camera \(+\) IMU \(+\) ngữ nghĩa trong một đồ thị}{Cho thấy cả thông tin ngữ nghĩa cũng chỉ là một loại nhân tử}
+\ud{maplab \cite{schneider2018maplab}}{Nhiều cảm biến, nhiều phiên, hiệu chuẩn ngoại trong cùng khung}{Kết hợp chương này với \ptr{C/13} và \ptr{C/14}}
+\ud{OpenVINS \cite{geneva2020openvins}}{Camera \(+\) IMU với hiệu chuẩn ngoại và \(t_d\) trực tuyến}{Mục 2B --- thả ngoại và thời gian ra làm biến}
+\end{ungdung}
+
+\begin{duan}{Thêm odometry bánh xe vào một hệ VIO, rồi đo giá trị thật của nó}{3 ngày}
+\dmt đo giá trị của một cảm biến phụ theo cách đúng --- không phải bằng ATE trung bình mà bằng tỉ lệ sống sót khi có sự cố.
+\ddl một robot mặt đất có bánh xe encoder, camera và IMU; tự thu ba loại chuỗi: chuỗi sạch, chuỗi có che camera vài giây, và chuỗi có bánh trượt (chạy lên một tấm thảm trơn hoặc nâng một bánh).
+\dbc thêm nhân tử odometry và ràng buộc nonholonomic vào một hệ VIO có sẵn; hiệu chuẩn đường kính bánh và ngoại bánh--camera theo \ptr{C/14}; cài một cổng phát hiện trượt ở \emph{mức chuỗi} theo mục 2C --- so tích luỹ odometry với tích luỹ IMU trên một cửa sổ; chạy bốn cấu hình (VIO thuần, VIO \(+\) odom không cổng, VIO \(+\) odom có cổng, VIO \(+\) odom \(+\) nonholonomic) trên cả ba loại chuỗi.
+\dxk bạn có một bảng bốn cấu hình nhân ba chuỗi với hai cột: ATE và \emph{có sống sót không}. Bạn phải quan sát được: (a) trên chuỗi sạch, thêm odometry cải thiện ATE ít --- đúng như dự đoán, vì đó không phải giá trị chính của nó; (b) trên chuỗi che camera, chỉ các cấu hình có odometry sống sót; (c) trên chuỗi trượt, cấu hình \emph{không cổng} tệ hơn cả VIO thuần --- xác nhận mục 2C bằng dữ liệu của chính bạn, và đó là kết quả đáng giá nhất của bài này.
+\dnv \ptr{C/18-danh-gia-va-phuong-phap-luan} chuẩn hoá cách đo ``tỉ lệ sống sót''; \ptr{D/19-ben-vung-trong-the-gioi-thuc} mở rộng danh mục sự cố cần thử.
+\end{duan}
+
+\begin{traloi}
+\tl{Ba điều kiện: (1) \emph{hiệp phương sai trung thực} --- trọng số quyết định nguồn này được tin bao nhiêu so với mọi nguồn khác, và khai quá nhỏ làm sai lệch có hệ thống của nó chảy vào toàn bộ nghiệm mà không có gì cảnh báo; (2) \emph{hệ quy chiếu và thời gian đúng} --- ngoại và \(t_d\), cả hai nên thả ra làm biến theo \ptr{C/14}; (3) \emph{cổng loại outlier riêng cho từng nguồn}. Điều kiện (3) hay bị bỏ nhất, vì nó đòi hiểu cơ chế hỏng của từng cảm biến chứ không suy ra được từ một công thức chung.}
+\tl{Vì \emph{bản chất sai số bù nhau}, không phải vì độ chính xác. Sai số thị giác \emph{tích luỹ} --- nhỏ ở ngắn hạn, lớn vô hạn ở dài hạn. Sai số GNSS \emph{bị chặn} --- vài mét ở mọi thời điểm, hôm nay cũng như một năm sau. Ghép lại: thị giác cho độ chính xác cục bộ, GNSS cho việc không trôi. Nguyên tắc chung đáng nhớ: khi ghép cảm biến, tìm nguồn có \emph{đặc tính sai số bù nhau}, không phải nguồn chính xác nhất --- hai cảm biến cùng trôi theo cùng kiểu không giúp được nhau. Lưu ý: thêm GNSS đòi ước lượng một phép biến đổi bốn bậc tự do giữa hệ cục bộ và hệ toàn cục, và nó cần quỹ đạo đủ cong để quan sát được yaw.}
+\tl{Vì chế độ hỏng của hai cảm biến \emph{bù nhau} chứ không trùng nhau. IMU trôi nhưng không bao giờ nói dối --- nó luôn đo đúng cái nó đo, chỉ có độ lệch, nên ta \emph{mô hình hoá} độ lệch và ước lượng nó. Odometry không trôi khi bình thường, nhưng khi bánh trượt thì nó nói dối một cách tự tin --- báo đã đi ba mét trong khi robot đứng yên quay bánh --- và không có mô hình nào cho việc trượt, nên phải \emph{phát hiện và loại}. Hai kiểu sai đòi hai cách xử lý ngược nhau. Kết luận: dùng cả hai, và chính việc chúng kiểm chéo lẫn nhau là cơ chế phát hiện trượt.}
+\tl{Vì mỗi nguồn có \emph{phân bố outlier riêng}. Ví dụ cụ thể: outlier thị giác là khớp sai --- rải rác, độc lập, phần dư rất lớn --- nên cổng Mahalanobis trên từng phép đo bắt tốt. Outlier odometry là trượt --- \emph{kéo dài} cả một đoạn, \emph{tương quan} (mọi phép đo sai cùng chiều), và phần dư của từng phép đo riêng lẻ có thể \emph{nhỏ}. Cổng Mahalanobis không bắt được vì không phép đo nào lệch đủ xa, nhưng tổng của chúng thì lệch rất xa. Cần một cổng ở \emph{mức chuỗi}: so tích luỹ odometry với tích luỹ từ nguồn độc lập trên một cửa sổ. Bài học: cổng phải thiết kế theo cơ chế hỏng của từng nguồn; \(n\) loại cảm biến cần \(n\) cơ chế phát hiện.}
+\tl{Đặt nó thành một bài toán \emph{phá gauge}: liệt kê các bậc tự do không quan sát được của cấu hình thuần thị giác (bảy với mono, theo \ptr{A/05}), rồi hỏi mỗi cảm biến phá được bậc nào và với điều kiện gì --- Bảng~\ref{tab:c15-sensors} là bảng trả lời. Thêm hai tiêu chí nữa để bài toán đầy đủ: (a) \emph{đặc tính sai số có bù nhau không} (tích luỹ so với bị chặn); (b) \emph{chế độ hỏng có độc lập không} --- hai cảm biến cùng chết khi mất điện hoặc cùng chết trong sương mù thì không cho khả năng phục hồi. Với robot mặt đất, kết quả thường là stereo \(+\) IMU \(+\) odometry bánh xe, và \ptr{D/21} lập luận vì sao đó là điểm ngọt.}
+\end{traloi}
+
+\begin{dongian}
+Hình dung một cuộc họp để đoán giá một ngôi nhà. Mỗi người đưa ra một con số kèm mức tự tin. Cách hợp lý để tổng hợp là trung bình có trọng số theo mức tự tin. Đó chính xác là điều một hệ hợp nhất cảm biến làm.
+
+Từ hình ảnh đó suy ra được cả ba chỗ có thể hỏng.
+
+Nếu một người nói ``tôi rất chắc'' trong khi thực ra chỉ đoán bừa, ý kiến người đó lấn át cả phòng --- và tệ hơn, cuộc họp sẽ kết luận rằng những người kia đang sai chứ không phải người này đang nói quá. Đây là chuyện xảy ra khi bạn khai mức tin cậy của một cảm biến quá cao.
+
+Nếu một người tính bằng đồng và người khác tính bằng đô la, trung bình hoá là vô nghĩa. Với cảm biến, điều này nghĩa là phải biết chúng đặt ở đâu so với nhau và đo vào lúc nào.
+
+Và nếu có người nói nhảm, phải loại --- nhưng mỗi người nói nhảm theo một kiểu. Một người thỉnh thoảng nhầm một chữ số, dễ thấy ngay. Một người khác thì nói rất hợp lý nhưng về một ngôi nhà hoàn toàn khác, và cả buổi không ai phát hiện. Hai kiểu ấy cần hai cách bắt. Đây là chỗ mà một quy tắc chung ``loại ai lệch quá xa'' sẽ bắt kiểu thứ nhất và bỏ sót kiểu thứ hai --- đúng cái xảy ra với bánh xe bị trượt.
+
+Nhưng điều quan trọng nhất thì không nằm ở việc trung bình. Giá trị lớn nhất của việc có nhiều người trong phòng không phải là con số chính xác hơn khi mọi người đều tỉnh táo. Đó là lúc \emph{một người ngất xỉu} --- cuộc họp vẫn tiếp tục được.
+
+Với một cái máy, ``ngất xỉu'' nghĩa là camera bị che, đèn tắt, hay đi vào một hành lang trắng trơn. Một hệ chỉ có camera sẽ dừng lại ở đó. Một hệ có thêm vài nguồn khác thì vẫn đi tiếp được --- kém chính xác hơn, nhưng vẫn đi. Và với một sản phẩm, khác biệt giữa ``kém chính xác'' và ``dừng lại'' là khác biệt giữa được và không được.
+
+\chuadongian{chỗ không rút gọn được là việc \emph{biết mỗi cảm biến nói dối theo kiểu nào}. Không có quy tắc chung; phải hiểu vật lý của từng cảm biến. Bánh xe nói dối khi trượt; GPS nói dối khi tín hiệu dội vào toà nhà; camera nói dối khi có một chiếc xe tải đi ngang chiếm hết khung hình. Ba kiểu nói dối ấy chẳng liên quan gì tới nhau, và mỗi kiểu cần một cách bắt riêng.}
+\motcau{Thêm một cảm biến là thêm một ý kiến vào cuộc họp --- và điều quan trọng nhất không phải nó nói gì, mà là nó có thành thật về mức nó chắc chắn hay không.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{C/15/05}
+
+Mệnh đề chính --- \emph{thêm cảm biến là thêm nhân tử, không đổi bộ giải} --- là hệ quả cấu trúc của đồ thị nhân tử (cửa a). Nó bị bác bỏ nếu có một loại phép đo không viết được thành một nhân tử với Jacobian và hiệp phương sai --- và có: các phép đo có \emph{cấu trúc rời rạc}, chẳng hạn ``robot đang ở trong phòng A'' từ một bộ phân loại, không phải một phần dư liên tục. Chúng cần các kỹ thuật khác (ước lượng đa giả thuyết), và đó là một giới hạn thật của khung này chứ không phải một ngoại lệ nhỏ.
+
+Mệnh đề thứ hai --- \emph{mỗi nguồn cần cổng riêng} --- kiểm được bằng mini project phần chuỗi trượt. Nó bị bác bỏ nếu một cổng chung đủ tốt cho mọi nguồn trên một tập sự cố đa dạng. Tôi cho là không, dựa trên lập luận về phân bố outlier, nhưng mức độ nghiêm trọng thì tôi chưa đo cho các cặp cảm biến ngoài odometry--thị giác.
+
+Mệnh đề thứ ba --- \emph{giá trị chính của cảm biến phụ là khả năng phục hồi, không phải độ chính xác} --- là một phán đoán về ưu tiên, và nó phụ thuộc ứng dụng. Với một hệ quét đo đạc chạy trong điều kiện kiểm soát, độ chính xác đúng là tiêu chí chính và mệnh đề này sai. Nó đúng cho robot hoạt động không giám sát, tức cho mục tiêu đã nêu ở \ptr{00-map} \emph{(tôi suy ra từ mục tiêu ấy, chưa đối chiếu nguồn)}.
+
+\section{Kết nối}
+\ptrtarget{C/15/06}
+
+Nối lên trên. \ptr{A/04-uoc-luong-map-va-bundle-adjustment} cho khung mà nguyên tắc ở mục~2 là hệ quả trực tiếp. \ptr{A/05-observability-gauge-va-suy-bien} cho ngôn ngữ để đọc Bảng~\ref{tab:c15-sensors}: mỗi cảm biến phá một gauge. \ptr{A/06-bat-dinh-va-lan-truyen-sai-so} là chương mà điều kiện một ở mục~2A phụ thuộc hoàn toàn vào --- và nó cũng cảnh báo rằng hiệp phương sai đáng tin là thứ khó có. \ptr{C/14-hieu-chuan-nhu-mot-nhanh-cua-slam} là điều kiện hai.
+
+Nối xuống dưới. \ptr{C/18-danh-gia-va-phuong-phap-luan} là chỗ khối \emph{Cần nhớ} trở thành phương pháp: đo một hệ hợp nhất bằng ATE trung bình là bỏ sót phần lớn giá trị của nó. \ptr{D/19-ben-vung-trong-the-gioi-thuc} mở rộng danh mục sự cố mà cảm biến phụ giúp vượt qua. \ptr{D/21-tu-prototype-len-mass-production} là chỗ việc chọn cấu hình cảm biến trở thành một quyết định có chi phí BOM, có ngân sách điện, và có hệ quả về dung sai cơ khí --- và là chỗ lập luận ``stereo \(+\) IMU \(+\) odometry là điểm ngọt cho robot mặt đất'' được trình bày đầy đủ.
+
+Nối ngang. \code{../IMU\_Fusion/} là cây đầy đủ về nhánh quán tính: tiền tích phân (chương 7), bộ lọc và tối ưu (chương 8, 9), khởi tạo (chương 10), ràng buộc chuyển động và đa cảm biến (chương 12). Chương này cố ý không lặp lại. \code{../marker/} là cây về nhánh fiducial, nơi marker đóng vai trò neo tuyệt đối --- và nó cho thấy cái giá thật của giải pháp ấy: lắp đặt, hiệu chuẩn, bảo trì.
+
+\begin{tukiem}
+\item Nêu nguyên tắc chung để thêm một cảm biến, và ba điều kiện của nó. Điều kiện nào hay bị bỏ nhất và vì sao?
+\item Vì sao một nhân tử có hiệp phương sai sai lại tệ hơn không có nhân tử đó, và vì sao không có gì cảnh báo?
+\item Outlier thị giác và outlier odometry khác nhau thế nào về phân bố, và vì sao một cổng chung không bắt được cả hai?
+\item Odometry bánh xe và IMU đều cho tỉ lệ metric. Chế độ hỏng của chúng khác nhau thế nào, và vì sao điều đó nghĩa là nên dùng cả hai?
+\item Thêm GNSS đòi ước lượng một phép biến đổi mấy bậc tự do, và điều kiện nào để nó quan sát được?
+\item Nêu nguyên tắc chọn cảm biến theo ``đặc tính sai số bù nhau'', và cho một ví dụ về hai cảm biến \emph{không} bù nhau.
+\item Vì sao đo một hệ hợp nhất bằng ATE trung bình trên chuỗi sạch là bỏ sót phần lớn giá trị của nó?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

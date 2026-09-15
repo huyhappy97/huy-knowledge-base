@@ -1,0 +1,21 @@
+% 00-map.tex — bản đồ Phần B. Ngày tạo: 2026-09-13 | Dependency: ../00-map.tex | Mức độ: điều hướng
+\documentclass[../vslam.tex]{subfiles}
+\begin{document}
+\begin{table}[H]\centering\small
+\caption{Bản đồ Phần B: các chương, nội dung, và mức đầu tư đề xuất.}
+\begin{tabularx}{\linewidth}{@{}L{0.8cm}L{3.3cm}YL{1.6cm}@{}}
+\toprule
+\textbf{Ch.} & \textbf{Thư mục} & \textbf{Nội dung} & \textbf{Mức}\\
+\midrule
+7 & \code{07-dac-trung-va-data-association} & Detector và descriptor cổ điển lẫn học được; KLT và optical flow; phân bố đặc trưng; RANSAC và họ của nó; tinh chỉnh subpixel & \muc{3}\\
+8 & \code{08-mo-hinh-phan-du} & Indirect, direct, semi-direct; tham số hoá landmark; structureless; phần dư độ sâu, đường thẳng, mặt phẳng; prior học được & \muc{3}\\
+9 & \code{09-paradigm-uoc-luong-back-end} & Bộ lọc (EKF, MSCKF, InEKF); cửa sổ trượt; fixed-lag; iSAM2; full batch; pose graph; dạng căn bậc hai; certifiable & \muc{3}\\
+10 & \code{10-khoi-tao} & Khởi tạo mono hai khung và model selection; khởi tạo từ stereo/depth; khởi tạo VI; từ prior học được; phát hiện thất bại và khởi tạo lại & \muc{2}\\
+11 & \code{11-loop-closure-va-nhat-quan-toan-cuc} & BoW và place recognition học được; kiểm định hình học; \(Sim(3)\); pose graph; back-end bền (switchable, DCS, GNC, RRR); perceptual aliasing & \muc{3}\\
+12 & \code{12-relocalization} & BoW \(+\) PnP; localization phân cấp; scene coordinate regression; vì sao APR không tốt; kidnapped robot; kiểm định chống reloc sai & \muc{2}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent Chương 7, 8, 9 là bộ ba xương sống và nên đọc liền nhau: chúng lần lượt trả lời ``phép đo đến từ đâu'', ``phép đo có dạng gì'', và ``ghép phép đo thế nào''. Chương 11 cũng là xương sống nhưng vì lý do khác --- nó là chương duy nhất mà một lỗi đơn lẻ có thể phá huỷ toàn bộ bản đồ, nên phần về back-end bền ở đó đáng đọc kỹ hơn vẻ ngoài. Chương 10 và 12 có thể đọc lướt lần đầu rồi quay lại khi bạn thật sự phải xây dựng hai mô-đun đó; cả hai đều là nơi \ptr{A/05} trả công và là nơi nguyên tắc ``biết từ chối quan trọng hơn luôn trả lời'' được áp dụng cụ thể nhất.
+\end{document}

@@ -1,0 +1,91 @@
+% ============================================================================
+%  06-bai-toan-kho — Tấn công bài toán khó: kiểm soát quan trọng hơn thủ thuật
+%  Ngày tạo: 2026-09-09 | Sửa gần nhất: 2026-09-09 | Ôn gần nhất: chưa
+%  Dependency: 03 (biểu diễn), 05 (Einstellung). Mức độ: nên nắm.
+% ============================================================================
+\documentclass[../hieu-suat.tex]{subfiles}
+\begin{document}
+\chapter{Bài toán khó: thứ phân biệt không phải là biết nhiều thủ thuật hơn}
+\ptrtarget{06}\ptrtarget{06-bai-toan-kho}
+\dependency{\ptr{03} (biểu diễn theo cấu trúc sâu), \ptr{05} (ý tưởng đầu tiên chiếm chú ý).}
+
+\begin{tomtat}
+Khi quan sát người ta giải bài toán không quen thuộc, thứ phân biệt người giải được với người đi lạc không phải vốn thủ thuật mà là \emph{kiểm soát}: quyết định lúc nào bỏ một hướng, lúc nào quay lại phân tích, lúc nào đổi biểu diễn. Trong các bản ghi hình của Schoenfeld, khoảng 60\% lượt giải của sinh viên có dạng ``đọc đề, chọn nhanh một hướng, rồi theo hướng đó tới cùng bất kể chuyện gì xảy ra''. Chương này biến quan sát đó thành một bộ quy tắc kiểm soát thời gian và hướng đi, và kết thúc bằng một điều ngược trực giác đo được trong phòng thí nghiệm thật: phát hiện bất ngờ không phải tai nạn hiếm gặp mà là nguyên liệu chính, chiếm một phần lớn kết quả thí nghiệm.
+\end{tomtat}
+
+\begin{nentang}
+\kn{kiểm soát (control)}{các quyết định ở tầng trên về việc dùng nguồn lực nào, theo hướng nào, và khi nào dừng --- khác với việc biết các kỹ thuật giải \cite{schoenfeld1985}.}
+\kn{niềm tin (beliefs)}{quan niệm ngầm về việc bài toán này \emph{nên} giải được trong bao lâu và bằng loại công cụ nào; nó điều khiển hành vi mạnh hơn kiến thức.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Hai người cùng biết đủ kiến thức để giải một bài; vì sao một người ra kết quả sau hai giờ còn người kia mắc kẹt ba tuần?}
+\h{Học thêm thủ thuật giải có làm tăng khả năng giải bài khó không?}
+\h{Khi kết quả thí nghiệm không như dự đoán, phản ứng đúng là gì?}
+\end{khoigoi}
+
+\section{Bốn thành phần, và thành phần hay thiếu nhất}
+
+Pólya \cite{polya1945} đưa ra bộ khung bốn bước quen thuộc: hiểu bài toán, lập kế hoạch, thực hiện, và \emph{nhìn lại}. Đây là sách hướng dẫn chứ không phải nghiên cứu thực nghiệm, nên giá trị của nó là ở chỗ đặt tên cho các bước --- đặc biệt bước cuối, bước mà hầu như ai cũng bỏ.
+
+Schoenfeld \cite{schoenfeld1985} đo bằng cách quay phim người thật giải bài thật, rồi phân tích. Ông tách năng lực giải toán thành bốn thành phần: \emph{nguồn lực} (kiến thức và thủ tục đã có), \emph{heuristic} (các chiến lược như đi ngược từ đích, vẽ hình, xét trường hợp riêng), \emph{kiểm soát} (quyết định dùng cái gì lúc nào, và khi nào từ bỏ một hướng), và \emph{niềm tin} (quan niệm ngầm về bản chất của việc giải toán) \nT{}. Phát hiện thực nghiệm quan trọng nhất nằm ở thành phần thứ ba: trong các bản ghi hình sinh viên giải bài không quen thuộc, khoảng \textbf{60\%} số lượt có dạng ``đọc đề, quyết định nhanh một hướng, rồi theo hướng đó bất kể chuyện gì'' \nD{} (con số này tôi đọc qua các nguồn trích dẫn Schoenfeld, chưa mở được bản gốc năm 1985); hành vi này gần như không xuất hiện khi họ làm bài tập quen thuộc, vì lúc đó bối cảnh đã nói sẵn phải dùng kỹ thuật nào.
+
+\begin{trucgiac}
+Nói cách khác \nM{}: người mới không thiếu công cụ, họ thiếu \emph{đồng hồ và người điều phối}. Họ tiêu toàn bộ ngân sách thời gian cho hướng đầu tiên, và vì đã tiêu nhiều nên càng khó bỏ --- cộng hưởng với cơ chế Einstellung ở \ptr{05}, nơi ý tưởng đầu tiên còn kéo cả sự chú ý về phía nó. Hai cơ chế này nhân nhau: hướng đầu tiên vừa chiếm thời gian vừa chiếm tầm nhìn.
+\end{trucgiac}
+
+\section{Trước khi tấn công: chọn biểu diễn}
+
+Chương \ptr{03} đã cho kết quả then chốt: chuyên gia và người mới \emph{nhìn thấy bài toán khác nhau} trước khi bắt đầu giải \cite{chi1981}. Trong thực hành, điều đó biến thành một thao tác cụ thể trước khi viết dòng mã đầu tiên \nM{}: viết ra bài toán này thuộc họ cấu trúc nào (bài toán ước lượng có hướng suy biến? bài toán tìm tương ứng có nhiễu tương quan? bài toán tối ưu có cực tiểu địa phương?), và bài toán nào đã biết có cùng cấu trúc đó. Nếu không trả lời được câu hỏi này thì việc chọn kỹ thuật chỉ là đoán.
+
+\section{Kiểm soát: bộ quy tắc dùng được}
+
+Đây là phần tôi rút ra \nM{}, ghép quan sát của Schoenfeld với cơ chế chú ý ở chương \ptr{05}.
+
+\begin{enumerate}
+\item \textbf{Ngân sách trước, tấn công sau.} Trước khi bắt đầu, ghi: hướng này tôi cho bao nhiêu thời gian, và \emph{dấu hiệu nào cho biết nó sai}. Không có tiêu chí dừng viết trước thì tiêu chí dừng sẽ là sự mệt mỏi.
+\item \textbf{Đồng hồ giám sát.} Cứ mỗi 30--45 phút, dừng và trả lời ba câu: tôi đang làm gì, vì sao, và nếu nó chạy thì nó chứng minh điều gì? Đây chính là thao tác mà 60\% lượt giải trong dữ liệu của Schoenfeld thiếu.
+\item \textbf{Bắt buộc có hướng thứ hai.} Trước khi cam kết, viết ra ít nhất hai hướng khác nhau về \emph{bản chất} (không phải hai biến thể tham số). Cơ chế Einstellung nói rằng sau khi có hướng thứ nhất, tôi sẽ không còn tự sinh ra hướng thứ hai nữa \cite{bilalic2008}.
+\item \textbf{Ví dụ nhỏ nhất còn hỏng.} Thu bài toán về trường hợp nhỏ nhất mà lỗi vẫn xuất hiện --- ít khung hình nhất, ít tham số nhất, dữ liệu tổng hợp nếu được. Vòng phản hồi rút từ hàng giờ xuống hàng phút, và đó là toàn bộ mục tiêu theo \ptr{02}.
+\item \textbf{Sổ quyết định.} Mỗi lần đổi hướng, ghi một dòng: bỏ hướng gì, vì bằng chứng nào. Sau một tháng, sổ này cho biết tôi thường bỏ quá sớm hay bám quá lâu --- một trong rất ít cách đo được thành phần \emph{kiểm soát} của chính mình.
+\item \textbf{Nhìn lại, kể cả khi đã xong.} Bước bị bỏ nhiều nhất của Pólya. Câu hỏi: lời giải này còn đúng nếu bỏ giả thiết nào? Nó là trường hợp riêng của cái gì tổng quát hơn?
+\end{enumerate}
+
+\section{Phát hiện bất ngờ là nguyên liệu, không phải tai nạn}
+
+Có một quan sát định lượng đáng thay đổi thái độ hằng ngày. Dunbar \cite{dunbar1997} mã hoá toàn bộ kết quả được trình bày ở bốn buổi họp của một phòng thí nghiệm: trong sáu thí nghiệm với 70 điều kiện, có \textbf{22} kết quả đúng như dự đoán, \textbf{18} kết quả bất ngờ, và \textbf{30} kết quả thuộc loại thăm dò (không có dự đoán trước) \nD{}. Nghĩa là kết quả trái với dự đoán xảy ra gần ngang với kết quả đúng dự đoán --- ở những nhà khoa học đang làm việc bình thường, không phải trong khủng hoảng.
+
+Quan trọng hơn là cách họ phản ứng: số lượt suy luận dành cho các phát hiện bất ngờ nhiều hơn hẳn so với các phát hiện đúng dự đoán, và \emph{có rất ít nỗ lực giải thích cho qua} các kết quả bất ngờ \nD{}. Ở mức nhóm, chênh lệch còn lớn hơn: 176 lượt tương tác cho các phát hiện bất ngờ so với 23 lượt cho các phát hiện đúng dự đoán \nD{}.
+
+\begin{cambay}
+Phản xạ thông thường khi số ra không như mong đợi là nghi ngờ cài đặt và đi sửa mã cho tới khi số ``đúng''. Nếu quá trình đó dừng ngay khi kết quả trở nên vừa ý, thì nó không phải gỡ lỗi mà là chọn lọc kết quả \nM{}. Cách phân biệt: viết trước cả hai tiêu chí --- dấu hiệu nào chứng tỏ có lỗi cài đặt, và dấu hiệu nào chứng tỏ giả thuyết sai --- trước khi mở trình gỡ lỗi.
+\end{cambay}
+
+\begin{cannho}
+Ba đòn bẩy lớn nhất khi mắc kẹt, theo thứ tự \nM{}: đổi \emph{biểu diễn} bài toán; thu về \emph{ví dụ nhỏ nhất còn hỏng}; và đưa cho \emph{người thứ hai} với câu hỏi ``hướng này sai ở đâu''. Học thêm thủ thuật đứng sau cả ba.
+\end{cannho}
+
+\begin{traloi}
+\tl{Vì thành phần \emph{kiểm soát} khác nhau, không phải vì kiến thức khác nhau: khoảng 60\% lượt giải của người mới là chọn nhanh một hướng rồi theo tới cùng \cite{schoenfeld1985}.}
+\tl{Ít hơn nhiều so với người ta tưởng. Heuristic chỉ là một trong bốn thành phần, và nó vô dụng nếu không có quyết định dùng cái nào lúc nào \cite{schoenfeld1985}.}
+\tl{Coi nó là nguyên liệu: trong lab thật, kết quả bất ngờ xảy ra gần ngang kết quả đúng dự đoán và nhận được nhiều suy luận hơn hẳn, chứ không bị giải thích cho qua \cite{dunbar1997}.}
+\end{traloi}
+
+\begin{tukiem}
+\item Nêu bốn thành phần của Schoenfeld và nói thành phần nào bạn yếu nhất, kèm bằng chứng từ tuần làm việc gần nhất.
+\item Vì sao ``ngân sách thời gian kèm tiêu chí dừng'' phải viết \emph{trước} khi bắt đầu chứ không phải khi thấy mệt?
+\item Lần gần nhất một thí nghiệm cho kết quả trái dự đoán, bạn đã làm gì trong ba mươi phút sau đó? So sánh với hành vi trong dữ liệu của Dunbar.
+\item ``Ví dụ nhỏ nhất còn hỏng'' liên hệ thế nào với bốn phép tử tế hoá môi trường ở \ptr{02}?
+\end{tukiem}
+
+\begin{onbai}
+\ar[3]{Bốn thành phần}{Nguồn lực · heuristic · kiểm soát · niềm tin \cite{schoenfeld1985}.}
+\ar[3]{60\%}{Tỉ lệ lượt giải của người mới theo kiểu ``chọn nhanh rồi bám tới cùng'' \cite{schoenfeld1985}.}
+\ar[3]{Đồng hồ giám sát}{Mỗi 30--45 phút: tôi đang làm gì, vì sao, nếu chạy thì chứng minh điều gì.}
+\ar[2]{Ví dụ nhỏ nhất còn hỏng}{Cách rẻ nhất để rút vòng phản hồi từ hàng giờ xuống hàng phút.}
+\ar[2]{22 / 18 / 30}{Kết quả đúng dự đoán / bất ngờ / thăm dò trong bốn buổi họp lab \cite{dunbar1997}.}
+\ar[2]{176 vs 23}{Lượt tương tác của nhóm cho phát hiện bất ngờ so với phát hiện đúng dự đoán \cite{dunbar1997}.}
+\ar[1]{Bước ``nhìn lại''}{Bước thứ tư của Pólya, bị bỏ nhiều nhất \cite{polya1945}.}
+\end{onbai}
+
+\end{document}

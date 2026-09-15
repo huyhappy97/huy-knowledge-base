@@ -1,0 +1,128 @@
+% ============================================================================
+%  A/02-vat-ly-tao-anh/04-cam-bien-khac-va-domain-gap
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: A/02/01, A/02/02. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Cảm biến ngoài RGB và nguồn gốc domain gap (Beyond RGB: Sensors and the Origin of Domain Gap)}
+\ptrtarget{A/02-vat-ly-tao-anh/04}\ptrtarget{A/02-vat-ly-tao-anh/04-cam-bien-khac-va-domain-gap}\ptrtarget{A/02/04}\ptrtarget{A/02/04-cam-bien-khac-va-domain-gap}
+\dependency{\ptr{A/02-vat-ly-tao-anh/01-anh-sang-va-nhieu} (mô hình nhiễu) và \ptr{A/02/02-isp-va-khong-gian-mau} (chuỗi xử lý) --- mục này áp cùng cách phân tích đó cho các cảm biến khác, rồi rút ra kết luận chung về domain gap.}
+
+\begin{tomtat}
+Mục này làm hai việc. Thứ nhất, so sánh năm loại cảm biến --- depth, thermal, event, LiDAR, radar --- trên bốn tiêu chí: đo trực tiếp cái gì, giả định gì, mạnh khi nào, hỏng khi nào. Thứ hai, trả lời câu hỏi lớn nhất của cả chương: khoảng cách giữa hiệu năng khi huấn luyện và khi triển khai sinh ra ở đâu. Đọc xong bạn chọn được cảm biến theo ràng buộc thay vì theo thói quen. Bạn biết mỗi loại đòi hỏi thay đổi gì trong kiến trúc và hàm mất mát. Và bạn biết chỗ nào trong pipeline đáng đầu tư công sức để thu hẹp domain gap. Nếu chỉ nhớ một điều: \emph{phần lớn domain gap trong thị giác sinh ra ở khâu tạo ảnh, không ở kiến trúc}. Đổi backbone vì thế hiếm khi chữa được thứ mà một thay đổi ở khâu thu thập hoặc tiền xử lý chữa được ngay.
+\end{tomtat}
+
+\begin{nentang}
+\kn{domain gap (dịch chuyển miền)}{hiện tượng phân phối dữ liệu lúc triển khai khác phân phối lúc huấn luyện, khiến mô hình tụt hiệu năng dù không có gì trong mô hình thay đổi. ``Miền'' ở đây nghĩa là một điều kiện thu thập: một hãng camera, một thời điểm trong ngày, một bệnh viện.}
+\kn{inductive bias (thiên lệch quy nạp)}{những giả định được cài sẵn vào mô hình hoặc vào dữ liệu, cho phép nó tổng quát hoá từ số mẫu hữu hạn. Ví dụ: \en{convolution} cài sẵn giả định cấu trúc ảnh mang tính cục bộ và không đổi khi dịch chuyển.}
+\kn{camera độ sâu (depth camera)}{cảm biến trả về khoảng cách tới bề mặt tại mỗi pixel, bằng một trong ba cơ chế: chiếu hoa văn hồng ngoại rồi đo biến dạng (structured light), đo thời gian ánh sáng đi và về (time-of-flight), hoặc dùng hai camera và thị sai (stereo).}
+\kn{camera nhiệt (thermal)}{cảm biến đo bức xạ hồng ngoại mà vật tự phát ra, phụ thuộc nhiệt độ và \emph{độ phát xạ} của vật liệu; nó không cần nguồn sáng ngoài nên hoạt động trong bóng tối hoàn toàn.}
+\kn{event camera}{cảm biến mà mỗi pixel báo cáo \emph{độc lập và bất đồng bộ} mỗi khi độ sáng log tại pixel đó đổi quá một ngưỡng; đầu ra là một dòng sự kiện thưa theo thời gian, không phải khung hình.}
+\kn{LiDAR}{cảm biến phát tia laser và đo thời gian phản hồi để lấy khoảng cách trực tiếp; đầu ra là một đám mây điểm 3D thưa, không phụ thuộc ánh sáng môi trường.}
+\kn{radar}{cảm biến dùng sóng vô tuyến; nó đo được khoảng cách và, nhờ hiệu ứng Doppler, đo trực tiếp cả \emph{vận tốc xuyên tâm} của vật thể trong một lần đo.}
+\kn{độ phân giải góc}{khả năng phân biệt hai vật nằm sát nhau theo hướng nhìn. Cảm biến có độ phân giải góc thấp thì hai vật gần nhau ở xa sẽ trộn thành một.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Hai câu hỏi tưởng như tách rời nhưng có chung một câu trả lời. Câu thứ nhất: khi bài toán không giải được bằng camera RGB --- trời tối, sương mù, vật thể trong suốt, cần vận tốc tức thời --- thì đổi sang cảm biến nào, và đổi kiến trúc thế nào cho khớp? Câu thứ hai: vì sao một mô hình đạt \(95\%\) khi thử nghiệm lại chỉ còn \(80\%\) khi triển khai, dù dữ liệu ``vẫn là ảnh của cùng loại vật thể''?
+
+Câu trả lời chung là: \emph{mỗi cảm biến kèm theo một tập giả định riêng về thế giới, và hiệu năng sập đúng lúc một giả định bị vi phạm}. Với câu hỏi thứ nhất, việc chọn cảm biến chính là việc chọn tập giả định nào chấp nhận được. Với câu hỏi thứ hai, khoảng cách train--production chính là khoảng cách giữa hai tập giả định: tập lúc thu thập dữ liệu và tập lúc triển khai. Cả hai tập ấy được ấn định ở khâu tạo ảnh, trước khi kiến trúc kịp có ý kiến.
+
+\textbf{Học xong mục này thì làm được gì mà trước đó không làm được?} Chọn cảm biến dựa trên ràng buộc và chế độ hỏng thay vì theo thói quen; sửa lại pipeline dữ liệu khi phải xử lý depth, thermal hay event thay vì nhồi chúng vào một mạng RGB không đổi; và khi gặp một cú tụt hiệu năng lúc triển khai, biết tìm nguyên nhân ở đúng chỗ thay vì thử đổi mô hình.
+
+\begin{trucgiac}
+Mỗi cảm biến là một loại nhân chứng với một kiểu mù riêng. Camera RGB là nhân chứng nhìn rất tinh nhưng chỉ làm việc khi có đèn, và kể lại màu sắc theo cách đã được biên tập. LiDAR là nhân chứng đo khoảng cách chính xác nhưng nhìn thế giới qua vài chục đường kẻ ngang và không phân biệt nổi chữ trên biển báo. Radar nhìn xuyên sương và nói ngay được vật đang lao tới nhanh cỡ nào, nhưng không phân biệt được cái vỏ lon với cái nắp cống. Ghép nhiều nhân chứng lại không cho ra một nhân chứng hoàn hảo. Nó cho ra một bài toán mới: tin ai khi hai lời khai mâu thuẫn. Đó mới là phần khó thật của hợp nhất cảm biến.
+\end{trucgiac}
+
+\subsection{B. Năm cảm biến, cùng một khung phân tích}
+\begin{table}[H]\centering\footnotesize
+\caption{Năm loại cảm biến ngoài RGB. Cột ``đo trực tiếp cái gì'' quyết định inductive bias mà cảm biến mang lại; cột cuối quyết định bạn có dùng được nó không.}
+\label{tab:cam-bien}
+\begin{tabularx}{\linewidth}{@{}L{1.6cm}L{2.7cm}YL{4.3cm}@{}}
+\toprule
+\textbf{Cảm biến} & \textbf{Đo trực tiếp cái gì} & \textbf{Mạnh khi nào} & \textbf{Hỏng khi nào}\\
+\midrule
+Depth (ToF / structured light / stereo) & Khoảng cách tới bề mặt tại mỗi pixel & Trong nhà, tầm ngắn, cần hình học tuyệt đối mà không cần tam giác hoá & Bề mặt bóng, trong suốt, hoặc rất tối (không phản xạ đủ); ánh nắng lấn át nguồn hồng ngoại; ToF bị nhiễu đa đường ở góc tường. Pixel thiếu dữ liệu \emph{không} phân bố ngẫu nhiên mà tương quan với vật liệu\\
+Thermal & Bức xạ hồng ngoại vật tự phát & Bóng tối hoàn toàn, khói, phát hiện người và động cơ & Không có kết cấu bề mặt nên nhận dạng chi tiết rất khó; ``thời điểm cân bằng nhiệt'' lúc bình minh và hoàng hôn làm tương phản biến mất; bù đồng đều cảm biến làm ảnh đứng hình chớp nhoáng theo chu kỳ\\
+Event & Thay đổi độ sáng log tại từng pixel, bất đồng bộ & Chuyển động rất nhanh, dải động cực rộng, độ trễ micro giây, tiêu thụ điện thấp & Cảnh tĩnh gần như không sinh dữ liệu; không có cường độ tuyệt đối; nhiễu nền tăng vọt ở mức sáng thấp; mọi kiến trúc ảnh thông thường phải đổi vì đầu vào là dòng sự kiện thưa\\
+LiDAR & Khoảng cách theo tia laser & Hình học 3D chính xác, không phụ thuộc ánh sáng, tầm trung và xa & Mưa, sương, bụi làm tán xạ; bề mặt phản xạ gương; mật độ điểm giảm theo bình phương khoảng cách nên vật ở xa chỉ còn vài điểm; đắt và có bộ phận chuyển động\\
+Radar & Khoảng cách \emph{và} vận tốc xuyên tâm & Thời tiết xấu, tầm xa, cần vận tốc ngay lập tức & Độ phân giải góc rất thấp nên hai vật gần nhau trộn làm một; phản xạ nhiều đường tạo mục tiêu ma; vật kim loại nhỏ có thể sáng hơn cả một chiếc xe\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Hai hệ quả cho phía mô hình, và cả hai đều bị bỏ qua thường xuyên:
+
+\begin{itemize}
+\item \textbf{Dữ liệu thiếu không phải nhiễu ngẫu nhiên.} Với camera độ sâu, các pixel không có giá trị tập trung ở kính, ở bề mặt bóng, ở mép vật thể --- tức là tương quan mạnh với chính thứ ta muốn dự đoán. Cho mạng nhận thêm một kênh mặt nạ ``chỗ nào thiếu'' nghe có vẻ vô hại, nhưng nó \emph{rò rỉ nhãn}: mô hình có thể học ``chỗ nào thiếu độ sâu thì chỗ đó là cửa kính'' và đạt điểm cao mà không hiểu gì về cửa kính. Đây là biến thể của cùng một cạm bẫy sẽ gặp lại ở \code{B} dưới tên \en{shortcut learning}.
+\lk{B}{trường hợp riêng của}{mô hình bám vào một dấu hiệu tương quan với nhãn thay vì cơ chế thật --- ở đây dấu hiệu đó là chính cái mặt nạ dữ liệu thiếu}
+
+\item \textbf{Cấu trúc dữ liệu quyết định kiến trúc.} Đám mây điểm LiDAR không có lưới đều nên convolution hai chiều không áp thẳng được; hoặc phải chiếu về một lưới (mất thông tin, sinh aliasing --- đúng bài toán ở \ptr{A/01/04}), hoặc phải dùng kiến trúc làm việc trực tiếp trên tập điểm. Dòng sự kiện của event camera còn xa lưới hơn nữa. Việc ``chỉ đổi cảm biến, giữ nguyên mạng'' hầu như không bao giờ là lựa chọn đúng.
+\lk{C}{ràng buộc bởi}{cấu trúc dữ liệu quyết định kiến trúc dùng được: lưới đều cho convolution, tập điểm cho kiến trúc trên tập, dòng sự kiện cho biểu diễn thời gian}
+
+\end{itemize}
+
+\subsection{C. Domain gap sinh ra ở đâu}
+Đây là luận điểm trung tâm của cả chương \ptr{A/02}. Hình~\ref{fig:nguon-domain-gap} đặt các nguồn dịch chuyển vào đúng chỗ chúng sinh ra dọc theo đường đi của tín hiệu.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.45cm and 0.75cm,
+  blk/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.0cm},
+  hot/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.0cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.3cm}]
+\node[blk] (sc) {Cảnh};
+\node[blk,right=of sc] (op) {Ống kính\\+ phơi sáng};
+\node[blk,right=of op] (se) {Cảm biến};
+\node[blk,right=of se] (isp) {ISP\\+ nén};
+\node[hot,right=of isp] (md) {Mô hình};
+\draw[ar] (sc) -- node[lb,below=1pt] {mùa, giờ, địa điểm, phân bố lớp} (op);
+\draw[ar] (op) -- node[lb,below=1pt] {tiêu cự, méo, nhoè, chính sách phơi sáng} (se);
+\draw[ar] (se) -- node[lb,below=1pt] {kích thước pixel, nhiễu đọc, dải động} (isp);
+\draw[ar] (isp) -- node[lb,below=1pt] {gamma, cân bằng trắng, khử nhiễu, mức nén} (md);
+\end{tikzpicture}}
+\caption{Bốn nhóm nguồn dịch chuyển, và cả bốn đều nằm \emph{trước} mô hình. Đổi kiến trúc chỉ tác động vào khối cuối cùng, nên nó là công cụ yếu để chữa một khoảng cách sinh ra ở ba khối đầu. Ngược lại, ghi lại và kiểm soát bốn nhóm này lúc thu thập dữ liệu là công cụ mạnh --- và rẻ hơn nhiều.}
+\label{fig:nguon-domain-gap}
+\end{figure}
+
+Luận điểm ``phần lớn domain gap sinh ở khâu tạo ảnh'' có bằng chứng ủng hộ, nhưng cần phát biểu cho đúng mức. Bằng chứng gồm: các bộ benchmark đo độ bền trước các biến dạng ảnh cho thấy độ chính xác tụt rất mạnh trước những biến dạng vốn là mô phỏng thô của hiệu ứng cảm biến và nén \cite{hendrycks2019benchmarking}; việc dựng lại một tập test theo đúng quy trình gốc vẫn làm mọi mô hình tụt hàng điểm \cite{recht2019imagenet}; và các tập dữ liệu được thiết kế riêng để đo dịch chuyển miền cho thấy khoảng cách giữa các miền lớn hơn nhiều so với khoảng cách giữa các kiến trúc \cite{koh2021wilds}. Điều \emph{chưa} được chứng minh là một phát biểu định lượng phổ quát, kiểu ``\(x\) phần trăm khoảng cách đến từ khâu tạo ảnh''. Con số đó phụ thuộc bài toán. Ai nêu một tỉ lệ cụ thể cho mọi trường hợp là đang nói quá. Hãy giữ nó ở dạng \emph{chiều hướng đã được kiểm chứng nhiều lần}, không phải một hằng số.
+
+\begin{mach}[Mạch 4 --- thu hẹp domain gap, theo thứ tự chi phí tăng dần]
+\item \vd{mô hình tụt điểm khi triển khai, chưa biết vì sao.} \gp trước hết \emph{đo} chứ đừng sửa: giữ một tập nhỏ dữ liệu thu ở chính điều kiện triển khai và tính độ chính xác trên đó, tách theo từng điều kiện (thiết bị, giờ trong ngày, địa điểm). \hq bạn biết khoảng cách nằm ở nhóm điều kiện nào trước khi tiêu một giờ nào cho mô hình.
+\item \vd{khoảng cách đến từ khác biệt về cảm biến và ISP.} \gp làm cho tiền xử lý \emph{giống nhau} ở hai đầu --- cùng cách resize, cùng mức nén, cùng chính sách phơi sáng --- và mô phỏng phần còn lại bằng augmentation có cơ sở vật lý ở miền tuyến tính. \gia tốn công dựng pipeline gỡ xử lý; đổi lại là cách rẻ nhất trong các cách thật sự hiệu quả.
+\item \vd{vẫn còn khoảng cách vì cảnh khác hẳn.} \gp thu thêm dữ liệu ở đúng miền đích, dù chỉ vài trăm mẫu có nhãn để tinh chỉnh. \gd bạn tiếp cận được miền đích --- không phải lúc nào cũng đúng. \hq theo kinh nghiệm thực hành, một lượng nhỏ dữ liệu đúng miền thường có giá trị hơn một lượng lớn dữ liệu sai miền.
+\item \vd{không lấy được nhãn ở miền đích.} \gp các phương pháp thích nghi miền không giám sát, hoặc huấn luyện trên nhiều miền để mô hình học phần bất biến. \gia đây là nhóm phương pháp có kết quả \emph{không ổn định} nhất: nhiều so sánh có kiểm soát cho thấy chúng khó vượt được một \en{baseline} được tune tử tế \cite{gulrajani2021search}. Hãy coi đây là lựa chọn cuối, không phải lựa chọn đầu.
+\end{mach}
+
+\subsection{D. Giới hạn và trường hợp hỏng}
+\begin{itemize}
+\item \textbf{Hợp nhất cảm biến không phải phép cộng.} Ghép LiDAR với camera đòi hỏi hiệu chỉnh ngoại chính xác \emph{và} đồng bộ thời gian chính xác; sai lệch một phần trăm giây ở tốc độ xe làm điểm 3D lệch cả mét. Khi hai cảm biến mâu thuẫn, hệ thống phải có quy tắc quyết định --- và quy tắc đó là một thiết kế, không phải một thứ mạng tự học được từ dữ liệu bình thường.
+\item \textbf{Một cảm biến ``tốt hơn'' vẫn có thể làm hệ thống tệ đi} nếu chế độ hỏng của nó tương quan với chế độ hỏng của cảm biến kia. Camera và LiDAR cùng hỏng trong sương mù dày; thêm LiDAR không mua được sự độc lập mà bạn tưởng.
+\item \textbf{Không phải mọi khoảng cách đều thu hẹp được.} Nếu thông tin đã bị xoá ở khâu thu thập --- vùng cháy sáng, chi tiết màu bị giảm mẫu, vật thể chỉ còn ba pixel --- thì không phương pháp thích nghi miền nào lấy lại được. Phân biệt ``mô hình chưa học được'' với ``thông tin không còn ở đó'' là bước chẩn đoán đầu tiên và hay bị bỏ qua nhất.
+\end{itemize}
+
+\begin{cambay}
+Đừng chữa một vấn đề của khâu tạo ảnh bằng một thay đổi ở kiến trúc. Đây là phản xạ tự nhiên vì kiến trúc là thứ ta kiểm soát trực tiếp và thay đổi nhanh, còn đi thu thập lại dữ liệu thì chậm và chán. Nhưng giả sử tập huấn luyện chụp bằng một hãng máy còn triển khai bằng hãng khác. Khi đó mọi giờ dành cho việc đổi backbone đều tiêu vào sai chỗ. Tệ hơn, các thí nghiệm ấy vẫn cho những khác biệt nhỏ ngẫu nhiên, đủ để bạn tin rằng mình đang tiến bộ.
+\end{cambay}
+
+\begin{cannho}
+Mỗi cảm biến là một tập giả định về thế giới. Hệ thống sập đúng lúc một giả định bị vi phạm. Vì vậy hãy chọn cảm biến theo \emph{chế độ hỏng}, không theo thông số đẹp. Và khi hiệu năng tụt lúc triển khai, hãy đi ngược đường đi của tín hiệu từ cảnh tới mô hình trước khi chạm vào mô hình. \T{1}
+\end{cannho}
+
+\subsection{E. Kết nối}
+Mục này khép lại chương \ptr{A/02} bằng cách tổng quát hoá hai mục đầu: mô hình nhiễu ở \ptr{A/02/01} và chuỗi xử lý ở \ptr{A/02/02} là trường hợp riêng cho cảm biến RGB của cùng một khung phân tích. 
+\lk{E}{tiền đề}{đánh giá theo nhóm điều kiện --- thiết bị, giờ trong ngày, địa điểm --- thay cho một con số trung bình duy nhất, là hệ quả trực tiếp của luận điểm này}
+Nó nối sang ba nhánh. Sang \code{B}, nơi domain gap được nhìn như một dạng ràng buộc thiết kế và \en{shortcut learning} được mổ xẻ. Sang \code{D} ở phần augmentation, nơi ta phân biệt augmentation mô phỏng miền với augmentation chính quy hoá. Và sang \code{E}, nơi đánh giá tách theo nhóm điều kiện trở thành kỷ luật bắt buộc, thay cho một con số trung bình duy nhất.
+
+\begin{tukiem}
+\item Vì sao các pixel thiếu dữ liệu của một camera độ sâu không được coi là nhiễu ngẫu nhiên, và điều đó tạo ra dạng rò rỉ nào khi bạn thêm một kênh mặt nạ?
+\item Event camera mạnh ở dải động và độ trễ --- vậy nó mất gì so với camera thường, và loại bài toán nào nó gần như vô dụng?
+\item Vì sao thêm LiDAR vào một hệ camera không nhất thiết làm hệ bền hơn trong sương mù?
+\item Luận điểm ``phần lớn domain gap sinh ở khâu tạo ảnh'' được ủng hộ bởi bằng chứng nào, và phát biểu nào của nó thì \emph{chưa} được chứng minh?
+\item Bạn phát hiện mô hình tụt 15 điểm khi triển khai --- bước đầu tiên nên làm là gì, và vì sao nó không phải là đổi kiến trúc?
+\item Làm sao phân biệt ``mô hình chưa học được'' với ``thông tin không còn trong dữ liệu'', và vì sao phân biệt đó quyết định toàn bộ hướng xử lý tiếp theo?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

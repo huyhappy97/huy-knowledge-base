@@ -1,0 +1,238 @@
+% ============================================================================
+%  C/14-noi-dung-muc — file chương
+%  Ngày tạo: 2026-09-07 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+%  Dependency: B/08, C/13. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../english.tex]{subfiles}
+\begin{document}
+\chapter{Nói đúng mức: cam kết và rào đón (Calibrated Claims)}
+\ptrtarget{C/14}\ptrtarget{C/14-noi-dung-muc}
+\dependency{\ptr{B/08} là mặt đọc của cùng hiện tượng; \ptr{C/13} vì phần thảo luận là nơi việc này quan trọng nhất.}
+
+\begin{tomtat}
+Chương \ptr{B/08} dạy bạn \emph{đọc ra} mức tin của tác giả. Chương này đảo lại: làm sao diễn đạt đúng mức tin của \emph{chính bạn}. Ý trung tâm là hiệu chỉnh --- mức mạnh của câu phải khớp với mức mạnh của bằng chứng, không mạnh hơn và cũng không yếu hơn. Nội dung gồm: thang cam kết sáu bậc và cách chọn bậc; bốn công cụ ngôn ngữ để hạ hoặc nâng mức; cái giá của việc rào đón quá đà, thứ mà ít tài liệu cảnh báo; cách chuyển từ tương quan sang nhân quả một cách trung thực; và vì sao đây là chỗ người viết không bản ngữ mất điểm nhiều nhất. Nếu chỉ nhớ một điều: rào đón không phải khiêm tốn --- nó là \emph{độ chính xác}, và một rào đón đặt sai chỗ gây hại đúng như một khẳng định quá mạnh.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mức cam kết}{độ mạnh mà một câu khẳng định điều gì đó là đúng.}
+\kn{rào đón}{ngôn ngữ hạ mức cam kết: \emph{may}, \emph{suggest}, \emph{appear to}, \emph{in most cases}.}
+\kn{tăng cường}{ngôn ngữ nâng mức cam kết: \emph{clearly}, \emph{demonstrate}, \emph{establish}, \emph{must}.}
+\kn{hiệu chỉnh}{trạng thái mức cam kết khớp với sức mạnh bằng chứng --- mục tiêu của cả chương.}
+\kn{phạm vi}{giới hạn điều kiện mà khẳng định đúng: \emph{on the EuRoC sequences}, \emph{when the baseline exceeds \ldots}}
+\kn{quy trách}{gán một khẳng định cho ai: bạn, tài liệu trước, hay dữ liệu.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Nếu rào đón thể hiện sự thận trọng, vì sao rào đón nhiều lại có hại?}
+\h{Bạn quan sát A và B đi cùng nhau. Viết thế nào để không ngầm khẳng định A gây ra B, mà vẫn nói được điều đáng nói?}
+\h{Hai câu cùng nội dung, một câu dùng \emph{our results suggest}, một câu dùng \emph{our results demonstrate}. Người phản biện đọc chúng khác nhau ra sao?}
+\h{Có công cụ nào ngoài các từ \emph{may}/\emph{might} để hạ mức cam kết một cách chính xác hơn không?}
+\h{Vì sao người viết không phải bản ngữ đặc biệt hay sai ở chỗ này?}
+\end{khoigoi}
+
+Hãy bắt đầu bằng ba câu mô tả cùng một kết quả.
+
+\begin{capdoi}[Cùng dữ liệu, ba mức cam kết]
+\truoc{Our method is more accurate than \textup{[7]}.}
+\sau{On the eleven EuRoC sequences, our method reduces median error by 32\% relative to \textup{[7]}; the gain is largest in sequences with strong rotation.}
+\vico{Câu trên khẳng định không phạm vi --- đúng ở đâu, đo bằng gì, so với điều kiện nào? Câu dưới mạnh hơn về mặt khoa học dù nghe ``dè dặt'' hơn.}
+\truoc{The results may possibly suggest that our approach could potentially be beneficial in some cases.}
+\sau{The results suggest that our approach helps when the motion is rotation-dominated.}
+\vico{Bốn lớp rào đón chồng lên nhau xoá sạch nội dung; người đọc kết luận rằng chính bạn cũng không tin kết quả của mình.}
+\end{capdoi}
+
+Cặp thứ hai chính là câu trả lời cho câu hỏi mở đầu thứ nhất, và nó là điều ít tài liệu nói: rào đón quá đà \emph{không} an toàn. Nó gây ba thiệt hại. Người đọc không biết bạn thật sự khẳng định gì. Người phản biện đọc nó như dấu hiệu bạn không tin dữ liệu của mình. Và khi mọi câu đều rào đón, bạn mất khả năng phân biệt --- chỗ bạn thật sự chắc chắn nghe y hệt chỗ bạn đang đoán.
+
+\section{Thang cam kết}
+
+Chương \ptr{B/08} đã dựng thang này để đọc, dựa trên mô tả của Hyland về siêu diễn ngôn\cite{hyland2005}. Ở đây ta dùng nó để viết, và thêm một cột: bằng chứng nào cho phép bạn đứng ở bậc nào.
+
+\begin{center}\footnotesize
+\rowcolors{2}{white}{tblalt}
+\begin{longtable}{@{}L{1.0cm}L{3.5cm}L{4.6cm}L{5.6cm}@{}}
+\toprule
+\textbf{Bậc} & \textbf{Ngôn ngữ} & \textbf{Nghĩa} & \textbf{Bằng chứng cần có}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Bậc} & \textbf{Ngôn ngữ} & \textbf{Nghĩa} & \textbf{Bằng chứng cần có (tiếp)}\\
+\midrule
+\endhead
+6 & \emph{X is} / \emph{we prove} & Sự thật hoặc chứng minh & Chứng minh toán học, hoặc định nghĩa\\
+5 & \emph{we show}, \emph{we demonstrate} & Dữ liệu của bạn thiết lập điều này & Thí nghiệm đủ mạnh, có so sánh, có lặp lại\\
+4 & \emph{results indicate}, \emph{X reduces Y} & Bằng chứng rõ trong phạm vi đã nêu & Kết quả nhất quán, đã nêu điều kiện\\
+3 & \emph{results suggest}, \emph{appears to} & Bằng chứng có nhưng chưa đủ chắc & Xu hướng rõ nhưng ít mẫu hoặc còn cách giải thích khác\\
+2 & \emph{may}, \emph{might}, \emph{is consistent with} & Một khả năng bạn không loại trừ & Quan sát gợi ý, chưa kiểm riêng\\
+1 & \emph{we hypothesise}, \emph{one possible explanation} & Giả thuyết chưa kiểm & Suy luận từ cơ chế, chưa có dữ liệu\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+Quy tắc dùng bảng này rất gọn: \emph{chọn bậc cao nhất mà bằng chứng của bạn chống đỡ được, rồi dừng ở đó}. Cao hơn là nói quá; thấp hơn là lãng phí công sức bạn đã bỏ ra để có dữ liệu.
+
+Câu hỏi mở đầu thứ ba hỏi người phản biện đọc \emph{suggest} và \emph{demonstrate} khác nhau ra sao. Rất khác. \emph{Demonstrate} là một lời mời kiểm tra: người phản biện sẽ hỏi ``dữ liệu này có đủ để thiết lập điều đó không?'' và nếu không, đó thành một điểm phản đối. \emph{Suggest} không mời kiểm tra theo cách đó --- nó nói bạn biết bằng chứng chưa đủ kết luận. Chọn sai bậc theo hướng cao là cách nhanh nhất để tạo ra một điểm phản đối mà lẽ ra không cần có.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[
+  ax/.style={-{Latex[length=2.4mm]},draw=steel,very thick},
+  tick/.style={draw=steel,thick},
+  lb/.style={font=\scriptsize,align=center},
+  zone/.style={draw=none,fill=greenbg,rounded corners=2pt},
+  bad/.style={draw=none,fill=redbg,rounded corners=2pt}]
+\fill[bad] (0,-0.28) rectangle (3.0,0.28);
+\fill[zone] (3.0,-0.28) rectangle (7.4,0.28);
+\fill[bad] (7.4,-0.28) rectangle (10.6,0.28);
+\draw[ax] (0,0) -- (11.1,0);
+\foreach \x/\t in {0.6/1, 2.2/2, 3.8/3, 5.4/4, 7.0/5, 8.6/6}{
+  \draw[tick] (\x,-0.16) -- (\x,0.16);
+  \node[lb,below=0.10cm] at (\x,-0.16) {bậc \t};}
+\node[lb,above=0.34cm,color=reddark,text width=2.6cm] at (1.4,0) {rào đón quá đà:\\ không nói gì};
+\node[lb,above=0.34cm,color=greendark,text width=3.4cm] at (5.2,0) {vùng hiệu chỉnh:\\ khớp bằng chứng};
+\node[lb,above=0.34cm,color=reddark,text width=2.8cm] at (9.0,0) {nói quá:\\ tạo điểm phản đối};
+\end{tikzpicture}
+\caption{Thang cam kết. Cả hai đầu đều hỏng, và đây là điều nhiều tài liệu chỉ nói một nửa: rào đón quá đà bị coi là an toàn, nhưng nó cũng làm bạn mất uy tín --- chỉ theo một kiểu khác.}
+\label{fig:thang-cam-ket-viet}
+\end{figure}
+
+\section{Bốn công cụ, không phải một}
+
+Câu hỏi mở đầu thứ tư hỏi có gì ngoài \emph{may} và \emph{might}. Có, và ba công cụ còn lại chính xác hơn nhiều.
+
+\emph{Công cụ một --- động từ tình thái và động từ báo cáo.} \emph{May}, \emph{might}, \emph{could}; \emph{suggest}, \emph{indicate}, \emph{show}, \emph{demonstrate}. Đây là công cụ thô nhất: nó hạ mức tin của \emph{cả câu} mà không nói vì sao.
+
+\emph{Công cụ hai --- giới hạn phạm vi.} Thay vì hạ mức tin, hãy thu hẹp điều kiện. \emph{Our method is faster} \(\rightarrow\) \emph{Our method is faster on sequences longer than 60 s}. Câu sau vừa mạnh hơn vừa an toàn hơn, vì nó đúng \emph{hoàn toàn} trong phạm vi đã nêu. Đây thường là công cụ tốt nhất và bị dùng ít nhất.
+
+\emph{Công cụ ba --- quy trách.} Nói rõ khẳng định này của ai. \emph{It is widely believed that\ldots} khác hẳn \emph{We believe that\ldots} và cả hai khác \emph{Our data show that\ldots}. Quy trách sai là một lỗi nghiêm trọng hơn nhiều so với chọn sai bậc: gán ý của bạn cho tài liệu trước là lỗi trích dẫn.
+
+\emph{Công cụ bốn --- nêu điều kiện của kết luận.} \emph{If the calibration is accurate to within 0.1\textdegree, then\ldots} Công cụ này chuyển câu từ khẳng định sang điều kiện, và nó rất hợp khi bạn biết chính xác giả định nào chống đỡ kết luận.
+
+\begin{cannho}
+Khi định thêm một \emph{may} hoặc \emph{possibly}, hãy dừng lại và hỏi: mình đang không chắc về \emph{cái gì}? Nếu không chắc về \emph{phạm vi} thì dùng công cụ hai. Nếu không chắc về \emph{nguyên nhân} thì dùng công cụ bốn hoặc nói thẳng rằng có cách giải thích khác. Chỉ dùng \emph{may} khi cái bạn không chắc thật sự là bản thân khẳng định. Đây là khác biệt giữa rào đón chính xác và rào đón lười.
+\end{cannho}
+
+\section{Tương quan và nhân quả}
+
+Câu hỏi mở đầu thứ hai là trường hợp cụ thể quan trọng nhất của cả chương, vì đây là chỗ ngôn ngữ dễ nói quá nhất mà người viết không nhận ra.
+
+Vấn đề: nhiều động từ tiếng Anh \emph{ngầm} mang nhân quả dù bạn không định. \emph{Improves}, \emph{reduces}, \emph{causes}, \emph{leads to}, \emph{results in} --- tất cả đều khẳng định A tác động lên B. Nếu bạn chỉ quan sát chúng đi cùng nhau, những động từ này đã vượt quá dữ liệu.
+
+Ba mức diễn đạt, đi từ an toàn tới mạnh:
+
+\begin{mauau}[Từ tương quan tới nhân quả]
+\mc{Chỉ đồng biến}{X and Y are correlated (\(r=0.8\)) across the eleven sequences.}{Chỉ nói cái đo được}
+\mc{Nhất quán với giả thuyết}{This pattern is consistent with X influencing Y.}{Không loại trừ cách giải thích khác}
+\mc{Nhân quả có kiểm}{Disabling X removed the effect, which indicates that X drives Y.}{Có can thiệp \(\Rightarrow\) được dùng động từ nhân quả}
+\mc{Nêu cách giải thích khác}{An alternative explanation is that both follow from Z.}{Nêu trước khi người phản biện nêu}
+\mc{Nhân quả trong phạm vi}{Within this dataset, increasing X reduces Y; we did not test outside \ldots}{Kết hợp công cụ hai}
+\end{mauau}
+
+Điểm mấu chốt: bạn được dùng động từ nhân quả khi có \emph{can thiệp} --- bạn thay đổi A và quan sát B đổi theo, các thứ khác giữ nguyên. Đó là lý do các thí nghiệm bóc tách có giá trị lớn: chúng nâng bạn từ bậc 3 lên bậc 4 hoặc 5 một cách chính đáng.
+
+\section{Vì sao người không bản ngữ hay sai chỗ này}
+
+Câu hỏi mở đầu thứ năm. Ba nguyên nhân, và không cái nào là vốn từ.
+
+\emph{Nguyên nhân một --- không thấy được sắc thái nên chọn cực đoan.} Khi chưa cảm được khoảng cách giữa \emph{indicate} và \emph{demonstrate}, người viết chọn theo cảm giác an toàn hoặc theo thói quen, và thường rơi vào một trong hai đầu thang. Cách chữa: bảng ở mục 1 dùng như một bảng tra, không phải một thứ để cảm.
+
+\emph{Nguyên nhân hai --- chuẩn lịch sự khác nhau giữa các nền văn hoá học thuật.} Mức khiêm tốn được coi là đúng mực thay đổi rõ giữa các truyền thống viết. Điều được coi là chừng mực trong một nền có thể bị đọc là thiếu tự tin trong nền khác --- và vì bạn viết cho cộng đồng quốc tế, chuẩn áp dụng là chuẩn của cộng đồng đó, học được bằng cách quan sát các bài gần đây (\ptr{C/13}).
+
+\emph{Nguyên nhân ba --- sợ bị bắt lỗi.} Đây là nguyên nhân mạnh nhất và cũng dễ chữa nhất khi bạn hiểu nó: rào đón được dùng như bảo hiểm. Nhưng như hình ở mục 1 cho thấy, bảo hiểm này không miễn phí. Cách chữa đúng không phải rào đón mà là \emph{nêu phạm vi} --- công cụ hai --- vì nó cho bạn cùng mức an toàn mà không mất nội dung.
+
+\section{Gốc rễ: vì sao khoa học lại rào đón}
+
+Rào đón trong văn khoa học thường bị người học coi là một tật lịch sự thừa thãi. Thực ra nó phục vụ ba chức năng khác nhau, và chỉ một trong ba là lịch sự.
+
+\emph{Chức năng thứ nhất là nhận thức luận.} Khoa học thực nghiệm không chứng minh; nó tích luỹ bằng chứng. Một câu ở bậc 6 --- \emph{X is} --- tuyên bố điều mà dữ liệu thực nghiệm về nguyên tắc không cho phép. Rào đón vì thế là cách nói \emph{đúng} về loại tri thức bạn đang tạo ra, không phải cách nói khiêm tốn.
+
+\emph{Chức năng thứ hai là xã hội, và nó xuất phát từ một quan sát tổng quát hơn về ngôn ngữ.} Nghiên cứu về lịch sự trong giao tiếp\cite{brownlevinson1987} chỉ ra rằng con người bao gói các phát ngôn có thể gây mất mặt --- yêu cầu, phản bác, phê bình --- trong những lớp ngôn ngữ làm giảm áp lực. Trong khoa học, phản bác công trình của người khác chính là loại phát ngôn đó, và cộng đồng bạn phản bác cũng là cộng đồng sẽ phản biện bài bạn. Rào đón lúc này là một hình thức của cùng cơ chế.
+
+\emph{Chức năng thứ ba là chiến lược.} Một khẳng định rào đón khó bị bác bỏ hơn. Điều này nghe như một trò chơi, và đôi khi đúng là vậy --- đây là mặt mà \ptr{B/08} dạy bạn nhận ra khi \emph{đọc}. Khi viết, ranh giới đạo đức khá rõ: dùng rào đón để mô tả đúng độ chắc chắn là trung thực; dùng nó để nói một điều mạnh mà vẫn có đường lui là không.
+
+Việc mô tả có hệ thống hiện tượng này trong văn học thuật gắn với công trình của Hyland từ những năm 1990\cite{hyland1998,hyland2005}, và một phát hiện của dòng nghiên cứu đó đáng nhớ: rào đón \emph{không} phân bố đều trong bài. Chúng tập trung ở phần thảo luận và phần kết luận --- đúng những chỗ tác giả rời khỏi số liệu. Phần kết quả gần như không có rào đón, vì ở đó bạn chỉ nói cái đo được. Nếu bài của bạn có rào đón rải đều khắp nơi, đó là dấu hiệu bạn đang rào đón theo thói quen chứ không theo bằng chứng.
+
+\begin{gocre}
+\gr{Bản chất khoa học thực nghiệm}{Dữ liệu có chứng minh được không?}{Không --- chỉ tích luỹ bằng chứng. Rào đón là cách nói đúng về loại tri thức này.}
+\gr{Lịch sự trong giao tiếp\cite{brownlevinson1987}}{Vì sao con người nói vòng khi phản bác?}{Phát ngôn gây mất mặt được bao gói; phản bác công trình người khác thuộc loại đó.}
+\gr{Cộng đồng phản biện kín}{Người bạn phê bình cũng là người chấm bài bạn.}{Chuẩn diễn đạt phê bình rất chừng mực; \ptr{C/13} mục 4 là hệ quả.}
+\gr{1990s --- Hyland\cite{hyland1998}}{Rào đón phân bố thế nào trong bài?}{Tập trung ở thảo luận và kết luận, gần như vắng ở phần kết quả \(\Rightarrow\) tiêu chí tự kiểm.}
+\gr{Khủng hoảng lặp lại kết quả}{Vì sao nhiều kết quả không lặp lại được?}{Một phần vì kết luận vượt quá dữ liệu \(\Rightarrow\) áp lực mới lên việc hiệu chỉnh và nêu phạm vi.}
+\gr{Chuẩn báo cáo hiện đại}{Làm sao buộc tác giả nêu giới hạn?}{Nhiều tạp chí yêu cầu mục hạn chế riêng --- biến việc nêu phạm vi từ phong cách thành quy định.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Xác suất và thống kê}{Khoảng tin cậy}{Cùng ý: một ước lượng kèm khoảng chính xác hơn một con số trần. Nêu phạm vi trong văn là phiên bản ngôn ngữ của cùng ý tưởng.}
+\lh{Học máy}{Hiệu chỉnh xác suất dự đoán}{Một mô hình tốt không chỉ đoán đúng mà còn \emph{biết mình chắc tới đâu}. Chương này là hiệu chỉnh áp cho câu văn.}
+\lh{Kỹ thuật}{Hệ số an toàn}{Kỹ sư nêu biên an toàn thay vì nói ``chắc là chịu được''. Công cụ hai (nêu phạm vi) chính là khai báo biên.}
+\lh{Dự báo và tình báo}{Từ ngữ chỉ mức chắc chắn được chuẩn hoá}{Các tổ chức dự báo quy định nghĩa số cho \emph{likely}, \emph{probable} vì cùng vấn đề: từ mơ hồ gây quyết định sai.}
+\lh{Y khoa}{Mức bằng chứng trong khuyến cáo}{Khuyến cáo lâm sàng gắn nhãn mức bằng chứng cho từng câu --- thang cam kết ở mục 1 được thể chế hoá.}
+\lh{Đời thường}{Hứa hẹn trong công việc}{``Xong thứ Sáu'' so với ``nếu bản API xong trước thứ Tư thì xong thứ Sáu''. Cùng kỹ thuật, và cùng lợi ích về uy tín.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Vì rào đón quá đà gây ba thiệt hại. Người đọc không biết bạn thật sự khẳng định gì. Người phản biện đọc nó như dấu hiệu chính bạn cũng không tin dữ liệu của mình. Và khi mọi câu đều rào đón, bạn mất khả năng phân biệt --- chỗ bạn chắc chắn nghe y hệt chỗ bạn đang đoán. Cả hai đầu của thang đều hỏng, chỉ theo hai kiểu khác nhau.}
+\tl{Dùng thang ba mức. An toàn nhất: chỉ nói cái đo được --- \emph{X and Y are correlated across the eleven sequences}. Trung gian: \emph{This pattern is consistent with X influencing Y}, kèm nêu cách giải thích khác. Mạnh: chỉ khi có \emph{can thiệp} --- \emph{disabling X removed the effect} --- vì bạn thay đổi A và quan sát B đổi theo. Cẩn thận với các động từ ngầm mang nhân quả: \emph{improves}, \emph{reduces}, \emph{leads to}, \emph{results in}.}
+\tl{Rất khác. \emph{Demonstrate} là lời mời kiểm tra: người phản biện sẽ hỏi dữ liệu có đủ để thiết lập điều đó không, và nếu không thì đó thành một điểm phản đối. \emph{Suggest} không mời kiểm tra theo cách đó --- nó nói bạn biết bằng chứng chưa đủ để kết luận. Chọn bậc cao hơn mức bằng chứng cho phép là cách nhanh nhất tạo ra một điểm phản đối lẽ ra không cần có.}
+\tl{Có ba công cụ khác, và chúng chính xác hơn. Giới hạn phạm vi: thu hẹp điều kiện thay vì hạ mức tin --- \emph{faster on sequences longer than 60 s} vừa mạnh hơn vừa an toàn hơn; đây là công cụ tốt nhất và bị dùng ít nhất. Quy trách: nói rõ khẳng định này của ai --- của bạn, của tài liệu trước, hay của dữ liệu. Và nêu điều kiện: \emph{if the calibration is accurate to within 0.1\textdegree, then\ldots}}
+\tl{Ba nguyên nhân, không cái nào là vốn từ. Chưa cảm được khoảng cách giữa \emph{indicate} và \emph{demonstrate} nên chọn theo thói quen và rơi vào một trong hai đầu thang --- chữa bằng cách dùng bảng bậc như bảng tra. Chuẩn khiêm tốn khác nhau giữa các nền văn hoá học thuật, mà chuẩn áp dụng là của cộng đồng bạn gửi bài. Và sợ bị bắt lỗi nên dùng rào đón như bảo hiểm --- cách chữa đúng là nêu phạm vi, cho cùng mức an toàn mà không mất nội dung.}
+\end{traloi}
+
+\begin{dongian}
+Khi viết báo cáo hay bài báo, có một việc quyết định người đọc có tin bạn hay không, mà lại ít ai dạy: nói \emph{đúng mức}.
+
+Ý là thế này. Câu bạn viết có một độ mạnh, và dữ liệu bạn có cũng có một độ mạnh. Hai cái phải khớp nhau. Mạnh hơn dữ liệu thì bị bắt lỗi. Yếu hơn dữ liệu thì bạn phí công làm thí nghiệm.
+
+Nhiều người chỉ được cảnh báo một chiều: ``đừng nói quá''. Nên họ chuyển sang chiều kia và viết những câu như \emph{The results may possibly suggest that our approach could potentially be beneficial in some cases}. Câu này an toàn tuyệt đối --- vì nó không nói gì cả. Người chấm bài đọc nó và nghĩ: chính tác giả cũng không tin kết quả của mình.
+
+Cách sửa hay nhất không phải bớt hay thêm \emph{may}. Nó là \emph{nói rõ phạm vi}. So hai câu: \emph{Our method is faster} và \emph{Our method is faster on sequences longer than 60 seconds}. Câu thứ hai nghe dè dặt hơn, nhưng thực ra nó \emph{mạnh} hơn --- vì nó đúng hoàn toàn, và người đọc biết chính xác bạn đang khẳng định gì.
+
+Một chỗ nữa rất dễ trượt: khi bạn thấy hai thứ đi cùng nhau, đừng viết như thể cái này gây ra cái kia. Nhiều động từ tiếng Anh ngầm mang nhân quả mà bạn không để ý: \emph{improves}, \emph{reduces}, \emph{leads to}. Bạn chỉ được dùng chúng khi đã \emph{thử tắt đi} --- thay đổi một thứ và xem cái kia có đổi theo không. Còn nếu chỉ quan sát, hãy nói đúng cái quan sát được.
+
+Và một mẹo nhỏ để tự kiểm: các câu rào đón trong bài của bạn nên tập trung ở phần bàn luận và kết luận, chứ không rải đều. Ở phần kết quả bạn chỉ nói cái đo được --- chỗ đó không cần \emph{may} nào cả. Nếu bài bạn rào đón khắp nơi, bạn đang làm theo thói quen chứ không theo bằng chứng.
+\motcau{Nói mạnh đúng bằng bằng chứng --- không hơn, không kém.}
+\chuadongian{Ranh giới giữa rào đón trung thực và rào đón chiến lược nằm ở ý định người viết, nên không có phép thử ngôn ngữ nào tách được hai cái.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Nguyên tắc hiệu chỉnh}{Mức mạnh của câu phải khớp mức mạnh của bằng chứng --- cả hai đầu thang đều hỏng.}
+\ar[3]{Ba thiệt hại của rào đón quá đà}{Người đọc không biết bạn khẳng định gì; bị đọc là thiếu tự tin; mất khả năng phân biệt chắc và đoán.}
+\ar[3]{Sáu bậc cam kết}{\emph{prove} \(>\) \emph{demonstrate} \(>\) \emph{indicate} \(>\) \emph{suggest} \(>\) \emph{may} \(>\) \emph{hypothesise}.}
+\ar[3]{Quy tắc chọn bậc}{Chọn bậc cao nhất mà bằng chứng chống đỡ được, rồi dừng.}
+\ar[3]{Bốn công cụ}{Động từ tình thái/báo cáo; giới hạn phạm vi; quy trách; nêu điều kiện.}
+\ar[3]{Công cụ tốt nhất}{Giới hạn phạm vi --- vừa an toàn vừa mạnh hơn, và bị dùng ít nhất.}
+\ar[2]{Câu hỏi trước khi thêm \emph{may}}{``Mình không chắc về cái gì?'' Phạm vi \(\rightarrow\) công cụ hai; nguyên nhân \(\rightarrow\) công cụ bốn.}
+\ar[2]{Động từ ngầm nhân quả}{\emph{improves}, \emph{reduces}, \emph{causes}, \emph{leads to}, \emph{results in} --- chỉ dùng khi có can thiệp.}
+\ar[2]{Điều kiện để nói nhân quả}{Bạn thay đổi A và quan sát B đổi theo, giữ nguyên các thứ khác --- lý do thí nghiệm bóc tách có giá trị.}
+\ar[2]{Ba chức năng của rào đón}{Nhận thức luận (khoa học không chứng minh); xã hội (giảm mất mặt); chiến lược (khó bị bác).}
+\ar[2]{Phân bố rào đón}{Tập trung ở thảo luận và kết luận; gần như vắng ở phần kết quả.}
+\ar[1]{Ba nguyên nhân sai của người không bản ngữ}{Chưa cảm được sắc thái nên chọn cực đoan; chuẩn lịch sự khác nhau; và dùng rào đón làm bảo hiểm.}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Người phản biện bảo tôi ``nói quá''. Sửa thế nào cho nhanh?}{Đừng phản xạ thêm \emph{may} vào mọi câu. Hãy làm ba bước. Tìm câu bị chê và xác định nó đang ở bậc mấy trong bảng mục 1. Hỏi bằng chứng của bạn chống đỡ tới bậc nào. Nếu chênh một bậc, hạ động từ (\emph{demonstrate} \(\rightarrow\) \emph{indicate}); nếu chênh vì thiếu điều kiện, hãy thêm phạm vi thay vì hạ bậc --- thường đó mới là cái người phản biện thật sự muốn.}
+\qa{Tôi thấy nhiều bài nổi tiếng viết rất mạnh mà không sao. Vì sao?}{Ba lý do có thể. Bằng chứng của họ thật sự đủ mạnh cho bậc đó. Hoặc câu mạnh nằm ở phần tóm tắt trong khi phần thảo luận đã nêu đầy đủ giới hạn --- một cách phân bố hợp lệ. Hoặc họ đang tiêu vào uy tín đã có, thứ mà một tác giả mới không có. Hãy nhìn kỹ trường hợp thứ hai: rất nhiều bài trông ``mạnh'' ở tóm tắt lại rất chừng mực ở chỗ nó quan trọng.}
+\qa{Dùng \emph{we believe} có được không?}{Được, nhưng ít khi là lựa chọn tốt nhất, vì nó quy trách cho niềm tin của bạn thay vì cho bằng chứng. Hợp lý khi bạn đưa ra một phán đoán mà dữ liệu không quyết được --- ví dụ chọn hướng nghiên cứu tiếp theo. Không hợp khi bạn đang nói về kết quả: \emph{our data indicate} mạnh hơn và kiểm tra được. Một quy tắc gọn: \emph{we believe} cho ý kiến, động từ báo cáo cho kết quả.}
+\qa{Trong tóm tắt tôi có được nói mạnh hơn trong bài không?}{Một chút thì được và đó là thực tế phổ biến, nhưng có giới hạn rõ. Điều được chấp nhận là bỏ bớt các điều kiện phụ cho gọn. Điều không được là khẳng định ở tóm tắt một điều mà phần thảo luận phải rào đón --- vì người đọc chỉ đọc tóm tắt sẽ mang đi một kết luận sai, và người đọc kỹ sẽ thấy mâu thuẫn. Cách an toàn: giữ nguyên động từ báo cáo giữa hai chỗ, chỉ rút gọn phạm vi.}
+\qa{Nêu hạn chế có làm bài dễ bị từ chối hơn không?}{Ngược lại là chính. Người phản biện gần như luôn tìm ra hạn chế; câu hỏi chỉ là bạn nêu trước hay họ nêu. Nếu bạn nêu, nó thành bằng chứng rằng bạn hiểu công trình mình và người phản biện chuyển sang đánh giá phần còn lại. Nếu họ nêu, nó thành thứ bạn đã bỏ sót. \ptr{C/13} mục 5 nói kỹ hơn về chỗ đặt.}
+\qa{Có danh sách nào cho biết từ nào ở bậc nào không?}{Bảng ở mục 1 là bộ khung, nhưng đừng biến nó thành từ điển cứng --- các động từ báo cáo mang sắc thái khác nhau tuỳ ngành và tuỳ vị trí trong câu. Cách hiệu chỉnh tốt nhất là quan sát: lấy mười bài trong đúng lĩnh vực bạn, ghi lại động từ họ dùng cho các loại khẳng định khác nhau, và bạn sẽ thấy quy ước của cộng đồng đó rất nhanh. Đây cũng là một bài tập ở cuối chương.}
+\qa{Quy tắc này áp dụng ngoài viết bài báo không?}{Có, và có lẽ đó là chỗ nó trả công nhiều nhất. Trong báo cáo công việc, ``sẽ xong thứ Sáu'' so với ``nếu bản API xong trước thứ Tư thì xong thứ Sáu'' là đúng khác biệt giữa bậc 5 và bậc 4 kèm điều kiện. Người xây được tiếng nói đúng mức trong công việc được tin cậy hơn nhiều so với người luôn nói chắc --- vì đồng nghiệp học được cách đọc mức tin của bạn.}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Xếp 15 câu khẳng định trong một bài báo vào sáu bậc của bảng mục 1}{Bài báo ngành}{Ghi động từ và trạng từ quyết định bậc.}
+\bt[1]{Tìm 5 câu rào đón chồng nhiều lớp trong bài của bạn và viết lại mỗi câu một lớp}{Bài viết của bạn}{So xem có mất nội dung gì không.}
+\bt[2]{Với 5 khẳng định của bạn, viết lại bằng công cụ hai thay vì công cụ một}{Bài viết của bạn}{Nêu phạm vi thay vì hạ mức tin.}
+\bt[2]{Tìm 5 chỗ trong bài của bạn dùng động từ ngầm nhân quả mà chỉ có tương quan}{Bài viết của bạn}{Viết lại theo ba mức ở mục 3.}
+\bt[2]{Đếm số rào đón theo từng phần của một bài báo}{Bài báo ngành}{Kiểm xem chúng có tập trung ở thảo luận và kết luận không.}
+\bt[3]{Lấy 10 bài trong lĩnh vực bạn, lập bảng động từ báo cáo họ dùng cho từng loại khẳng định}{Bài báo ngành}{Đây là cách học chuẩn của cộng đồng, chính xác hơn mọi danh sách chung.}
+\bt[3]{Viết hai bản của phần thảo luận: một bản bậc 5, một bản bậc 3, rồi chọn}{Bài viết của bạn}{Ghi lý do chọn dựa trên bằng chứng bạn thật sự có.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Bốn chương của phần C tới đây đã cho bốn nguyên tắc: ai làm gì trong câu, cũ trước mới sau giữa các câu, đáp đúng kỳ vọng về khuôn ở cấp bài, và mức cam kết khớp bằng chứng ở mọi cấp.
+
+Nhưng biết bốn nguyên tắc không có nghĩa là áp được chúng khi đang viết. Người viết có kinh nghiệm không cố viết đúng ngay từ bản nháp đầu --- họ tách việc \emph{nghĩ ra ý} khỏi việc \emph{làm cho ý rõ}, và họ có một quy trình cho việc thứ hai. Chương \ptr{C/15} biến bốn nguyên tắc này thành một danh sách kiểm dùng được, và nói về phần công việc mà mọi người viết giỏi đều thừa nhận là quan trọng nhất nhưng hiếm khi được dạy.
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

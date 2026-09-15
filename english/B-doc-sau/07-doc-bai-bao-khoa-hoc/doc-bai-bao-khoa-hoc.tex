@@ -1,0 +1,262 @@
+% ============================================================================
+%  B/07-doc-bai-bao-khoa-hoc — file chương
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+%  Dependency: B/05, B/06. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../english.tex]{subfiles}
+\begin{document}
+\chapter{Đọc bài báo khoa học: phương pháp ba lượt (Reading a Paper in Three Passes)}
+\ptrtarget{B/07}\ptrtarget{B/07-doc-bai-bao-khoa-hoc}
+\dependency{\ptr{B/05} cho ba tầng đọc và \ptr{B/06} cho bộ khung lập luận --- chương này áp cả hai vào một thể loại cụ thể.}
+
+\begin{tomtat}
+Bài báo khoa học là thể loại có cấu trúc chặt nhất mà bạn sẽ đọc, và chính vì chặt nên nó đọc được theo quy trình. Chương này trình bày phương pháp ba lượt với ngân sách thời gian rõ ràng cho từng lượt, chỉ ra mỗi phần của bài thật sự chứa thông tin gì --- và phần nào có thể bỏ qua ở lượt đầu. Kèm theo là cách đọc phần thực nghiệm một cách phản biện (so sánh có công bằng không, có bỏ sót đường cơ sở nào không), cách lần theo trích dẫn để dựng bản đồ một lĩnh vực, và một mẫu ghi chú mà sau sáu tháng bạn vẫn dùng được. Nếu chỉ nhớ một điều: đừng đọc bài báo từ đầu tới cuối --- hãy đọc tóm tắt, rồi hình, rồi kết luận, và chỉ đi vào phần thân khi đã biết mình đang tìm gì.
+\end{tomtat}
+
+\begin{nentang}
+\kn{IMRAD}{cấu trúc chuẩn của bài báo thực nghiệm: mở đầu (Introduction), phương pháp (Methods), kết quả (Results), thảo luận (Discussion). Nhiều ngành thêm phần công trình liên quan và phần kết luận.}
+\kn{đường cơ sở (baseline)}{phương pháp có sẵn được dùng để so sánh. Chất lượng của đường cơ sở quyết định giá trị của toàn bộ phần thực nghiệm.}
+\kn{nghiên cứu cắt bỏ (ablation)}{thí nghiệm bỏ đi từng thành phần của phương pháp để xem thành phần nào thực sự đóng góp.}
+\kn{lần theo trích dẫn}{đi ngược (đọc các bài mà bài này trích) hoặc đi xuôi (tìm các bài trích lại bài này) để dựng bản đồ lĩnh vực.}
+\kn{ghi chú nguyên tử}{mỗi ghi chú chứa đúng một ý, viết bằng lời của bạn, và đứng độc lập được --- dạng ghi chú duy nhất còn dùng được sau nhiều tháng.}
+\kn{tính tái lập}{khả năng người khác làm lại được thí nghiệm từ mô tả trong bài; đây là tiêu chí đọc phần phương pháp.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao đọc bài báo từ đầu tới cuối lại là cách kém hiệu quả nhất?}
+\h{Trong một bài báo thực nghiệm, phần nào chứa nhiều thông tin nhất trên mỗi phút đọc?}
+\h{Làm sao biết phần so sánh thực nghiệm có công bằng hay không, khi bạn không phải tác giả?}
+\h{Ghi chú thế nào để sáu tháng sau vẫn dùng được mà không phải mở lại bài?}
+\h{Bạn cần nắm một lĩnh vực mới. Bắt đầu từ bài nào, và lần theo trích dẫn theo hướng nào?}
+\end{khoigoi}
+
+Một nghiên cứu sinh trung bình đọc vài chục bài báo mỗi tháng và chỉ thực sự cần chi tiết của vài bài. Nếu đọc mọi bài theo cùng một cách, hoặc bạn đọc kỹ hết và không đủ thời gian, hoặc bạn đọc lướt hết và không nắm được bài nào. Cách thoát ra không phải đọc nhanh hơn mà là \emph{phân tầng} --- đúng ý ở \ptr{B/05}, nay áp cho một thể loại có cấu trúc rất chuẩn nên quy trình hoá được.
+
+Phương pháp trình bày ở đây dựa trên một bài viết hai trang của Keshav năm 2007\cite{keshav2007}, được truyền tay rộng rãi trong giới nghiên cứu máy tính, cộng thêm phần đọc phản biện và phần ghi chú mà kinh nghiệm thực tế đòi hỏi.
+
+\section{Lượt một: năm tới mười phút}
+
+Mục tiêu: trả lời năm câu hỏi và ra một quyết định. Chỉ đọc tiêu đề, tóm tắt, phần mở đầu, các đề mục, hình cùng chú thích, kết luận, và liếc danh mục tham khảo --- \emph{không} đọc phần thân.
+
+Năm câu hỏi:
+
+\begin{enumerate}
+\item \textbf{Loại gì?} Bài đề xuất phương pháp mới, bài phân tích một phương pháp cũ, bài khảo sát, hay bài đo đạc so sánh? Loại bài quyết định bạn kỳ vọng gì ở phần thực nghiệm.
+\item \textbf{Bối cảnh nào?} Nó dựa trên nền tảng nào, thuộc dòng nghiên cứu nào? Nếu bạn không nhận ra tên nào trong danh mục tham khảo, hãy tìm một bài khảo sát trước.
+\item \textbf{Giả định có hợp lý không?} Đọc lướt các giả định nêu trong phần mở đầu và phương pháp.
+\item \textbf{Đóng góp là gì?} Thường được liệt kê tường minh ở cuối phần mở đầu.
+\item \textbf{Bài viết có rõ ràng không?} Đây là tín hiệu gián tiếp nhưng đáng tin về mức độ cẩn thận của tác giả.
+\end{enumerate}
+
+Kết thúc lượt một, ra quyết định như ở \ptr{B/05}: bỏ, lưu lại để tra khi cần, hay đọc lượt hai. Với phần lớn bài, câu trả lời đúng là một trong hai lựa chọn đầu.
+
+Có một mẹo rất hiệu quả và ít người dùng: \emph{đọc hình trước khi đọc chữ}. Trong bài kỹ thuật, hình và bảng thường mang kết quả chính, và chú thích được viết để đứng độc lập. Xem hết hình rồi mới đọc tóm tắt cho bạn một khung cụ thể để nạp thông tin vào --- và đôi khi cho bạn thấy ngay rằng bài này không liên quan tới câu hỏi của bạn.
+
+\section{Lượt hai: khoảng một giờ}
+
+Mục tiêu: nắm được nội dung và bộ khung lập luận đủ để trình bày lại cho người khác, nhưng \emph{chưa} kiểm tra chi tiết kỹ thuật.
+
+Ba nguyên tắc.
+
+\emph{Bỏ qua chi tiết ở lượt này.} Chứng minh, dẫn xuất dài, phần cấu hình siêu tham số --- đánh dấu và đi tiếp. Bạn quay lại ở lượt ba nếu cần.
+
+\emph{Đọc kỹ hình và bảng.} Với mỗi hình, hỏi ba câu: trục là gì và đơn vị gì; đường nào là phương pháp của tác giả; và có đường cơ sở nào đáng lẽ phải có mà không thấy? Với mỗi bảng, tìm cột chỉ số chính và hàng đường cơ sở mạnh nhất.
+
+\emph{Ghi chú theo bộ khung của \ptr{B/06}.} Khẳng định chính, bằng chứng, giả định nối. Ba dòng này là xương sống của ghi chú.
+
+Cuối lượt hai, bạn phải tóm tắt được bài trong bốn tới năm câu. Nếu không, có ba khả năng và đáng phân biệt: chủ đề quá xa nền của bạn (cần đọc nền trước); bài viết lỏng (ghi lại nhận xét đó); hoặc bạn đã đọc thiếu tập trung (đọc lại lượt hai).
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[yscale=0.9,xscale=1.0]
+\foreach \x/\w/\lab/\col/\sub in {
+  0/2.0/{Lượt 1}/steel/{5--10 phút},
+  2.3/3.4/{Lượt 2}/accent/{\(\approx\)1 giờ},
+  6.0/4.6/{Lượt 3}/reddark/{4--5 giờ}}{
+  \fill[\col!13,draw=\col,thick,rounded corners=2pt] (\x,0.6) rectangle (\x+\w,1.7);
+  \node[font=\scriptsize\bfseries,color=\col] at (\x+\w/2,1.35) {\lab};
+  \node[font=\scriptsize,color=\col] at (\x+\w/2,0.95) {\sub};}
+\node[font=\scriptsize,color=tiercol,anchor=west,text width=3.0cm] at (0,-0.2) {Có nên đọc tiếp không?};
+\node[font=\scriptsize,color=tiercol,anchor=west,text width=3.4cm] at (2.3,-0.2) {Nội dung và lập luận; tóm tắt được cho người khác};
+\node[font=\scriptsize,color=tiercol,anchor=west,text width=4.6cm] at (6.0,-0.2) {Dựng lại trong đầu như thể mình là tác giả; kiểm mọi giả định};
+\draw[-{Latex[length=2.2mm]},thick,color=tiercol] (0,2.1) -- (10.6,2.1);
+\node[font=\scriptsize,color=tiercol,anchor=south] at (5.3,2.15) {số bài đi qua mỗi lượt giảm rất nhanh};
+\node[font=\scriptsize,color=steel,anchor=north] at (1.0,2.05) {100\%};
+\node[font=\scriptsize,color=accent,anchor=north] at (4.0,2.05) {\(\approx\)20\%};
+\node[font=\scriptsize,color=reddark,anchor=north] at (8.3,2.05) {\(\approx\)2\%};
+\end{tikzpicture}
+\caption{Ba lượt đọc với ngân sách thời gian. Điểm quan trọng là số bài lọt qua mỗi lượt giảm rất nhanh: bạn thăm dò hàng chục bài, đọc kỹ vài bài, và chỉ dựng lại chi tiết một hai bài thực sự quan trọng với công việc của mình. Đọc mọi bài ở lượt ba là cách chắc chắn nhất để không đọc được bài nào.}
+\label{fig:three-pass}
+\end{figure}
+
+\section{Lượt ba: bốn tới năm giờ}
+
+Chỉ dành cho những bài bạn phải hiểu tường tận --- vì bạn sẽ cài lại, vì bạn sẽ so sánh với nó, hoặc vì bạn đang phản biện nó.
+
+Ý tưởng cốt lõi: \emph{dựng lại bài báo trong đầu như thể bạn là tác giả}. Bạn đi qua từng bước và tự hỏi ``nếu tôi làm việc này, tôi sẽ làm thế nào'', rồi so với những gì họ viết. Chỗ nào bạn làm khác thì hoặc bạn đã hiểu sai, hoặc họ có lý do mà bạn chưa thấy, hoặc đó là một điểm yếu thật.
+
+Ba việc cụ thể ở lượt này: kiểm mọi giả định --- kể cả những giả định không được nêu; kiểm tính tái lập --- nếu phải cài lại, thông tin trong bài có đủ không, thiếu chỗ nào; và ghi lại các ý tưởng cho công việc của chính bạn --- lượt ba thường sinh ra nhiều ý tưởng hơn hai lượt trước cộng lại, vì bạn đang tư duy như người làm chứ không như người đọc.
+
+\section{Mỗi phần của bài báo thực sự nói gì}
+
+\begin{center}\footnotesize
+\rowcolors{2}{white}{tblalt}
+\begin{longtable}{@{}L{2.9cm}L{5.2cm}L{6.1cm}@{}}
+\toprule
+\textbf{Phần} & \textbf{Chứa gì} & \textbf{Đọc để tìm gì}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Phần} & \textbf{Chứa gì} & \textbf{Đọc để tìm gì (tiếp)}\\
+\midrule
+\endhead
+Tóm tắt & Bài toán, cách làm, kết quả chính, thường kèm một con số & Khẳng định chính và mức cam kết (\ptr{A/01})\\
+Mở đầu & Bối cảnh, khoảng trống, đóng góp & Nước đi ``tạo khoảng trống'' --- lý do bài tồn tại (\ptr{B/06})\\
+Công trình liên quan & Bản đồ các hướng tiếp cận & Cách tác giả \emph{định vị} mình; và các bài đáng đọc tiếp\\
+Phương pháp & Mô tả kỹ thuật & Tính tái lập: thiếu tham số nào, giả định nào ngầm\\
+Thiết lập thí nghiệm & Dữ liệu, chỉ số, đường cơ sở & So sánh có công bằng không --- mục 5\\
+Kết quả & Hình, bảng, số & Đọc hình trước; tìm đường cơ sở mạnh nhất\\
+Thảo luận & Diễn giải kết quả & Chỗ tác giả nói mạnh hơn dữ liệu cho phép (\ptr{B/08})\\
+Hạn chế & Điều tác giả thừa nhận & So với danh sách giả định của \emph{bạn}; phần chênh mới đáng chú ý\\
+Kết luận & Tóm tắt và hướng tiếp & Ít thông tin mới; đọc ở lượt một để nắm nhanh\\
+Phụ lục & Chứng minh, chi tiết cấu hình & Chỉ đọc ở lượt ba, khi cần tái lập\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\section{Đọc phần thực nghiệm một cách phản biện}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ ba và là kỹ năng đáng giá nhất chương. Sáu câu hỏi, dùng cho mọi bài có so sánh thực nghiệm.
+
+\emph{Một --- đường cơ sở có mạnh không?} Phương pháp được so sánh có phải phương pháp tốt nhất hiện có, hay là một phương pháp cũ dễ vượt? Nếu bài không so với công trình mà bạn biết là mạnh nhất, hãy tìm lý do trong bài; không có lý do là một dấu hiệu.
+
+\emph{Hai --- điều kiện có công bằng không?} Các phương pháp có được tinh chỉnh tham số ở mức tương đương không? Chạy trên cùng phần cứng, cùng dữ liệu, cùng tiền xử lý?
+
+\emph{Ba --- chỉ số có phù hợp không?} Chỉ số được chọn có đo đúng thứ ta quan tâm, hay đo một thứ tương quan gần đúng? Có chỉ số nào lẽ ra nên báo cáo mà không thấy?
+
+\emph{Bốn --- có bao nhiêu lần chạy?} Kết quả là một lần chạy hay trung bình nhiều lần? Có báo cáo độ lệch không? Với các phương pháp có yếu tố ngẫu nhiên, một lần chạy gần như không nói lên gì.
+
+\emph{Năm --- nghiên cứu cắt bỏ có đầy đủ không?} Nếu phương pháp có ba thành phần mới mà chỉ cắt bỏ một, hai thành phần kia có thể không đóng góp gì.
+
+\emph{Sáu --- trường hợp thất bại có được báo cáo không?} Bài trung thực luôn có ít nhất một ví dụ về khi nào phương pháp không hoạt động. Không có phần đó là dấu hiệu đáng ngờ hơn là dấu hiệu phương pháp hoàn hảo.
+
+\begin{cambay}
+Một mẫu đáng để ý khi đọc bảng kết quả: nếu phương pháp của tác giả thắng ở mọi cột trong mọi bộ dữ liệu, hãy tăng mức nghi ngờ chứ đừng tăng mức tin. Các phương pháp thật gần như luôn có đánh đổi --- nhanh hơn thì kém chính xác hơn, chính xác hơn thì tốn bộ nhớ hơn. Một bảng ``thắng toàn diện'' thường có nghĩa là điều kiện so sánh được chọn có lợi cho tác giả, hoặc các đánh đổi bị giấu ở chỗ khác.
+\end{cambay}
+
+\section{Lần theo trích dẫn để dựng bản đồ lĩnh vực}
+
+Câu hỏi mở đầu thứ năm hỏi cách bắt đầu với một lĩnh vực mới. Quy trình bốn bước.
+
+\emph{Bước 1 --- tìm một bài khảo sát gần đây.} Nó cho bạn từ vựng, bản đồ các hướng, và một danh sách các bài kinh điển. Đọc nó ở lượt một và hai.
+
+\emph{Bước 2 --- đi ngược.} Từ bài khảo sát, chọn năm tới mười bài được trích nhiều nhất và đọc lượt một. Những bài được trích lại nhiều lần trong nhiều nguồn khác nhau chính là các bài nền của lĩnh vực.
+
+\emph{Bước 3 --- đi xuôi.} Với mỗi bài nền, tìm những bài mới trích lại nó. Đây là cách thấy được lĩnh vực đã đi tới đâu \emph{sau} bài khảo sát --- và với các lĩnh vực chuyển động nhanh, đây là bước quan trọng nhất.
+
+\emph{Bước 4 --- lập bảng.} Các hàng là bài, các cột là: hướng tiếp cận, giả định chính, dữ liệu dùng, kết quả chính, và điểm yếu. Chính bảng này --- chứ không phải tập ghi chú riêng lẻ --- là thứ cho bạn bức tranh lĩnh vực, đúng như tầng đọc đối chiếu ở \ptr{B/05}.
+
+\section{Ghi chú còn dùng được sau sáu tháng}
+
+Ghi chú thất bại khi nó chỉ hiểu được lúc bạn vừa đọc xong. Ba nguyên tắc chống lại điều đó.
+
+\emph{Viết bằng lời của bạn.} Sao chép một câu từ bài chỉ có ích khi bạn định trích dẫn; còn để hiểu, hãy diễn đạt lại. Việc diễn đạt lại vừa là bài kiểm tra hiểu (\ptr{A/01}) vừa tạo ra thứ đọc lại được.
+
+\emph{Mỗi ghi chú một ý, đứng độc lập.} Thay vì một ghi chú dài về cả bài, hãy tách thành vài ghi chú nhỏ, mỗi cái về một ý và tự hiểu được mà không cần ngữ cảnh. Đây là ý tưởng cốt lõi của các hệ thống ghi chú liên kết\cite{ahrens2017}, và nó có một lợi ích thứ hai: các ghi chú nhỏ nối được với ghi chú từ bài khác, dần dựng thành mạng.
+
+\emph{Luôn có dòng ``liên quan gì tới tôi''.} Một dòng nói vì sao bạn lưu ghi chú này: nó chống lại một giả định trong công việc của bạn, nó cho một kỹ thuật bạn có thể dùng, hay nó là đường cơ sở bạn phải so sánh. Không có dòng này thì sáu tháng sau bạn sẽ không biết vì sao mình từng quan tâm.
+
+Mẫu ghi chú tối thiểu gồm sáu dòng: thư mục đầy đủ; một câu về khẳng định chính; hai ba dòng về bằng chứng và điều kiện; một dòng về giả định nối chưa nói ra; một dòng về hạn chế thật (theo đánh giá của bạn); và một dòng ``liên quan gì tới tôi''.
+
+\section{Gốc rễ: vì sao bài báo có cấu trúc như hiện nay}
+
+Cấu trúc IMRAD không phải quy ước tự nhiên mà là kết quả của một quá trình chuẩn hoá kéo dài. Các bài báo khoa học thế kỷ 17 và 18 phần lớn là thư từ hoặc tường thuật theo trình tự thời gian --- tác giả kể lại họ đã làm gì theo thứ tự đã làm. Cách viết đó dễ theo dõi với một thí nghiệm đơn giản nhưng không dùng được khi số bài tăng và khi người đọc cần \emph{so sánh} các nghiên cứu với nhau.
+
+Trong nửa đầu thế kỷ 20, cấu trúc phương pháp--kết quả--thảo luận dần trở thành chuẩn trong các ngành thực nghiệm, và tới thập niên 1970 thì gần như thống trị trong y sinh học và lan sang các ngành khác. Động cơ rất thực dụng: nó cho phép người đọc \emph{tìm} thông tin thay vì đọc tuần tự --- muốn biết cách làm thì mở phần phương pháp, muốn biết kết quả thì mở phần kết quả.
+
+Đó cũng chính là điều kiện làm cho phương pháp ba lượt hoạt động được. Nếu bài báo vẫn viết theo lối tường thuật thì không có cách nào lướt qua có hệ thống; chính vì cấu trúc đã chuẩn hoá nên mới có thể quy trình hoá việc đọc.
+
+Điểm đáng suy nghĩ: cấu trúc chuẩn cũng có mặt trái mà người đọc cần biết. Nó khuyến khích trình bày nghiên cứu như một quá trình gọn gàng đi thẳng từ giả thuyết tới kết luận, trong khi nghiên cứu thật hầu như luôn lộn xộn --- nhiều hướng bỏ dở, nhiều kết quả bất ngờ đổi hướng cả dự án. Khoảng cách giữa \emph{cách nghiên cứu diễn ra} và \emph{cách nó được viết ra} là điều bạn nên nhớ khi đọc, và nó giải thích vì sao phần thảo luận đôi khi có cảm giác được viết ngược từ kết quả.
+
+\begin{gocre}
+\gr{Thế kỷ 17--18 --- báo cáo dạng thư}{Truyền đạt một quan sát cho cộng đồng nhỏ.}{Tường thuật theo trình tự thời gian; dễ đọc với một thí nghiệm, không so sánh được giữa các bài.}
+\gr{Nửa đầu thế kỷ 20 --- chuẩn hoá dần}{Số công bố tăng; người đọc cần so sánh phương pháp và kết quả.}{Cấu trúc phương pháp--kết quả--thảo luận thành chuẩn, cho phép \emph{tra} thay vì đọc tuần tự.}
+\gr{Thập niên 1970 --- IMRAD thống trị}{Ngành y sinh cần chuẩn cho tổng quan hệ thống.}{Cấu trúc thống nhất tạo điều kiện cho tổng quan hệ thống và cho việc đọc có chọn lọc.}
+\gr{2007 --- Keshav}{Nghiên cứu sinh đọc hàng chục bài mỗi tháng mà không có quy trình.}{Phương pháp ba lượt với ngân sách thời gian; chỉ khả thi được vì cấu trúc bài báo đã chuẩn.}
+\gr{Thập niên 2010--nay --- khủng hoảng tái lập}{Nhiều kết quả công bố không lặp lại được.}{Yêu cầu công khai mã và dữ liệu, tiền đăng ký nghiên cứu, báo cáo đầy đủ hơn --- và với người đọc, thêm một tiêu chí đánh giá bài.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Đánh giá mã nguồn}{Đọc nhiều lượt: cấu trúc trước, logic sau, chi tiết cuối}{Cùng nguyên tắc phân tầng và cùng lý do: trí nhớ làm việc có hạn nên không thể kiểm mọi thứ cùng lúc. Lượt ba của bài báo tương ứng với việc tự viết lại đoạn mã trong đầu.}
+\lh{Thẩm định đầu tư}{Đánh giá một hồ sơ theo mức độ sâu dần}{Cùng cấu trúc phễu: lọc nhanh nhiều hồ sơ, đi sâu vài cái. Cùng nguyên tắc: tiêu chí loại bỏ phải rõ ràng và áp dụng sớm.}
+\lh{Y học dựa trên bằng chứng}{Tổng quan hệ thống và phân tích gộp}{Bảng so sánh ở mục 6 là phiên bản cá nhân của tổng quan hệ thống. Ngành y đã chuẩn hoá quy trình này tới mức có hướng dẫn báo cáo riêng --- đáng tham khảo nếu bạn viết bài khảo sát.}
+\lh{Báo chí điều tra}{Kiểm chứng chéo nhiều nguồn}{Cùng kỹ thuật lần theo nguồn và cùng nguyên tắc: điều được nhiều nguồn độc lập xác nhận đáng tin hơn điều chỉ một nguồn nói.}
+\lh{Quản lý tri thức cá nhân}{Ghi chú nguyên tử và liên kết}{Mẫu ghi chú ở mục 7 là bước đầu; giá trị thật xuất hiện khi các ghi chú nối với nhau và bạn nhận ra hai bài ở hai lĩnh vực đang nói cùng một điều\cite{ahrens2017}.}
+\lh{Kỹ thuật hệ thống}{Báo cáo hiệu năng và điều kiện đo}{Sáu câu hỏi ở mục 5 áp thẳng vào việc đọc báo cáo hiệu năng nội bộ: đường cơ sở nào, điều kiện gì, bao nhiêu lần chạy, có báo cáo phương sai không.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Vì bài báo không được viết để đọc tuần tự --- nó được viết để \emph{tra}. Cấu trúc chuẩn hoá tồn tại chính để người đọc nhảy tới phần mình cần. Đọc từ đầu tới cuối nghĩa là bạn nạp chi tiết phương pháp trước khi biết kết quả có đáng quan tâm không, và nạp phần công trình liên quan trước khi biết bài này định vị ở đâu. Thứ tự hiệu quả hơn: tóm tắt \(\rightarrow\) hình \(\rightarrow\) kết luận \(\rightarrow\) rồi mới vào thân bài với một câu hỏi cụ thể trong đầu.}
+\tl{Hình và bảng, cùng chú thích của chúng. Trong bài kỹ thuật, hình mang kết quả chính, và chú thích được viết để đứng độc lập nên thường là những câu súc tích nhất trong cả bài. Sau đó là tóm tắt, rồi tới nước đi ``tạo khoảng trống'' ở phần mở đầu. Ngược lại, phần chứa ít thông tin mới nhất thường là kết luận --- nó chủ yếu lặp lại tóm tắt.}
+\tl{Bằng sáu câu hỏi ở mục 5, trong đó ba câu quan trọng nhất là: đường cơ sở có phải phương pháp mạnh nhất hiện có không; các phương pháp có được tinh chỉnh ở mức tương đương không; và có bao nhiêu lần chạy kèm độ lệch. Một dấu hiệu cảnh báo hữu ích: nếu phương pháp của tác giả thắng ở mọi cột và mọi bộ dữ liệu, hãy tăng nghi ngờ --- các phương pháp thật gần như luôn có đánh đổi, và bảng thắng toàn diện thường có nghĩa đánh đổi bị giấu ở chỗ khác.}
+\tl{Ba nguyên tắc: viết bằng lời của bạn chứ không chép câu gốc; mỗi ghi chú một ý và đứng độc lập được; và luôn có một dòng nói \emph{vì sao bạn lưu nó} --- nó chống lại giả định nào trong công việc của bạn, cho kỹ thuật gì, hay là đường cơ sở nào. Dòng cuối là dòng khiến ghi chú còn nghĩa sau sáu tháng, vì lúc đó bạn không còn nhớ ngữ cảnh mình đã đọc nó trong tình huống nào.}
+\tl{Bắt đầu từ một bài khảo sát gần đây để lấy từ vựng và bản đồ; rồi đi \emph{ngược} theo trích dẫn để tìm các bài nền (bài nào được nhiều nguồn khác nhau trích lại là bài nền); rồi đi \emph{xuôi} --- tìm các bài mới trích lại bài nền --- để xem lĩnh vực đã đi tới đâu sau bài khảo sát. Bước đi xuôi là bước quan trọng nhất với lĩnh vực chuyển động nhanh, và cũng là bước hay bị bỏ.}
+\end{traloi}
+
+\begin{dongian}
+Bài báo khoa học không phải một cuốn tiểu thuyết. Nó được viết như một cuốn cẩm nang tra cứu: mỗi phần đứng ở chỗ cố định để người đọc nhảy thẳng tới chỗ mình cần. Vì vậy đọc nó từ trang đầu tới trang cuối là cách dùng sai công cụ.
+
+Cách dùng đúng gồm ba vòng, mỗi vòng dành cho ít bài hơn vòng trước.
+
+Vòng một mất năm tới mười phút và chỉ để trả lời một câu: bài này có đáng đọc tiếp không? Bạn đọc tóm tắt, xem hình, đọc kết luận. Với phần lớn bài, câu trả lời là không --- và đó là kết quả tốt, vì bạn vừa tiết kiệm một giờ.
+
+Vòng hai mất khoảng một tiếng, dành cho những bài đã qua vòng một. Ở đây bạn đọc để hiểu \emph{họ khẳng định gì và dựa vào đâu}, nhưng bỏ qua chứng minh và chi tiết cấu hình. Cuối vòng hai bạn phải kể lại được bài đó trong bốn năm câu.
+
+Vòng ba mất vài tiếng và chỉ dành cho một hai bài thật sự quan trọng. Ở đây bạn đọc như thể mình sắp phải làm lại thí nghiệm của họ: từng bước, tự hỏi mình sẽ làm thế nào, rồi so với những gì họ viết.
+
+Và có một chỗ nên đọc kỹ hơn mọi người thường làm: phần thí nghiệm. Hãy hỏi họ so sánh với phương pháp nào, so trong điều kiện gì, chạy bao nhiêu lần. Nếu một bảng cho thấy phương pháp của họ thắng ở mọi cột, đừng vội tin --- trong thực tế mọi phương pháp đều có chỗ đánh đổi, nên bảng thắng sạch thường nghĩa là chỗ đánh đổi đã bị giấu đi đâu đó.
+\motcau{Đừng đọc bài báo từ đầu tới cuối; hãy đọc tóm tắt, hình, kết luận --- rồi mới vào thân bài với một câu hỏi cụ thể.}
+\chuadongian{Với bài ở lĩnh vực bạn chưa có nền, không quy trình nào giúp được nhiều; lúc đó phải đọc một tài liệu nền trước, và đó là chi phí không tránh được.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Ba lượt và ngân sách}{Lượt 1: 5--10 phút, quyết định đọc tiếp hay không. Lượt 2: \(\approx\)1 giờ, nắm nội dung và lập luận. Lượt 3: 4--5 giờ, dựng lại như thể mình là tác giả.}
+\ar[3]{Năm câu hỏi của lượt một}{Loại bài gì; bối cảnh nào; giả định có hợp lý không; đóng góp là gì; bài có viết rõ không.}
+\ar[3]{Thứ tự đọc hiệu quả}{Tóm tắt \(\rightarrow\) hình và chú thích \(\rightarrow\) kết luận \(\rightarrow\) thân bài với câu hỏi cụ thể. Hình mang nhiều thông tin nhất trên mỗi phút.}
+\ar[3]{Sáu câu hỏi đọc phần thực nghiệm}{Đường cơ sở mạnh không; điều kiện công bằng không; chỉ số phù hợp không; bao nhiêu lần chạy; cắt bỏ đầy đủ không; có báo cáo trường hợp thất bại không.}
+\ar[3]{Dấu hiệu ``thắng toàn diện''}{Thắng mọi cột mọi bộ dữ liệu \(\Rightarrow\) tăng nghi ngờ, vì mọi phương pháp thật đều có đánh đổi.}
+\ar[3]{Mẫu ghi chú sáu dòng}{Thư mục; khẳng định chính; bằng chứng và điều kiện; giả định nối chưa nói; hạn chế thật theo bạn; \emph{liên quan gì tới tôi}.}
+\ar[2]{Lần theo trích dẫn}{Khảo sát \(\rightarrow\) đi ngược tìm bài nền \(\rightarrow\) đi xuôi tìm bài mới \(\rightarrow\) lập bảng so sánh. Bước đi xuôi hay bị bỏ nhất.}
+\ar[2]{Mỗi phần nói gì}{Mở đầu: khoảng trống. Công trình liên quan: cách tác giả định vị mình. Phương pháp: tính tái lập. Thảo luận: chỗ nói mạnh hơn dữ liệu. Hạn chế: so với danh sách của bạn.}
+\ar[2]{Ba nguyên tắc ghi chú}{Viết bằng lời của bạn; mỗi ghi chú một ý đứng độc lập; luôn có dòng ``liên quan gì tới tôi''.}
+\ar[2]{Nếu không tóm tắt được sau lượt hai}{Ba khả năng: thiếu nền (đọc nền trước), bài viết lỏng (ghi nhận xét), hoặc đọc thiếu tập trung (đọc lại).}
+\ar[1]{Vì sao IMRAD tồn tại}{Để người đọc \emph{tra} thay vì đọc tuần tự; chính sự chuẩn hoá này làm phương pháp ba lượt khả thi.}
+\ar[1]{Mặt trái của cấu trúc chuẩn}{Nó trình bày nghiên cứu như một quá trình gọn gàng, trong khi nghiên cứu thật lộn xộn --- nhớ khoảng cách đó khi đọc phần thảo luận.}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Tôi mất nhiều hơn một giờ cho lượt hai. Có bình thường không?}{Bình thường khi bài ở ngoài vùng chuyên môn của bạn hoặc khi bạn mới bắt đầu. Nhưng nếu điều đó xảy ra với mọi bài, hãy kiểm hai chỗ: bạn có đang đọc cả chứng minh và chi tiết cấu hình ở lượt hai không (không nên), và nền của bạn về chủ đề đó có đủ không. Nếu thiếu nền thì đọc thêm mười bài cùng loại cũng không giải quyết được --- hãy dành một buổi đọc một chương giáo trình hoặc một bài khảo sát.}
+\qa{Có nên đọc phần công trình liên quan không?}{Ở lượt một thì lướt để lấy tên; ở lượt hai thì đọc, nhưng đọc với một mục đích cụ thể: xem tác giả \emph{định vị} bài của họ thế nào so với các hướng khác. Phần này thường cho bạn bản đồ lĩnh vực nhanh hơn bất kỳ phần nào khác, và nó cũng tiết lộ thiên hướng của tác giả --- họ nhóm các công trình theo tiêu chí nào, và họ bỏ qua hướng nào.}
+\qa{Làm sao biết một bài có đáng đọc lượt ba không?}{Ba tiêu chí. Bạn sẽ phải \emph{cài lại} hoặc \emph{so sánh với} phương pháp này. Bài này chống lại một giả định trong công việc của bạn --- nếu họ đúng thì bạn phải đổi cách làm. Hoặc bạn sẽ phản biện hay trích dẫn nó ở chỗ quan trọng trong bài viết của mình. Nếu không rơi vào ba trường hợp đó, lượt hai cộng một ghi chú tốt là đủ.}
+\qa{Tôi hay quên mất mình đã đọc bài nào. Quản lý thế nào?}{Một hệ thống tối thiểu gồm ba thành phần: một trình quản lý thư mục để lưu tệp và trích dẫn; một tệp ghi chú theo mẫu sáu dòng cho mỗi bài đã đọc lượt hai trở lên; và một bảng tổng hợp cho mỗi chủ đề bạn đang theo đuổi. Điều quan trọng hơn công cụ là quy tắc: \emph{không lưu bài nào mà không kèm ít nhất một dòng ghi chú}. Một thư viện đầy tệp không ghi chú là thư viện chết.}
+\qa{Đọc bài báo bằng tiếng Anh chậm hơn nhiều so với tiếng Việt. Có mẹo gì không?}{Ba mẹo đặc thù cho thể loại này. Một, đọc tóm tắt hai lần: lần đầu để nắm ý, lần hai để chú ý các từ chỉ mức cam kết (\ptr{A/01}) --- tóm tắt là chỗ dày thông tin nhất nên đáng đầu tư. Hai, đọc hình trước; hình không có rào cản ngôn ngữ và cho bạn khung để đoán nội dung. Ba, đọc hẹp trong một chủ đề (\ptr{A/02}): sau năm bài cùng chủ đề, từ vựng lặp lại và tốc độ tăng rõ rệt.}
+\qa{Khi nào nên đọc bài gốc thay vì bài khảo sát?}{Đọc khảo sát trước để lấy bản đồ, nhưng đọc bài gốc khi ba điều kiện: bạn cần chi tiết kỹ thuật để cài lại; bạn nghi ngờ cách bài khảo sát tóm tắt công trình đó; hoặc bạn sẽ trích dẫn nó ở một điểm quan trọng. Điều cuối là quy tắc nghề nghiệp đáng giữ: \emph{đừng trích dẫn bài mà bạn chỉ đọc qua tóm tắt của người khác} --- các tóm tắt gián tiếp hay bỏ mất điều kiện và phạm vi.}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Áp lượt một cho năm bài trong 45 phút}{Tài liệu ngành}{Trả lời năm câu hỏi cho mỗi bài và ra quyết định rõ ràng.}
+\bt[1]{Đọc hình trước, rồi tóm tắt, cho một bài mới}{Tài liệu ngành}{Ghi lại phỏng đoán về nội dung sau khi xem hình, rồi kiểm lại sau khi đọc tóm tắt.}
+\bt[2]{Áp lượt hai cho một bài và tóm tắt trong năm câu}{Tài liệu ngành}{Viết tóm tắt \emph{trước} khi mở lại bài để kiểm.}
+\bt[2]{Áp sáu câu hỏi phản biện cho phần thực nghiệm của một bài}{Tài liệu ngành}{Tìm ít nhất một chỗ mà so sánh có thể không công bằng.}
+\bt[2]{Viết ghi chú sáu dòng cho ba bài đã đọc}{Bài tập ghi chú}{Đặc biệt chú ý dòng cuối: liên quan gì tới công việc của bạn.}
+\bt[3]{Lần theo trích dẫn cho một chủ đề: khảo sát, đi ngược, đi xuôi, lập bảng}{Tài liệu ngành}{Bảng ít nhất năm hàng và năm cột; đây là bài tập tổng hợp của cả phần B.}
+\bt[3]{Chọn một bài quan trọng và làm lượt ba}{Tài liệu ngành}{Ghi lại mọi chỗ bạn sẽ làm khác, và với mỗi chỗ, quyết định đó là hiểu nhầm của bạn hay điểm yếu của bài.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Chương này biến việc đọc bài báo thành một quy trình có ngân sách thời gian và có tiêu chí dừng. Ba điều đáng mang theo: thứ tự đọc tóm tắt--hình--kết luận trước khi vào thân bài; sáu câu hỏi để đọc phần thực nghiệm một cách phản biện; và mẫu ghi chú sáu dòng với dòng cuối là ``liên quan gì tới tôi''.
+
+Nhưng còn một tầng thông tin mà cả \ptr{B/06} lẫn chương này mới chạm tới: những gì tác giả \emph{ngụ ý} mà không viết ra. Khi một bài viết \emph{these results suggest} thay vì \emph{these results show}, khi phần công trình liên quan viết \emph{little attention has been paid to}, hay khi một phản biện viết \emph{the paper would benefit from} --- tất cả đều là những phát biểu có nội dung rõ ràng với người trong nghề. Chương \ptr{B/08} giải mã tầng đó.
+\end{document}

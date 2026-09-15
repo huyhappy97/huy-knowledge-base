@@ -1,0 +1,157 @@
+% ---------------------------------------------------------------------------
+%  Chương 16 — Thị giác 3D và hình học
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: A/02-vat-ly-tao-anh; B/04-nen-tang-hoc-tu-du-lieu; B/07
+%  Mức độ: cốt lõi
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Thị giác 3D và hình học (3D Vision and Geometry)}
+\ptrtarget{C/16}\ptrtarget{C/16-thi-giac-3d}
+\dependency{\ptr{A/02-vat-ly-tao-anh/03-camera-va-hinh-hoc-nhieu-view} (mô hình chiếu, hiệu chỉnh); \ptr{B/04-nen-tang-hoc-tu-du-lieu} (đánh đổi giả định \(\leftrightarrow\) dữ liệu); \ptr{B/07-chia-du-lieu-va-danh-gia} (giao thức đánh giá, ATE/RPE); \ptr{C/13-kien-truc-backbone} (transformer, thiên lệch quy nạp).}
+
+\begin{tomtat}
+Đây là lĩnh vực có mạch lịch sử rõ nhất trong computer vision: cùng một bài toán --- suy hình dạng 3D và pose camera từ ảnh 2D --- được giải lại từ đầu bốn lần, mỗi lần đổi một loại giả định lấy một loại độ bền. Chương này dựng khung bốn thế hệ đó, rồi đi vào các quyết định con (biểu diễn, độ sâu, SLAM, học trên point cloud) và hai thứ mới nhất là \en{neural rendering} và hợp nhất cảm biến. Đọc xong bạn chọn được thế hệ đúng cho dữ liệu đang có và biết cách phát hiện lúc một mô hình học đang nói dối về hình học. Nếu chỉ nhớ một điều: mỗi lần bỏ bớt một giả định về thế giới, bạn phải bù bằng dữ liệu, \emph{và} bạn mất một phần khả năng tự chẩn đoán. Đó là cái giá ít được nói tới nhất của thị giác 3D hiện đại.
+\end{tomtat}
+
+\begin{nentang}
+\kn{thị giác 3D (3D vision)}{nhánh của computer vision lo việc suy hình dạng ba chiều và chuyển động camera từ ảnh hai chiều --- ngược lại với nhánh nhận dạng, vốn chỉ hỏi ``trong ảnh có gì''.}
+\kn{phép chiếu phối cảnh (perspective projection)}{cách camera biến một điểm 3D thành một pixel: chia toạ độ ngang và dọc cho độ sâu. Chính phép chia này làm mất chiều thứ ba.}
+\kn{prior (prior)}{những gì mô hình ``tin sẵn'' về thế giới trước khi nhìn dữ liệu hiện tại --- có thể do người viết cài cứng (mô hình vật lý) hoặc do mạng học từ dữ liệu lớn.}
+\kn{metric (đơn vị mét)}{một kết quả gọi là metric khi nó cho ra số đo tuyệt đối tính bằng mét, chứ không chỉ đúng sai khác một hệ số tỉ lệ chưa biết.}
+\kn{SLAM và VIO}{hai hệ thống ước lượng vị trí robot theo thời gian thực trong lúc dựng bản đồ, dùng camera (SLAM) hoặc camera cộng cảm biến quán tính (VIO). Chương này giả sử bạn đã quen chúng và chỉ đặt chúng vào bức tranh chung.}
+\kn{neural rendering}{họ phương pháp học một biểu diễn cảnh bằng cách bắt nó render ra ảnh giống các ảnh đã chụp, thay vì bằng cách đo hình học trực tiếp.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao thêm bao nhiêu dữ liệu cũng không cho một camera đơn biết vật thể trước mặt lớn thật sự bao nhiêu mét?}
+\h{Nếu một \en{transformer} suy được pose và hình học chỉ trong một lượt xuôi, vì sao COLMAP vẫn chưa bị thay thế?}
+\h{Vì sao NeRF phải mô tả cảnh bằng khói mờ thay vì bằng bề mặt cứng, trong khi thứ tồn tại thật là bề mặt?}
+\h{Vì sao một hệ hợp nhất camera--LiDAR có thể chạy hoàn hảo lúc robot đứng yên rồi hỏng đúng lúc nó xoay nhanh, dù không một tham số nào thay đổi?}
+\end{khoigoi}
+
+\section*{Vì sao chương này chia làm ba mục}
+Chương được chia theo ba tầng câu hỏi, và thứ tự là thứ tự phụ thuộc chứ không phải thứ tự lịch sử.
+
+Mục thứ nhất dựng \emph{khung}: bốn thế hệ giải cùng một bài toán, mỗi thế hệ thay một đoạn khác nhau của cùng một pipeline. Không có khung này thì mọi thứ còn lại rơi vào tình trạng ``một đống phương pháp'', và ta không trả lời được câu hỏi thực dụng nhất --- với dữ liệu đang có thì nên dùng cái gì. Khung này cũng là chỗ trục đánh đổi ``giả định mạnh + ít dữ liệu \(\leftrightarrow\) giả định yếu + nhiều dữ liệu'' của chương 4 hiện ra rõ nhất trong toàn bộ CV.
+
+Mục thứ hai đi vào các \emph{quyết định con} mà mọi thế hệ đều phải đưa ra: lưu cảnh bằng biểu diễn nào, lấy độ sâu từ đâu và cái gì cố định tỉ lệ, SLAM đứng ở đâu trong bức tranh, và làm sao đưa mạng nơ-ron lên một tập điểm không thứ tự. Đây là tầng ``vốn từ'': không nắm nó thì không đọc được mục ba.
+
+Mục thứ ba đào sâu đúng hai thứ xa nền tảng hình học cổ điển nhất --- neural rendering (NeRF, 3DGS) và hợp nhất camera--LiDAR--IMU. Hai chủ đề này được gộp vào một mục vì chúng chia chung một bài học: cả hai đều dễ trông có vẻ hoạt động trong khi giả định nền đã bị vi phạm, và cả hai đều đòi một cơ chế kiểm chứng \emph{bên ngoài} hàm mất mát của chính chúng.
+
+Hình~\ref{fig:ban-do-ch16} vẽ ba mục đó cùng nút thắt mà mỗi mục gỡ.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  sec/.style={draw=steel,fill=bluebg,rounded corners=3pt,inner sep=5pt,align=center,
+              font=\scriptsize,text width=3.5cm,minimum height=1.15cm},
+  ar/.style={-{Stealth[length=5pt]},steel,very thick},
+  nt/.style={font=\scriptsize,color=reddark,align=center,text width=3.9cm}]
+\node[sec] (s1) {\textbf{16.1} Bốn thế hệ, cùng một bài toán};
+\node[sec,right=1.9cm of s1] (s2) {\textbf{16.2} Biểu diễn, độ sâu và SLAM};
+\node[sec,right=1.9cm of s2] (s3) {\textbf{16.3} NeRF, 3DGS và hợp nhất cảm biến};
+\draw[ar] (s1) -- node[above,font=\scriptsize,steel,align=center,text width=1.8cm]{cung cấp\\ \emph{khung}} (s2);
+\draw[ar] (s2) -- node[above,font=\scriptsize,steel,align=center,text width=1.8cm]{cung cấp\\ \emph{vốn từ}} (s3);
+\node[nt,below=0.3cm of s1] {\emph{gỡ nút thắt:} ``một đống phương pháp'' \(\rightarrow\) một trục đánh đổi duy nhất};
+\node[nt,below=0.3cm of s2] {\emph{gỡ nút thắt:} mỗi thế hệ vẫn phải chọn biểu diễn và nguồn độ sâu --- chọn sai thì khoá cứng pipeline};
+\node[nt,below=0.3cm of s3] {\emph{gỡ nút thắt:} hai thứ dễ trông có vẻ đúng trong khi giả định nền đã vỡ};
+\draw[-{Stealth[length=4pt]},reddark,thick,dashed] ([yshift=-2.3cm]s3.south) to[bend left=18]
+  node[midway,below,font=\scriptsize,reddark,align=center]{cùng một bài học: phải kiểm chứng \emph{bên ngoài} hàm mất mát}
+  ([yshift=-2.3cm]s1.south);
+\end{tikzpicture}}
+\caption{Ba mục của chương và quan hệ phụ thuộc giữa chúng. Thứ tự là thứ tự \emph{phụ thuộc}, không phải thứ tự lịch sử: mục 16.1 dựng khung để hai mục sau không biến thành danh sách phương pháp rời rạc, mục 16.2 cung cấp vốn từ cho mục 16.3. Mũi tên đứt phía dưới là điều mà cả ba mục cùng dẫn tới, và cũng là điều dễ bị bỏ sót nhất khi đọc riêng từng mục.}
+\label{fig:ban-do-ch16}
+\end{figure}
+
+Với người đọc đang làm visual-inertial SLAM thật, ba mục này có mật độ thông tin mới rất khác nhau: mục một chủ yếu sắp xếp lại thứ đã biết, mục hai bổ sung phần học sâu trên dữ liệu 3D, còn mục ba mới là phần thực sự mới. Nếu thời gian eo hẹp, đọc mục một để lấy khung rồi nhảy thẳng sang mục ba.
+
+\subfile{00-map}
+\subfile{01-bon-the-he-3d/bon-the-he-3d}
+\subfile{02-bieu-dien-3d-va-depth/bieu-dien-3d-va-depth}
+\subfile{03-nerf-3dgs-va-hop-nhat/nerf-3dgs-va-hop-nhat}
+
+\section{Thực hành}
+Chương này là chương dễ thực hành nhất của Phần C, vì hạ tầng mã nguồn mở đã chín và một chiếc điện thoại là đủ để tạo dữ liệu. Một lưu ý về bán rã trước khi vào danh sách: danh sách dưới đây chốt tại \textbf{tháng 9/2026}, và các tên mô hình dẫn đầu bảng sẽ cũ trong 6--12 tháng. Các repo hạ tầng thì bền hơn nhiều: COLMAP, Open3D, evo, gsplat. Hãy đầu tư kỹ năng vào nhóm sau.
+
+\begin{description}
+\item[Repo và tài nguyên.] \emph{SfM tham chiếu:} \repo{colmap/colmap} (giấy phép BSD; lưu ý bản 4.x đổi backend đọc ảnh nên không tái lập bit-for-bit với 3.x) \cite{schoenberger2016colmap}. \emph{Feed-forward geometry:} \repo{facebookresearch/vggt} (CVPR 2025 best paper; nhiều pipeline không cần COLMAP dựng trên nó), DUSt3R/MASt3R \cite{wang2024dust3r}. \emph{Splatting và rendering:} \repo{nerfstudio-project/gsplat} (Apache 2.0, mặc định hợp lý cho nghiên cứu), \repo{graphdeco-inria/gaussian-splatting} (bản gốc, giấy phép hạn chế nhất --- đọc kỹ trước khi dùng cho sản phẩm), \repo{nerfstudio-project/nerfstudio}, NVIDIA vkSplatting. \emph{Độ sâu đơn ảnh:} Depth Anything V2, Apple MoGe. \emph{SLAM:} ORB-SLAM3 \cite{campos2021orbslam3}, DROID-SLAM; đánh giá bằng \repo{MichaelGrupp/evo}. \emph{Point cloud:} \repo{isl-org/Open3D}, \repo{open-mmlab/mmdetection3d}.
+\item[Câu hỏi kiểm tra hiểu.] Vì sao ATE cần bước căn chỉnh còn RPE thì không, và mỗi cái nhạy với loại lỗi nào? 3DGS nhanh hơn NeRF nhờ đổi cái gì lấy cái gì? Feed-forward geometry tốt hơn COLMAP ở tình huống nào và tệ hơn ở tình huống nào --- và bạn nhận ra mình đang ở tình huống nào bằng dấu hiệu gì \emph{trước khi} chạy?
+\item[Mini project (vài giờ đến hai ngày).] Quay một video 60 giây quanh một vật thể. Chạy hai đường: (a) COLMAP \ra gsplat, (b) một mô hình tiến thẳng \ra gsplat. So ba đại lượng: thời gian tường, PSNR trên các view giữ lại, và độ lệch pose giữa hai đường. Giá trị của bài này không nằm ở con số mà ở chỗ bạn buộc phải quyết định \emph{đường nào là tham chiếu} --- và phát hiện ra rằng câu hỏi đó không có câu trả lời hiển nhiên.
+\end{description}
+
+\begin{onbai}
+\ar[3]{SfM}{Quy trình cổ điển suy đồng thời pose camera và cấu trúc 3D thưa từ một tập ảnh: tìm tương ứng, ước lượng pose, tam giác hoá, tinh chỉnh. Nó là thế hệ một và vẫn là chuẩn đối chiếu của mọi phương pháp mới.}
+\ar[3]{Hiệu chỉnh chùm tia}{Bài toán bình phương tối thiểu phi tuyến, tinh chỉnh đồng thời mọi pose và mọi điểm 3D sao cho sai số chiếu lại nhỏ nhất. Điều đáng nhớ nhất: nó trả về phần dư và hiệp phương sai, nên hệ thống tự biết lúc nào nó sai.}
+\ar[2]{Point map}{Ảnh mà mỗi pixel chứa một toạ độ 3D thay vì một màu. Đây là dạng đầu ra của các mô hình tiến thẳng như DUSt3R hay VGGT, thay cho đám mây điểm rời rạc.}
+\ar[3]{Vì sao mô hình tiến thẳng hỏng ``im lặng''?}{Vì nó là một bài hồi quy, không phải một bài ước lượng có ràng buộc. Không còn phần dư hình học nào để mâu thuẫn với kết quả, nên cảnh trong hay ngoài phân phối nó đều trả lời với cùng vẻ tự tin.}
+\ar[2]{Thị sai}{Độ lệch ngang của cùng một điểm giữa ảnh trái và ảnh phải trong hệ stereo. Nó tỉ lệ nghịch với độ sâu: \(Z=fb/d\).}
+\ar[2]{Vì sao sai số độ sâu stereo tăng theo \(Z^{2}\)?}{Vì \(Z=fb/d\) nên \(\Delta Z = Z^{2}\Delta d/(fb)\). Hệ quả thực hành: mọi hệ stereo có một ``chân trời'', và cách duy nhất đẩy nó ra xa là tăng tiêu cự hoặc đường cơ sở.}
+\ar[3]{Scale ambiguity}{Phóng to cả cảnh lẫn quãng đường camera cùng một hệ số cho ra đúng bộ ảnh cũ. Vì vậy tỉ lệ tuyệt đối không suy ra được từ ảnh, dù thêm bao nhiêu dữ liệu; chỉ prior hoặc một cảm biến biết mét mới phá được.}
+\ar[2]{Voxel}{Ô lập phương trong một lưới đều 3D. Ưu điểm là lân cận cho sẵn nên conv 3D dùng được ngay; nhược điểm là số ô tăng theo luỹ thừa ba, và hơn 99\,\% ô là rỗng.}
+\ar[2]{SDF}{Hàm gán cho mỗi điểm khoảng cách có dấu tới bề mặt gần nhất --- âm ở trong, dương ở ngoài. Bề mặt là tập điểm bằng 0, nên trích lưới tam giác là chuyện cơ học; đổi lại render phải dò dọc tia.}
+\ar[2]{Point cloud}{Tập toạ độ 3D không có thứ tự và không có kết nối. Gọn và hợp với LiDAR, nhưng không có sẵn khái niệm lân cận, nên mọi phép cục bộ đều phải trả tiền tìm kiếm.}
+\ar[2]{PointNet}{Mạng cho tập điểm: mọi điểm qua cùng một MLP rồi gộp bằng phép max theo từng chiều. Phép max không quan tâm thứ tự nên tính bất biến hoán vị là đúng tuyệt đối, không phải học được.}
+\ar[1]{Bản đồ dựng ra trông đẹp nhưng mọi khoảng cách sai cùng một hệ số --- nguyên nhân?}{Scale ambiguity chưa được phá: pipeline đơn mắt không có cảm biến nào biết đơn vị mét. Phép phân biệt với lỗi hiệu chỉnh: đo vài vật ở các tầm khác nhau --- sai một hệ số \emph{không đổi} là lỗi tỉ lệ, sai tăng dần theo tầm là lỗi hiệu chỉnh.}
+\ar[1]{Mô hình LiDAR 64 tia tụt mạnh trên 32 tia, mất vật ở xa trước --- nguyên nhân?}{Mật độ điểm lúc chạy khác lúc huấn luyện, và vùng xa là nơi mật độ giảm nhanh nhất. Phân biệt với lỗi hiệu chỉnh: lỗi hiệu chỉnh làm lệch vị trí hộp ở mọi tầm, không làm mất hẳn vật ở xa.}
+\ar[3]{Volume rendering}{Cách tính màu một pixel bằng cách lấy mẫu nhiều điểm dọc tia rồi cộng dồn màu có trọng số theo độ đục tích luỹ. Nó thay câu hỏi ``bề mặt ở đâu'' bằng câu hỏi ``mật độ tại điểm này bao nhiêu''.}
+\ar[3]{Vì sao NeRF dùng mật độ liên tục, không dùng bề mặt?}{Vì đạo hàm. Bề mặt cứng làm hàm mất mát thành bậc thang, gradient bằng không gần như mọi nơi. Mật độ liên tục biến mỗi pixel thành tổng có trọng số, nên mọi điểm mẫu đều nhận được gradient.}
+\ar[2]{Positional encoding}{Ánh xạ toạ độ qua một dãy sin/cos nhiều tần số trước khi đưa vào MLP. Không có nó thì ảnh mờ nhoè, vì MLP thiên lệch mạnh về hàm tần số thấp.}
+\ar[3]{3D Gaussian splatting}{Biểu diễn cảnh bằng hàng triệu Gaussian dị hướng có màu và độ đục, render bằng cách chiếu rồi trộn theo thứ tự độ sâu. Được tốc độ thời gian thực; mất dung lượng (236 byte mỗi Gaussian) và mất bề mặt tường minh.}
+\ar[2]{Vì sao early fusion nhạy với lệch hiệu chỉnh hơn late fusion?}{Vì nó liên kết ở mức pixel. Lệch \(1^{\circ}\) ở 20 m là 35 cm, đủ để điểm LiDAR rơi lên nhầm vật và biến đặc trưng ghép thành rác. Late fusion liên kết ở mức đối tượng, nơi 35 cm vẫn nằm trong kích thước vật.}
+\ar[1]{PSNR trên view giữ lại rất cao nhưng bản đồ hình học sai --- nghĩa là gì?}{Mô hình đã ``vẽ'' thay vì ``dựng'': nó khớp ảnh bằng màu phụ thuộc hướng nhìn. Phép phân biệt: ngoại suy ra ngoài quỹ đạo chụp, hoặc so với một quét chân trị.}
+\ar[1]{Hệ hợp nhất chạy hoàn hảo khi robot đứng yên, hỏng khi xoay nhanh --- nguyên nhân?}{Lệch đồng bộ thời gian, vì sai số của nó tỉ lệ với tốc độ quay: 5 ms ở \(100^{\circ}\)/s là \(0{,}5^{\circ}\). Phân biệt với lệch hiệu chỉnh ngoại: lệch hiệu chỉnh sai cả khi đứng yên.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{COLMAP}{Hiện thực tham chiếu của thế hệ một: tìm tương ứng, ước lượng pose, hiệu chỉnh chùm tia. Vẫn là chuẩn để đối chiếu mọi phương pháp mới}{Hạ tầng bền; phần lớn dữ liệu huấn luyện của thế hệ bốn cũng do nó tạo ra}
+\ud{ORB-SLAM3}{Hiệu chỉnh chùm tia dưới ràng buộc thời gian thực, với tách frontend/backend và đóng vòng để chặn sai số}{Chuẩn đối chứng của SLAM đặc trưng thưa}
+\ud{DUSt3R / MASt3R / VGGT}{Thế hệ bốn: point map trong một hệ toạ độ chung, không cần pose đầu vào}{Mạnh ở khởi tạo và ảnh thưa; vẫn thường được nối tiếp bằng một vòng hiệu chỉnh chùm tia}
+\ud{gsplat, nerfstudio}{Neural rendering thực dụng: tối ưu biểu diễn cảnh bằng loss render khả vi, tiêu thụ pose từ SfM}{Hạ tầng; phần lớn pipeline dựng cảnh hiện nay đi qua đây}
+\ud{Depth Anything V2, MoGe}{Độ sâu đơn ảnh bất biến affine --- bỏ tỉ lệ để đổi lấy khả năng khái quát}{Dùng làm prior tương đối thì tốt; dùng làm phép đo metric thì phải kèm hai ẩn tỉ lệ và độ dịch}
+\ud{Open3D, mmdetection3d}{Học sâu trên point cloud: bất biến hoán vị, phân cấp không gian, tích chập thưa}{Hạ tầng cho mảng LiDAR}
+\end{ungdung}
+
+\begin{duan}{Hai đường dựng cảnh 3D và điểm giao của chúng}{1--2 ngày}
+\dmt tìm bằng số cái ngưỡng mà ở dưới nó thế hệ tiến thẳng thắng hình học cổ điển, và ở trên nó thì thua. Đo trên chính camera và chính loại cảnh bạn đang chạy SLAM, không phải trên benchmark của paper.
+\ddl một video 60 giây quay quanh một vật thể hoặc một góc phòng, quay bằng đúng camera bạn dùng cho SLAM (giữ nguyên phơi sáng thủ công nếu có). Trích ra bốn tập ảnh với \(N = 8,\,15,\,30,\,60\) khung hình phân bố đều, và giữ riêng 10\,\% khung hình làm view kiểm.
+\dbc với mỗi \(N\): (1) chạy đường A --- COLMAP \ra gsplat --- và đường B --- một mô hình 3D tiến thẳng (DUSt3R/MASt3R/VGGT) \ra gsplat; (2) ghi thời gian tường của từng khâu; (3) ghi PSNR trên view kiểm; (4) ghi độ lệch pose giữa hai đường sau khi căn chỉnh Sim3; (5) ghi lại \(N\) nhỏ nhất mà mỗi đường còn khởi tạo được.
+\dxk bạn vẽ được hai đường PSNR theo \(N\) trên cùng một trục và chỉ ra điểm giao bằng con số, kèm bảng thời gian tường và \(N\) tối thiểu của từng đường. Câu trả lời phải có dạng ``dưới \(N=\ldots\) đường tiến thẳng thắng, trên đó COLMAP thắng, và nó tốn thêm \(\ldots\) phút''.
+\dnv \ptr{C/16/01} giải thích vì sao điểm giao đó \emph{phải} tồn tại; \ptr{B/07} cho cách tách view kiểm cho đúng; \ptr{E/24} cho việc lặp lại nhiều lần trước khi tin một chênh lệch. Bảng số bạn tạo ra ở đây là baseline cho mini project của chương sau.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì phóng to cả cảnh lẫn quãng đường camera cùng một hệ số cho ra chuỗi ảnh y hệt --- đây là tính không xác định được, dữ liệu không mang thông tin đó. Chỉ prior kích thước, hoặc một cảm biến biết đơn vị mét (đường cơ sở stereo, LiDAR, gia tốc kế), mới phá được.}
+\tl{Vì hai bên giải hai bài toán khác nhau. Mô hình tiến thẳng mạnh ở \emph{khởi tạo}: ít ảnh, chồng lấn kém, không pose. Hiệu chỉnh chùm tia mạnh ở \emph{tinh chỉnh}. Quan trọng hơn, chỉ nó trả về phần dư và hiệp phương sai, nên chỉ nó cho ta biết lúc nào kết quả không đáng tin.}
+\tl{Vì đạo hàm. Bề mặt cứng làm hàm mất mát thành bậc thang, gradient bằng không gần như mọi nơi nên không có hướng để đi. Mật độ liên tục biến mỗi pixel thành tổng có trọng số của hàng chục điểm dọc tia, và mọi điểm đều nhận được một phần gradient.}
+\tl{Vì lệch đồng bộ thời gian chỉ hiện ra khi có chuyển động và tỉ lệ thuận với tốc độ quay: 5 ms ở \(100^{\circ}\)/s là \(0{,}5^{\circ}\), ở tầm 20 m thành khoảng 17 cm. Early fusion liên kết ở mức pixel nên độ lệch đó biến điểm LiDAR thành rơi lên nhầm vật, tức là đầu vào rác.}
+\end{traloi}
+
+\begin{dongian}
+Hãy nghĩ tới cái bóng của một vật in trên tường. Nhìn cái bóng, bạn không có cách nào biết vật đó to bằng nào và cách tường bao xa: một cái cốc nhỏ để gần và một cái thùng lớn để xa đổ ra đúng cùng một cái bóng. Đó chính xác là chuyện xảy ra khi máy ảnh chụp một cảnh --- ảnh là cái bóng, và chiều sâu bị mất khi chụp.
+
+Cả chương này là các cách lấy lại chiều đã mất, và chỉ có ba cách. Cách thứ nhất là đi vòng sang chỗ khác chụp thêm vài cái bóng nữa rồi ghép chúng lại; chỗ nào các cái bóng chỉ về cùng một điểm thì đó là vật thật. Cách này chính xác tới từng centimét, và quan trọng hơn, nếu các cái bóng mâu thuẫn nhau thì bạn biết ngay là mình đã sai ở đâu đó. Cách thứ hai là nặn một mô hình bằng đất sét trong bóng tối, rồi soi đèn từ đúng những hướng đã chụp và chỉnh đất sét cho tới khi mọi cái bóng khớp. Cách thứ ba là đưa ba tấm ảnh cho một người đã nhìn hàng triệu cảnh và hỏi luôn.
+
+Cái giá thì rất rõ. Cách thứ nhất cần bạn đi thêm một vòng và cần cảnh đứng yên. Cách thứ hai cho mô hình đổ bóng đúng ở mọi hướng đã thử. Nhưng nó chưa chắc đúng khi soi từ một hướng mới, vì bạn chỉ ép nó khớp \emph{cái bóng}, không ép nó khớp \emph{hình dạng}. Cách thứ ba trả lời trong một giây và không cần đi đâu cả, nhưng khi gặp một cảnh lạ nó vẫn trả lời tự tin y hệt, và không có cái bóng nào mâu thuẫn để tố cáo nó.
+
+\chuadongian{chỗ nói về sai lệch khi lắp camera và cảm biến với nhau. Cách nói đơn giản tự nhiên là ``phải lắp cho thật chuẩn'', nhưng nói vậy là sai trọng tâm: vấn đề không phải sai số lớn hay nhỏ, mà là nó \emph{lặp lại y hệt} ở mọi phép đo, nên gom thêm bao nhiêu phép đo cũng không triệt tiêu được nó. Đây là chỗ phải nói đủ dài mới không sai.}
+\motcau{Ảnh làm mất chiều sâu, và bạn chỉ có hai cách lấy lại: đi thêm một vòng để nhìn từ chỗ khác, hoặc đoán bằng kinh nghiệm --- chỉ cách thứ nhất mới tự nói cho bạn biết lúc nào nó sai.}
+\end{dongian}
+
+\subsection*{Kết nối}
+Chương này khép lại phần hình học của Phần C. \ptr{C/17-mo-hinh-sinh} lấy lại nguyên vẹn ý tưởng ``đặt cái ta muốn vào hàm mất mát rồi tối ưu trên chính đối tượng cần tạo ra'', lần này trên pixel; \ptr{B/07-chia-du-lieu-va-danh-gia} hoàn thiện phần giao thức đánh giá mà chương này chỉ nhắc qua; \ptr{E/25-do-tin-cay-va-van-hanh} biến ``cơ chế phát hiện sai từ bên ngoài'' thành thiết kế cụ thể.
+
+\subsection*{Tổng kết chương}
+Ta đã đi từ một bài toán duy nhất --- lấy lại chiều đã mất khi chiếu --- qua bốn cách giải nó, và thấy chúng không xếp thành một chuỗi tiến bộ mà thành một trục đánh đổi. Ở một đầu trục là hình học cổ điển: giả định nhiều, dữ liệu ít, độ chính xác metric cao, và quan trọng nhất là tự biết lúc nào mình sai. Ở đầu kia là mô hình tiến thẳng: giả định ít, dữ liệu nhiều, chạy được ở chỗ hình học bó tay, và im lặng khi sai. Neural rendering không nằm trên trục đó mà nằm ở một tầng khác --- nó không cạnh tranh với SfM mà tiêu thụ đầu ra của SfM, và nó tối ưu cho một mục tiêu khác hẳn là chất lượng ảnh.
+
+Ba chủ đề còn bỏ ngỏ, và cả ba đều là chỗ nên theo dõi trong một hai năm tới: thứ nhất, các mô hình tiến thẳng dự đoán thẳng biểu diễn render được, tức là gộp thế hệ ba và bốn làm một; thứ hai, neural rendering cho cảnh động, nơi giả định cảnh tĩnh bị gỡ bỏ; thứ ba, và thực dụng nhất với robot, cách gắn một ước lượng bất định tin cậy được vào đầu ra của các mô hình học. Chừng nào chưa có nó, thế hệ bốn vẫn chỉ dùng được ở vai trò khởi tạo, không phải vai trò quyết định.
+\begin{tukiem}
+\item Luận điểm gộp là mỗi lần bỏ một giả định, bạn bù bằng dữ liệu \emph{và} mất một phần khả năng tự chẩn đoán. Theo dấu khoản mất thứ hai qua bốn thế hệ: ở mỗi thế hệ, tín hiệu tự chẩn đoán nào biến mất?
+\item Tính không xác định của tỉ lệ ở mục 1 và mục 2, so với việc mô hình ở mục 3 vẫn dựng được cảnh trông rất đúng --- hai chỗ này có mâu thuẫn không? Chỉ ra thông tin nào đã lén vào thay cho ràng buộc còn thiếu.
+\item Bạn có ba nguồn độ sâu cho cùng một pixel: stereo, độ sâu đơn ảnh học được, và LiDAR thưa. Ba luật sai số ở đây khác hẳn nhau; luật nào khiến việc gán trọng số theo nghịch đảo phương sai trở nên không hợp lệ, và bạn xử lý thế nào?
+\item Hình học cổ điển hỏng ồn ào còn mô hình học được hỏng im lặng. Với một hệ dùng cả hai, bạn dựng cơ chế nào để buộc phần im lặng phát ra tiếng, và cơ chế đó tiêu tốn cái gì?
+\item Loop closure ở mục 2 và tinh chỉnh toàn cục sau khâu pose ở mục 1 đều là ràng buộc toàn cục. Vì sao neural rendering ở mục 3 hầu như không có thứ tương đương, và hệ quả với một bản đồ dựng suốt nhiều giờ là gì?
+\item Bạn nghi hệ hợp nhất hỏng vì hiệu chỉnh ngoại tại hoặc lệch đồng bộ thời gian chứ không vì thuật toán. Phép thử nào tách hai nguyên nhân đó, và vì sao chuyển động xoay là điều kiện thử tốt hơn chuyển động thẳng?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

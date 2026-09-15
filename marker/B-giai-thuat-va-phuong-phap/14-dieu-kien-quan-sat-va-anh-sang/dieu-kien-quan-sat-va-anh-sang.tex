@@ -1,0 +1,316 @@
+% ---------------------------------------------------------------------------
+% Chương 14 — Điều kiện quan sát và ánh sáng
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-13  |  Ôn gần nhất: —
+% Phụ thuộc: A/06 (hiệu ứng vật lý), B/07 (ngưỡng hoá là bước hỏng khi thiếu sáng)
+% Mức độ: QUAN TRỌNG — chương quyết định sigma có ỔN ĐỊNH không, khác với B/08
+%         quyết định sigma bằng bao nhiêu. Ổn định quan trọng hơn với teach-by-showing.
+% Kiểm chứng công thức lõi:
+%   (1) Chiếu sáng chủ động + bandpass làm sigma độc lập với ánh sáng môi trường
+%       — cửa (a) lập luận tỉ số tín hiệu; CHƯA qua cửa (b) hay (c) cho một
+%         so sánh định lượng. Đây là mệnh đề định tính.
+%   (2) Exposure/gain tự động là nguồn thay đổi không kiểm soát trong hệ đo lường
+%       — cửa (a) lập luận: chúng đổi theo cảnh, nên sigma đổi theo cảnh.
+%   (3) Phản xạ gương gây thiên lệch phụ thuộc góc chiếu sáng
+%       — cửa (a) hình học phản xạ; kế thừa A/06 mục 6.
+% Ghi chú trung thực: không có số đo thực nghiệm. Nhận định về mức cải thiện của
+%   IR chủ động là ĐỊNH TÍNH, không kèm con số.
+% ---------------------------------------------------------------------------
+\documentclass[../../marker.tex]{subfiles}
+\begin{document}
+\chapter{Điều kiện quan sát và ánh sáng (Observation Conditions)}
+\ptrtarget{B/14}\ptrtarget{B/14-dieu-kien-quan-sat-va-anh-sang}
+\dependency{\ptr{A/06-hieu-ung-vat-ly-va-quang-hoc} (mục~6, vật liệu và bề mặt marker; và mục~7, phân loại hiệu ứng theo vận tốc); \ptr{B/07-detection-pipeline} (mục~6, ngưỡng hoá là bước hỏng khi tương phản kém --- và nó hỏng theo kiểu tag biến mất hoàn toàn).}
+
+\begin{tomtat}
+Chương này khép Phần~B bằng một chủ đề khác bản chất với bảy chương trước: nó không bàn cách làm \(\sigma\) \emph{nhỏ hơn} mà bàn cách làm \(\sigma\) \emph{ổn định hơn}. Sự phân biệt ấy quan trọng vì hai lý do. Thứ nhất, một hệ có \(\sigma\) tốt trong điều kiện tốt và tệ trong điều kiện xấu thì ngân sách phải lập theo trường hợp xấu. Thứ hai, và quan trọng hơn: teach-by-showing (\ptr{B/13} mục~3) triệt tiêu sai số hệ thống \emph{với điều kiện chúng không đổi}, nên mọi thứ làm điều kiện quan sát thay đổi đều phá mẹo ấy. Năm chủ đề: chống loá, chiếu sáng chủ động, khoá mọi tham số tự động, chọn cảm biến, và chống báo sai. Nếu chỉ nhớ một điều: \emph{khoá mọi thứ khoá được} --- exposure, gain, cân bằng trắng, nét --- vì một hệ đo lường không được phép có tham số tự đổi.
+\end{tomtat}
+
+\begin{nentang}
+\kn{tương phản (contrast)}{chênh lệch độ sáng giữa vùng đen và vùng trắng của tag. Nó quyết định bước ngưỡng hoá có thành công không, và nó quyết định độ lớn gradient tại cạnh --- tức quyết định \(\sigma\).}
+\kn{phơi sáng tự động (auto exposure)}{cơ chế camera tự điều chỉnh thời gian phơi sáng theo độ sáng cảnh. Tiện cho chụp ảnh, tai hại cho đo lường, vì nó làm điều kiện đo thay đổi theo những gì trong khung hình.}
+\kn{loá (glare)}{vùng sáng chói do phản xạ gương của nguồn sáng trên bề mặt marker. Nó ``ăn'' mất cạnh trong vùng bị trùm và gây thiên lệch phụ thuộc góc chiếu sáng.}
+\kn{retroreflective}{vật liệu phản xạ ánh sáng ngược về phía nguồn. Với đèn gắn cạnh camera, nó cho tương phản rất cao gần như độc lập với ánh sáng môi trường.}
+\kn{bộ lọc bandpass}{kính lọc chỉ cho qua một dải bước sóng hẹp. Ghép với đèn chiếu sáng cùng bước sóng, nó loại gần hết ánh sáng môi trường.}
+\kn{blooming}{hiện tượng điện tích tràn từ pixel bão hoà sang pixel lân cận, làm vùng sáng ``nở'' ra và làm cạnh dịch chỗ.}
+\kn{whitelist ID}{danh sách các ID hợp lệ mà hệ thống chấp nhận. Mọi ID khác bị loại ngay, bất kể mã có hợp lệ về mặt Hamming.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Hệ của bạn chạy hoàn hảo trong phòng thí nghiệm và thất thường trong nhà kho. Nêu ba cơ chế hoàn toàn khác nhau, và nêu biện pháp duy nhất giải quyết được cả ba cùng lúc.}
+\h{Phơi sáng tự động là tính năng mà mọi camera đều có và mọi người đều bật. Vì sao nó là một quyết định sai trong hệ đo lường, và hậu quả cụ thể là gì?}
+\h{Một vệt loá nằm trùm lên một cạnh của tag. Vì sao hậu quả là \emph{thiên lệch} chứ không phải nhiễu, và vì sao teach-by-showing không cứu được?}
+\h{Chiếu sáng hồng ngoại chủ động cộng bộ lọc bandpass là giải pháp mạnh nhất trong chương. Lợi ích chính của nó là gì --- và câu trả lời \emph{không} phải ``ảnh sáng hơn''?}
+\h{Chống báo sai có hai tầng biện pháp. Nêu cả hai, và nói vì sao tầng thứ hai gần như miễn phí trong bài toán docking mà lại không dùng được trong bài toán tổng quát.}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{B/14/01}
+
+Bảy chương trước của Phần~B đều bàn cách làm sai số \emph{nhỏ hơn}. Chương này bàn một thứ khác: cách làm sai số \emph{ổn định hơn}.
+
+Sự phân biệt ấy có vẻ thứ yếu và nó không phải. Hai lý do.
+
+\emph{Lý do thứ nhất, về cách lập ngân sách.} Nếu \(\sigma\) của bạn là 0,1\,px trong điều kiện tốt và 0,6\,px khi có nắng chiếu xiên qua cửa sổ, thì ngân sách ở \ptr{C/15} phải lập theo con số nào? Câu trả lời là 0,6 --- trường hợp xấu --- vì một hệ thống chỉ đạt yêu cầu 80\% thời gian là một hệ thống không đạt yêu cầu. Nói cách khác: \emph{giảm sự biến thiên của \(\sigma\) có giá trị ngang với giảm giá trị trung bình của nó}, và nó thường rẻ hơn.
+
+\emph{Lý do thứ hai, và nó quan trọng hơn:} teach-by-showing của \ptr{B/13} mục~3 triệt tiêu sai số hệ thống \emph{với điều kiện chúng không đổi giữa lần dạy và lần chạy}. Mọi thứ trong chương này làm điều kiện quan sát thay đổi --- ánh sáng khác, phơi sáng khác, vệt loá ở chỗ khác --- đều phá đúng điều kiện ấy. Một hệ dùng teach-by-showing mà không kiểm soát điều kiện quan sát là một hệ đã bỏ đi lợi ích lớn nhất mà nó vừa mua được.
+
+Bài toán gốc thuộc về kỹ thuật thị giác công nghiệp hơn là robot học, và ngành ấy đã có câu trả lời từ lâu: trong một hệ thống đo lường bằng ảnh, \emph{chiếu sáng là một thành phần của thiết bị đo, không phải một điều kiện môi trường}. Người ta thiết kế chiếu sáng cùng với camera, khoá mọi tham số, và che chắn ánh sáng ngoài. Robot di động không che chắn được, nhưng phần lớn các nguyên tắc vẫn áp dụng.
+
+Cách hiển nhiên --- và cách gần như mọi dự án đi --- là dùng ánh sáng có sẵn và bật phơi sáng tự động. Nó hoạt động trong phòng thí nghiệm, nơi ánh sáng đều và không đổi, và nó bắt đầu thất thường khi triển khai. Chẩn đoán thì khó vì triệu chứng không tái lập được: hệ chạy tốt buổi sáng và tệ buổi chiều, tốt ở lối này và tệ ở lối kia. Đây là câu trả lời cho một nửa của Q1, và ba cơ chế cụ thể nằm ở mục~2.
+
+Có một điểm cần nói rõ về vị trí của chương trong Phần~B: nó có \emph{đòn bẩy thấp về giá trị trung bình của \(\sigma\) nhưng đòn bẩy cao về phương sai của \(\sigma\)}. Với một hệ đã làm tốt \ptr{B/09} và \ptr{B/13}, chương này thường là chương quyết định xem hệ có chạy được ngoài phòng thí nghiệm hay không --- và đó là một loại giá trị khác, không xuất hiện trong bảng ngân sách nhưng quyết định dự án.
+
+\begin{trucgiac}
+Hình dung sự khác nhau giữa một cái thước và một cái thước co giãn theo nhiệt độ.
+
+Cái thước thường có thể hơi sai --- chẳng hạn nó dài hơn chuẩn 0,5\% --- nhưng nếu nó luôn sai đúng như vậy thì bạn sống được với nó: mọi phép đo lệch cùng một tỉ lệ, và nếu bạn chỉ cần so sánh hai vật thì sai số triệt tiêu.
+
+Cái thước co giãn thì khác hẳn. Sáng lạnh nó ngắn, chiều nóng nó dài. Bây giờ hai phép đo ở hai thời điểm không so được với nhau nữa, và không có cách nào hiệu chỉnh trừ khi bạn cũng đo cả nhiệt độ.
+
+Camera với phơi sáng tự động là cái thước thứ hai. Khi có thêm một vật sáng vào khung hình, camera giảm phơi sáng, ảnh của tag tối đi, gradient tại cạnh yếu đi, và vị trí cạnh được xác định kém chính xác hơn --- và có thể lệch đi một chút theo một hướng. Cái ``vật sáng vào khung hình'' ấy có thể là một cánh cửa mở, một cái xe đi qua, hay đơn giản là mặt trời di chuyển.
+
+Ánh sáng môi trường là cùng một vấn đề ở tầng khác: nó đổi theo giờ, theo thời tiết, theo việc ai bật tắt đèn.
+
+Và đây là lối thoát, và nó là ý tưởng trung tâm của chương: \emph{mang theo ánh sáng của riêng mình, và bịt mắt camera với mọi ánh sáng khác}. Gắn một đèn hồng ngoại cạnh camera, lắp một kính lọc chỉ cho qua đúng bước sóng ấy. Bây giờ camera gần như không nhìn thấy ánh sáng mặt trời, không nhìn thấy đèn trần, không nhìn thấy gì ngoài cái tag được chiếu bởi chính đèn của nó. Buổi sáng hay buổi chiều, trong nhà hay gần cửa sổ --- ảnh trông giống hệt nhau.
+
+Cái ta mua được không phải ảnh sáng hơn. Cái ta mua được là \emph{ảnh giống nhau}.
+\end{trucgiac}
+
+\section{Ba cơ chế làm điều kiện thay đổi}
+\ptrtarget{B/14/02}
+
+Mục này trả lời Q1.
+
+\emph{Cơ chế một: mức sáng tổng thể đổi.} Ánh sáng môi trường thay đổi theo giờ, theo thời tiết, theo vị trí trong nhà kho. Với phơi sáng cố định, tag ở vùng tối cho ảnh tối, gradient yếu, \(\sigma\) lớn --- hoặc tệ hơn, ngưỡng hoá thất bại và tag biến mất hoàn toàn (\ptr{B/07} mục~6). Với phơi sáng tự động, mức sáng của tag được giữ nhưng \emph{thời gian phơi sáng đổi}, kéo theo motion blur đổi (\ptr{A/06} mục~3) --- bạn đổi một vấn đề lấy một vấn đề khác.
+
+\emph{Cơ chế hai: hướng chiếu sáng đổi.} Đây là cơ chế tinh vi nhất và nó gây hậu quả tệ nhất. Ánh sáng chiếu xiên tạo bóng đổ và tạo phản xạ gương; vị trí của vệt loá phụ thuộc vào góc giữa nguồn sáng, bề mặt marker, và camera. Khi robot di chuyển, góc ấy đổi, nên vệt loá \emph{di chuyển trên tag} --- và nó gây thiên lệch phụ thuộc tư thế, loại nguồn sai số khó chịu nhất.
+
+\emph{Cơ chế ba: tương phản của chính marker đổi.} Bụi, xước, phai màu, ẩm. Nó đổi chậm nên nó không gây triệu chứng thất thường, nhưng nó làm hệ thống xuống cấp dần --- và nếu bạn dùng teach-by-showing với một ảnh mẫu chụp từ sáu tháng trước, nó phá phép triệt tiêu.
+
+Biện pháp duy nhất giải quyết được cả ba --- phần thứ hai của Q1 --- là \emph{chiếu sáng chủ động cộng lọc bandpass}, mục~4. Nó áp đảo cơ chế một (ánh sáng của bạn lớn hơn ánh sáng môi trường trong dải bước sóng được lọc), nó cố định cơ chế hai (nguồn sáng gắn với camera nên góc chiếu không đổi theo vị trí robot), và nó giảm nhẹ cơ chế ba (tương phản cao hơn nên bụi ít ảnh hưởng tương đối hơn).
+
+\section{Chống loá}
+\ptrtarget{B/14/03}
+
+Mục này trả lời Q3.
+
+Loá là phản xạ gương: ánh sáng từ nguồn đập vào bề mặt marker và bật thẳng vào camera, cho một vùng sáng chói. Nếu vùng ấy trùm lên một cạnh tag, ba chuyện xảy ra: pixel bão hoà nên gradient tại cạnh biến mất; blooming làm điện tích tràn sang pixel lân cận nên cạnh ``nở'' ra; và phép khớp đường trong \ptr{B/07} mục~2 nhận một profile bất đối xứng nên nó khớp lệch.
+
+Hậu quả là \emph{thiên lệch} chứ không phải nhiễu --- đây là phần một của Q3 --- vì ở một tư thế cho trước, vệt loá luôn ở cùng chỗ và luôn đẩy cạnh theo cùng hướng. Lấy trung bình một nghìn khung không giúp gì (\ptr{B/11} mục~6).
+
+Và teach-by-showing không cứu được --- phần hai của Q3 --- vì vị trí vệt loá \emph{phụ thuộc tư thế}. Ở tư thế dạy, vệt loá ở một chỗ; ở tư thế hiện tại cách đó vài xăng-ti-mét, nó ở chỗ khác. Hai thiên lệch khác nhau nên chúng không trừ đi nhau. Đây là một ví dụ cụ thể của giới hạn ``\(g\) phụ thuộc tư thế'' ở \ptr{B/13} mục~3C.
+
+Ba biện pháp.
+
+\emph{Một, vật liệu nhám (matte).} Bề mặt nhám tán xạ ánh sáng theo mọi hướng thay vì phản xạ gương, nên không có vệt chói tập trung. Đây là biện pháp rẻ nhất và nên là mặc định. Tránh laminate bóng, tránh in trên vật liệu tráng.
+
+\emph{Hai, bố trí tránh đường phản xạ gương.} Nếu nguồn sáng cố định (đèn trần) và đường tiếp cận cố định, có thể tính trước xem ở tư thế nào thì có phản xạ gương và nghiêng tag để tránh. Với nêm nghiêng đã có từ \ptr{B/09} mục~4, bạn có sẵn một bậc tự do để làm việc này --- và đây là một lý do nữa để chọn góc nghiêng có cân nhắc thay vì tuỳ tiện.
+
+\emph{Ba, chiếu sáng chủ động đặt lệch.} Nếu đèn gắn cạnh camera nhưng lệch đi vài chục xăng-ti-mét, đường phản xạ gương từ đèn không đi vào camera với hầu hết tư thế. Đây là một chi tiết bố trí đơn giản và hiệu quả.
+
+Một lưu ý về retroreflective: nó cho tương phản rất cao nhưng nó \emph{cố ý} phản xạ ngược về nguồn, nên với đèn gắn ngay cạnh camera thì nó luôn cho vùng sáng mạnh --- và vùng sáng ấy dễ bão hoà và dễ blooming. Nó là một đánh đổi: tương phản tuyệt vời, rủi ro blooming cao. Nếu dùng, phải kiểm soát phơi sáng cẩn thận và kiểm rằng không có pixel nào bão hoà.
+
+\section{Chiếu sáng chủ động}
+\ptrtarget{B/14/04}
+
+Biện pháp mạnh nhất trong chương, và mục này trả lời Q4.
+
+Ý tưởng: gắn một nguồn sáng lên robot, cạnh camera, và lắp trên camera một bộ lọc chỉ cho qua bước sóng của nguồn ấy. Thường dùng LED hồng ngoại gần (khoảng 850\,nm) vì mắt người không thấy nó --- nên nó không gây khó chịu cho người làm việc quanh robot --- và vì cảm biến silicon vẫn nhạy ở dải ấy.
+
+Cơ chế: bộ lọc chặn gần hết ánh sáng môi trường (mặt trời, đèn trần) vì chúng trải rộng trên phổ, trong khi nguồn của bạn tập trung toàn bộ năng lượng vào đúng dải được cho qua. Tỉ số tín hiệu trên nhiễu môi trường tăng mạnh, và ảnh trở nên gần như độc lập với ánh sáng xung quanh.
+
+Đây là câu trả lời cho Q4, và điều quan trọng là lợi ích chính \emph{không} phải ``ảnh sáng hơn'' --- bạn có thể làm ảnh sáng hơn bằng cách tăng gain, và điều đó không giải quyết gì. Lợi ích chính là \emph{ảnh giống nhau ở mọi điều kiện}. Cụ thể:
+
+\emph{\(\sigma\) trở nên ổn định.} Cùng một tag ở cùng một tư thế cho cùng một ảnh, buổi sáng hay buổi chiều, gần cửa sổ hay trong góc tối.
+
+\emph{Điều kiện teach-by-showing được thoả.} Hàm sai lệch \(g\) của \ptr{B/13} mục~3 không đổi theo ánh sáng nữa, nên phép triệt tiêu hoạt động đúng như lý thuyết.
+
+\emph{Phơi sáng cố định được.} Vì mức sáng không đổi, bạn khoá được exposure và gain --- và mục~5 giải thích vì sao điều đó quan trọng.
+
+\emph{Vệt loá cố định.} Vì nguồn sáng gắn với camera, góc giữa nguồn, marker và camera chỉ phụ thuộc tư thế tương đối chứ không phụ thuộc vị trí trong phòng. Loá vẫn có nhưng nó trở thành hàm của tư thế --- tức nó có thể được tính trước, tránh bằng bố trí, và một phần triệt tiêu trong teach-by-showing.
+
+\emph{Ghi chú trung thực:} tôi phát biểu các lợi ích trên ở dạng \emph{định tính} và không kèm con số về mức cải thiện. Lập luận dựa trên tỉ số tín hiệu trên nhiễu môi trường (cửa a); tôi không có số đo so sánh được (cửa b và c chưa qua). Mức cải thiện thực tế phụ thuộc mạnh vào công suất nguồn, độ hẹp của bộ lọc, và mức ánh sáng môi trường --- và nó phải đo cho từng lắp đặt.
+
+Chi phí và hạn chế: nguồn sáng tiêu thụ điện; bộ lọc làm giảm lượng ánh sáng tới cảm biến nên cần phơi sáng dài hơn hoặc nguồn mạnh hơn; và trong ánh nắng trực tiếp mạnh, ngay cả sau bộ lọc thì nền vẫn có thể sáng đáng kể. Một biến thể cho trường hợp khắc nghiệt là \emph{marker backlit} --- tag phát sáng từ phía sau --- cho tương phản gần như tuyệt đối, nhưng nó đòi nguồn điện tại dock.
+
+\section{Khoá mọi thứ khoá được}
+\ptrtarget{B/14/05}
+
+Mục ngắn nhất và có lẽ có giá trị trên mỗi dòng cao nhất trong chương. Nó trả lời Q2.
+
+Danh sách những thứ phải khoá: thời gian phơi sáng, gain, cân bằng trắng, gamma, mọi chế độ ``tăng cường'' của camera, và tiêu điểm (\ptr{A/01} mục~8).
+
+Lý do, và nó là một nguyên tắc chứ không phải một lời khuyên: \emph{một hệ đo lường không được phép có tham số tự đổi}. Mọi tham số tự động là một hàm của cảnh, và cảnh thì đổi. Nên tham số tự động biến một sai số cố định (chấp nhận được, và triệt tiêu được bằng teach-by-showing) thành một sai số thay đổi (không chấp nhận được, và không triệt tiêu được).
+
+Hậu quả cụ thể của phơi sáng tự động --- phần hai của Q2 --- theo ba đường. \emph{Một}, thời gian phơi sáng đổi nên motion blur đổi (\ptr{A/06} mục~3), và blur là thiên lệch tỉ lệ với vận tốc. \emph{Hai}, mức sáng của tag đổi nên độ lớn gradient tại cạnh đổi, nên \(\sigma\) đổi. \emph{Ba}, và đây là đường tệ nhất: phơi sáng tự động phản ứng với \emph{toàn bộ khung hình}, nên một vật sáng đi vào khung --- một cánh cửa mở, một chiếc xe, một người mặc áo trắng --- làm điều kiện đo của tag thay đổi dù bản thân tag không đổi gì. Sai số của bạn bây giờ phụ thuộc vào những thứ hoàn toàn không liên quan.
+
+Về việc chọn giá trị cố định: chọn phơi sáng \emph{ngắn nhất} mà vẫn cho tương phản đủ, vì phơi sáng ngắn giảm motion blur. Điều này đẩy bạn về phía cần nhiều ánh sáng hơn --- tức về phía mục~4. Hai mục ấy là một cặp: chiếu sáng chủ động cho phép phơi sáng ngắn, phơi sáng ngắn cho phép đo trong khi di chuyển.
+
+Về gain: giữ thấp. Gain cao khuếch đại cả tín hiệu lẫn nhiễu đọc, nên nó làm ảnh sáng hơn mà không làm \(\sigma\) tốt hơn --- và nó thường làm \(\sigma\) tệ đi.
+
+\begin{cannho}
+Một hệ đo lường không được phép có tham số tự đổi.
+
+Khoá: exposure, gain, cân bằng trắng, gamma, mọi chế độ tăng cường, và tiêu điểm. Với tiêu điểm thì khoá bằng phần mềm chưa đủ --- dán keo vào vòng lấy nét, vì một cú va chạm nhẹ cũng làm nó xoay.
+
+Chọn exposure ngắn nhất còn đủ tương phản (giảm blur), và gain thấp nhất (giảm nhiễu). Hai yêu cầu ấy xung đột nhau trừ khi bạn có thêm ánh sáng --- và đó chính là lập luận cho chiếu sáng chủ động ở mục~4.
+
+Và ghi lại các giá trị đã khoá vào tệp cấu hình cùng với ngày. Một hệ thống bị ai đó vô tình đổi exposure rồi không ai nhớ giá trị cũ là một hệ thống phải hiệu chuẩn lại từ đầu.
+\end{cannho}
+
+\section{Chọn cảm biến}
+\ptrtarget{B/14/06}
+
+Ngắn, vì \ptr{A/06} đã dẫn phần lớn lập luận.
+
+\emph{Global shutter, gần như bắt buộc nếu đo khi di chuyển.} \ptr{A/06} mục~2 giải thích: rolling shutter làm tag bị \emph{xé} chứ không chỉ mờ, và đó là một chế độ hỏng im lặng. Nếu chiến lược là stop-and-go thuần (\ptr{B/13} mục~4) thì rolling shutter chấp nhận được và bạn tiết kiệm được tiền --- nhưng phải đảm bảo rung đã tắt hẳn trước khi chụp.
+
+\emph{Đơn sắc thay vì màu, nếu có lựa chọn.} Cảm biến màu dùng ma trận lọc Bayer, nên mỗi pixel chỉ đo một kênh màu và các kênh còn lại được nội suy --- tức độ phân giải không gian thực tế thấp hơn số pixel danh nghĩa, và phép nội suy đưa vào một mức làm mượt. Với tag đen trắng thì thông tin màu vô dụng, nên cảm biến đơn sắc cho nhiều hơn với cùng số pixel. Nó cũng nhạy hơn (không mất ánh sáng qua bộ lọc màu) và tương thích tốt hơn với chiếu sáng hồng ngoại ở mục~4.
+
+\emph{Ảnh thô, không nén.} Nén JPEG đưa vào các hiện vật quanh cạnh --- đúng chỗ mà chúng ta đang đo. Nếu camera chỉ cho ra JPEG thì đặt chất lượng cao nhất và biết rằng bạn đang mất một phần \(\sigma\).
+
+\emph{Độ phân giải: chỉ tăng khi quang học chưa phải nút thắt.} \ptr{A/06} mục~5B cho phép thử: chụp lại với nhiều sáng hơn và phơi sáng dài hơn; nếu \(\sigma\) không cải thiện thì quang học là nút thắt và thêm pixel vô ích.
+
+\section{Chống báo sai và xử lý che khuất}
+\ptrtarget{B/14/07}
+
+Mục này trả lời Q5.
+
+\subsection{A. Hai tầng chống báo sai}
+
+\emph{Tầng một, ở trong detector:} giảm số lỗi bit cho phép sửa (\ptr{B/07} mục~5C). Đánh đổi: tầm phát hiện giảm một chút.
+
+\emph{Tầng hai, ở tầng ứng dụng: whitelist ID và kiểm tính hợp lý.} Đây là tầng gần như miễn phí trong bài toán docking --- và phần hai của Q5 là vì sao nó không dùng được trong bài toán tổng quát.
+
+Lý do: trong docking, bạn \emph{biết trước} constellation gồm đúng những ID nào và chúng ở đâu so với nhau. Nên bạn loại được ngay mọi ID ngoài danh sách, và bạn kiểm được tính hợp lý của mỗi phát hiện: tag này có kích thước hợp lý ở khoảng cách này không; pose của nó có nhất quán với các tag khác không (\ptr{B/09} mục~7); khoảng cách và góc có nằm trong dải vận hành không. Bốn phép kiểm ấy tốn vài dòng và chúng loại gần hết báo sai.
+
+Trong bài toán tổng quát --- chẳng hạn một robot đi trong môi trường có tag ở nhiều nơi chưa biết --- không có whitelist, không biết trước quan hệ giữa các tag, nên tầng hai gần như không dùng được và toàn bộ gánh nặng dồn lên tầng một. Đó là lý do các họ tag đầu tư nặng vào mã hoá, và cũng là lý do bài toán docking dễ hơn nhiều về mặt an toàn.
+
+\subsection{B. Che khuất và bẩn}
+
+Che khuất một phần: detector thường vẫn phát hiện được nếu đủ ô bit còn thấy, nhưng các góc nằm trong vùng bị che sẽ sai. Biện pháp: cổng chi-square ở mức từng góc (\ptr{A/03} mục~7) loại chúng. Và quan trọng hơn, \ptr{B/10} mục~1 cảnh báo rằng che khuất có thể làm các tag còn lại tình cờ đồng phẳng --- nên phải theo dõi cả \(\rho\).
+
+Bẩn và mài mòn: chúng làm giảm tương phản và có thể gây thiên lệch cục bộ. Biện pháp phòng: chỉ báo liên tục ở \ptr{B/12} mục~6, theo dõi theo tuần. Biện pháp chữa: lau tag định kỳ --- nghe tầm thường nhưng nó là một mục trong quy trình bảo trì, và bỏ qua nó thì hệ thống xuống cấp dần một cách khó chẩn đoán.
+
+Một biện pháp thiết kế đáng nêu: \emph{dư thừa}. Nếu constellation có sáu tag và hệ vẫn hoạt động tốt với bốn, thì che khuất một hoặc hai tag không gây sự cố. Dư thừa tốn ít --- vài tấm tag nữa --- và nó chuyển một chế độ hỏng thành một chế độ suy giảm. Điều kiện: tập con còn lại phải \emph{vẫn} là một constellation tốt (có baseline, không đồng phẳng), và đó là một ràng buộc thật khi thiết kế bố trí ở \ptr{B/09}.
+
+\section{Giới hạn và chế độ hỏng}
+\ptrtarget{B/14/08}
+
+\textbf{Chương này không giảm \(\sigma\) trung bình nhiều.} Nó giảm phương sai của \(\sigma\). Nếu hệ của bạn đã ở điều kiện kiểm soát tốt thì nó trả lại ít.
+
+\textbf{Chiếu sáng chủ động không thắng được nắng trực tiếp.} Trong ánh nắng mạnh chiếu thẳng vào marker, ngay cả sau bộ lọc bandpass thì nền vẫn có thể sáng đáng kể. Với dock đặt gần cửa sổ lớn, phải tính tới chuyện che chắn vật lý.
+
+\textbf{Nguồn hồng ngoại có thể nhiễu với cảm biến khác.} Một số cảm biến chiều sâu dùng hồng ngoại và chúng có thể can nhiễu lẫn nhau. Kiểm nếu robot có nhiều cảm biến.
+
+\textbf{Các lợi ích được phát biểu định tính.} Đã ghi ở mục~4: tôi không có số đo cho mức cải thiện của chiếu sáng chủ động. Nó phải đo cho từng lắp đặt.
+
+\textbf{Khoá tham số không chống được trôi phần cứng.} Khoá exposure không ngăn cảm biến trôi theo nhiệt độ, và khoá nét bằng phần mềm không ngăn vòng lấy nét bị xoay do va chạm. Cần cả biện pháp vật lý và chỉ báo giám sát.
+
+\section{Thực hành}
+\ptrtarget{B/14/09}
+
+Năm việc, theo thứ tự chi phí.
+
+\emph{Một, khoá mọi tham số tự động ngay hôm nay.} Không tốn gì và nó là điều kiện tiên quyết cho mọi thứ khác.
+
+\emph{Hai, đổi sang vật liệu nhám nếu marker đang bóng.} Rẻ, và nó loại một nguồn thiên lệch phụ thuộc tư thế.
+
+\emph{Ba, đo \(\sigma\) ở nhiều điều kiện ánh sáng} --- sáng, tối, có nắng xiên, có đèn bật tắt --- thay vì chỉ ở một điều kiện. Con số tệ nhất là con số đưa vào ngân sách.
+
+\emph{Bốn, cân nhắc chiếu sáng chủ động cộng bandpass} nếu bước ba cho thấy biến thiên lớn. Đây là biện pháp mạnh nhất và nó nên được quyết định dựa trên số đo chứ không dựa trên nguyên tắc.
+
+\emph{Năm, bật whitelist ID và ba phép kiểm hợp lý} ở mục~7A.
+
+\begin{onbai}
+\ar[3]{Chương này bàn gì, khác \ptr{B/08} thế nào}{\ptr{B/08} làm \(\sigma\) \emph{nhỏ hơn}; chương này làm \(\sigma\) \emph{ổn định hơn}. Hai lý do quan trọng: ngân sách phải lập theo trường hợp \emph{xấu nhất}; và teach-by-showing đòi điều kiện \emph{không đổi} giữa dạy và chạy.}
+\ar[3]{Ba cơ chế làm điều kiện đổi}{Mức sáng tổng thể đổi (\(\Rightarrow\) \(\sigma\) đổi hoặc tag biến mất); \emph{hướng} chiếu sáng đổi (\(\Rightarrow\) vệt loá di chuyển trên tag, thiên lệch phụ thuộc tư thế); và tương phản marker xuống cấp (bụi, xước, phai).}
+\ar[3]{Biện pháp giải quyết cả ba}{Chiếu sáng chủ động cộng lọc bandpass: áp đảo cơ chế một, cố định cơ chế hai (nguồn gắn với camera nên góc chiếu không đổi theo vị trí robot), giảm nhẹ cơ chế ba.}
+\ar[3]{Lợi ích chính của IR chủ động}{\textbf{Không phải ``ảnh sáng hơn''} --- tăng gain cũng làm ảnh sáng hơn mà không giải quyết gì. Lợi ích là \emph{ảnh giống nhau ở mọi điều kiện}, tức \(\sigma\) ổn định và điều kiện teach-by-showing được thoả.}
+\ar[3]{Vì sao loá gây thiên lệch}{Ở một tư thế cho trước, vệt loá luôn ở cùng chỗ và luôn đẩy cạnh cùng hướng. Ba cơ chế: pixel bão hoà (mất gradient), blooming (cạnh nở), profile bất đối xứng (khớp đường lệch).}
+\ar[3]{Vì sao teach-by-showing không cứu được loá}{Vì vị trí vệt loá \emph{phụ thuộc tư thế}: ở tư thế dạy nó ở một chỗ, ở tư thế hiện tại nó ở chỗ khác. Hai thiên lệch khác nhau nên không trừ đi nhau. Ví dụ cụ thể của giới hạn ``\(g\) phụ thuộc tư thế'' (\ptr{B/13} mục 3C).}
+\ar[3]{Nguyên tắc về tham số tự động}{\textbf{Một hệ đo lường không được phép có tham số tự đổi.} Tham số tự động là hàm của cảnh, và cảnh đổi --- nên nó biến sai số \emph{cố định} (triệt tiêu được) thành sai số \emph{thay đổi} (không triệt tiêu được).}
+\ar[3]{Ba đường hại của phơi sáng tự động}{Thời gian phơi sáng đổi \(\Rightarrow\) blur đổi; mức sáng đổi \(\Rightarrow\) gradient đổi \(\Rightarrow\) \(\sigma\) đổi; và nó phản ứng với \emph{toàn khung hình} nên một vật sáng đi qua làm điều kiện đo của tag đổi dù tag không đổi gì.}
+\ar[2]{Chọn giá trị cố định}{Exposure \emph{ngắn nhất} còn đủ tương phản (giảm blur); gain \emph{thấp nhất} (gain cao khuếch đại cả nhiễu đọc). Hai yêu cầu xung đột trừ khi có thêm ánh sáng --- đó là lập luận cho mục 4.}
+\ar[2]{Ba biện pháp chống loá}{Vật liệu nhám (rẻ nhất, nên mặc định); bố trí tránh đường phản xạ gương (dùng bậc tự do góc nghiêng đã có từ \ptr{B/09} mục 4); và đặt nguồn sáng lệch khỏi trục camera vài chục cm.}
+\ar[2]{Đánh đổi của retroreflective}{Tương phản tuyệt vời nhưng nó \emph{cố ý} phản xạ ngược về nguồn, nên với đèn cạnh camera thì luôn cho vùng sáng mạnh --- dễ bão hoà và blooming. Phải kiểm không có pixel nào bão hoà.}
+\ar[2]{Chọn cảm biến}{Global shutter nếu đo khi di chuyển; \emph{đơn sắc} thay vì màu (Bayer làm mất độ phân giải thật và đưa vào làm mượt; màu vô dụng với tag đen trắng); ảnh thô không nén; và chỉ tăng độ phân giải khi quang học chưa phải nút thắt.}
+\ar[3]{Hai tầng chống báo sai}{Tầng một trong detector: giảm số lỗi bit cho phép sửa. Tầng hai ở ứng dụng: whitelist ID cộng kiểm hợp lý (kích thước, pose, nhất quán liên tag, dải vận hành).}
+\ar[3]{Vì sao tầng hai miễn phí với docking}{Vì bạn \emph{biết trước} constellation gồm ID nào và chúng ở đâu so với nhau. Trong bài toán tổng quát (tag chưa biết trong môi trường) thì không có whitelist, nên toàn bộ gánh nặng dồn lên tầng một.}
+\ar[2]{Dư thừa như biện pháp thiết kế}{Sáu tag mà hệ vẫn chạy tốt với bốn \(\Rightarrow\) che khuất một hai tag thành chế độ \emph{suy giảm} thay vì \emph{hỏng}. Điều kiện: tập con còn lại phải \emph{vẫn} là constellation tốt --- ràng buộc thật khi thiết kế ở \ptr{B/09}.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{Chiếu sáng IR + bandpass}{Thực hành chuẩn trong thị giác công nghiệp: chiếu sáng là thành phần của thiết bị đo, không phải điều kiện môi trường}{Biện pháp mạnh nhất của chương; quyết định dựa trên số đo biến thiên \(\sigma\)}
+\ud{Marker backlit}{Tương phản gần như tuyệt đối; đòi nguồn điện tại dock}{Cho trường hợp khắc nghiệt nhất, chẳng hạn gần cửa sổ lớn}
+\ud{Camera global shutter đơn sắc}{Loại bỏ rolling shutter (\ptr{A/06} mục 2) và Bayer cùng lúc}{Lựa chọn mặc định cho hệ đo lường; chi phí chênh nhỏ so với thời gian gỡ lỗi}
+\ud{Whitelist ID + kiểm hợp lý}{Vài dòng code, loại gần hết báo sai trong bài toán docking}{Tận dụng chính điều làm docking dễ hơn bài toán tổng quát}
+\ud{Vật liệu nhám cho marker \cite{kalaitzakis2021fiducial}}{Tránh phản xạ gương; công trình so sánh có bàn ảnh hưởng của điều kiện chiếu sáng}{Đọc phần điều kiện đo trước khi dùng số của họ}
+\end{ungdung}
+
+\begin{duan}{Đo biến thiên của \(\sigma\) theo điều kiện ánh sáng}{2 ngày}
+\dmt biết con số \(\sigma\) \emph{tệ nhất} của hệ bạn thay vì con số trong điều kiện tốt nhất --- vì con số tệ nhất mới là con số vào ngân sách.
+\ddl phần cứng thật, tại chính vị trí lắp đặt hoặc một nơi có điều kiện ánh sáng tương tự.
+\dbc chọn một tư thế cố định gần tư thế cập chuẩn; ở tư thế ấy, đo \(\sigma\) theo quy trình của \ptr{B/07} mini project (500 khung, độ lệch chuẩn của toạ độ góc) trong \emph{sáu} điều kiện: đèn trần bình thường; đèn trần tắt (chỉ ánh sáng tự nhiên); có nắng xiên chiếu vào marker; có đèn pin chiếu từ một bên tạo loá có chủ ý; sáng sớm và chiều muộn nếu có ánh sáng tự nhiên; và --- nếu đã có --- với chiếu sáng chủ động bật. Với mỗi điều kiện, ghi cả \(\sigma\) lẫn \emph{vị trí trung bình} của từng góc.
+\dxk bạn có một bảng sáu hàng. Hai cột quan trọng: \(\sigma\) (nhiễu) và độ lệch của vị trí trung bình so với điều kiện chuẩn (thiên lệch). Dự đoán của chương: \(\sigma\) biến thiên vài lần giữa các điều kiện, và --- quan trọng hơn --- \emph{vị trí trung bình} cũng dịch, đặc biệt trong điều kiện có loá. Cột thứ hai ấy chính là thứ mà lấy trung bình nhiều khung không chữa được và teach-by-showing cũng không. Kiểm tra chéo bắt buộc: nếu vị trí trung bình \emph{không} dịch giữa các điều kiện thì bạn đang có một hệ rất tốt về mặt thiên lệch, và cả chương này chỉ còn quan trọng cho phần \(\sigma\) --- một kết quả đáng mừng và đáng ghi lại.
+\dnv \ptr{C/15} nhận con số \(\sigma\) tệ nhất; \ptr{C/16} đưa phép đo này vào quy trình nghiệm thu định kỳ.
+\end{duan}
+
+\begin{traloi}
+\tl{Ba cơ chế: mức sáng tổng thể khác nhau (nhà kho có vùng tối vùng sáng, và ánh sáng đổi theo giờ) làm \(\sigma\) đổi hoặc làm ngưỡng hoá thất bại hẳn; \emph{hướng} chiếu sáng khác nhau tạo vệt loá ở những chỗ khác nhau trên tag, gây thiên lệch phụ thuộc tư thế; và marker trong môi trường thật bị bụi, xước, phai màu nên tương phản giảm dần. Biện pháp duy nhất giải quyết cả ba là \emph{chiếu sáng chủ động cộng bộ lọc bandpass}: nó áp đảo cơ chế một vì nguồn của bạn tập trung năng lượng vào dải được cho qua trong khi ánh sáng môi trường trải rộng trên phổ; nó cố định cơ chế hai vì nguồn gắn với camera nên góc chiếu chỉ phụ thuộc tư thế tương đối chứ không phụ thuộc vị trí trong phòng; và nó giảm nhẹ cơ chế ba vì tương phản cao hơn làm bụi ít ảnh hưởng tương đối hơn.}
+\tl{Vì một hệ đo lường không được phép có tham số tự đổi: mọi tham số tự động là một hàm của cảnh, và cảnh thì đổi --- nên nó biến một sai số \emph{cố định} (chấp nhận được, và triệt tiêu được bằng teach-by-showing) thành một sai số \emph{thay đổi} (không chấp nhận được, không triệt tiêu được). Ba hậu quả cụ thể: thời gian phơi sáng đổi nên motion blur đổi, mà blur là thiên lệch tỉ lệ với vận tốc; mức sáng của tag đổi nên độ lớn gradient tại cạnh đổi nên \(\sigma\) đổi; và --- tệ nhất --- phơi sáng tự động phản ứng với \emph{toàn bộ khung hình}, nên một vật sáng đi vào khung (cánh cửa mở, một chiếc xe, một người mặc áo trắng) làm điều kiện đo của tag thay đổi dù bản thân tag không đổi gì. Sai số của bạn bây giờ phụ thuộc vào những thứ hoàn toàn không liên quan tới phép đo.}
+\tl{Thiên lệch chứ không phải nhiễu vì ở một tư thế cho trước, vệt loá luôn ở cùng một chỗ và luôn đẩy cạnh theo cùng một hướng --- ba cơ chế cùng tác động: pixel bão hoà làm mất gradient, blooming làm cạnh nở ra, và profile bất đối xứng làm phép khớp đường lệch. Lấy trung bình nghìn khung không giúp gì. Teach-by-showing không cứu được vì vị trí vệt loá \emph{phụ thuộc tư thế}: nó là hàm của góc giữa nguồn sáng, bề mặt marker và camera, nên ở tư thế dạy nó nằm ở một chỗ và ở tư thế hiện tại cách đó vài xăng-ti-mét nó nằm ở chỗ khác. Hai thiên lệch khác nhau thì không trừ đi nhau. Đây là một ví dụ rất cụ thể của giới hạn ``hàm sai lệch phụ thuộc tư thế'' mà \ptr{B/13} mục 3C nêu ra ở dạng tổng quát.}
+\tl{Lợi ích chính là \emph{ảnh giống nhau ở mọi điều kiện}, không phải ảnh sáng hơn --- bạn làm ảnh sáng hơn được bằng cách tăng gain, và điều đó chẳng giải quyết gì (thậm chí làm \(\sigma\) tệ hơn vì gain khuếch đại cả nhiễu đọc). Cụ thể, sự ``giống nhau'' ấy mua cho bạn bốn thứ: \(\sigma\) ổn định nên ngân sách lập được theo một con số thay vì theo trường hợp xấu nhất; điều kiện của teach-by-showing được thoả nên phép triệt tiêu sai số hệ thống hoạt động đúng như lý thuyết; phơi sáng khoá được vì mức sáng không đổi; và vệt loá trở thành hàm của tư thế tương đối chứ không của vị trí trong phòng, nên nó tính trước được và một phần triệt tiêu được.}
+\tl{Tầng một nằm trong detector: giảm số lỗi bit cho phép sửa, đánh đổi bằng tầm phát hiện ngắn hơn một chút. Tầng hai nằm ở tầng ứng dụng: whitelist ID cộng với kiểm tính hợp lý --- kích thước tag có hợp lý ở khoảng cách này không, pose có nhất quán với các tag khác không, khoảng cách và góc có trong dải vận hành không. Tầng hai gần như miễn phí trong docking vì bạn \emph{biết trước} constellation gồm đúng những ID nào và chúng ở đâu so với nhau, nên bạn loại được ngay mọi thứ không khớp với hiểu biết ấy. Trong bài toán tổng quát --- một robot đi trong môi trường có tag ở những nơi chưa biết --- không có whitelist và không biết trước quan hệ giữa các tag, nên tầng hai gần như không dùng được và toàn bộ gánh nặng an toàn dồn lên mã hoá ở tầng một. Đó là lý do các họ tag đầu tư nặng vào khoảng cách Hamming, và cũng là lý do bài toán docking dễ hơn nhiều về mặt an toàn.}
+\end{traloi}
+
+\begin{dongian}
+Mấy chương trước lo chuyện làm sao đo cho \emph{chính xác}. Chương này lo một chuyện khác: làm sao đo cho \emph{giống nhau}.
+
+Nghe như chuyện nhỏ hơn nhưng không phải. Một cái thước hơi sai nhưng luôn sai đúng như vậy thì vẫn dùng được --- mọi phép đo lệch cùng một kiểu, và nếu chỉ cần so hai lần đo với nhau thì cái lệch triệt tiêu. Một cái thước lúc dài lúc ngắn thì vô dụng, dù trung bình nó đúng.
+
+Camera với chế độ tự động chính là cái thước thứ hai. Có ai mở cửa cho nắng vào, camera tự giảm sáng, ảnh của tag tối đi, và phép đo đổi --- dù cái tag chẳng đổi gì. Nên việc đầu tiên và rẻ nhất là: \emph{tắt hết chế độ tự động}. Khoá thời gian chụp, khoá độ khuếch đại, khoá cân bằng màu, khoá nét --- và với cái nét thì khoá bằng phần mềm chưa đủ, phải dán keo vào vòng xoay, vì một cú va nhẹ cũng làm nó lệch.
+
+Chuyện thứ hai là vệt loá. Nếu tấm tag bóng và có đèn chiếu xiên vào, sẽ có một vệt sáng chói. Vệt ấy ăn mất một đoạn cạnh, và phép đo lệch đi. Tệ ở chỗ vệt ấy \emph{di chuyển} khi robot di chuyển, nên cái lệch cũng đổi theo --- và mọi mẹo triệt tiêu đều bó tay với thứ thay đổi. Cách chữa rẻ nhất: dùng vật liệu nhám thay vì bóng.
+
+Chuyện thứ ba là cách mạnh nhất, và ý tưởng của nó đơn giản đến bất ngờ: \emph{mang theo ánh sáng của riêng mình, rồi bịt mắt camera với mọi ánh sáng khác}. Gắn một cái đèn hồng ngoại cạnh camera, lắp một tấm kính lọc chỉ cho qua đúng màu của cái đèn ấy. Bây giờ camera gần như không thấy mặt trời, không thấy đèn trần, chỉ thấy cái tag được chiếu bởi chính đèn của nó. Sáng hay chiều, gần cửa sổ hay trong góc tối --- ảnh trông giống hệt nhau.
+
+Cái mua được không phải ảnh sáng hơn. Ảnh sáng hơn thì vặn độ khuếch đại lên là xong, và nó chẳng giúp gì. Cái mua được là \emph{ảnh giống nhau}, và đó mới là thứ đáng tiền.
+
+Cuối cùng, một điều may mắn riêng của bài toán này. Robot cập dock thì \emph{biết trước} nó sắp gặp những cái tag nào. Nên chỉ cần bảo nó ``chỉ chấp nhận đúng sáu cái tag này, và chỉ khi chúng nằm đúng vị trí so với nhau'' là gần như mọi chuyện nhận nhầm đều bị loại. Một robot đi lang thang trong nhà kho gặp tag lạ thì không có cái may ấy --- và đó là lý do bài toán docking dễ hơn về mặt an toàn so với bài toán tổng quát.
+
+\chuadongian{mức cải thiện cụ thể của việc chiếu sáng chủ động thì không nói trước được bằng con số --- nó phụ thuộc đèn mạnh cỡ nào, kính lọc hẹp cỡ nào, và môi trường sáng cỡ nào. Cách duy nhất là đo \(\sigma\) ở vài điều kiện ánh sáng khác nhau rồi xem nó nhảy bao nhiêu; nếu nó nhảy nhiều thì đáng đầu tư, nếu nó ổn định thì thôi.}
+\motcau{Tắt hết chế độ tự động, dùng vật liệu nhám, và nếu được thì mang theo ánh sáng của riêng mình.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{B/14/10}
+
+Mệnh đề chính --- \emph{chiếu sáng chủ động cộng bandpass làm \(\sigma\) ổn định qua các điều kiện ánh sáng} --- bị bác bỏ nếu mini project cho thấy \(\sigma\) vẫn biến thiên đáng kể với chiếu sáng chủ động bật. Tôi phát biểu nó định tính và dựa trên lập luận tỉ số tín hiệu (cửa a); nó chưa qua cửa (b). Kết quả có thể phụ thuộc mạnh vào công suất nguồn so với mức ánh sáng môi trường, nên nó không phải một mệnh đề vô điều kiện.
+
+Mệnh đề thứ hai --- \emph{loá gây thiên lệch chứ không nhiễu} --- được kiểm bởi cột thứ hai của mini project: nếu \emph{vị trí trung bình} của các góc dịch khi có loá, mệnh đề đúng; nếu chỉ \(\sigma\) tăng mà vị trí trung bình không đổi, thì loá chỉ gây nhiễu và teach-by-showing \emph{có} cứu được --- một kết quả sẽ làm nhẹ lời cảnh báo ở mục~3.
+
+Mệnh đề thứ ba --- \emph{tham số tự động gây hại} --- gần như hiển nhiên về cơ chế, nhưng độ lớn của tác hại thì chưa đo. Có thể trong một môi trường ánh sáng ổn định, phơi sáng tự động gần như không bao giờ thay đổi và tác hại bằng không. Phép kiểm: ghi lại giá trị exposure mà camera chọn theo thời gian trong một ngày vận hành, và xem nó biến thiên bao nhiêu.
+
+\section{Kết nối}
+\ptrtarget{B/14/11}
+
+Chương này khép Phần~B và nó nối chủ yếu sang các chương về điều kiện vận hành.
+
+Nối lên trên. \ptr{A/06-hieu-ung-vat-ly-va-quang-hoc} mục~6 cấp nền về vật liệu; chương này mở rộng nó thành hướng dẫn thiết kế chiếu sáng. Mục~7 ở đó --- bảng phân loại theo vận tốc --- bổ sung cho bảng của chương này theo một chiều khác: một bảng phân loại theo \emph{vận tốc}, một theo \emph{điều kiện quan sát}.
+
+Nối ngang. \ptr{B/07-detection-pipeline} mục~6 chỉ ra rằng ngưỡng hoá hỏng thì tag biến mất hoàn toàn --- một chế độ hỏng mà chỉ chương này chữa được. \ptr{B/08-corner-refinement} quyết định \(\sigma\) trong điều kiện cho trước; chương này quyết định điều kiện ấy có ổn định không. Hai chương là một cặp: một cái tối ưu giá trị, một cái tối ưu phương sai. \ptr{B/13-docking-control} mục~3C là chỗ chương này quan trọng nhất: mọi giới hạn của teach-by-showing liên quan tới ``\(g\) phải không đổi'' đều được chương này phục vụ.
+
+Nối xuống Phần~C. \ptr{C/15-ngan-sach-sai-so} nhận một yêu cầu phương pháp luận: \emph{lập ngân sách theo \(\sigma\) tệ nhất}, không theo \(\sigma\) trong điều kiện tốt. Và nó nhận một dòng riêng cho thiên lệch do loá, thuộc loại hệ thống nhưng \emph{phụ thuộc tư thế} --- một loại khó chịu vì nó không triệt tiêu trong teach-by-showing. \ptr{C/16-danh-gia-va-nghiem-thu} nhận mini project của chương này làm mục ``thử nghiệm độ bền'' trong quy trình nghiệm thu, và nó mở rộng sang các yếu tố khác: nhiệt độ, rung, marker bẩn.
+
+\begin{tukiem}
+\item Chương này khác \ptr{B/08} ở chỗ nào, và vì sao sự khác biệt ấy quan trọng với một hệ dùng teach-by-showing?
+\item Nêu ba cơ chế làm điều kiện quan sát thay đổi, và nêu biện pháp duy nhất giải quyết cả ba.
+\item Vì sao phơi sáng tự động gây hại theo ba đường khác nhau, và đường nào tệ nhất?
+\item Loá gây thiên lệch hay nhiễu? Giải thích cơ chế, và nêu vì sao teach-by-showing không cứu được nó.
+\item Lợi ích chính của chiếu sáng hồng ngoại chủ động là gì, và vì sao ``ảnh sáng hơn'' là câu trả lời sai?
+\item Chống báo sai có hai tầng. Nêu cả hai, và giải thích vì sao tầng thứ hai là một lợi thế riêng của bài toán docking.
+\item Bạn thiết kế dư thừa bằng cách dùng sáu tag thay vì bốn. Nêu điều kiện mà nếu không thoả thì dư thừa ấy vô nghĩa.
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

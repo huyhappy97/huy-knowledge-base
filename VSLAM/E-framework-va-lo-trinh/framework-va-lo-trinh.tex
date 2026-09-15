@@ -1,0 +1,17 @@
+\documentclass[../vslam.tex]{subfiles}
+\begin{document}
+\part{FRAMEWORK VÀ LỘ TRÌNH}
+\begin{tomtat}
+Hai chương khép cây. Chương 23 là bản đồ công cụ --- ai đã cài sẵn cái gì, và quan trọng hơn, \emph{đọc mã nguồn nào để học được gì}; nó được xếp cuối vì nó hết hạn nhanh nhất và vì nó chỉ có nghĩa khi bạn đã biết mình đang tìm gì. Chương 24 là lộ trình năm giai đoạn: thứ tự học, với lý do cho từng thứ tự, và một lập luận rằng giai đoạn bốn --- tự dựng dữ liệu và đo thất bại --- là giai đoạn bị bỏ qua nhiều nhất và có giá trị cao nhất. Nếu chỉ nhớ một điều: \emph{đọc mã nguồn của một hệ trưởng thành dạy nhiều hơn đọc bài báo của nó}, vì phần lớn kiến thức ở Phần~C và Phần~D không tồn tại trong bài báo.
+\end{tomtat}
+
+Phần này ngắn và có vai trò khác hẳn bốn phần trước. Bốn phần trước xây dựng hiểu biết; phần này là điều hướng --- nó nói bạn nên đi đâu tiếp và theo thứ tự nào.
+
+Một lưu ý về tính hết hạn. Chương 23 chốt tại tháng 9/2026 và nó là phần hết hạn nhanh nhất của cả cây cùng với \ptr{C/16} và \ptr{C/17}. Các dự án mã nguồn mở đổi, các thư viện đổi API, và các hệ thống mới xuất hiện. Điều \emph{không} đổi nhanh là \emph{nguyên tắc chọn} --- đọc cái gì để học cái gì --- nên chương 23 được viết xoay quanh nguyên tắc ấy chứ không xoay quanh danh sách.
+
+Chương 24 thì ngược lại: nó gần như không hết hạn, vì nó nói về thứ tự học, và thứ tự ấy suy ra từ cấu trúc phụ thuộc của chính lĩnh vực. Lie group phải đến trước bundle adjustment vì BA cần Jacobian trên đa tạp; observability phải đến sau BA vì nó là câu hỏi về ma trận của BA. Những quan hệ ấy không đổi.
+\subfile{00-map}
+\subfile{23-framework-va-cong-cu/framework-va-cong-cu}
+\subfile{24-lo-trinh/lo-trinh}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

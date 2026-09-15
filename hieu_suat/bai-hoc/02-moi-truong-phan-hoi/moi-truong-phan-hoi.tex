@@ -1,0 +1,132 @@
+% ============================================================================
+%  02-moi-truong-phan-hoi — Luyện tập có chủ đích và môi trường phản hồi
+%  Ngày tạo: 2026-09-09 | Sửa gần nhất: 2026-09-09 | Ôn gần nhất: chưa
+%  Dependency: 01-nen-tang (cỡ hiệu ứng, tương quan vs can thiệp). Mức độ: CỐT LÕI.
+%  Kiểm chứng: mọi con số ở đây lấy trực tiếp từ bản gốc hoặc từ bài trích nguyên văn (cửa c).
+% ============================================================================
+\documentclass[../hieu-suat.tex]{subfiles}
+\begin{document}
+\chapter{Môi trường phản hồi: vì sao ``luyện tập nhiều hơn'' không phải câu trả lời}
+\ptrtarget{02}\ptrtarget{02-moi-truong-phan-hoi}
+\dependency{\ptr{01} --- cần phân biệt tương quan với can thiệp, và cần biết đọc con số ``phần trăm phương sai được giải thích''.}
+
+\begin{tomtat}
+Chương này dựng xương sống của cả bài học. Lý thuyết luyện tập có chủ đích không nói ``luyện nhiều thì giỏi''; nó nói luyện tập chỉ tạo ra tiến bộ khi thoả \emph{năm điều kiện} rất ngặt, mà điều kiện then chốt là phản hồi tức thì, cụ thể và hành động được. Một phân tích tổng hợp lớn cho thấy sức giải thích của luyện tập tụt dần khi đi từ cờ vua và âm nhạc sang giáo dục và nghề nghiệp, xuống dưới 1\% ở nhóm nghề nghiệp. Tôi đọc chênh lệch đó không phải như bằng chứng chống lại luyện tập, mà như phép đo về \emph{chất lượng môi trường phản hồi} của từng lĩnh vực. Nghiên cứu khoa học vi phạm gần hết năm điều kiện. Vì vậy nâng hiệu suất nghiên cứu chủ yếu không phải là luyện nhiều hơn, mà là \emph{dựng lại các vòng phản hồi} mà môi trường không tự cấp --- đó là nội dung của tám chương còn lại.
+\end{tomtat}
+
+\begin{nentang}
+\kn{luyện tập có chủ đích (deliberate practice)}{hoạt động được thiết kế riêng để cải thiện một mặt yếu cụ thể, lặp lại nhiều lần, kèm phản hồi tức thì --- không phải là ``làm việc chăm chỉ'' và cũng không phải là ``kinh nghiệm nhiều năm''.}
+\kn{môi trường học tử tế / xấu tính (kind / wicked learning environment)}{cặp khái niệm mô tả mức độ khớp giữa hoàn cảnh lúc \emph{học} và hoàn cảnh lúc \emph{áp dụng}, và chất lượng phản hồi nhận được trong lúc học \cite{hogarth2015}.}
+\kn{can thiệp phản hồi (feedback intervention)}{bất kỳ thao tác nào cung cấp thông tin về hiệu suất của một người nhằm cải thiện hiệu suất đó --- và không phải lúc nào cũng cải thiện.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Nếu luyện tập có chủ đích hiệu quả đến thế ở cờ vua, vì sao nó gần như mất tác dụng giải thích ở các nghề nghiệp?}
+\h{Mười năm kinh nghiệm nghiên cứu có làm một người thành nhà nghiên cứu giỏi hơn không, và cơ chế nào quyết định điều đó?}
+\h{Nếu phản hồi luôn tốt, vì sao một phần ba các can thiệp phản hồi lại làm hiệu suất \emph{giảm}?}
+\end{khoigoi}
+
+\section{Định nghĩa gốc chặt hơn nhiều so với cách nó được trích}
+
+Khái niệm luyện tập có chủ đích ra đời trong công trình của Ericsson, Krampe và Tesch-Römer \cite{ericsson1993}. Trong cách nó được truyền lại ở sách phổ thông, nó co lại thành ``mười nghìn giờ''. Trong bản gốc, nó là một danh sách điều kiện. Bài trả lời năm 2021 của chính Ericsson liệt kê lại năm tiêu chí kèm trích dẫn nguyên văn từ bản 1993 \cite[tr.~1114--1120]{ericsson2021} \nT{}:
+
+\begin{enumerate}
+\item nhiệm vụ \textbf{được định nghĩa rõ}, có mục tiêu cụ thể và người luyện hiểu đầy đủ mục tiêu đó;
+\item người luyện \textbf{tự thực hiện được} nhiệm vụ đó;
+\item có \textbf{phản hồi tức thì, cụ thể và hành động được} sau mỗi lần thực hiện;
+\item được \textbf{lặp lại} trên cùng nhiệm vụ hoặc nhiệm vụ tương tự;
+\item nhiệm vụ được \textbf{thiết kế riêng} cho người học dưới sự hướng dẫn cá nhân hoá của một người thầy, kèm chẩn đoán lỗi riêng.
+\end{enumerate}
+
+Điều đáng chú ý là danh sách những hoạt động \emph{không} tính là luyện tập có chủ đích theo định nghĩa gốc: nghe giảng, xem thi đấu, học sinh tự học một mình, và cả buổi tập nhóm do huấn luyện viên dẫn \cite{ericsson2021} \nT{}. Nghĩa là phần lớn những gì một nghiên cứu sinh làm cả ngày --- đọc paper, nghe seminar, tự mò một mình --- đều nằm ngoài định nghĩa. Đây không phải tiểu tiết học thuật; nó là chìa khoá của toàn bộ tranh cãi tiếp theo.
+
+\section{Phản biện: con số tụt dần theo lĩnh vực}
+
+Macnamara, Hambrick và Oswald \cite{macnamara2014} gộp các nghiên cứu đo quan hệ giữa lượng luyện tập và trình độ, rồi báo cáo phần phương sai hiệu suất mà luyện tập giải thích được: \textbf{26\% ở trò chơi trí tuệ, 21\% ở âm nhạc, 18\% ở thể thao, 4\% ở giáo dục, và dưới 1\% ở các nghề nghiệp} \nD{}. Kết luận của họ: luyện tập quan trọng, nhưng không quan trọng như đã được tuyên bố.
+
+Ericsson trả lời rằng phân tích tổng hợp đó đo một thứ rộng hơn định nghĩa gốc: khi gộp ``mọi hoạt động có cấu trúc nhằm cải thiện'' --- gồm cả nghe giảng và tự học --- vào cùng một biến, thì hiển nhiên tương quan loãng đi, và điều bị bác bỏ không phải là lý thuyết mà là một phiên bản nới rộng của nó \cite{ericsson2021} \nT{}.
+
+\begin{trucgiac}
+Hai bên không mâu thuẫn nhiều như vẻ ngoài, nếu tách hai câu hỏi khác nhau ra \nM{}. Câu hỏi thứ nhất: \emph{trong dân số hiện tại, biến thiên trình độ đến từ đâu?} --- câu trả lời là số giờ luyện tập chỉ giải thích được một phần, và phần đó nhỏ dần ở các lĩnh vực ít cấu trúc. Câu hỏi thứ hai: \emph{nếu tôi muốn khá lên, tôi phải làm gì?} --- câu trả lời là thiết kế hoạt động thoả năm điều kiện. Con số 4\% hay dưới 1\% không nói rằng điều kiện thứ ba (phản hồi tức thì) là vô dụng; nó nói rằng ở giáo dục và nghề nghiệp, hầu như \emph{không ai đang thoả} điều kiện đó.
+\end{trucgiac}
+
+\section{Môi trường học tử tế và môi trường xấu tính}
+
+Hogarth, Lejarraga và Soyer \cite{hogarth2015} cho khung khái niệm để nói chính xác chỗ khác nhau giữa cờ vua và nghiên cứu. Mọi việc học liên quan hai bối cảnh: bối cảnh \emph{thu nhận} thông tin, và bối cảnh \emph{áp dụng} nó. Môi trường \textbf{tử tế} là môi trường trong đó hai bối cảnh khớp nhau và phản hồi đến \emph{tức thì, chính xác và dồi dào}; môi trường \textbf{xấu tính} là môi trường có sai lệch giữa hai bối cảnh, và phản hồi thì \emph{trễ, thiếu, không liên quan, không đáng tin, hoặc đánh lừa} \nT{}.
+
+Đặt định nghĩa đó cạnh năm điều kiện của luyện tập có chủ đích, ta có bảng chẩn đoán cho chính nghề của mình.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Năm điều kiện của luyện tập có chủ đích \cite{ericsson1993,ericsson2021} đối chiếu với thực tế nghiên cứu thị giác máy tính. Cột cuối là chương xử lý vi phạm đó \nM{}.}
+\begin{tabularx}{\linewidth}{L{3.1cm} L{4.3cm} Y c}
+\toprule
+\textbf{Điều kiện} & \textbf{Thực tế trong nghiên cứu} & \textbf{Vì sao} & \textbf{Chữa ở}\\
+\midrule
+Nhiệm vụ định nghĩa rõ & Vi phạm một phần & Câu hỏi nghiên cứu thường mơ hồ cho tới khi gần xong; ``làm cho nó tốt hơn'' không phải nhiệm vụ có mục tiêu kiểm được & ch.~6, ch.~9\\
+Tự thực hiện được & Thoả & Viết mã, chạy thí nghiệm, viết bài đều nằm trong tầm tay & ---\\
+Phản hồi tức thì, cụ thể & \textbf{Vi phạm nặng} & Phản hồi thật đến sau nhiều tháng (phản biện), và bản thân nó nhiễu tới mức khoảng một nửa phương sai điểm phản biện là chủ quan \cite{cortes2021} & ch.~4, 5, 8\\
+Lặp lại nhiều lần & Vi phạm & Mỗi dự án gần như là một lần duy nhất; không ai chạy lại cùng một bài toán mười lần để sửa kỹ thuật & ch.~7, ch.~8\\
+Thiết kế cá nhân hoá bởi thầy & Vi phạm phần lớn & Người hướng dẫn xem sản phẩm cuối, hiếm khi quan sát \emph{quá trình} và chẩn đoán lỗi ở mức thao tác & ch.~5\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng này giải thích được con số dưới 1\% ở nhóm nghề nghiệp mà không cần viện tới tài năng bẩm sinh \nM{}: khi phản hồi trễ hàng tháng, nhiễu bằng nửa tín hiệu, và mỗi nhiệm vụ chỉ làm một lần, thì thời gian trôi qua không mang theo thông tin sửa lỗi. Người làm mười năm chỉ đơn giản là đã lặp lại năm thứ nhất mười lần.
+
+\section{Phản hồi không tự động là thứ tốt}
+
+Có một cạm bẫy ngay sau kết luận trên. Nếu vấn đề là thiếu phản hồi thì có vẻ giải pháp là ``xin thật nhiều phản hồi''. Kluger và DeNisi \cite{kluger1996} gộp 607 cỡ hiệu ứng từ 23\,663 quan sát và tìm thấy: can thiệp phản hồi trung bình \emph{có} cải thiện hiệu suất (\(d = 0{,}41\)), nhưng \textbf{hơn một phần ba số can thiệp làm hiệu suất giảm} \nD{}. Lý thuyết họ đề xuất giải thích điều đó bằng \emph{chỗ mà phản hồi kéo sự chú ý tới}: phản hồi hướng chú ý vào nhiệm vụ và vào cách làm thì giúp ích; phản hồi hướng chú ý vào bản thân người nhận --- giỏi hay dốt, xứng đáng hay không --- thì tiêu tốn nguồn lực vào việc bảo vệ cái tôi thay vì sửa thao tác \nT{}.
+
+\begin{cambay}
+Hai loại phản hồi trông giống nhau nhưng tác dụng ngược nhau: ``bài này chưa đủ tốt'' hướng vào người; ``kết quả ở Bảng 3 không loại được giả thuyết cạnh tranh vì thiếu nhóm đối chứng'' hướng vào nhiệm vụ. Khi tự phê bình chính mình, tôi cũng chọn được giữa hai loại này --- và loại thứ nhất là loại tôi hay chọn mà không nhận ra \nM{}.
+\end{cambay}
+
+\section{Tiền lệ: y khoa đã tự chế môi trường tử tế}
+
+Nghiên cứu không phải lĩnh vực đầu tiên đối mặt với vấn đề này. Ericsson \cite{ericsson2004} lập luận rằng trong y khoa, kinh nghiệm hành nghề nhiều năm không tự động dẫn tới trình độ cao hơn, và cách chữa là dựng các tình huống mô phỏng: nhiệm vụ có đáp án đúng đã biết trước, lặp lại được, phản hồi ngay sau mỗi lần thực hiện \nT{}. Nói cách khác, họ không đợi môi trường trở nên tử tế; họ xây một môi trường tử tế nhân tạo bên trong một nghề xấu tính.
+
+\begin{mach}
+\item \vd{nghiên cứu là môi trường xấu tính --- phản hồi trễ, nhiễu, và mỗi nhiệm vụ chỉ làm một lần \cite{hogarth2015,cortes2021}.} \gp không đợi phản hồi tự đến; \emph{tự chế} các vòng phản hồi ngắn bên trong công việc hằng ngày. \gd điều quyết định tiến bộ không phải số giờ mà là số vòng lặp có mang thông tin sửa lỗi. \gia mất thời gian cho việc không sinh ra sản phẩm trực tiếp: viết dự đoán trước khi chạy, chạy lại kết quả đã biết, xin phê bình khi bản thảo còn xấu.
+\item \vd{phản hồi tự chế có thể sai hướng và làm hại --- hơn một phần ba can thiệp phản hồi làm hiệu suất giảm \cite{kluger1996}.} \gp thiết kế phản hồi hướng vào \emph{nhiệm vụ}, có tiêu chí kiểm được, thay vì hướng vào giá trị bản thân. \hq bốn phép ``tử tế hoá'' ở mục cuối chương là bốn cách làm điều đó một cách hệ thống.
+\end{mach}
+
+\section{Bốn phép biến môi trường xấu tính thành tử tế hơn}
+
+Đây là bộ khung tôi rút ra từ các nguồn trên \nM{}, và cũng là bản đồ của các chương còn lại.
+
+\textbf{Một --- rút ngắn vòng.} Bất kỳ chỗ nào phản hồi mất hàng tháng, tìm một đại lượng thay thế đến trong hàng giờ. Bản thảo chưa xong vẫn đưa người khác đọc (ch.~4); một giả thuyết về cơ chế được kiểm bằng một thí nghiệm nhỏ có đáp án rõ trước khi xây cả hệ thống (ch.~8).
+
+\textbf{Hai --- viết dự đoán trước khi nhìn kết quả.} Phản hồi chỉ mang thông tin khi có thứ để sai. Không có dự đoán ghi lại thì mọi kết quả đều ``hợp lý'' sau khi đã biết (ch.~5, ch.~8).
+
+\textbf{Ba --- tạo nhiệm vụ có đáp án đã biết.} Cách duy nhất để hiệu chỉnh trực giác kỹ thuật là làm những bài mà mình biết chắc đúng sai: tái lập một kết quả đã công bố, dựng dữ liệu tổng hợp có sự thật nền, chạy lại một baseline cho khớp số gốc (ch.~8).
+
+\textbf{Bốn --- mượn phản hồi từ bên ngoài.} Con người đánh giá lập luận của người khác khách quan hơn nhiều so với lập luận của chính mình \cite{mercier2011}; và trong các phòng thí nghiệm thật, chính nhóm là nơi các suy luận sai của cá nhân bị chặn lại \cite{dunbar1997} (ch.~5).
+
+\begin{cannho}
+Câu hỏi trung tâm của cả bài học không phải ``hôm nay tôi đã làm bao nhiêu giờ'' mà \textbf{``hôm nay tôi đã đóng được bao nhiêu vòng phản hồi, và mỗi vòng có thứ gì để tôi sai không?''}
+\end{cannho}
+
+\begin{traloi}
+\tl{Vì thước đo trong phân tích tổng hợp gộp cả những hoạt động không thoả định nghĩa gốc, và vì ở nghề nghiệp thì điều kiện phản hồi tức thì gần như không bao giờ được thoả \cite{macnamara2014,ericsson2021,hogarth2015}. Con số nhỏ là phép đo về môi trường, không phải về giới hạn của con người \nM{}.}
+\tl{Không tự động. Cơ chế quyết định là số vòng lặp có phản hồi sửa lỗi, chứ không phải số năm; y khoa phải dựng mô phỏng mới có được điều đó \cite{ericsson2004} \nT{}.}
+\tl{Vì phản hồi hướng sự chú ý, và khi nó hướng vào bản thân người nhận thay vì vào nhiệm vụ thì nguồn lực bị tiêu vào việc bảo vệ cái tôi \cite{kluger1996}.}
+\end{traloi}
+
+\begin{tukiem}
+\item Nêu năm điều kiện của luyện tập có chủ đích, rồi chỉ ra điều kiện nào công việc tuần trước của bạn vi phạm và vi phạm ở chỗ nào cụ thể.
+\item Vì sao con số ``dưới 1\% ở nghề nghiệp'' không phải bằng chứng rằng luyện tập vô ích? Trả lời bằng ngôn ngữ của chương 1.
+\item Một phản hồi hướng vào nhiệm vụ và một phản hồi hướng vào bản thân, cùng nói về một sai lầm của bạn tuần trước --- viết cả hai ra.
+\item Trong dự án hiện tại, phản hồi thật đầu tiên về việc bạn có đúng hay không sẽ đến sau bao lâu? Có đại lượng thay thế nào đến trong 24 giờ không?
+\end{tukiem}
+
+\begin{onbai}
+\ar[3]{Năm điều kiện của luyện tập có chủ đích}{Mục tiêu rõ · tự làm được · phản hồi tức thì và hành động được · lặp lại · thiết kế cá nhân hoá bởi thầy \cite{ericsson2021}.}
+\ar[3]{26 / 21 / 18 / 4 / \(<\)1\%}{Phương sai hiệu suất mà luyện tập giải thích ở trò chơi / âm nhạc / thể thao / giáo dục / nghề nghiệp \cite{macnamara2014}.}
+\ar[3]{Môi trường xấu tính}{Phản hồi trễ, thiếu, không liên quan, không đáng tin hoặc đánh lừa; bối cảnh học lệch bối cảnh áp dụng \cite{hogarth2015}.}
+\ar[3]{\(d=0{,}41\) nhưng \(>1/3\) làm giảm}{Phản hồi trung bình có ích nhưng hơn một phần ba can thiệp làm hiệu suất giảm \cite{kluger1996}.}
+\ar[2]{Phản hồi hướng nhiệm vụ vs hướng bản thân}{Cùng nội dung, tác dụng ngược; chọn được cả khi tự phê bình.}
+\ar[2]{Bốn phép ``tử tế hoá''}{Rút ngắn vòng · dự đoán trước · nhiệm vụ có đáp án đã biết · mượn phản hồi bên ngoài.}
+\ar[1]{Tiền lệ y khoa}{Mô phỏng là cách dựng môi trường tử tế nhân tạo trong nghề xấu tính \cite{ericsson2004}.}
+\end{onbai}
+
+\end{document}

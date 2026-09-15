@@ -1,0 +1,21 @@
+\documentclass[../marker.tex]{subfiles}
+\begin{document}
+\part{NGUYÊN LÝ VÀ TOÁN HỌC}
+\begin{tomtat}
+Phần A dựng đúng lượng nền cần thiết cho bốn phần sau, và nó được tổ chức theo \emph{đường đi của một photon tới một con số}: camera biến điểm 3D thành pixel thế nào và méo ảnh phá hỏng gì, hình học phẳng cho ta công cụ gì, PnP biến tập góc thành pose ra sao, vì sao target phẳng luôn có hai nghiệm, một pixel nhiễu biến thành bao nhiêu milimét, và cuối cùng là những hiệu ứng vật lý mà mô hình toán bỏ qua nhưng thực tế thì không. Nếu chỉ nhớ một điều: bốn chương đầu là công cụ, chương~5 là chương định giá --- nó biến mọi lựa chọn thiết kế thành một con số milimét, và nó là chương mà cả Phần~C dựa vào.
+\end{tomtat}
+
+Phần này tồn tại để phục vụ Phần~C, và nguyên tắc chi phối nó là \emph{học theo nhu cầu của ngân sách}: mỗi chương chỉ đi tới mức đủ để ta biết khâu đó đóng góp bao nhiêu vào sai số cuối cùng, và đủ để ta tự dẫn lại được quan hệ tỉ lệ khi cần. Đây là lựa chọn có chủ ý và nó khác với một giáo trình thị giác máy tính. Một giáo trình sẽ dành nhiều trang cho việc phân rã homography thành pose vì đó là một kết quả đẹp; ở đây kết quả ấy được trình bày ngắn, vì trong thực hành nó chỉ dùng làm khởi tạo cho một phép tinh chỉnh phi tuyến, và chính phép tinh chỉnh mới quyết định sai số. Ngược lại, quan hệ \(\delta Z \approx Z\sigma/w\) --- một dòng trong hầu hết sách --- được dành cả một mục ở chương~5, vì nó là dòng quyết định bạn có đạt 5\,mm hay không.
+
+Sáu chương có vai trò rất khác nhau, và mức đầu tư nên khác nhau theo. Chương~1 là mô hình camera: nó tồn tại chủ yếu để giải thích vì sao méo ảnh chưa khử sạch làm \emph{cong} cạnh tag và vì thế làm sai chỗ giao của hai đường thẳng, và vì sao principal point sai gây ra một thiên lệch xoay có hệ thống --- nguồn lỗi xoay lớn nhất trong thực tế mà hầu như không ai ngờ tới. Chương~2 cho hình học phẳng, và nó chứa một sự thật nhỏ mà hậu quả lớn: tâm của hình chiếu không bằng hình chiếu của tâm. Chương~3 là PnP, tức cỗ máy biến góc thành pose. Chương~4 là chương bệnh lý: với target phẳng luôn tồn tại đúng hai nghiệm, và đây là nguyên nhân số một của hiện tượng pose nhảy. Chương~5 là chương định giá. Chương~6 gom những hiệu ứng vật lý mà năm chương trước giả định là không có.
+
+Thứ tự đọc đề xuất là tuần tự, với hai lưu ý. Chương~2 có thể đọc lướt nếu bạn đã quen hình học đa khung nhìn --- chỉ cần dừng kỹ ở mục về cross-ratio và bias tâm ellipse. Chương~5 thì ngược lại: nên đọc kỹ ngay cả khi chưa hiểu hết chi tiết Jacobian, vì bốn quan hệ tỉ lệ trong đó là thứ bạn sẽ dùng hằng ngày, và chúng đủ đơn giản để thuộc lòng.
+\subfile{00-map}
+\subfile{01-mo-hinh-camera-va-distortion/mo-hinh-camera-va-distortion}
+\subfile{02-homography-va-hinh-hoc-phang/homography-va-hinh-hoc-phang}
+\subfile{03-pnp-va-uoc-luong-tu-the/pnp-va-uoc-luong-tu-the}
+\subfile{04-pose-ambiguity-target-phang/pose-ambiguity-target-phang}
+\subfile{05-lan-truyen-sai-so-pixel-sang-pose/lan-truyen-sai-so-pixel-sang-pose}
+\subfile{06-hieu-ung-vat-ly-va-quang-hoc/hieu-ung-vat-ly-va-quang-hoc}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

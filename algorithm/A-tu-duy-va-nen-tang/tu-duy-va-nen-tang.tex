@@ -1,0 +1,24 @@
+% ============================================================================
+%  A — file phần: Tư duy và nền tảng
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../algorithm.tex]{subfiles}
+\begin{document}
+\part{TƯ DUY VÀ NỀN TẢNG}
+\begin{tomtat}
+Phần A không dạy một thuật toán nào. Nó dựng bốn thứ mà mọi chương sau đều dùng: một quy trình để đối mặt với bài lạ (chương 1), kinh nghiệm luyện tập đã được kiểm chứng của những người giỏi nhất (chương 2), thước đo chi phí để biết lời giải có đủ nhanh không (chương 3), công cụ chứng minh để biết lời giải có đúng không (chương 4), và bộ toán tối thiểu quay lại nhiều lần nhất (chương 5). Đọc xong phần này, bạn có một quy trình để chạy khi không biết làm gì, và hai thước đo để tự chấm lời giải của mình trước khi gõ code. Nếu chỉ nhớ một điều: người giải giỏi không khác người giải kém ở lượng thuật toán thuộc lòng, mà ở khả năng tự giám sát --- biết mình đang đi hướng nào, đi bao lâu rồi, và khi nào phải bỏ hướng đó.
+\end{tomtat}
+
+Có một lý do rất cụ thể để phần này đứng trước tất cả. Khi bạn bí một bài, cái thiếu hầu như không bao giờ là một thuật toán bạn chưa từng nghe tên. Cái thiếu là một trong ba thứ: bạn chưa hiểu đúng đề, bạn chưa thử đủ ví dụ nhỏ để thấy cấu trúc, hoặc bạn đang đi một hướng sai mà không chịu bỏ. Cả ba đều thuộc về quy trình chứ không thuộc về kiến thức, và cả ba đều luyện được --- đó chính là nội dung của chương 1 và chương 2.
+
+Chương 3 và chương 4 là hai cái thước. Không có thước đo chi phí, bạn không biết ý tưởng vừa nghĩ ra có đáng gõ hay không, và bạn sẽ mất hàng giờ cài một lời giải \Ob{n^2} cho \(n = 10^6\). Không có thước đo tính đúng, bạn viết code rồi tin vào vài ví dụ tự bịa, và cái sai chỉ lộ ra ở test 47. Hai chương này dạy cách trả lời hai câu hỏi \emph{trước khi gõ dòng code đầu tiên}: bài này cho phép độ phức tạp nào, và lời giải của tôi giữ bất biến gì.
+
+Chương 5 khác ba chương kia: nó là kho tra cứu chứ không phải mạch đọc. Ở đó có tổng, hệ thức truy hồi, tổ hợp, xác suất và một ít đại số --- đúng những mảnh toán quay lại nhiều nhất trong phần B, C và D. Đừng đọc một mạch; đọc lướt để biết trong đó có gì, rồi quay lại đúng mục khi một chương sau cần đến.
+\subfile{00-map}
+\subfile{01-nghe-thuat-giai-bai/nghe-thuat-giai-bai}
+\subfile{02-kinh-nghiem-nguoi-gioi/kinh-nghiem-nguoi-gioi}
+\subfile{03-mo-hinh-may-va-do-phuc-tap/mo-hinh-may-va-do-phuc-tap}
+\subfile{04-tinh-dung-va-chung-minh/tinh-dung-va-chung-minh}
+\subfile{05-toan-cho-thuat-toan/toan-cho-thuat-toan}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

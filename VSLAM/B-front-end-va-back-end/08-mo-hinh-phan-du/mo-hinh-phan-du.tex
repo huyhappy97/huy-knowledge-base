@@ -1,0 +1,279 @@
+% ---------------------------------------------------------------------------
+% Chương 8 — Mô hình phần dư
+% Tạo: 2026-09-13 | Phụ thuộc: A/02 (mô hình quang trắc), A/04 (khung MAP), A/06 (phân bố lệch)
+% Mức độ: XƯƠNG SỐNG.
+% Kiểm chứng:
+%   (1) Inverse depth tuyến tính hoá tốt hơn với điểm xa — cửa (a) từ A/06 mục 3B;
+%       cửa (c) civera2008inversedepth.
+%   (2) Structureless / null-space projection của MSCKF — cửa (c) mourikis2007msckf;
+%       cửa (a) suy từ phần bù Schur ở A/04.
+%   (3) Phần dư quang trắc cần mô hình exposure affine — cửa (c) engel2018dso.
+%   (4) Số bậc tự do: XYZ 3, inverse depth neo 3 (hoặc 1 nếu neo cố định tia) — cửa (a) đếm.
+% Ghi chú trung thực: KHÔNG so sánh số liệu accuracy giữa direct và indirect — các con số
+%   công bố không so sánh được (khác dataset, khác cấu hình, khác cách đếm).
+% ---------------------------------------------------------------------------
+\documentclass[../../vslam.tex]{subfiles}
+\begin{document}
+\chapter{Mô hình phần dư (Residual Models)}
+\ptrtarget{B/08}\ptrtarget{B/08-mo-hinh-phan-du}
+\dependency{\ptr{A/02-mo-hinh-camera} (mô hình quang trắc --- bắt buộc cho direct); \ptr{A/04-uoc-luong-map-va-bundle-adjustment} (khung MAP --- chương này chỉ thay hàm \(h\) mà không đổi gì khác); \ptr{A/06-bat-dinh-va-lan-truyen-sai-so} (phân bố lệch của độ sâu --- lập luận đầy đủ cho nghịch đảo độ sâu); \ptr{B/07-dac-trung-va-data-association} (đầu vào cho indirect; direct thì bỏ qua bước này).}
+
+\begin{tomtat}
+Khung MAP ở \ptr{A/04} là một cái khuôn: đưa vào một hàm đo \(h\) và một trọng số \(\Omega\), nhận về một bộ ước lượng. Chương này bàn về việc \emph{chọn \(h\)}, và nó cho thấy khuôn ấy tổng quát tới mức nào --- toàn bộ sự khác nhau giữa ORB-SLAM và DSO nằm ở một lựa chọn duy nhất trong chương này, chứ không nằm ở bộ giải. Nội dung có ba phần. Một: ba họ phần dư --- indirect (sai số chiếu lại), direct (sai số cường độ), semi-direct --- với phân tích cơ chế chứ không phải bảng số liệu, vì các con số công bố của hai họ này gần như không so sánh được. Hai: tham số hoá landmark, nơi một chi tiết thống kê ở \ptr{A/06} quyết định một lựa chọn kiến trúc; và kỹ thuật structureless, nơi landmark biến mất hoàn toàn khỏi vector trạng thái nhờ một phép chiếu. Ba: các loại phần dư khác --- độ sâu, đường thẳng, mặt phẳng, prior học được --- và cái giá ẩn của chúng, vốn là phá vỡ cấu trúc thưa mà \ptr{A/04} phụ thuộc vào. Nếu chỉ nhớ một điều: \emph{lựa chọn phần dư quyết định hệ thống cần gì từ thế giới} --- indirect cần vân có cấu trúc, direct cần ánh sáng ổn định, và đó là lý do không cái nào thắng ở mọi nơi.
+\end{tomtat}
+
+\begin{nentang}
+\kn{phần dư chiếu lại (reprojection residual)}{hiệu giữa toạ độ pixel quan sát được của một đặc trưng và toạ độ mà mô hình dự đoán. Đơn vị pixel, hai chiều cho mỗi quan sát.}
+\kn{phần dư quang trắc (photometric residual)}{hiệu giữa \emph{giá trị cường độ} của một pixel ở khung này và giá trị của pixel tương ứng ở khung kia. Đơn vị mức xám, một chiều cho mỗi pixel.}
+\kn{nghịch đảo độ sâu (inverse depth)}{tham số hoá một điểm bằng \(\rho = 1/z\) thay vì \(z\), thường kèm một khung \emph{neo} và một hướng tia. Điểm ở vô hạn tương ứng \(\rho = 0\), một giá trị hoàn toàn hợp lệ chứ không phải kỳ dị.}
+\kn{khung neo (anchor frame)}{khung hình mà toạ độ của landmark được biểu diễn tương đối với nó. Chọn khung đầu tiên nhìn thấy điểm làm neo giữ cho tham số hoá ổn định số học.}
+\kn{structureless}{kỹ thuật loại landmark khỏi vector trạng thái bằng cách chiếu phần dư lên không gian rỗng của Jacobian theo landmark. Kết quả là một ràng buộc chỉ giữa các tư thế.}
+\kn{độ sáng affine (affine brightness)}{mô hình \(I' = a I + b\) cho thay đổi cường độ giữa hai khung do phơi sáng hoặc gain tự động. Hai tham số mỗi khung, đưa vào chính bài toán tối ưu.}
+\kn{gradient ảnh}{điều kiện tồn tại của direct method: phần dư quang trắc chỉ ràng buộc được tư thế ở những pixel có gradient khác không. Vùng phẳng đóng góp đúng bằng không.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Direct method dùng \emph{mọi} pixel có gradient, indirect chỉ dùng vài trăm đặc trưng. Vì sao direct không thắng tuyệt đối, và thứ gì nó phải trả giá để có được nhiều dữ liệu như vậy?}
+\h{Tham số hoá một điểm bằng \(z\) và bằng \(1/z\) mô tả cùng một điểm và cho cùng một nghiệm. Vậy vì sao lựa chọn giữa chúng lại đổi kết quả, và đổi ở đâu?}
+\h{MSCKF khử landmark khỏi vector trạng thái bằng phép chiếu null-space. Nếu landmark biến mất thì thông tin về nó đi đâu, và vì sao kỹ thuật này cho một bộ lọc chi phí tuyến tính thay vì bậc hai?}
+\h{Bạn thêm một ràng buộc ``hai landmark này nằm trên cùng một mặt phẳng''. Ràng buộc đúng, và nó làm bài toán chậm đi nhiều bậc. Vì sao?}
+\h{Một mô hình học được cho độ sâu metric của mỗi pixel. Nghe như nó giải quyết bài toán tỉ lệ của mono. Nêu điều kiện để đưa nó vào đồ thị một cách hợp lệ, và nói vì sao đưa vào sai còn tệ hơn không dùng.}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{B/08/01}
+
+\ptr{A/04} dựng một khuôn tổng quát: cực tiểu hoá \(\sum_k \mathbf{r}_k^\top \Omega_k \mathbf{r}_k\). Khuôn ấy không nói \(\mathbf{r}_k\) là gì. Chương này bàn đúng câu hỏi đó, và câu trả lời hoá ra là chỗ phân chia lớn nhất trong lịch sử Visual SLAM.
+
+Bài toán gốc phát biểu thế này. Ta có một chuỗi ảnh --- những mảng số. Ta muốn một hàm biến giả thuyết về tư thế và cấu trúc thành một dự đoán \emph{kiểm được với ảnh}. Có hai cách làm việc đó, và chúng khác nhau ở chỗ \emph{trừu tượng hoá ở đâu}.
+
+Cách thứ nhất: trừu tượng hoá \emph{sớm}. Biến ảnh thành một tập điểm có toạ độ và mô tả (\ptr{B/07}), rồi so sánh toạ độ dự đoán với toạ độ quan sát. Đây là \term{indirect}, và nó thống trị từ PTAM \cite{klein2007ptam} tới ORB-SLAM \cite{murartal2015orbslam}.
+
+Cách thứ hai: \emph{không} trừu tượng hoá. So sánh trực tiếp giá trị cường độ: nếu tư thế đúng thì pixel này ở khung một phải có cùng độ sáng với pixel tương ứng ở khung hai. Đây là \term{direct}, và nó được LSD-SLAM \cite{engel2014lsdslam} và DSO \cite{engel2018dso} phát triển thành một dòng hoàn chỉnh.
+
+Ai gặp sự lựa chọn này? Mọi người thiết kế một hệ SLAM, và đó là một trong hai hoặc ba quyết định kiến trúc lớn nhất --- nó lan toả vào mọi thứ khác, từ yêu cầu phần cứng tới cách hệ thống hỏng.
+
+Điều đáng nói ngay là vì sao tranh luận này \emph{không} giải quyết được bằng cách đo. Các con số công bố cho hai họ này gần như không so sánh được: chúng chạy trên các bộ dữ liệu khác nhau, với các mức hiệu chuẩn quang trắc khác nhau (DSO cần nó, ORB-SLAM không), và với các định nghĩa thất bại khác nhau. Đặt hai con số cạnh nhau tạo ra ảo giác so sánh --- đúng thứ \code{research-rules.md} mục~6.2 cảnh báo là chỗ dễ tự lừa mình nhất.
+
+Điều \emph{có thể} nói một cách trung thực là mỗi họ \emph{cần gì từ thế giới}, và cần gì thì hỏng khi thiếu cái đó. Indirect cần vân có cấu trúc đủ để trích ra đặc trưng lặp lại được; nó bất chấp thay đổi ánh sáng trong giới hạn rộng. Direct cần ánh sáng ổn định hoặc một mô hình quang trắc đúng; nó bất chấp việc thiếu góc cạnh, chỉ cần có gradient. Hai yêu cầu ấy độc lập với nhau, nên có những môi trường mà cái này sống cái kia chết, và ngược lại. Đó là phát biểu trung thực nhất mà tôi đưa ra được, và nó hữu ích hơn một bảng số liệu.
+
+\begin{trucgiac}
+Hình dung bạn phải kiểm tra xem một bản đồ có khớp với thực địa không.
+
+\emph{Cách indirect}: bạn chọn ra hai mươi mốc dễ nhận --- ngã tư, tháp nước, cây đa đầu làng --- rồi kiểm xem từng mốc có ở đúng chỗ bản đồ nói không. Ưu điểm: mỗi mốc là một phép kiểm rõ ràng, và bạn không quan tâm hôm nay trời nắng hay mưa. Nhược điểm: bạn đã \emph{vứt bỏ} toàn bộ phần còn lại của thực địa --- những con đường, những cánh đồng --- và nếu vùng đó không có mốc nào dễ nhận thì bạn bó tay.
+
+\emph{Cách direct}: bạn không chọn mốc nào. Bạn chồng bản đồ lên ảnh chụp từ trên cao và đo xem chúng lệch nhau bao nhiêu ở \emph{mọi} chỗ có sự biến đổi --- mọi ranh giới, mọi bờ ruộng. Ưu điểm: bạn dùng được rất nhiều thông tin, kể cả ở vùng không có mốc nào. Nhược điểm: nếu ảnh chụp hôm nay sáng hơn ảnh gốc --- vì trời nắng hơn, vì máy chỉnh phơi sáng --- thì mọi chỗ đều lệch, và bạn sẽ kết luận nhầm rằng bản đồ sai.
+
+Đó là toàn bộ sự đánh đổi. Cách một bền với thay đổi bề ngoài nhưng vứt bỏ phần lớn dữ liệu. Cách hai dùng gần hết dữ liệu nhưng phải biết chính xác điều kiện chụp.
+
+Và một chi tiết quyết định về cách hai: ở giữa một cánh đồng phẳng lì, không có gì để so. Vùng không có sự biến đổi đóng góp \emph{đúng bằng không}. Nên direct không thật sự dùng ``mọi pixel'' --- nó dùng mọi pixel \emph{có gradient}, và ở một bức tường trắng thì con số đó cũng bằng không, y như indirect.
+\end{trucgiac}
+
+\section{Ba họ phần dư}
+\ptrtarget{B/08/02}
+
+\subsection{A. Indirect: sai số chiếu lại}
+
+\[
+\mathbf{r}^{\text{ind}}_{ij} \;=\; \mathbf{z}_{ij} \;-\; \pi\bigl(T_i^{-1}\,\mathbf{P}_j\bigr) \;\in\; \mathbb{R}^2 .
+\]
+Jacobian đã dẫn ở \ptr{A/03} công thức~\eqref{eq:a03-jac}. Trọng số \(\Omega = \sigma^{-2}I\) với \(\sigma\) là độ chính xác subpixel đo ở \ptr{B/07} mục~4B.
+
+Ba tính chất quyết định. \emph{Bền với vẻ ngoài}: descriptor được thiết kế bất biến với ánh sáng và một phần với góc nhìn, nên thay đổi phơi sáng không ảnh hưởng gì. \emph{Ít phần dư}: vài trăm quan sát mỗi khung thay vì vài chục nghìn --- rẻ, và cấu trúc thưa của \ptr{A/04} giữ nguyên hoàn hảo. \emph{Mất thông tin}: toàn bộ ảnh bị rút xuống vài trăm toạ độ; mọi thứ ở vùng ít vân bị vứt.
+
+Điểm thứ ba là điểm đáng suy nghĩ nhất. Một bức tường trắng có gradient rất yếu nhưng \emph{không phải bằng không}, và direct khai thác được phần thông tin ít ỏi đó trong khi indirect thì không --- vì detector cần một cực đại rõ ràng để tồn tại. Đây là lý do direct thường sống lâu hơn trong hành lang trống, và nó là một lợi thế thật chứ không phải lý thuyết.
+
+\subsection{B. Direct: sai số cường độ}
+
+\[
+r^{\text{dir}}_{ij} \;=\; I_i(\mathbf{u}) \;-\; I_j\bigl(\pi(T_{ij}\,\pi^{-1}(\mathbf{u}, \rho))\bigr) \;\in\; \mathbb{R}.
+\]
+Một chiều cho mỗi pixel. Trọng số dựa trên nhiễu cảm biến và độ tin cậy của gradient.
+
+Ba yêu cầu mà direct đặt ra, và chúng là cái giá của nó.
+
+\emph{Một --- mô hình quang trắc.} Nếu phơi sáng đổi giữa hai khung thì \emph{mọi} phần dư lệch cùng một lượng, và bộ giải sẽ diễn giải điều đó thành một chuyển động. DSO xử lý bằng hai cách đồng thời: hiệu chuẩn ngoại tuyến vignette và CRF (\ptr{A/02} mục~5B), và ước lượng trực tuyến hai tham số affine \((a,b)\) cho mỗi khung \cite{engel2018dso}. Cách thứ hai đáng chú ý vì nó là luận đề trung tâm áp dụng ở quy mô nhỏ: thay vì fix một tham số ta không biết, thả nó ra làm biến.
+
+\emph{Hai --- khởi tạo tốt.} Hàm mục tiêu quang trắc \emph{rất} không lồi: bề mặt cường độ của một ảnh thật có hàng nghìn cực tiểu địa phương. Direct chỉ hội tụ trong một bán kính hẹp, nên nó bắt buộc phải dùng tháp ảnh (coarse-to-fine) và một tiên nghiệm chuyển động. Đây là giới hạn nghiêm trọng nhất và là lý do direct dễ mất bám khi chuyển động nhanh.
+
+\emph{Ba --- gradient.} Pixel không có gradient cho Jacobian bằng không, đóng góp đúng bằng không. Nên ``dùng mọi pixel'' thực ra là ``dùng mọi pixel có gradient'', và DSO chọn có chọn lọc vài nghìn pixel phân bố đều thay vì dùng hết --- một quyết định hội tụ về chính nguyên tắc phân bố ở \ptr{B/07} mục~4A.
+
+\subsection{C. Semi-direct}
+
+SVO \cite{forster2017svo} kết hợp theo một cách không phải thoả hiệp mà là phân công theo thế mạnh: \emph{direct cho tracking, indirect cho mapping}.
+
+Logic: tracking cần \emph{nhanh} và chỉ giải sáu ẩn với khởi tạo tốt từ khung trước --- đúng chế độ mà direct mạnh. Mapping cần \emph{bền} vì landmark sống lâu và phải nhận ra lại sau nhiều khung --- đúng chế độ mà indirect mạnh, vì descriptor cho phép nhận ra lại sau khi mất bám.
+
+Kết quả là một hệ rất nhanh với độ bền chấp nhận được. Đây là một ví dụ tốt về việc \emph{nhận ra hai bài toán con có yêu cầu khác nhau} thay vì chọn một công cụ cho cả hai --- một khuôn mẫu thiết kế xuất hiện lại ở \ptr{B/09} và \ptr{C/13}.
+
+\begin{table}[H]\centering\small
+\caption{Ba họ phần dư, so sánh theo \emph{cơ chế và yêu cầu}, không theo con số. Cột ``cần gì từ thế giới'' là cột quyết định lựa chọn.}
+\label{tab:b08-residual}
+\begin{tabularx}{\linewidth}{@{}L{1.9cm}L{2.6cm}L{3.4cm}Y@{}}
+\toprule
+\textbf{Họ} & \textbf{Cần gì từ thế giới} & \textbf{Hỏng khi} & \textbf{Được gì}\\
+\midrule
+Indirect & Vân có cấu trúc đủ để trích đặc trưng lặp lại được & Vùng ít vân; vân lặp lại (perceptual aliasing) & Bền với đổi ánh sáng và phơi sáng; rẻ; cấu trúc thưa hoàn hảo; dễ nhận ra lại sau mất bám\\
+Direct & Ánh sáng ổn định hoặc mô hình quang trắc đúng; gradient khác không & Đổi phơi sáng không mô hình hoá; chuyển động nhanh (không lồi); vật động & Dùng được vùng gradient yếu; độ chính xác subpixel ngầm; không cần bước trích đặc trưng\\
+Semi-direct & Cả hai, nhưng ở hai chỗ khác nhau & Kế thừa cả hai chế độ hỏng, nhẹ hơn & Nhanh như direct, bền như indirect ở chỗ cần bền\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Tham số hoá landmark}
+\ptrtarget{B/08/03}
+
+\subsection{A. Vì sao XYZ không đủ}
+
+Cách hiển nhiên là ba toạ độ Euclid. Nó hỏng với điểm xa, và lý do đã được dẫn đầy đủ ở \ptr{A/06} mục~3B --- đây là câu trả lời cho câu hỏi mở đầu thứ hai.
+
+Tóm tắt lập luận. Quan hệ giữa phép đo (disparity, hoặc parallax) và \(z\) là \emph{nghịch đảo}. Nhiễu Gauss trên phép đo, đi qua một hàm nghịch đảo, cho phân bố \emph{lệch} trên \(z\): đuôi phía xa dài hơn nhiều. Ở giới hạn parallax rất nhỏ, phân bố của \(z\) thậm chí không có kỳ vọng hữu hạn. Hệ quả: một ellipsoid Gauss trong toạ độ XYZ là mô tả \emph{sai} về bất định của một điểm xa, và bộ giải làm việc với một mô hình sai.
+
+Có một hệ quả thứ hai, thực dụng hơn: \emph{điểm ở vô hạn không biểu diễn được}. Trong SLAM ngoài trời, nhiều điểm gần như ở vô hạn, và chúng cực kỳ hữu ích cho việc ước lượng xoay (\ptr{A/03} mục~5, khối \([\mathbf{P}_c]_\times\)). Với tham số hoá XYZ, ta buộc phải hoặc gán cho chúng một \(z\) hữu hạn tuỳ tiện, hoặc vứt bỏ chúng. Cả hai đều lãng phí.
+
+\subsection{B. Nghịch đảo độ sâu có neo}
+
+Tham số hoá đúng \cite{civera2008inversedepth}: biểu diễn điểm bằng một khung \emph{neo} \(a\), một hướng tia \(\mathbf{m}\) trong khung đó, và một nghịch đảo độ sâu \(\rho\):
+\[
+\mathbf{P} \;=\; \mathbf{c}_a \;+\; \frac{1}{\rho}\,R_a\,\mathbf{m}.
+\]
+Nếu hướng tia lấy trực tiếp từ quan sát đầu tiên và giữ cố định, chỉ còn \emph{một} ẩn \(\rho\) --- giảm từ ba xuống một, một khoản tiết kiệm đáng kể khi có hàng trăm nghìn landmark.
+
+Ba lợi ích. \emph{Phân bố gần Gauss}: \(\rho\) tỉ lệ tuyến tính với disparity, nên nhiễu Gauss trên phép đo cho phân bố gần Gauss trên \(\rho\) --- xấp xỉ của \ptr{A/06} trở lại hợp lệ. \emph{Điểm ở vô hạn hợp lệ}: \(\rho = 0\) là một giá trị bình thường, không phải kỳ dị, nên một điểm rất xa vẫn nằm trong bài toán và vẫn đóng góp cho ước lượng xoay. \emph{Tuyến tính hoá tốt hơn}: hàm đo gần tuyến tính theo \(\rho\) hơn nhiều so với theo \(z\), nên Gauss-Newton hội tụ tốt hơn ở chính chế độ khó.
+
+Cái giá: cần theo dõi khung neo, và khi khung neo bị marginalize thì phải chuyển landmark sang neo mới --- một phép toán không miễn phí và là một nguồn lỗi cài đặt. Đây là loại phức tạp mà một hệ sản phẩm phải chấp nhận, và là lý do \ptr{C/13} coi quản lý bản đồ là một chương riêng.
+
+\subsection{C. Structureless: khi landmark biến mất}
+
+MSCKF \cite{mourikis2007msckf} đi xa hơn: \emph{không} đưa landmark vào vector trạng thái. Đây là câu trả lời cho câu hỏi mở đầu thứ ba.
+
+Ý tưởng. Với một landmark quan sát từ \(n\) khung, xếp toàn bộ phần dư thành một véctơ:
+\[
+\mathbf{r} \;\approx\; H_x\,\boldsymbol{\delta}_x \;+\; H_f\,\boldsymbol{\delta}_f \;+\; \mathbf{n},
+\]
+với \(\boldsymbol{\delta}_f\) là nhiễu loạn của landmark. Lấy \(N\) là ma trận có các cột trực chuẩn sinh ra \emph{không gian rỗng trái} của \(H_f\), rồi nhân trái:
+\[
+N^{\top}\mathbf{r} \;=\; N^{\top}H_x\,\boldsymbol{\delta}_x \;+\; N^{\top}\mathbf{n}.
+\]
+Landmark biến mất hoàn toàn. Cái còn lại là một ràng buộc \emph{chỉ giữa các tư thế} --- chính là thông tin mà landmark mang về hình học tương đối, tách khỏi vị trí cụ thể của nó.
+
+Thông tin đi đâu? Nó không mất: nó được chuyển thành ràng buộc giữa các tư thế. Về mặt đại số, đây là phần bù Schur của \ptr{A/04} mục~4C viết ở dạng khác --- khử một khối biến nhưng giữ nguyên ảnh hưởng của nó lên phần còn lại. Khác biệt duy nhất là ở đây ta \emph{không} thế ngược để lấy lại landmark, vì ta không cần nó.
+
+Vì sao điều này quan trọng cho bộ lọc: chi phí của EKF là bậc ba theo kích thước trạng thái, nên một trạng thái chứa hàng nghìn landmark là bất khả thi. Structureless giữ trạng thái chỉ gồm một cửa sổ tư thế, nên chi phí không phụ thuộc số landmark. Đây chính là điều làm MSCKF khả thi trong khi EKF-SLAM thì không --- và là một trong những kỹ thuật đẹp nhất trong cả cây, vì nó đổi một bài toán bậc ba thành bậc thấp bằng một phép chiếu.
+
+Cái giá: landmark không được ước lượng, nên không có bản đồ để tái sử dụng. MSCKF là một hệ \emph{odometry}, không phải SLAM đầy đủ --- nó không đóng vòng được vì không có gì để nhận ra lại. Đây là một đánh đổi kiến trúc thật, và \ptr{B/09} bàn về nó.
+
+\section{Các loại phần dư khác và cái giá ẩn}
+\ptrtarget{B/08/04}
+
+\subsection{A. Phần dư độ sâu và ICP}
+
+Với RGB-D hoặc stereo, ta có phép đo độ sâu trực tiếp. Cách đưa vào đơn giản: thêm một chiều vào phần dư chiếu, \(r_z = z_{\text{đo}} - z_{\text{dự đoán}}\), với trọng số theo công thức \(\sigma_z \approx z^2\sigma_d/(bf)\) ở \ptr{A/06}.
+
+Điểm đáng nhấn mạnh: trọng số ấy \emph{phải} phụ thuộc \(z\). Gán một \(\sigma_z\) không đổi cho mọi điểm là một trong những lỗi phổ biến nhất với RGB-D, và nó gây hại theo cả hai chiều --- điểm gần bị tin quá ít, điểm xa bị tin quá nhiều. Cái thứ hai nguy hiểm hơn: nó bơm sai lệch có hệ thống vào bài toán và là một nguồn của bệnh quá tự tin ở \ptr{A/06} mục~4B.
+
+ICP dùng phần dư hình học giữa hai đám mây điểm. Nó là chuẩn mực trong LiDAR SLAM và xuất hiện trong RGB-D SLAM dày. Điểm cần biết cho chương này: ICP có bài toán data association của riêng nó --- việc ghép điểm gần nhất --- và bài toán đó có cùng cấu trúc và cùng chế độ hỏng như \ptr{B/07}.
+
+\subsection{B. Đường thẳng và mặt phẳng: cái giá ẩn}
+
+Trong môi trường nhân tạo, đường thẳng và mặt phẳng có mặt khắp nơi và ổn định hơn điểm. Việc thêm chúng vào có vẻ hiển nhiên có lợi, và nó có --- nhưng có một cái giá ít được nói tới, và đó là câu trả lời cho câu hỏi mở đầu thứ tư.
+
+Quay lại \ptr{A/04} mục~4B: phần bù Schur hoạt động được \emph{vì} khối \(V\) là khối chéo, và \(V\) khối chéo \emph{vì} không nhân tử nào nối hai landmark với nhau. Một ràng buộc ``ba điểm này cùng nằm trên một mặt phẳng'' là đúng một nhân tử nối ba landmark. Khối \(V\) mất tính khối chéo, nghịch đảo của nó không còn tách được thành các phép nghịch đảo \(3\times3\) độc lập, và toàn bộ lợi thế tính toán của Schur biến mất.
+
+Đây là một ví dụ quan trọng của một nguyên tắc chung: \emph{thêm ràng buộc đúng không miễn phí}. Ràng buộc cấu trúc cho thông tin thêm nhưng phá vỡ tính thưa. Cách xử lý thực tế là mô hình hoá mặt phẳng như một \emph{landmark riêng} với các điểm nối vào nó --- lúc đó cấu trúc thưa khôi phục được một phần, vì các điểm lại chỉ nối với một biến chung thay vì nối với nhau. Ràng buộc Manhattan hoặc Atlanta (các mặt phẳng vuông góc hoặc song song với nhau) thì mạnh hơn nữa và cũng nguy hiểm hơn: chúng đúng trong nhiều toà nhà và sai trong nhiều toà nhà khác, và khi sai thì chúng bơm vào một sai lệch có hệ thống mà không có gì báo.
+
+\subsection{C. Prior độ sâu học được}
+
+Các mô hình độ sâu metric đơn ảnh gần đây --- Depth Anything v2 \cite{yang2024depthanything2}, UniDepth \cite{piccinelli2024unidepth} --- cho một ước lượng độ sâu có đơn vị mét từ một ảnh duy nhất. Nghe như nó giải quyết bài toán tỉ lệ của mono, và đây là câu trả lời cho câu hỏi mở đầu thứ năm.
+
+Cách đưa vào đồ thị đúng nguyên tắc: thêm một nhân tử prior trên \(\rho\) của mỗi landmark, với hiệp phương sai phản ánh độ tin cậy của mô hình. Điều này hợp lệ và hữu ích. Nhưng nó có ba điều kiện, và vi phạm bất kỳ điều kiện nào thì đưa vào còn tệ hơn không dùng.
+
+\emph{Một --- hiệp phương sai phải trung thực.} Nếu mô hình sai nhiều hơn ta khai báo, prior kéo nghiệm đi và không có gì cảnh báo. Vấn đề: các mô hình độ sâu học được \emph{không} đi kèm một bất định đã hiệu chuẩn, và bất định của chúng thay đổi mạnh theo loại cảnh --- tốt trong nhà kiểu phòng khách, tệ với bề mặt phản chiếu hoặc cảnh ngoài phân bố huấn luyện. \ptr{C/17} bàn về điều này.
+
+\emph{Hai --- sai số phải gần độc lập giữa các pixel.} Không đúng chút nào: một mô hình đơn ảnh sai cả một vùng cùng lúc, theo một cách tương quan mạnh. Đưa vào như các prior độc lập là \emph{đếm thừa} thông tin nghiêm trọng --- nguồn số một của bệnh quá tự tin ở \ptr{A/06} mục~4B.
+
+\emph{Ba --- phải có cổng phát hiện khi mô hình ra ngoài phân bố.} Đây là điều kiện khó nhất và chưa ai giải tốt.
+
+Cách dùng an toàn nhất trong thực tế: dùng prior học được để \emph{khởi tạo} tỉ lệ và độ sâu, rồi giảm mạnh trọng số của nó (hoặc bỏ hẳn) khi đã có đủ quan sát hình học. Như vậy ta lấy được phần giá trị lớn nhất --- vượt qua chỗ khó là khởi tạo --- mà không để một mô hình không được hiệu chuẩn chi phối nghiệm dài hạn.
+
+\begin{cambay}
+\textbf{Một nhân tử có hiệp phương sai sai còn tệ hơn không có nhân tử đó}, và đây là nguyên tắc quan trọng nhất của mục 4.
+
+Lý do nằm ở chính khung MAP. Trọng số \(\Omega = \Sigma^{-1}\) quyết định nhân tử này được tin bao nhiêu \emph{so với} mọi nhân tử khác. Khai \(\Sigma\) quá nhỏ nghĩa là bạn ra lệnh cho bộ giải tin nguồn này hơn tất cả --- và nếu nguồn ấy có sai lệch có hệ thống, sai lệch đó sẽ chảy vào toàn bộ nghiệm, kéo theo cả những phần vốn được ước lượng tốt.
+
+Điều làm nó đặc biệt nguy hiểm: \emph{không có gì cảnh báo}. Phần dư của các nhân tử khác sẽ tăng lên, nhưng bộ giải diễn giải điều đó là ``các nguồn kia kém chính xác'' chứ không phải ``nguồn này sai''. Bạn thấy một hệ thống hội tụ đẹp về một nghiệm sai.
+
+Quy tắc thực hành: trước khi thêm bất kỳ loại nhân tử mới nào vào đồ thị, hãy trả lời được \emph{hiệp phương sai của nó từ đâu ra}. Nếu câu trả lời là ``tôi chỉnh cho tới khi nó chạy'' thì bạn đã có một hằng số tuỳ tiện trong hệ thống, và ba năm sau không ai biết vì sao nó bằng con số đó. Với nguồn học được, câu trả lời trung thực thường là ``tôi không biết'', và lúc đó cách đúng là dùng nó làm khởi tạo chứ không làm ràng buộc.
+\end{cambay}
+
+\begin{ungdung}
+\ud{ORB-SLAM3 \cite{campos2021orbslam3}}{Indirect thuần; landmark XYZ với quản lý cẩn thận}{Chứng minh indirect vẫn cạnh tranh khi front-end và quản lý bản đồ tốt}
+\ud{DSO \cite{engel2018dso}}{Direct thưa; nghịch đảo độ sâu có neo; hai tham số affine mỗi khung}{Cài đặt tham chiếu của mục 2B; đọc cách nó chọn pixel để thấy nguyên tắc phân bố}
+\ud{SVO-Pro \cite{forster2017svo}}{Semi-direct: direct cho tracking, indirect cho mapping}{Mục 2C --- phân công theo thế mạnh thay vì thoả hiệp}
+\ud{MSCKF \cite{mourikis2007msckf}}{Structureless qua chiếu null-space}{Mục 3C --- kỹ thuật làm bộ lọc khả thi}
+\ud{VINS-Mono \cite{qin2018vinsmono}}{Nghịch đảo độ sâu có neo trong cửa sổ trượt}{Cho thấy chi phí thật của việc chuyển neo khi marginalize}
+\ud{Kimera \cite{rosinol2020kimera}}{Thêm nhân tử mặt phẳng và ngữ nghĩa vào đồ thị GTSAM}{Ví dụ về cái giá ẩn ở mục 4B trong một hệ thật}
+\end{ungdung}
+
+\begin{duan}{So sánh ba tham số hoá landmark trên cùng dữ liệu, đặc biệt ở điểm xa}{3 ngày}
+\dmt tự thấy vì sao nghịch đảo độ sâu thắng, và thấy nó thắng \emph{ở đâu} --- vì nó không thắng ở mọi nơi.
+\ddl tự sinh, để kiểm soát được phân bố độ sâu: một quỹ đạo, và ba bản đồ --- toàn điểm gần (\(1\)--\(3\) m), toàn điểm xa (\(20\)--\(100\) m), và trộn cả hai.
+\dbc dựng BA với ba tham số hoá: XYZ, nghịch đảo độ sâu ba ẩn, và nghịch đảo độ sâu một ẩn có neo cố định tia; với mỗi tổ hợp (tham số hoá \(\times\) bản đồ), đo số vòng lặp tới hội tụ, ATE cuối, số điều kiện của \(\Lambda\), và --- quan trọng nhất --- chạy Monte-Carlo để so \emph{phân bố} sai số độ sâu của các điểm xa với một Gauss.
+\dxk bạn có một bảng ba nhân ba, và bạn quan sát được: với bản đồ gần, ba tham số hoá gần như tương đương; với bản đồ xa, XYZ hội tụ chậm hơn rõ rệt và phân bố sai số của nó \emph{lệch} trong khi phân bố theo \(\rho\) thì gần Gauss. Cái sau là kết quả quan trọng nhất và là thứ xác nhận \ptr{A/06} mục 3B bằng số của chính bạn.
+\dnv \ptr{B/09-paradigm-uoc-luong-back-end} chọn kiến trúc dùng các tham số hoá này; \ptr{C/13-quan-ly-ban-do} xử lý chi phí thật của việc chuyển khung neo.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì ``mọi pixel'' thực ra là ``mọi pixel có gradient khác không'' --- vùng phẳng đóng góp Jacobian bằng không, nên ở một bức tường trắng direct cũng nghèo thông tin như indirect. Và cái giá phải trả có ba phần: (a) \emph{mô hình quang trắc} phải đúng, vì thay đổi phơi sáng làm mọi phần dư lệch cùng lượng và bộ giải diễn giải đó là chuyển động; (b) \emph{khởi tạo tốt} là bắt buộc, vì hàm mục tiêu quang trắc cực kỳ không lồi với hàng nghìn cực tiểu địa phương --- đây là giới hạn nghiêm trọng nhất và là lý do direct dễ mất bám khi chuyển động nhanh; (c) khó nhận ra lại sau mất bám, vì không có descriptor để so.}
+\tl{Vì nghiệm thì trùng nhau nhưng \emph{đường đi tới nghiệm} và \emph{mô tả bất định} thì không. Quan hệ phép đo--\(z\) là nghịch đảo, nên nhiễu Gauss trên phép đo cho phân bố \emph{lệch} trên \(z\) (ở giới hạn parallax nhỏ, không có cả kỳ vọng hữu hạn), trong khi trên \(\rho = 1/z\) thì gần Gauss. Hệ quả: với XYZ, xấp xỉ Gauss của hiệp phương sai là mô tả sai, và tuyến tính hoá tệ hơn nên Gauss-Newton hội tụ chậm hơn --- cả hai đúng ở chế độ khó nhất là điểm xa. Thêm nữa, XYZ không biểu diễn được điểm ở vô hạn, trong khi \(\rho=0\) là giá trị hợp lệ, nên ta giữ được các điểm xa vốn rất tốt cho ước lượng xoay.}
+\tl{Thông tin không mất --- nó được chuyển thành một ràng buộc \emph{chỉ giữa các tư thế}, chính là phần thông tin mà landmark mang về hình học tương đối, tách khỏi vị trí cụ thể của nó. Về đại số, đây là phần bù Schur ở \ptr{A/04} viết ở dạng khác, khác duy nhất ở chỗ ta không thế ngược để lấy lại landmark. Nó cho bộ lọc chi phí không phụ thuộc số landmark vì chi phí EKF là bậc ba theo kích thước trạng thái, và trạng thái bây giờ chỉ gồm một cửa sổ tư thế. Cái giá: không có bản đồ để tái sử dụng, nên MSCKF là odometry chứ không phải SLAM --- nó không đóng vòng được.}
+\tl{Vì nó phá vỡ tính khối chéo của khối \(V\) trong Hessian. Phần bù Schur ở \ptr{A/04} mục 4C hoạt động được \emph{chỉ vì} không nhân tử nào nối hai landmark với nhau, nên \(V^{-1}\) tách thành các phép nghịch đảo \(3\times3\) độc lập. Một ràng buộc đồng phẳng là một nhân tử nối nhiều landmark, và nó phá đúng tính chất đó --- toàn bộ lợi thế tính toán biến mất. Cách xử lý: mô hình hoá mặt phẳng như một \emph{landmark riêng} với các điểm nối vào nó, để các điểm lại chỉ nối với một biến chung thay vì nối trực tiếp với nhau.}
+\tl{Ba điều kiện. (a) \emph{Hiệp phương sai trung thực} --- nhưng các mô hình độ sâu học được không đi kèm bất định đã hiệu chuẩn, và bất định của chúng thay đổi mạnh theo loại cảnh. (b) \emph{Sai số gần độc lập giữa các pixel} --- hoàn toàn không đúng, vì một mô hình đơn ảnh sai cả một vùng theo cách tương quan mạnh, nên đưa vào như các prior độc lập là đếm thừa thông tin nghiêm trọng. (c) \emph{Có cổng phát hiện khi ra ngoài phân bố}. Đưa vào sai tệ hơn không dùng vì trọng số quá lớn sẽ kéo cả nghiệm theo một sai lệch có hệ thống, và bộ giải sẽ diễn giải phần dư tăng của các nguồn khác là ``các nguồn kia kém chính xác''. Cách an toàn: dùng làm khởi tạo rồi hạ mạnh trọng số khi đã có đủ quan sát hình học.}
+\end{traloi}
+
+\begin{dongian}
+Bạn muốn biết mình đã đi bao xa, bằng cách so hai bức ảnh chụp trước và sau. Có hai cách làm, và chúng khác nhau ở một điểm duy nhất.
+
+Cách một: chọn ra vài chục thứ dễ nhận trong ảnh --- góc cửa sổ, mép bàn --- rồi xem chúng dịch đi đâu. Bạn không quan tâm hôm nay đèn sáng hơn hay tối hơn, vì góc cửa sổ vẫn là góc cửa sổ. Nhưng nếu bạn đang nhìn một bức tường trắng trơn thì không có gì để chọn, và bạn bó tay.
+
+Cách hai: không chọn gì cả. Chồng hai ảnh lên nhau và trượt qua trượt lại cho tới khi chúng khớp nhất. Bạn dùng được cả những chỗ mờ nhạt mà cách một bỏ qua. Nhưng nếu ai đó vừa bật thêm đèn, hai ảnh sẽ không bao giờ khớp --- và bạn sẽ kết luận nhầm rằng mình đã di chuyển.
+
+Cả hai cách đều đúng, và không cách nào thắng ở mọi nơi. Cách một cần thế giới \emph{có hình thù rõ}; cách hai cần ánh sáng \emph{đừng thay đổi}. Hai đòi hỏi đó chẳng liên quan gì tới nhau, nên có phòng cách này sống cách kia chết, và ngược lại. Đó là lý do tranh luận ``cái nào tốt hơn'' kéo dài hai mươi năm không có kết quả --- vì nó là câu hỏi sai.
+
+Còn một chuyện nữa, về cách ghi lại vị trí của một điểm mốc. Nếu điểm mốc ở gần, ghi ``cách ba mét'' là hợp lý. Nếu nó ở rất xa --- một ngọn núi --- thì ``cách mười ki-lô-mét'' hay ``cách hai mươi ki-lô-mét'' đều là những phỏng đoán tệ như nhau, và ghi con số nào cũng gây hiểu lầm rằng ta biết. Cách khôn hơn là ghi \emph{độ gần}: ``rất gần'', ``khá gần'', ``gần như không gần chút nào''. Với ngọn núi, câu cuối là một mô tả hoàn toàn chính xác --- và quan trọng là, nó vẫn cho biết ngọn núi nằm về \emph{hướng} nào, thứ mà ta biết rất rõ.
+
+\chuadongian{chỗ không rút gọn được là việc \emph{ước lượng bất định của một mô hình học được}. Một cái máy nói ``chỗ này cách ba mét'' --- nhưng nó chắc tới mức nào? Nó không biết, và ta cũng không có cách nào biết hộ nó. Đó là lý do phần cuối chương này khuyên dùng các mô hình ấy để khởi động chứ không để quyết định, và là một trong tám khoảng trống ở \ptr{D/22}.}
+\motcau{Chọn phần dư là chọn hệ thống của bạn sẽ đòi hỏi gì ở thế giới --- và thế giới không phải lúc nào cũng đáp ứng.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{B/08/05}
+
+Mệnh đề chính --- \emph{indirect và direct đòi hỏi hai thứ độc lập từ thế giới, nên không cái nào thắng ở mọi nơi} --- bị bác bỏ nếu một hệ thuộc một họ vượt trội hệ thuộc họ kia trên \emph{mọi} loại môi trường trong một khảo sát có kiểm soát, với cùng phần cứng và cùng mức hiệu chuẩn. Tôi không biết một khảo sát như vậy tồn tại, và tôi nghi ngờ nó sẽ khó thực hiện công bằng vì DSO cần hiệu chuẩn quang trắc mà ORB-SLAM không cần --- nên ``cùng mức hiệu chuẩn'' không định nghĩa được rõ ràng. Đây là một lý do cấu trúc khiến tranh luận này khó giải quyết bằng thực nghiệm \emph{(tôi suy ra, chưa đối chiếu nguồn)}.
+
+Mệnh đề thứ hai --- \emph{nghịch đảo độ sâu cho phân bố gần Gauss còn XYZ thì lệch} --- là hệ quả toán học của việc lan truyền qua hàm nghịch đảo (cửa a, dẫn ở \ptr{A/06}) và kiểm được bằng Monte-Carlo trong mini project (cửa b). Nó bị bác bỏ nếu thí nghiệm cho thấy hai phân bố lệch như nhau --- điều sẽ xảy ra nếu parallax luôn lớn, tức nếu bạn không có điểm xa thật sự.
+
+Mệnh đề thứ ba --- \emph{ràng buộc cấu trúc phá vỡ tính thưa} --- là một sự kiện về cấu trúc ma trận, kiểm được bằng cách nhìn mẫu khác không. Điều \emph{có thể} sai là kết luận thực dụng rằng cái giá đó đáng kể: với bài toán nhỏ hoặc với số ràng buộc ít, nó có thể không đo được. Tôi chưa đo.
+
+Mệnh đề thứ tư --- \emph{một nhân tử có hiệp phương sai sai tệ hơn không có nhân tử đó} --- là mệnh đề tôi tin nhất và cũng là mệnh đề khó kiểm nhất, vì nó đòi so sánh với một chân trị. Nó bị bác bỏ nếu một hệ thêm prior học được với hiệp phương sai đoán bừa vẫn cho ATE tốt hơn hệ không dùng, một cách nhất quán qua nhiều điều kiện. Điều này \emph{có thể} xảy ra khi prior đủ tốt và bài toán gốc đủ thiếu ràng buộc --- và nếu nó xảy ra thì kết luận đúng không phải ``hiệp phương sai không quan trọng'' mà là ``bài toán gốc thiếu thông tin tới mức bất kỳ prior nào cũng giúp'', tức một chẩn đoán thuộc \ptr{A/05}.
+
+\section{Kết nối}
+\ptrtarget{B/08/06}
+
+Nối lên trên. \ptr{A/04-uoc-luong-map-va-bundle-adjustment} là khuôn mà chương này đổ vào, và điều đáng chú ý nhất là khuôn ấy \emph{không đổi gì} dù ta thay indirect bằng direct --- đó là bằng chứng mạnh nhất cho tính tổng quát của nó. \ptr{A/02-mo-hinh-camera} mục~5B là điều kiện tiên quyết cho direct. \ptr{A/06-bat-dinh-va-lan-truyen-sai-so} mục~3B cho lập luận đầy đủ về nghịch đảo độ sâu, và mục~4B cho lý do vì sao hiệp phương sai sai lại nguy hiểm. \ptr{B/07-dac-trung-va-data-association} là đầu vào của indirect, và điều thú vị là với direct thì cả chương đó gần như biến mất --- direct không có bước trích đặc trưng, nhưng nó trả giá bằng yêu cầu khởi tạo tốt.
+
+Nối xuống dưới. \ptr{B/09-paradigm-uoc-luong-back-end} nhận structureless ở mục~3C như một kỹ thuật nền tảng, và bàn về hệ quả kiến trúc của nó --- odometry so với SLAM đầy đủ. \ptr{B/10-khoi-tao} chịu ảnh hưởng trực tiếp: direct cần khởi tạo tốt hơn nhiều so với indirect, nên chiến lược khởi tạo phụ thuộc vào lựa chọn ở chương này. \ptr{C/15-hop-nhat-da-cam-bien} mở rộng nguyên tắc ở khối \emph{Cạm bẫy} mục~4: mỗi nguồn thêm vào đồ thị cần hiệp phương sai đúng và cổng loại outlier riêng. \ptr{C/16-dense-mapping-va-bieu-dien} dùng phần dư quang trắc và độ sâu ở quy mô dày. \ptr{C/17-hoc-may-trong-slam} bàn kỹ hơn về prior học được ở mục~4C, đặc biệt về bài toán hiệu chuẩn bất định.
+
+\ptr{D/19-ben-vung-trong-the-gioi-thuc} là chỗ hai họ phần dư lộ ra chế độ hỏng thật: direct rất nhạy với vật động (vì một vật động làm hỏng cường độ của cả một vùng) và với thay đổi ánh sáng đột ngột. \ptr{D/20-toi-uu-hieu-nang-va-he-thong} là chỗ chi phí tính toán của lựa chọn này được cân: direct có nhiều phần dư hơn hàng chục lần nhưng mỗi phần dư rẻ hơn, và kết quả ròng phụ thuộc vào phần cứng.
+
+\begin{tukiem}
+\item Nêu điều mà indirect cần từ thế giới và điều mà direct cần, rồi nói vì sao hai điều đó độc lập với nhau.
+\item ``Direct dùng mọi pixel.'' Câu đó sai ở chỗ nào, và sự thật là gì?
+\item Vì sao nghịch đảo độ sâu tuyến tính hoá tốt hơn XYZ với điểm xa? Trả lời bằng ngôn ngữ hình dạng phân bố, không bằng ngôn ngữ ``nó chạy tốt hơn''.
+\item Structureless khử landmark khỏi trạng thái. Thông tin đi đâu, và kỹ thuật này liên hệ thế nào với phần bù Schur ở \ptr{A/04}?
+\item Vì sao thêm một ràng buộc đồng phẳng --- một ràng buộc \emph{đúng} --- lại làm bài toán chậm đi nhiều bậc?
+\item Nêu ba điều kiện để đưa một prior độ sâu học được vào đồ thị một cách hợp lệ, và nói điều kiện nào khó thoả nhất.
+\item Vì sao một nhân tử có hiệp phương sai sai lại tệ hơn không có nhân tử đó, và vì sao không có gì cảnh báo khi điều đó xảy ra?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

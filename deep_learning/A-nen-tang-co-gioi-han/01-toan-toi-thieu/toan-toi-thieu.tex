@@ -1,0 +1,146 @@
+% ============================================================================
+%  A/01-toan-toi-thieu — file chương
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: không. Mức độ: cốt lõi, nhưng đọc theo nhu cầu.
+% ============================================================================
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Toán tối thiểu dùng lại suốt đời (The Minimal Mathematics You Reuse Forever)}
+\ptrtarget{A/01}\ptrtarget{A/01-toan-toi-thieu}
+\dependency{không --- đây là chương mở đầu của cây. Chương này chỉ nên đọc \emph{theo nhu cầu}: quay lại đúng mục cần khi một chương ở Phần B, C hay D đòi hỏi, chứ không đọc một mạch từ đầu tới cuối.}
+
+\begin{tomtat}
+Chương này giữ lại đúng phần toán quay lại nhiều lần về sau, chia theo \emph{vai trò} chứ không theo tên môn học. Mục 1 lo không gian và phổ. Mục 2 dựng bộ máy đưa mô hình từ khởi tạo tới nghiệm. Mục 3 nói nguồn gốc của hàm mất mát và độ tin cậy của một con số đo được. Mục 4 nói cấu trúc có sẵn trong dữ liệu ảnh. Đọc xong bạn chẩn đoán được nguyên nhân của một đường cong huấn luyện xấu, suy được loss từ giả định nhiễu thay vì tra bảng, và bắt được các lỗi im lặng ở khâu tiền xử lý. Nếu chỉ nhớ một điều: đây là chương \T{1}, nên đừng học cho đủ --- hãy quay lại đúng mục mà một chương sau đang cần, vì kiến thức học không có nhu cầu đi kèm sẽ bay hết trong hai tuần.
+\end{tomtat}
+
+\begin{nentang}
+\kn{deep learning}{cách tiếp cận trong đó ta xếp chồng nhiều tầng biến đổi có tham số, rồi để dữ liệu tự quyết định các tham số đó thông qua tối ưu hoá, thay vì tự tay thiết kế đặc trưng.}
+\kn{mô hình, tham số, huấn luyện}{mô hình là một hàm có tham số nhận đầu vào và trả về dự đoán; tham số là các con số bên trong nó; huấn luyện là quá trình tìm bộ tham số làm dự đoán sát nhãn nhất.}
+\kn{hàm mất mát (loss function)}{một con số đo mức sai của dự đoán so với nhãn --- đại lượng mà quá trình huấn luyện thực sự cực tiểu.}
+\kn{tensor}{mảng số nhiều chiều; một ảnh màu là tensor ba chiều (cao \(\times\) rộng \(\times\) kênh), một batch ảnh là tensor bốn chiều.}
+\kn{nhãn tầng bán rã \T{1}--\T{4}}{quy ước của cây này về tuổi thọ của tri thức: \T{1} là toán và vật lý gần như không đổi; \T{2} là nguyên lý thiết kế hệ thống; \T{3} là thuật toán và mô hình; \T{4} là thư viện và công cụ, cũ nhanh nhất.}
+\kn{SLAM và hiệu chỉnh chùm tia (bundle adjustment)}{SLAM là bài toán vừa dựng bản đồ vừa định vị trong chính bản đồ đó; hiệu chỉnh chùm tia là bước tinh chỉnh đồng thời mọi tư thế camera và điểm 3D bằng bình phương tối thiểu. Chương này dùng chúng làm điểm neo quen thuộc, không đòi hỏi bạn phải cài được chúng.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Nếu quy tắc chuỗi là thứ ai cũng học từ năm nhất, vì sao tính \en{gradient} cho một mạng \(10^9\) tham số lại từng là chuyện bất khả thi?}
+\h{Vì sao đổi đơn vị từ mét sang milimét trong một bài hiệu chỉnh chùm tia làm số điều kiện đổi ba bậc, trong khi bài toán không hề dễ hay khó đi?}
+\h{Hai mô hình chênh nhau một điểm phần trăm trên tập test 500 mẫu, mà khoảng tin cậy của mỗi mô hình rộng hơn năm điểm --- vậy vì sao kết luận ``A tốt hơn B'' vẫn có thể đúng?}
+\h{Vì sao một mạng dự đoán phép quay bằng bốn số lại khó huấn luyện hơn bằng sáu số, dù bốn số đã \emph{thừa} để mô tả ba bậc tự do?}
+\end{khoigoi}
+
+Mọi lộ trình học deep learning đều bắt đầu bằng một chương toán, và phần lớn người học đều bỏ dở nó. Lý do không phải toán khó mà vì chương đó thường được viết như một giáo trình rút gọn: đầy đủ, tuyến tính, và không nói cho người đọc biết thứ nào sẽ quay lại vào lúc nào. Kết quả là người ta học đại số tuyến tính suốt sáu tuần rồi vẫn không biết vì sao huấn luyện của mình không hội tụ. Chương này cố ý làm ngược lại: chỉ giữ những gì \emph{thật sự} quay lại nhiều lần, và mỗi mục phải trả lời được câu ``thứ này xuất hiện lại ở đâu''.
+
+Cách chia bốn mục theo vai trò, và giữa chúng có phụ thuộc thật chứ không phải thứ tự tuỳ tiện:
+
+\begin{itemize}
+\item \textbf{Mục 1 --- đại số tuyến tính:} bộ từ vựng về không gian và phổ. Trả lời ``bài toán này suy biến ở hướng nào, tôi mất bao nhiêu chữ số''.
+\item \textbf{Mục 2 --- vi phân và tối ưu hoá:} bộ máy đưa mô hình từ khởi tạo tới nghiệm. \emph{Phụ thuộc mục 1}, vì ``hình dạng landscape'' chính là phổ trị riêng của Hessian nói bằng lời khác.
+\item \textbf{Mục 3 --- xác suất và lý thuyết thông tin:} trả lời hai câu mà hai mục trước không đụng tới --- hàm mất mát từ đâu ra, và con số đo được đáng tin đến đâu. \emph{Tiếp nhận câu hỏi mà mục 2 để ngỏ.}
+\item \textbf{Mục 4 --- hình học và tín hiệu:} khác hẳn ba mục kia ở chỗ nó không nói về \emph{cách học} mà về \emph{cấu trúc có sẵn trong dữ liệu ảnh}. Đọc được độc lập, và là cầu nối trực tiếp sang chương \ptr{A/02}.
+\end{itemize}
+
+Thứ tự đọc đề nghị là 1 \(\rightarrow\) 2 \(\rightarrow\) 3, còn mục 4 đọc được bất cứ lúc nào. Với người đã làm SLAM bằng C\texttt{++}, phần lớn mục 1 và nửa đầu mục 4 là ôn tập; bốn chỗ đáng dừng lại vì kinh nghiệm ước lượng trạng thái \emph{không} chuyển sang miễn phí là: số điều kiện đọc theo nghĩa tốc độ huấn luyện, điều kiện dừng theo validation, toàn bộ mục 3, và phần lấy mẫu của mục 4.
+
+\subfile{00-map}
+\subfile{01-dai-so-tuyen-tinh/dai-so-tuyen-tinh}
+\subfile{02-vi-phan-va-toi-uu/vi-phan-va-toi-uu}
+\subfile{03-xac-suat-va-thong-tin/xac-suat-va-thong-tin}
+\subfile{04-hinh-hoc-va-tin-hieu/hinh-hoc-va-tin-hieu}
+
+\section{Thực hành}
+Phần lý thuyết ở trên chỉ trở thành kiến thức dùng được sau khi bạn tự tay chạm vào một lần. Khối dưới đây được thiết kế để tốn ít thời gian nhất mà chạm được vào nhiều điểm nhất; hãy làm mini project ngay cả khi thấy đã hiểu, vì câu hỏi kết thúc nó là câu hỏi mà lý thuyết một mình không trả lời được.
+
+\begin{description}
+\item[Repo và tài nguyên.] Cho phần lý thuyết, \emph{Mathematics for Machine Learning} \cite{deisenroth2020} có PDF miễn phí và đúng liều lượng cho mục tiêu ở đây. Khi cần đối chiếu một đạo hàm ma trận, \repo{matrixcalculus.org} trả lời nhanh hơn tra sách; cần chắc chắn hơn nữa thì \repo{sympy} cho phép derive tay có kiểm chứng ký hiệu. Đạo hàm tự viết phải kiểm bằng \repo{torch.autograd.gradcheck} trên đầu vào kiểu double --- kiểm bằng float32 hay báo sai giả. Ghi chú lan truyền ngược của CS231n vẫn là bản giải thích đồ thị tính toán tốt nhất ở mức nhập môn, dù danh mục kiến trúc trong cùng khoá học thì nên đọc như lịch sử tư duy. Nhóm tài nguyên này ít bị bán rã --- sách toán và công cụ ký hiệu bền hơn nhiều so với tên mô hình dẫn đầu bảng, vốn sẽ cũ trong 6--12 tháng kể từ mốc chốt tháng 9/2026.
+\item[Câu hỏi kiểm tra hiểu.] Ba câu, mỗi câu chạm một mục khác nhau:
+  \begin{itemize}
+  \item Vì sao KL divergence không đối xứng, và sự bất đối xứng đó khiến một mô hình sinh trải mỏng hay chọn một mode?
+  \item Số điều kiện lớn của một ma trận trọng số nói gì về độ ổn định huấn luyện --- và nó \emph{không} nói gì?
+  \item Với tập test 500 mẫu và độ chính xác \(90\%\), khoảng tin cậy \(95\%\) rộng bao nhiêu, và chênh lệch một điểm phần trăm giữa hai mô hình có nghĩa không? Câu trả lời khác nhau ra sao giữa hai phép đo độc lập và một phép so sánh ghép cặp trên cùng tập test?
+  \end{itemize}
+\item[Bài tập phụ.] Cài PCA và \en{whitening} bằng NumPy thuần trên CIFAR-10 --- tự tính ma trận hiệp phương sai, tự phân rã, hiển thị 16 vector riêng đầu tiên dưới dạng ảnh --- rồi trả lời: vì sao whitening gần như không được dùng trong pipeline thị giác hiện đại? Ba lý do đáng tự tìm trước khi đọc gợi ý: chuẩn hoá theo tầng bên trong mạng đã làm một việc tương đương nhưng thích nghi hơn; whitening khuếch đại đúng những hướng phương sai nhỏ vốn chủ yếu là nhiễu cảm biến; và thống kê whitening tính trên tập huấn luyện trở thành một cái bẫy dịch chuyển miền khi triển khai trên camera khác. Nửa ngày, và nó xa SLAM --- bài chính của chương nằm ở khối mini project bên dưới.
+\end{description}
+
+
+\begin{onbai}
+\ar[3]{Phép chiếu vuông góc}{Phép hạ một vector xuống không gian con gần nó nhất, sao cho phần dư vuông góc với không gian đó. Mọi bài bình phương tối thiểu \emph{là} một phép chiếu; phương trình chuẩn tắc chỉ là cách viết lại điều kiện vuông góc.}
+\ar[2]{SVD}{Phân rã giá trị kỳ dị: cách viết một ma trận bất kỳ thành xoay, kéo dãn theo vài trục, rồi xoay lần nữa. Dùng để đọc hạng, để xấp xỉ hạng thấp, và để ép một ma trận nhiễu về \(SO(3)\).}
+\ar[3]{Số điều kiện}{Tỉ số giữa trị kỳ dị lớn nhất và nhỏ nhất. Nó là hệ số khuếch đại sai số của \emph{bài toán}, nên đổi solver hay đổi optimizer không cứu được. Nó vô nghĩa khi so giữa hai cách chọn đơn vị đo khác nhau.}
+\ar[2]{Xấp xỉ hạng thấp}{Giữ lại \(k\) trị kỳ dị lớn nhất để có ma trận hạng \(k\) gần bản gốc nhất. Đứng sau PCA, sau phép chiếu về \(SO(3)\), và sau LoRA.}
+\ar[1]{Hạng hiệu dụng}{Entropy của phổ trị kỳ dị đã chuẩn hoá. Cần nó vì với số dấu phẩy động hầu như không trị kỳ dị nào bằng đúng không, nên đếm số trị khác không là vô nghĩa.}
+\ar[2]{Vì sao lập \(A^\top A\) làm mất chữ số có nghĩa?}{Vì trị kỳ dị bị bình phương, nên số điều kiện cũng bình phương. Bạn mất khoảng một nửa số chữ số; QR hoặc SVD giải thẳng trên \(A\) thì không.}
+\ar[3]{Lan truyền ngược}{Thuật toán tính gradient bằng cách đi ngược đồ thị phép tính đúng một lượt. Nó rẻ vì mỗi lượt trả về đạo hàm theo \emph{mọi} tham số, nhưng phải giữ lại giá trị trung gian của lượt xuôi nên tốn bộ nhớ.}
+\ar[3]{Lan truyền ngược so với lượt ngược}{Lan truyền ngược là \emph{thuật toán}; lượt ngược là \emph{một lần chạy} thuật toán đó trên một batch. Hai từ này hay bị dùng lẫn.}
+\ar[3]{Quy tắc khớp shape}{Gradient của một đại lượng phải có đúng shape của chính nó, nên thường chỉ còn một cách ghép hợp lệ. Khớp shape trước, dấu và hệ số sau; phần còn lại kiểm bằng \code{gradcheck} ở kiểu double.}
+\ar[2]{Điểm yên ngựa}{Điểm có gradient bằng không nhưng độ cong âm theo ít nhất một hướng. Trong không gian nhiều triệu chiều, gần như mọi điểm dừng đều là yên ngựa chứ không phải cực tiểu địa phương.}
+\ar[2]{Vì sao chuẩn hoá và Adam làm huấn luyện nhanh hơn?}{Cả hai kéo các hướng về cùng thang đo, tức hạ số điều kiện một cách gián tiếp. Khi các trục gần bằng nhau, một learning rate chung mới vừa cho mọi hướng.}
+\ar[2]{Loss thành NaN sau vài trăm bước --- nguyên nhân?}{Learning rate quá lớn, hoặc tràn số ở độ chính xác 16 bit. Phân biệt: hạ learning rate mười lần mà vẫn NaN thì là tràn số, hãy bật loss scaling hoặc đổi sang bf16.}
+\ar[3]{Độ hợp lý}{Xác suất mà mô hình gán cho dữ liệu đã quan sát, xem như hàm của tham số. Cực đại nó tương đương cực tiểu âm log của nó --- và đó chính là gần hết các hàm mất mát đang dùng.}
+\ar[3]{Sai số chuẩn}{Với độ chính xác đo trên \(n\) mẫu, nó bằng \(\sqrt{p(1-p)/n}\). Với \(n=500\) và \(p=0{,}9\) thì bằng \(1{,}34\) điểm, nên khoảng tin cậy \(95\%\) rộng hơn năm điểm. Nó phình to khi các mẫu không độc lập.}
+\ar[2]{Phân kỳ KL}{Chi phí phụ trội khi mã hoá dữ liệu của phân phối này bằng bảng mã của phân phối kia. Không đối xứng: chiều xuôi ép mô hình phủ mọi mode, chiều ngược ép nó bám lấy một mode.}
+\ar[2]{Vì sao hồi quy độ sâu bằng MSE cho ra biên mờ?}{Vì ở biên, độ sâu thật là đa phương thức, còn MSE giả định Gaussian đơn phương thức. Mô hình buộc phải trả về trung bình của hai đáp án đúng, tức một giá trị sai ở giữa.}
+\ar[1]{Loss ban đầu của bài 1000 lớp bằng 2 --- nghĩa là gì?}{Nghi có rò rỉ nhãn. Khởi tạo hợp lý phải cho khoảng \(\ln 1000\approx 6{,}9\); nếu ngược lại nó bằng 20 thì lỗi nằm ở khởi tạo hoặc ở tầng cuối.}
+\ar[3]{Aliasing}{Hiện tượng thành phần tần số cao \emph{gập} xuống thành tần số thấp giả khi lấy mẫu quá thưa. Nó không làm mất thông tin một cách trung thực mà bịa thêm cấu trúc không có thật.}
+\ar[2]{Đẳng biến tịnh tiến}{Tính chất dịch ảnh rồi lọc cũng bằng lọc rồi dịch. Convolution có tính chất này, nhưng bước stride và pooling phá nó, nên CNN không thật sự bất biến với dịch chuyển.}
+\ar[2]{Vì sao không cho mạng xuất ra quaternion?}{Vì \(q\) và \(-q\) là cùng một phép quay, nên hàm mục tiêu gián đoạn, mà một mạng liên tục thì không khớp nổi hàm gián đoạn. Cách sáu số rồi trực giao hoá thì liên tục.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{PyTorch, JAX}{Toàn bộ \en{autograd} là hiện thực của vi phân chế độ ngược trên đồ thị tính toán --- đúng mạch ở mục 2}{Hạ tầng, ổn định từ 2017; ít bán rã nhất trong bảng này}
+\ud{Ceres, g2o, GTSAM}{Bình phương tối thiểu phi tuyến với phân rã thưa và damping --- phép chiếu cộng điều hoà số học của mục 1}{Hạ tầng SLAM; chính là chỗ nối với nền sẵn có của bạn}
+\ud{LoRA và họ tinh chỉnh hiệu quả tham số}{Giả thiết ma trận cập nhật trọng số có hạng thấp, tức định lý xấp xỉ hạng thấp}{Cách tinh chỉnh mặc định cho mô hình lớn tính tới 9/2026}
+\ud{AdamW}{Tách weight decay khỏi bước thích nghi --- hệ quả trực tiếp của việc Adam đổi thang đo từng toạ độ}{Optimizer mặc định của phần lớn mô hình lớn hiện nay}
+\ud{Đặc trưng Fourier trong NeRF và họ biểu diễn ngầm}{Mã hoá đầu vào bằng nhiều tần số, vì mạng vốn khớp tần số thấp trước}{Ý tưởng còn sống trong các biến thể dựng cảnh gần đây}
+\end{ungdung}
+
+
+\begin{duan}{Đo số điều kiện của bài toán tư thế trên hai chuỗi EuRoC}{vài giờ tới một ngày}
+\dmt biến ba khái niệm trừu tượng nhất của chương --- phép chiếu, SVD, số điều kiện --- thành ba con số đọc được trên chính hệ SLAM bạn đang chạy. Câu cần trả lời: chuỗi nào khó hơn, và khó vì \emph{hình học chuyển động} chứ không vì thuật toán.
+\ddl hai chuỗi EuRoC có đặc tính chuyển động khác hẳn nhau --- một chuỗi tịnh tiến rộng và một chuỗi có nhiều đoạn xoay gần tại chỗ --- cùng chân trị tư thế đi kèm tập dữ liệu. Không cần dữ liệu tự quay.
+\dbc (1) với mỗi \en{keyframe}, lấy chính ma trận Jacobian mà solver của bạn đã dựng cho bài tối ưu tư thế, hoặc dựng lại bằng cách xếp các hàng ràng buộc sai số tái chiếu của những điểm đang bám được. (2) Cân lại thang đo hai khối biến trước khi so sánh --- tịnh tiến tính bằng mét, quay tính bằng radian --- vì nếu không thì số điều kiện chỉ phản ánh lựa chọn đơn vị. (3) Tính phổ trị kỳ dị bằng SVD và ghi \(\kappa=\sigma_{\max}/\sigma_{\min}\) theo thời gian cho cả hai chuỗi. (4) Ở mỗi chỗ phải chuẩn hoá một ma trận quay ước lượng, hãy làm bằng SVD: đặt cả ba trị kỳ dị bằng một. Ghi lại độ lệch trực giao \emph{trước} khi chiếu, như một chỉ báo sức khoẻ số học. (5) Tính \en{RPE} bằng \repo{evo} trên cửa sổ trượt để có một đường sai số cùng trục thời gian.
+\dxk bạn có một hình duy nhất, vẽ hai đường \(\kappa\) theo thời gian trên cùng trục. Trên đó bạn chỉ ra các đoạn \(\kappa\) vọt lên, và đối chiếu chúng với đoạn chuyển động gần thuần quay hoặc điểm gần đồng phẳng. Cuối cùng bạn nêu một ngưỡng \(\kappa\) mà vượt qua thì RPE cửa sổ trượt tăng rõ trên cả hai chuỗi.
+\dnv \ptr{A/01/01} cho SVD và số điều kiện; \ptr{A/01/04} cho phép chiếu về \(SO(3)\); \ptr{A/02/03} cho lý do hình học khiến cấu hình gần thuần quay là suy biến. Đường \(\kappa\) theo thời gian sinh ra ở đây được dùng lại làm biến giải thích trong mini project của chương 2.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì chi phí nằm ở \emph{thứ tự} nhân các Jacobian, không ở quy tắc chuỗi. Nhân ngược từ phía đầu ra vô hướng cho mọi đạo hàm trong một lượt; nhân theo chiều xuôi thì tốn một lượt cho mỗi tham số.}
+\tl{Vì số điều kiện đo tỉ số giữa trục dài nhất và trục ngắn nhất của bài toán \emph{sau khi đã chọn đơn vị}; đổi đơn vị chỉ co giãn các trục chứ không đổi lượng thông tin mà dữ liệu ràng buộc. Nên chỉ so sánh được khi cách tham số hoá giữ nguyên.}
+\tl{Vì đặt hai khoảng tin cậy độc lập cạnh nhau là phép so sánh sai. Trên cùng một tập test, hai mô hình sai ở phần lớn cùng những mẫu khó, nên chỉ các mẫu \emph{bất đồng} mới mang thông tin --- và kiểm định ghép cặp trên chúng có độ bất định nhỏ hơn nhiều.}
+\tl{Vì không tồn tại phép tham số hoá liên tục của \(SO(3)\) bằng ba hay bốn số: quaternion phủ hai lần nên hàm mục tiêu gián đoạn, mà một mạng liên tục theo đầu vào thì không khớp nổi hàm gián đoạn. Sáu số rồi trực giao hoá thì liên tục.}
+\end{traloi}
+
+
+\begin{dongian}
+Hãy tưởng tượng bạn phải tìm chỗ thấp nhất của một thung lũng, giữa sương mù dày, và chỉ nhìn được mặt đất ngay dưới chân. Cách duy nhất là sờ xem phía nào dốc xuống rồi bước một bước về phía đó. Chương này là ba câu hỏi nảy ra từ đúng tình huống ấy.
+
+Thung lũng này hình gì? Nhiều thung lũng thật ra là một khe rất hẹp và rất dài: đi ngang thì dốc đứng, đi dọc thì gần như bằng phẳng. Không biết điều đó thì bạn cứ nảy qua nảy lại giữa hai vách mà chẳng tiến xuống bao nhiêu. Có một phép tính cho biết khe hẹp gấp bao nhiêu lần chiều dài của nó, và con số ấy dự báo trước bạn sẽ phải chờ lâu cỡ nào.
+
+Bước bao nhiêu là vừa? Bước dài thì văng qua vách bên kia, bước ngắn thì cả đời không tới đáy.
+
+Làm sao biết mình đã xuống thật? Cái đồng hồ đo độ cao trong tay có sai số. Nếu nó sai chừng hai mét mà bạn khoe vừa xuống thêm một mét, thì bạn chưa khoe được gì.
+
+Cái giá: mọi mẹo trong chương chỉ làm khe rộng ra một chút cho dễ đi, chứ không ai vén được sương mù.
+
+\chuadongian{vì sao dừng ở một cái đáy rộng lại cho kết quả bền hơn dừng ở đáy nhọn thì tới nay chưa có lời giải thích vừa gọn vừa đúng --- và ngay cả chữ ``rộng'' cũng đổi nghĩa khi ta đổi cách viết các con số mô tả mô hình.}
+\motcau{Toán ở chương này chỉ để trả lời ba câu: thung lũng hẹp theo hướng nào, bước bao nhiêu thì an toàn, và khi nào cái đồng hồ đo mới thật sự nói rằng bạn đã xuống thấp hơn.}
+\end{dongian}
+
+\section{Kết nối}
+Chương này là tiền đề kỹ thuật của cả cây, nhưng nó nối ra ngoài theo ba hướng rất khác nhau. Hướng thứ nhất đi sang \ptr{A/02-vat-ly-tao-anh}: phần lấy mẫu và phần hình học của mục 4 được dùng gần như liên tục ở đó, nên đây là nhánh nên đọc tiếp ngay. Hướng thứ hai đi sang Phần B, nơi các đại lượng ở đây đổi vai. Số điều kiện và bộ nhớ kích hoạt không còn là tính chất toán học; chúng trở thành \emph{ràng buộc thiết kế}, đứng cạnh ràng buộc về nhãn và về độ trễ. Hướng thứ ba đi sang \code{E}: toàn bộ mục 3 là bộ công cụ mà chương đánh giá dùng hằng ngày, và nếu bỏ qua nó thì mọi bảng kết quả về sau đều đọc sai.
+
+\subsection*{Tổng kết chương}
+Chương này đã dựng bốn công cụ và, quan trọng hơn, đã gắn mỗi công cụ vào một câu hỏi cụ thể sẽ quay lại. Không gian con và phép chiếu cho ta cách đọc mọi bài bình phương tối thiểu; phổ và số điều kiện cho ta ngôn ngữ chung giữa ``bài toán suy biến'' trong ước lượng trạng thái và ``landscape khó tối ưu'' trong huấn luyện. Bộ máy vi phân cho ta quy tắc khớp shape trước rồi mới lo dấu, cùng hiểu biết vì sao lan truyền ngược đắt về bộ nhớ chứ không về phép tính. Xác suất và lý thuyết thông tin cho thấy hàm mất mát không phải phát minh rời rạc. Nó là âm log độ hợp lý của một giả định phân phối. Kèm theo đó là thói quen tính sai số trước khi tin một con số. Hình học và tín hiệu cho ta cấu trúc có sẵn của dữ liệu ảnh cùng hai câu hỏi phòng vệ: đã lọc trước khi giảm mẫu chưa, và biểu diễn quay này có liên tục không.
+
+Còn bỏ ngỏ khá nhiều, và bỏ ngỏ có chủ ý. Chương này không đụng tới lý thuyết học thống kê --- vì sao học được từ mẫu hữu hạn --- đó là nội dung của Phần B. Nó không đụng tới tối ưu hoá lồi ở mức chứng minh, không đụng tới giải tích ngẫu nhiên hay lý thuyết ma trận ngẫu nhiên, và cố ý chỉ chạm Lie group ở đúng ba thao tác dùng được. Nếu sau này bạn thấy cần sâu hơn ở một nhánh, đó là dấu hiệu tốt: nhu cầu thật xuất hiện trước, việc học đến sau. Nhánh nên đọc tiếp ngay là \ptr{A/02-vat-ly-tao-anh}, nơi phần lấy mẫu và phần hình học của mục 4 được dùng liên tục.
+\begin{tukiem}
+\item Mục 1 nói số điều kiện là tính chất của \emph{bài toán} nên đổi solver không cứu được, còn mục 2 nói chuẩn hoá và Adam làm huấn luyện nhanh hơn nhờ hạ số điều kiện. Hai phát biểu này mâu thuẫn ở chỗ nào, và giả định nào khác nhau khiến cả hai cùng đúng?
+\item Bài bình phương tối thiểu của mục 1 và âm log độ hợp lý Gauss của mục 3 là cùng một thứ viết hai cách. Nếu đổi giả định nhiễu sang một phân phối đuôi nặng, công cụ nào của mục 1 --- phương trình chuẩn tắc, phép chiếu, số điều kiện --- còn dùng được và cái nào mất?
+\item Bản đồ độ sâu của bạn mờ dọc theo mọi biên vật thể. Mục 3 và mục 4 cho hai nguyên nhân khác hẳn nhau cho cùng triệu chứng đó; hai nguyên nhân là gì, và phép thử nào phân biệt chúng mà không cần huấn luyện lại?
+\item Bạn cho mạng xuất sáu số rồi trực giao hoá bằng SVD để có một phép quay. Thao tác đó nằm trong đồ thị tính toán, nên mục 2 đòi hỏi thêm điều gì mà mục 4 chưa nói tới, và chuyện gì xảy ra khi hai trị kỳ dị gần bằng nhau?
+\item Ghép điều kiện dừng của mục 2 với sai số chuẩn của mục 3: vì sao ``val loss không giảm thêm sau nhiều epoch'' là quy tắc dừng có nghĩa hơn ``chuẩn gradient nhỏ'', và quy tắc đó vẫn hỏng trong trường hợp nào?
+\item Whitening bằng PCA và chuẩn hoá bên trong mạng đều nhằm kéo các hướng về cùng thang đo. Vì sao chỉ cái sau sống sót trong pipeline hiện đại, và lý do đó liên quan thế nào tới việc phổ trị riêng thay đổi trong lúc huấn luyện?
+\item Đường \(\kappa\) theo thời gian trong mini project chỉ đọc được sau khi bạn cân lại thang đo giữa khối tịnh tiến và khối quay. Nếu bỏ bước cân đó, đường \(\kappa\) có còn vọt lên ở các đoạn gần thuần quay không, và khi đó bạn đang đo cái gì?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

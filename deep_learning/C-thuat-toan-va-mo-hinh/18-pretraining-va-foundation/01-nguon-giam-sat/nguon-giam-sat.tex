@@ -1,0 +1,299 @@
+% ============================================================================
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: B/06-chat-luong-du-lieu, B/09-thiet-ke-ham-mat-mat,
+%              C/13-kien-truc-backbone, C/14-bai-toan-cv-loi
+%  Mức độ: cốt lõi
+% ============================================================================
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Nguồn giám sát ngày càng rẻ (Increasingly Cheap Supervision)}
+\ptrtarget{C/18-pretraining-va-foundation/01}\ptrtarget{C/18-pretraining-va-foundation/01-nguon-giam-sat}\ptrtarget{C/18/01}\ptrtarget{C/18/01-nguon-giam-sat}
+\dependency{\ptr{B/06-chat-luong-du-lieu} (nhãn đắt và bẩn tới mức nào); \ptr{B/09-thiet-ke-ham-mat-mat} (\en{contrastive loss}, cross-entropy); \ptr{C/13-kien-truc-backbone/03-vit-va-inductive-bias} (vì sao ViT cần nhiều dữ liệu hơn CNN); \ptr{C/14-bai-toan-cv-loi} (\en{open-vocabulary detection} là hệ quả trực tiếp của mục này).}
+
+\begin{tomtat}
+Mục này xếp bốn nguồn giám sát theo chi phí giảm dần: nhãn của người khác, chính bức ảnh, dòng chữ đi kèm ảnh, và khả năng suy luận mượn từ một mô hình ngôn ngữ. Với mỗi nguồn, mục nói rõ nó chống nghiệm tầm thường bằng cơ chế nào và hỏng ở đâu. Đọc xong, trước một bài toán có vài trăm ảnh nhãn, bạn quyết được ngay ba việc: đóng băng hay tinh chỉnh, chọn backbone tự giám sát nào, và công thức augmentation nào sẽ phá hỏng đúng tín hiệu bạn cần. Đoán mò ba việc đó thì mỗi cái tốn vài ngày GPU mới biết là sai. Nếu chỉ nhớ một điều: mỗi bất biến bạn ép vào augmentation chính là một loại thông tin bạn cố tình vứt đi, nên hãy liệt kê các bất biến đó trước khi sao chép công thức của bất kỳ paper nào.
+\end{tomtat}
+
+\begin{nentang}
+\kn{nhãn (label) và tín hiệu giám sát}{nhãn là đáp án đúng gắn với một mẫu dữ liệu; tín hiệu giám sát là bất cứ thứ gì đóng vai trò đáp án để tính hàm mất mát. Mọi ý tưởng trong mục này là cách tạo tín hiệu giám sát mà không phải trả tiền cho nhãn.}
+\kn{đặc trưng (feature) và embedding}{đặc trưng là vector số mà mạng sinh ra để mô tả một bức ảnh; \en{embedding} là cách gọi khác khi ta quan tâm tới hình học của không gian đó --- ảnh giống nhau thì vector gần nhau.}
+\kn{đóng băng (frozen) và linear probe}{đóng băng là giữ nguyên trọng số backbone, không cho gradient cập nhật. \en{Linear probe} là huấn luyện đúng một tầng tuyến tính trên đặc trưng đóng băng --- phép thử rẻ nhất để xem đặc trưng có chứa thông tin cần thiết hay không.}
+\kn{fine-tune (tinh chỉnh)}{huấn luyện tiếp một mô hình đã có trọng số, thường với \en{learning rate} nhỏ hơn nhiều lần để không xoá mất thứ nó đã học.}
+\kn{augmentation}{biến đổi ngẫu nhiên áp lên ảnh lúc huấn luyện (cắt, lật, đổi màu, làm mờ) nhằm dạy mô hình rằng những biến đổi đó không làm đổi đáp án. Chính vì thế nó cũng \emph{xoá} thông tin: bất biến nào bạn dạy thì thông tin đó mất.}
+\kn{contrastive (tương phản)}{kiểu học kéo các cặp ``giống nhau'' lại gần và đẩy các cặp ``khác nhau'' ra xa trong không gian đặc trưng. Cặp giống nhau gọi là \en{positive}, cặp khác nhau gọi là \en{negative}.}
+\kn{masked modeling}{che một phần đầu vào rồi bắt mô hình khôi phục phần bị che. Vì đáp án chính là dữ liệu gốc, không cần nhãn nào cả.}
+\kn{zero-shot}{dùng mô hình cho một lớp hoặc một tác vụ mà nó chưa từng được huấn luyện trên đó, chỉ bằng cách mô tả lớp ấy bằng ngôn ngữ.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Nhãn đắt, dữ liệu không nhãn thì gần như vô hạn. Một bộ ảnh nội soi có nhãn tổn thương cần bác sĩ ngồi vẽ \en{mask}; một bộ ảnh vệ tinh có nhãn loại đất cần chuyên gia đối chiếu thực địa. Trong khi đó, ổ cứng của cùng bệnh viện hay cùng cơ quan trắc địa chứa hàng triệu ảnh chưa ai chạm vào. Toàn bộ mục này là chuỗi câu trả lời ngày càng táo bạo cho một câu hỏi duy nhất: \emph{tín hiệu giám sát miễn phí có thể lấy từ đâu?}
+
+Câu hỏi nghe như một mẹo tiết kiệm chi phí, nhưng nó thực ra là câu hỏi về bản chất của việc học. Nhãn do người viết ra không phải thứ duy nhất mang thông tin về thế giới. Thông tin còn nằm ở ba chỗ khác. Hai bức ảnh chụp cùng một vật phải cho đặc trưng giống nhau. Phần bị che của một bức ảnh đoán được từ phần còn lại. Và dòng chú thích dưới một bức ảnh trên internet nói về đúng bức ảnh đó. Mỗi lần ngành khai thác được một nguồn như vậy, chi phí trên mỗi đơn vị giám sát giảm một bậc. Cái giá cũng tăng một bậc: tín hiệu gián tiếp hơn, nhiễu hơn, và khó truy ra mô hình đã học gì hơn.
+
+\textbf{Học xong mục này thì làm được gì mà trước đó không làm được?} Bạn nhìn một bài toán có 300 ảnh nhãn và quyết được ngay: đóng băng hay tinh chỉnh, chọn \en{backbone} tự giám sát nào, và công thức \en{augmentation} nào sẽ phá hỏng chính tín hiệu bạn cần. Đoán mò ba quyết định đó thì mỗi cái tốn vài ngày GPU mới lộ ra là sai.
+
+Hình~\ref{fig:dong-thoi-gian-giam-sat} đặt cả chuỗi lên một trục thời gian trước khi ta đi vào từng bước. Điều đáng nhìn không phải các mốc năm mà là \emph{hai mũi tên ngược chiều nhau} ở hai bên: chi phí đi xuống trong khi mức gián tiếp đi lên. Toàn bộ chương là câu chuyện về việc đánh đổi giữa hai trục ấy.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  ev/.style={draw=steel, fill=bluebg, rounded corners=2pt, align=center, inner sep=4pt, text width=2.9cm, font=\footnotesize},
+  ar/.style={-{Latex[length=2.2mm]}, draw=inkblue, thick}]
+\draw[-{Latex[length=3mm]}, draw=tiercol, thick] (-0.4,-0.6) -- (15.2,-0.6) node[right, font=\footnotesize]{thời gian};
+\node[ev] (a) at (0.9,3.6) {\textbf{Nhãn thủ công}\\ ImageNet, 2012\\ \emph{đắt nhất}};
+\node[ev] (b) at (4.4,2.7) {\textbf{Nhãn của người khác}\\ transfer, $\sim$2014};
+\node[ev] (c) at (7.9,1.8) {\textbf{Chính bức ảnh}\\ SimCLR, BYOL, MAE\\ 2020--2022};
+\node[ev] (d) at (11.2,1.0) {\textbf{Chữ đi kèm ảnh}\\ CLIP, 2021};
+\node[ev] (e) at (14.3,0.2) {\textbf{Mượn LLM}\\ VLM, 2023--2026};
+\draw[ar] (a) -- (b); \draw[ar] (b) -- (c); \draw[ar] (c) -- (d); \draw[ar] (d) -- (e);
+\draw[-{Latex[length=3mm]}, draw=steel, very thick] (-0.9,4.0) -- (-0.9,0.2)
+  node[midway, left, rotate=90, anchor=south, font=\footnotesize\itshape, align=center]{chi phí trên mỗi\\ đơn vị giám sát};
+\draw[-{Latex[length=3mm]}, draw=reddark, very thick] (16.0,0.2) -- (16.0,4.0)
+  node[midway, right, rotate=270, anchor=south, font=\footnotesize\itshape, align=center]{mức gián tiếp,\\ khó kiểm chứng};
+\end{tikzpicture}}
+\caption{Bốn nguồn giám sát trên một trục thời gian. Mỗi bước đi xuống một bậc chi phí và đi lên một bậc gián tiếp; không bước nào miễn phí thật sự, chúng chỉ dời hoá đơn từ ``thuê người gán nhãn'' sang ``không biết mô hình đã học gì''.}
+\label{fig:dong-thoi-gian-giam-sat}
+\end{figure}
+
+\begin{trucgiac}
+Nghĩ về nó như bài toán trắc địa. Để dựng một bản đồ, bạn không cần toạ độ tuyệt đối của từng cột mốc --- một việc đắt như thuê máy đo GNSS cho mỗi điểm. Bạn chỉ cần đủ nhiều \emph{ràng buộc tương đối} giữa các cột mốc (khoảng cách, góc), rồi giải hệ; hình dạng mạng lưới hiện ra chính xác, chỉ còn thiếu một phép biến đổi toàn cục --- \en{gauge} --- mà một vài điểm chuẩn rẻ tiền là ghim lại được.
+
+Học tự giám sát làm đúng như vậy trong không gian đặc trưng. Mỗi cặp \en{augmentation} của cùng một ảnh là một ràng buộc ``hai điểm này phải gần nhau''; mỗi cặp ảnh khác nhau là ràng buộc ``hai điểm này phải xa nhau''. Giải cả hệ ra được một không gian đặc trưng có hình dạng đúng nhưng chưa gắn nhãn --- tức là xác định tới một \en{gauge}. Vài trăm ảnh có nhãn sau đó đóng vai trò các điểm chuẩn: \en{linear probe} chính là bước ghim \en{gauge}, và nó rẻ vì nó chỉ phải xác định một phép biến đổi chứ không phải toàn bộ hình dạng.
+\end{trucgiac}
+
+\begin{mach}[Mạch chính --- bốn nguồn giám sát, theo thứ tự rẻ dần]
+\item \vd{gán nhãn cho bài toán của mình quá đắt, nhưng người khác đã gán nhãn cho bài toán của họ.} \gp \vn{học chuyển giao}{transfer learning}: lấy trọng số đã học trên ImageNet \cite{deng2009imagenet} làm điểm khởi đầu thay vì khởi tạo ngẫu nhiên. \gd các tầng đầu của mạng học những thứ chung cho mọi ảnh tự nhiên --- cạnh, kết cấu, gradient màu --- nên chúng không phụ thuộc vào việc nhãn đầu ra là gì. \gia bạn thừa hưởng cả những thiên lệch của nguồn, kể cả những thiên lệch bạn không muốn.
+\item \vd{ngay cả nhãn của người khác cũng có giới hạn, và miền của bạn có thể chẳng ai gán nhãn.} \gp \vn{học tự giám sát}{self-supervised learning}: tạo bài toán phụ mà đáp án suy ra được từ chính bức ảnh. \gd cấu trúc thống kê của ảnh đủ giàu để ép mô hình học biểu diễn có nghĩa khi ta buộc nó giải bài toán phụ đó. \vdm bài toán phụ có nghiệm tầm thường --- mô hình xuất ra một hằng số là thoả mọi ràng buộc ``giống nhau''. Chống lại sụp biểu diễn (\emph{collapse}: mọi ảnh cho cùng một vector) này là toàn bộ nội dung kỹ thuật của mảng này.
+\item \vd{ảnh tự nó không nói cho ta biết ngữ nghĩa; nó chỉ nói về tương quan pixel.} \gp CLIP và tiền huấn luyện \vn{thị giác--ngôn ngữ}{vision-language} \cite{radford2021clip}: dùng dòng chú thích đi kèm ảnh trên internet làm giám sát. \hq ngôn ngữ trở thành nguồn giám sát ngữ nghĩa rẻ nhất từng có, và nó mang theo một tập nhãn \emph{mở} thay vì 1000 lớp cố định. \gia dữ liệu web bẩn, thiên lệch, và không kiểm toán được.
+\item \vd{mô hình vẫn chỉ nhận dạng, chưa suy luận.} \gp \vn{mô hình thị giác--ngôn ngữ}{vision-language model, VLM} --- nối một \en{vision encoder} vào một LLM đã biết suy luận qua một tầng chiếu hoặc \en{cross-attention} \cite{li2023blip2,liu2023llava}. \gd biểu diễn thị giác có thể được ``phiên dịch'' thành thứ mà không gian \en{token} của LLM hiểu được, và phần suy luận không cần học lại. \gia đắt, khó kiểm soát, và \vn{ảo giác}{hallucination} của phần ngôn ngữ lan sang phần thị giác.
+\item \hq tích luỹ của cả bốn bước: \vn{mô hình nền tảng}{foundation model} trở thành một \emph{thành phần dựng sẵn}, giống thư viện BLAS chứ không giống một mô hình. Nhiều khi dùng đặc trưng đã tiền huấn luyện tốt hơn hẳn tự train, \emph{kể cả trong lĩnh vực hẹp} như ảnh y tế hay ảnh vệ tinh. Điều này trái trực giác, nhưng đã lặp lại đủ nhiều lần để tin \cite{oquab2024dinov2}.
+\end{mach}
+
+\subsection{B. Nguồn 1 --- nhãn của người khác (Transfer Learning)}
+Học chuyển giao là kỹ thuật cũ nhất và vẫn là kỹ thuật đáng thử đầu tiên. Điều đáng nói không phải ``nó hoạt động'', mà là \emph{quyết định thực tế gói gọn trong một bảng bốn ô}. Học thuộc bảng này tiết kiệm rất nhiều thí nghiệm vô ích.
+
+\begin{table}[H]\centering\small
+\caption{Bốn ô quyết định của học chuyển giao. Trục dọc là khoảng cách miền, trục ngang là lượng dữ liệu có nhãn của bạn.}
+\label{tab:bon-o-transfer}
+\begin{tabularx}{\linewidth}{@{}L{3.4cm}YY@{}}
+\toprule
+& \textbf{Dữ liệu ít} & \textbf{Dữ liệu nhiều}\\
+\midrule
+\textbf{Miền giống nguồn} & \en{Linear probe} trên đặc trưng đóng băng & \en{Fine-tune} toàn bộ\\
+\textbf{Miền khác nguồn} & \en{Fine-tune} vài tầng cuối, \en{augmentation} mạnh & \en{Fine-tune} toàn bộ; cân nhắc train từ đầu\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Nói gọn thì} lôgic bên dưới Bảng~\ref{tab:bon-o-transfer} chỉ có một câu: \emph{số tham số bạn cho phép thay đổi phải tương xứng với lượng thông tin mới mà dữ liệu của bạn mang tới}. Đây chính là trục đánh đổi giả định--dữ liệu đã gặp ở \ptr{B/04-nen-tang-hoc-tu-du-lieu}, lần này xuất hiện dưới dạng ``mở bao nhiêu tầng''. Ba hệ quả cụ thể:
+
+\lk{B/04}{cùng nguyên lý với}{đây chính là trục đánh đổi giả định--dữ liệu, lần này xuất hiện dưới dạng ``mở bao nhiêu tầng thì vừa với lượng nhãn đang có.}
+
+\begin{itemize}
+\item \textbf{Dữ liệu ít $\Rightarrow$ mở ít.} Mở toàn bộ mạng là mời gọi \en{overfitting} và \vn{quên thảm khốc}{catastrophic forgetting} --- mạng quên đặc trưng tổng quát để chạy theo vài trăm mẫu.
+\item \textbf{Miền xa $\Rightarrow$ thay tầng cuối.} Các tầng cuối chứa thông tin chuyên biệt của nguồn nên phải thay; các tầng đầu vẫn dùng được vì cạnh vẫn là cạnh.
+\item \textbf{Cả hai điều kiện thuận $\Rightarrow$ tiền huấn luyện chỉ còn là khởi tạo tốt.} Khi bạn có nhiều dữ liệu và miền xa, lợi ích của tiền huấn luyện thu hẹp dần và đôi khi biến mất.
+\end{itemize}
+
+Một chi tiết dễ bị bỏ qua: chất lượng mô hình nguồn trên ImageNet có tương quan với chất lượng chuyển giao, nhưng tương quan đó \emph{yếu đi rõ rệt} khi miền đích xa \cite{kornblith2019better}. Nói cách khác, đừng chọn \en{backbone} chỉ vì nó đứng cao trên bảng ImageNet; với ảnh nội soi hay ảnh radar, thứ hạng đó gần như không mang thông tin.
+
+\subsection{C. Nguồn 2 --- chính bức ảnh (Self-Supervised Learning)}
+Học tự giám sát tách thành ba triết lý khác nhau về cùng một câu hỏi: làm sao tạo tín hiệu từ hư không mà không rơi vào nghiệm tầm thường. Hình~\ref{fig:ba-triet-ly-ssl} cho thấy ba \emph{cấu trúc đồ thị tính toán} khác nhau, và chính sự khác nhau về cấu trúc --- chứ không phải về \vn{hàm mất mát}{loss function} --- mới là điều đáng nhớ.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  box/.style={draw=steel, fill=bluebg, rounded corners=2pt, minimum height=7mm, minimum width=15mm, inner sep=3pt},
+  enc/.style={box, fill=violetbg, draw=violetdark},
+  ar/.style={-{Latex[length=2mm]}, draw=inkblue, thick}]
+
+\node[align=center] at (0,2.5) {\bfseries Tương phản};
+\node[box] (c1) at (-1,1.5) {view 1};
+\node[box] (c2) at (1,1.5)  {view 2};
+\node[box] (c3) at (3,1.5)  {ảnh khác};
+\node[enc] (ce1) at (-1,0.4) {enc};
+\node[enc] (ce2) at (1,0.4)  {enc};
+\node[enc] (ce3) at (3,0.4)  {enc};
+\draw[ar] (c1)--(ce1); \draw[ar] (c2)--(ce2); \draw[ar] (c3)--(ce3);
+\draw[{Latex[length=2mm]}-{Latex[length=2mm]}, thick, draw=steel] (ce1) -- node[below,font=\footnotesize]{kéo gần} (ce2);
+\draw[{Latex[length=2mm]}-{Latex[length=2mm]}, thick, draw=reddark] (ce2) -- node[below,font=\footnotesize]{đẩy xa} (ce3);
+\node[font=\footnotesize, align=center] at (1,-0.75) {chống sụp bằng\\ lực đẩy tường minh};
+
+\begin{scope}[xshift=6.6cm]
+\node[align=center] at (1,2.5) {\bfseries Tự chưng cất};
+\node[box] (d1) at (0,1.5) {view 1};
+\node[box] (d2) at (2,1.5) {view 2};
+\node[enc] (de1) at (0,0.4) {student};
+\node[enc] (de2) at (2,0.4) {teacher};
+\draw[ar] (d1)--(de1); \draw[ar] (d2)--(de2);
+\draw[ar] (de2) -- node[below,font=\footnotesize]{mục tiêu} (de1);
+\node[font=\footnotesize, align=center] at (1,-0.75) {chống sụp bằng bất đối xứng:\\ teacher = EMA, \emph{stop-grad}};
+\end{scope}
+
+\begin{scope}[xshift=13.4cm]
+\node[align=center] at (1,2.5) {\bfseries Masked modeling};
+\node[box] (m1) at (0,1.5) {ảnh che 75\%};
+\node[enc] (me) at (0,0.4) {enc};
+\node[box] (md) at (2,0.4) {decoder};
+\node[box] (mo) at (2,1.5) {pixel gốc};
+\draw[ar] (m1)--(me); \draw[ar] (me)--(md); \draw[ar] (md)--(mo);
+\node[font=\footnotesize, align=center] at (1,-0.75) {không cần chống sụp:\\ mục tiêu không có nghiệm hằng};
+\end{scope}
+\end{tikzpicture}}
+\caption{Ba triết lý tự giám sát khác nhau ở \emph{cấu trúc đồ thị}, không ở hàm mất mát. Tương phản chống sụp bằng lực đẩy từ \en{negative}; tự chưng cất chống sụp bằng bất đối xứng kiến trúc; \en{masked modeling} không cần chống sụp vì khôi phục pixel không có nghiệm hằng số.}
+\label{fig:ba-triet-ly-ssl}
+\end{figure}
+
+\begin{table}[H]\centering\footnotesize
+\caption{Ba họ tự giám sát. Cột cuối là cột đáng tiền nhất.}
+\label{tab:ba-ho-ssl}
+\begin{tabularx}{\linewidth}{@{}L{2.0cm}YYL{3.5cm}@{}}
+\toprule
+\textbf{Triết lý} & \textbf{Cơ chế chống sụp} & \textbf{Giả định ngầm} & \textbf{Hỏng khi nào}\\
+\midrule
+\vn{Tương phản}{contrastive} \newline (SimCLR, MoCo) & Lực đẩy tường minh từ rất nhiều \en{negative} & Hai ảnh khác nhau trong \en{batch} thì thực sự khác lớp & Dữ liệu ít lớp hoặc lặp nhiều: \en{negative} hoá ra là \en{positive}; \en{batch} nhỏ làm tín hiệu yếu\\
+\vn{Tự chưng cất}{self-distillation} \newline (BYOL, DINO) & Bất đối xứng kiến trúc: teacher \en{EMA} (trung bình trượt, cập nhật chậm theo student), \en{stop-gradient}, \en{centering} & Điểm cố định của động lực học huấn luyện không phải hằng số & Cơ chế mong manh: đổi tốc độ EMA hay bỏ \en{predictor} là sụp; rất nhạy siêu tham số\\
+\en{Masked modeling} \newline (MAE) & Không cần: khôi phục pixel không có nghiệm tầm thường & Ngữ nghĩa nằm trong khả năng nội suy phần bị che & Đặc trưng thô, \en{linear probe} kém; phải \en{fine-tune} mới mạnh --- tức đắt hơn ở phía sau\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng~\ref{tab:ba-ho-ssl} nói rằng ba họ không cạnh tranh trên cùng một trục. Tương phản \cite{chen2020simclr,he2020moco} và tự chưng cất \cite{grill2020byol,caron2021dino} cho đặc trưng dùng được ngay với \en{linear probe}, hợp khi bạn định đóng băng \en{backbone}. Masked modeling \cite{he2022mae} cho đặc trưng cần tinh chỉnh, hợp khi bạn có đủ dữ liệu đích và muốn tận dụng khả năng mở rộng của ViT.
+
+\subsubsection{Ví dụ nhỏ nhất: nhiệt độ quyết định gradient nằm ở đâu}
+Lấy một \en{batch} bốn ảnh. Đặc trưng đã chuẩn hoá, \vn{độ tương đồng cosine}{cosine similarity} của cặp dương là $0{,}9$ và của ba cặp âm đều là $0{,}1$. Hàm InfoNCE \cite{oord2018cpc} cho một mẫu là
+\[
+L = -\log \frac{e^{s^{+}/\tau}}{e^{s^{+}/\tau} + \sum_{j} e^{s^{-}_j/\tau}} .
+\]
+Đọc bằng lời: đây là cross-entropy của một bài toán phân loại mà ``lớp đúng'' là bạn đồng hành của chính mình, còn $\tau$ quyết định phân phối đó nhọn tới mức nào. Thay số cho ba giá trị \vn{nhiệt độ}{temperature}:
+
+\begin{itemize}
+\item $\tau = 1$: \quad $L = -\log(2{,}460/5{,}775) = 0{,}853$
+\item $\tau = 0{,}5$: \quad $L = -\log(6{,}050/9{,}714) = 0{,}474$
+\item $\tau = 0{,}1$: \quad $L = -\log(8103{,}1/8111{,}2) = 0{,}0010$
+\end{itemize}
+
+Ba con số nói rõ một điều mà công thức tổng quát giấu đi. Ở nhiệt độ thấp, một cặp đã tách được ở mức tầm thường ($0{,}9$ so với $0{,}1$) đóng góp gần như \emph{không} gradient; toàn bộ gradient dồn vào những \en{negative} có độ tương đồng gần với \en{positive}. Nhiệt độ vì thế không phải siêu tham số trang trí --- nó là núm vặn quyết định hàm mất mát chú ý tới \en{negative} khó tới mức nào. Vặn quá thấp thì mô hình chỉ học từ vài cặp khó nhất và trở nên nhạy với nhãn nhiễu ngầm; vặn quá cao thì mọi cặp đóng góp như nhau và biểu diễn không tách được các lớp gần nhau. Đây đúng là cơ chế đã gặp ở \ptr{B/09-thiet-ke-ham-mat-mat} dưới tên \en{hard negative mining}, chỉ khác là ở đây nó được điều khiển bằng một số thực thay vì bằng một bộ lọc.
+
+\lk{B/09}{cùng nguyên lý với}{nhiệt độ dồn gradient về các cặp khó chính là hard negative mining, chỉ khác là ở đây nó được điều khiển bằng một số thực thay vì bằng một bộ lọc.}
+
+\subsection{D. Nguồn 3 --- văn bản đi kèm ảnh (Vision-Language Pretraining)}
+CLIP giữ nguyên ý tưởng tương phản nhưng đổi định nghĩa cặp dương: thay vì hai \en{augmentation} của cùng một ảnh, cặp dương là (ảnh, dòng chú thích của chính nó), và cặp âm là mọi tổ hợp chéo còn lại trong \en{batch}. Với \en{batch} kích thước $N$, một lượt tính cho ma trận $N \times N$ độ tương đồng và $2N$ bài toán phân loại $N$ lớp --- đó là lý do CLIP thèm \en{batch} lớn tới mức bất thường.
+
+Hình~\ref{fig:clip-matrix} cho thấy vì sao một \en{batch} lớn lại quan trọng đến thế: mỗi lượt chỉ có $N$ ô dương trên đường chéo nhưng $N^2 - N$ ô âm, nên tăng $N$ làm số ràng buộc âm tăng theo bình phương trong khi chi phí mã hoá chỉ tăng tuyến tính.
+
+\begin{figure}[H]\centering
+\resizebox{0.93\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  enc/.style={draw=violetdark, fill=violetbg, rounded corners=2pt, minimum width=22mm, minimum height=8mm, inner sep=3pt, font=\footnotesize},
+  io/.style={draw=steel, fill=bluebg, rounded corners=2pt, minimum width=16mm, minimum height=6mm, inner sep=2pt, font=\footnotesize},
+  cell/.style={draw=rulecol, fill=white, minimum size=8mm, inner sep=0pt, font=\footnotesize},
+  poscell/.style={draw=violetdark, fill=violetbg, minimum size=8mm, inner sep=0pt, font=\footnotesize\bfseries},
+  ar/.style={-{Latex[length=2mm]}, draw=inkblue, thick}]
+\foreach \i in {1,...,4} {\node[io] (im\i) at (0, {3.6-0.9*(\i-1)}) {ảnh \(I_\i\)};}
+\node[enc] (ie) at (2.6,2.25) {encoder ảnh};
+\foreach \i in {1,...,4} {\draw[ar] (im\i) -- (ie);}
+\foreach \j in {1,...,4} {\node[io] (tx\j) at ({5.0+0.9*(\j-1)}, 6.6) {\(T_\j\)};}
+\node[enc] (te) at (6.35,5.4) {encoder văn bản};
+\foreach \j in {1,...,4} {\draw[ar] (tx\j) -- (te);}
+\foreach \i in {1,...,4} {\foreach \j in {1,...,4} {\node[cell] at ({5.0+0.9*(\j-1)}, {3.6-0.9*(\i-1)}) {\(-\)};}}
+\foreach \i in {1,...,4} {\node[poscell] at ({5.0+0.9*(\i-1)}, {3.6-0.9*(\i-1)}) {\(+\)};}
+\draw[ar] (ie) -- (4.4,2.25);
+\draw[ar] (te) -- (6.35,4.3);
+\node[font=\footnotesize\itshape, color=steel, align=left, anchor=west] at (9.0,2.25)
+  {ma trận \(N\times N\) độ tương đồng\\ \(N\) ô dương (đường chéo)\\ \(N^2-N\) ô âm (còn lại)\\[0.3em] tăng \(N\): chi phí mã hoá tăng tuyến tính,\\ số ràng buộc âm tăng theo bình phương};
+\end{tikzpicture}}
+\caption{CLIP đổi định nghĩa cặp dương: thay vì hai \en{augmentation} của cùng một ảnh, cặp dương là (ảnh, chú thích của chính nó). Một lượt cho $N$ bài toán phân loại theo hàng và $N$ bài theo cột trên cùng một ma trận --- đó là toàn bộ lý do CLIP thèm \en{batch} lớn bất thường.}
+\label{fig:clip-matrix}
+\end{figure}
+
+
+Nhận thức then chốt không nằm ở kiến trúc mà ở tính chất của tín hiệu:
+
+\begin{itemize}
+\item \textbf{Nhãn ImageNet} là một hàm từ ảnh vào một tập 1000 phần tử \emph{cố định}.
+\item \textbf{Chú thích văn bản} là một hàm vào một không gian ngữ nghĩa \emph{mở}.
+\end{itemize}
+
+Hệ quả trực tiếp là phân loại \en{zero-shot}: muốn thêm một lớp mới, bạn viết thêm một câu chứ không gán thêm nhãn. Hệ quả xa hơn là toàn bộ dòng \vn{phát hiện từ vựng mở}{open-vocabulary detection} và phân vùng ở chương 14. Chúng chỉ ghép bộ đề xuất vùng với không gian \en{embedding} văn bản này, nên mọi điểm yếu của CLIP di truyền nguyên vẹn sang đó.
+
+\lk{C/14}{hệ quả của}{phát hiện từ vựng mở là bộ đề xuất vùng cắm vào chính không gian embedding này, nên nó thừa hưởng nguyên vẹn điểm yếu của CLIP về quan hệ không gian và đếm.}
+
+Cái giá thì cụ thể và đã được đo nhiều lần. Mô hình học từ chú thích web hành xử gần với một túi từ hơn là một bộ phân tích cú pháp: nó phân biệt tốt ``có con chó'' với ``có con mèo'', nhưng yếu ở quan hệ không gian (``con mèo bên trái con chó''), ở đếm số lượng, và ở phủ định. Kết quả \en{zero-shot} còn nhạy với cách viết \en{prompt} tới mức khó chịu. Chênh lệch giữa \code{"a photo of a \{\}"} và \code{"\{\}"} có thể tới vài điểm phần trăm. Hãy đọc con số đó như dấu hiệu mô hình chưa ổn định, không phải như một mẹo tối ưu.
+
+\subsection{E. Nguồn 4 --- ghép thị giác vào một LLM (Multimodal LLM)}
+Bước tiếp theo hỏi: nếu đã có một mô hình ngôn ngữ biết suy luận, tại sao phải dạy lại phần suy luận cho thị giác? Kiến trúc VLM vì thế rất đơn giản về ý tưởng và gồm đúng ba khối:
+
+\begin{enumerate}
+\item \textbf{Vision encoder} --- thường là CLIP hoặc SigLIP --- biến ảnh thành một chuỗi \en{token} thị giác.
+\item \textbf{Khối kết nối} --- một MLP chiếu, hoặc một tập truy vấn học được kiểu Q-Former \cite{li2023blip2} --- đưa chuỗi đó về cùng không gian với \en{token} văn bản.
+\item \textbf{LLM} --- xử lý chuỗi hỗn hợp hệt như xử lý văn bản thuần \cite{liu2023llava}.
+\end{enumerate}
+
+Trọng tâm thiết kế nằm ở khối thứ hai, và nó là một cuộc đánh đổi kinh điển. Chiếu MLP thẳng giữ nguyên số \en{token} thị giác nên giữ được chi tiết không gian, nhưng làm chuỗi dài ra và chi phí \en{attention} tăng theo bình phương. Nén xuống một số ít \en{token} truy vấn thì rẻ, nhưng chính bước nén đó vứt đi thông tin định vị --- và đó là lý do nhiều VLM mô tả ảnh trôi chảy nhưng chỉ sai vị trí. Cái được là VQA, \en{grounding}, \en{captioning} và điều khiển giao diện bằng một mô hình duy nhất; cái mất là chi phí, khả năng kiểm soát, và một dạng lỗi mới: mô hình bịa ra chi tiết không có trong ảnh với đúng giọng tự tin mà phần ngôn ngữ đã học được.
+
+Hình~\ref{fig:vlm-connector} đặt hai biến thể của khối kết nối cạnh nhau, vì chính chỗ này quyết định VLM của bạn định vị được hay không.
+
+\begin{figure}[H]\centering
+\resizebox{0.95\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  b/.style={draw=steel, fill=bluebg, rounded corners=2pt, align=center, inner sep=4pt, text width=2.5cm, font=\footnotesize},
+  c/.style={draw=violetdark, fill=violetbg, rounded corners=2pt, align=center, inner sep=4pt, text width=2.9cm, font=\footnotesize},
+  l/.style={draw=inkblue, fill=amberbg, rounded corners=2pt, align=center, inner sep=4pt, text width=2.3cm, font=\footnotesize},
+  tk/.style={draw=tiercol, fill=white, minimum width=3.4mm, minimum height=6mm, inner sep=0pt},
+  ar/.style={-{Latex[length=2mm]}, draw=inkblue, thick}]
+\node[b] (v1) at (0,2.6) {ảnh \(\rightarrow\) encoder\\ \(N\) token thị giác};
+\node[c] (k1) at (4.0,2.6) {\textbf{chiếu MLP}\\ giữ nguyên \(N\) token};
+\node[l] (m1) at (8.2,2.6) {LLM};
+\draw[ar] (v1) -- (k1); \draw[ar] (k1) -- (m1);
+\foreach \x in {0,...,7} {\node[tk] at ({6.2+0.22*\x},2.6) {};}
+\node[font=\scriptsize\itshape, color=steel, anchor=west, text width=5.4cm] at (10.0,2.6)
+  {giữ chi tiết không gian, nhưng chuỗi dài \(\Rightarrow\) chi phí \en{attention} tăng theo bình phương};
+\node[b] (v2) at (0,0.2) {ảnh \(\rightarrow\) encoder\\ \(N\) token thị giác};
+\node[c] (k2) at (4.0,0.2) {\textbf{truy vấn học được}\\ nén còn \(k \ll N\) token};
+\node[l] (m2) at (8.2,0.2) {LLM};
+\draw[ar] (v2) -- (k2); \draw[ar] (k2) -- (m2);
+\foreach \x in {0,...,2} {\node[tk] at ({6.6+0.22*\x},0.2) {};}
+\node[font=\scriptsize\itshape, color=reddark, anchor=west, text width=5.4cm] at (10.0,0.2)
+  {rẻ, nhưng chính bước nén vứt thông tin định vị \(\Rightarrow\) mô tả trôi chảy mà chỉ sai chỗ};
+\end{tikzpicture}}
+\caption{Hai cách nối bộ mã hoá thị giác vào một LLM. Số ô nhỏ giữa khối kết nối và LLM là số \en{token} thị giác thực sự đi vào chuỗi; đó là đại lượng duy nhất quyết định cả chi phí lẫn khả năng định vị, nên đây là lựa chọn thiết kế quan trọng nhất của một VLM.}
+\label{fig:vlm-connector}
+\end{figure}
+
+
+\subsection{F. Kết quả tích luỹ --- mô hình nền tảng như một thành phần}
+Điều đáng ngạc nhiên nhất của cả mục không phải là mô hình nền tảng mạnh, mà là nó mạnh \emph{ở những nơi lẽ ra nó không nên mạnh}. Lấy đặc trưng DINOv2 hoặc DINOv3 đóng băng rồi gắn thêm một đầu tuyến tính, bạn thường thắng một mạng train từ đầu ngay trên dữ liệu chuyên ngành \cite{oquab2024dinov2}. Điều đó đúng với ảnh nội soi, ảnh vệ tinh và ảnh vi thể, ở mức vài trăm tới vài nghìn nhãn. Trực giác thông thường nói dữ liệu trong miền phải thắng dữ liệu ngoài miền; thực nghiệm nói vài trăm mẫu không đủ để học lại những thống kê ảnh cơ bản mà 140 triệu ảnh đã học hộ.
+
+Điều này thay đổi vị trí của bạn trong hệ thống: bạn không còn là người huấn luyện mô hình mà là người \emph{tích hợp} nó --- giống hệt việc dùng một solver phi tuyến có sẵn thay vì tự viết Levenberg--Marquardt. Và cũng giống hệt như vậy, trách nhiệm chuyển từ ``mô hình có đúng không'' sang ``tôi có biết mô hình này giả định gì và hỏng ở đâu không''.
+
+\subsection{G. Giới hạn và trường hợp hỏng}
+\begin{itemize}
+\item \textbf{``Mở trọng số'' không đồng nghĩa với ``mở''.} Một số \en{backbone} tự giám sát mạnh nhất phát hành kèm giấy phép riêng hạn chế dùng thương mại, và dữ liệu huấn luyện thì hầu như không bao giờ được công bố. Với sản phẩm, đây là ràng buộc cứng cần kiểm tra \emph{trước} khi chạy thí nghiệm.
+\item \textbf{Chuyển giao thất bại có hệ thống khi vật lý tạo ảnh khác nguồn} --- ảnh nhiệt, radar, ảnh sự kiện, đa phổ. Ở đó thống kê tần số, phân bố nhiễu và cả số kênh đều khác, nên giả định ``cạnh vẫn là cạnh'' không còn đúng (xem \ptr{A/02-vat-ly-tao-anh/04-cam-bien-khac-va-domain-gap}).
+\item \textbf{Tự giám sát không miễn nhiễm với thiên lệch dữ liệu; nó chỉ làm thiên lệch khó nhìn hơn}, vì không còn bảng phân bố nhãn để kiểm tra. Nếu 90\% ảnh không nhãn của bạn chụp ban ngày, biểu diễn học ra sẽ tốt ban ngày và không ai cảnh báo bạn.
+\item \textbf{Đánh giá bằng \en{linear probe} che giấu rất nhiều.} Một biểu diễn có thể tuyến tính phân tách tốt các lớp phổ biến mà vẫn vô dụng cho định vị chính xác --- đúng loại thất bại quan trọng nhất nếu đầu ra của bạn là hộp, \en{mask} hay tương ứng điểm.
+\end{itemize}
+
+\begin{cambay}
+Bất biến mà bạn ép vào \en{augmentation} chính là thông tin bạn cố tình vứt đi. \en{Color jitter} mạnh dạy mô hình rằng màu không quan trọng --- một thảm hoạ nếu tác vụ đích là phát hiện gỉ sét, phân loại nhuộm mô bệnh học, hay đọc đèn tín hiệu. \en{Random resized crop} dạy mô hình rằng tỉ lệ không quan trọng --- một thảm hoạ nếu bạn cần ước lượng kích thước thật. Trước khi sao chép một công thức \en{augmentation} từ paper tự giám sát, hãy liệt kê các bất biến nó áp đặt và đối chiếu từng cái với thứ tác vụ của bạn cần \emph{phân biệt}.
+\end{cambay}
+
+\begin{cannho}
+Mỗi bước trong chuỗi này đổi \emph{nhãn đắt và chính xác} lấy \emph{tín hiệu rẻ và gián tiếp}. Nó gần như luôn có lãi, nhưng cái bạn mất là khả năng biết mô hình đã học gì --- và bạn chỉ phát hiện ra điều đó ở đúng những trường hợp biên mà bạn quan tâm nhất. Hệ quả hành động: với mọi mô hình nền tảng, hãy tự thu một tập đánh giá nhỏ trên đúng phân phối triển khai trước khi tin bất kỳ con số nào. \T{2}
+\end{cannho}
+
+\subsection{H. Kết nối}
+Mục này là tiền đề trực tiếp của \ptr{C/14-bai-toan-cv-loi}: phát hiện từ vựng mở chỉ là bộ đề xuất vùng cắm vào không gian \en{embedding} CLIP. Nó đối lập với \ptr{B/06-chat-luong-du-lieu}. Chương kia lập luận rằng chất lượng nhãn quyết định trần hiệu năng; mục này lập luận rằng phần lớn tín hiệu lấy được mà không cần nhãn. Cả hai đều đúng, và ranh giới nằm ở chỗ bạn cần \emph{ngữ nghĩa} hay cần \emph{biểu diễn}. Về phía sau, \ptr{C/18/02-kinh-te-hoc-pretraining} trả lời câu hỏi định lượng: đầu tư compute vào đâu, và khi nào tinh chỉnh đáng giá hơn đóng băng.
+
+\begin{tukiem}
+\item Vì sao BYOL không sụp về nghiệm hằng số dù không có một \en{negative} nào, và bỏ thành phần nào thì nó sụp?
+\item Với 500 ảnh nội soi, \en{linear probe} trên DINOv3 hay \en{fine-tune} toàn bộ ResNet ImageNet sẽ thắng, và lập luận đó dựa trên đại lượng nào --- ``số tham số được phép thay đổi so với lượng thông tin mới'' nói gì ở đây?
+\item Hạ nhiệt độ $\tau$ trong InfoNCE làm gradient dịch chuyển đi đâu, và tác dụng phụ nào xuất hiện khi tập dữ liệu có nhiều ảnh gần trùng nhau?
+\item MAE cho \en{linear probe} kém hơn DINO nhưng tinh chỉnh lại tốt hơn. Điều đó nói gì về loại thông tin mà hai mục tiêu huấn luyện giữ lại?
+\item Vì sao ``mở trọng số'' không đồng nghĩa với ``mở'', và điều đó ảnh hưởng gì tới lựa chọn \en{backbone} cho một sản phẩm thương mại?
+\item Tác vụ nào sẽ bị công thức \en{augmentation} chuẩn của SimCLR làm hỏng biểu diễn, và bất biến nào bị ép sai ở đó?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

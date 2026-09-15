@@ -1,0 +1,23 @@
+\documentclass[../vslam.tex]{subfiles}
+\begin{document}
+\part{FRONT-END VÀ BACK-END}
+\begin{tomtat}
+Phần B là phần dài nhất và là chỗ lĩnh vực này thật sự sống. Nó chia đôi theo đúng ranh giới mà mọi hệ thống SLAM tự chia: front-end lo việc \emph{tìm ra phép đo} từ pixel, back-end lo việc \emph{ghép phép đo thành trạng thái}. Sáu chương đi theo thứ tự một khung hình được xử lý: trích và khớp đặc trưng (chương 7), chọn dạng phần dư (chương 8), chọn kiến trúc ước lượng (chương 9), khởi động hệ thống từ số không (chương 10), phát hiện và đóng vòng khi quay lại chỗ cũ (chương 11), và tìm lại mình khi lạc (chương 12). Nếu chỉ nhớ một điều: \emph{front-end quyết định hệ thống hỏng theo kiểu nào, back-end quyết định nó chính xác tới đâu} --- và trong triển khai thật, kiểu hỏng quan trọng hơn độ chính xác.
+\end{tomtat}
+
+Ranh giới front-end / back-end không phải một quy ước tuỳ tiện mà là một đường phân chia có cơ sở. Front-end giải bài toán \term{data association} --- pixel nào ở khung này tương ứng với pixel nào ở khung kia, hoặc với landmark nào trong bản đồ. Đó là một bài toán \emph{tổ hợp}, có lời giải đúng hoặc sai, và sai thì sai thảm hoạ. Back-end giải bài toán \term{ước lượng} --- cho các tương ứng, tìm trạng thái tốt nhất. Đó là bài toán \emph{liên tục}, có lời giải chính xác hơn hoặc kém chính xác hơn, và sai thì sai từ từ.
+
+Hai loại sai ấy đòi hai loại công cụ, và đó là lý do sâu xa của sự phân chia. Chống lỗi tổ hợp cần dư thừa và kiểm định: RANSAC, kiểm tra hình học, ngưỡng chấp nhận bảo thủ. Chống lỗi liên tục cần mô hình đúng và trọng số đúng. Dùng công cụ của bên này cho bên kia thì hỏng --- và một trong những lỗi thiết kế phổ biến là hy vọng back-end sẽ ``chịu đựng được'' một front-end tồi. Nó chịu được vài phần trăm outlier; nó không chịu được một loop closure sai, và \ptr{B/11} nói vì sao.
+
+Sáu chương có mức đầu tư rất khác nhau. Chương 7 và 8 là hai chương mà mọi hệ thống đều phải quyết định, và quyết định của chúng định hình mọi thứ còn lại --- đó là lý do chúng đứng đầu. Chương 9 là chương hợp nhất: nó cho thấy bộ lọc, cửa sổ trượt, smoothing gia tăng và full batch đều là cùng một bài toán MAP của \ptr{A/04} với các lựa chọn khác nhau về marginalize cái gì và tuyến tính hoá lại bao nhiêu lần; hiểu điều đó thì việc chuyển qua lại giữa các thế giới trở nên tự nhiên. Chương 10 và 11 là hai chương về hai khoảnh khắc đặc biệt của một hệ thống --- lúc bắt đầu và lúc quay lại --- và cả hai đều là chỗ \ptr{A/05} trả công. Chương 12 là chương về khoảnh khắc thứ ba, lúc lạc đường, và nó là chương gần với sản phẩm nhất trong phần này.
+
+Thứ tự đọc đề xuất là tuần tự. Một ngoại lệ: nếu bạn đã đọc \code{../IMU\_Fusion/}, chương 9 ở đây chồng lấn với chương 8 và 9 ở đó; phần chồng lấn được viết lại từ góc nhìn thị giác, và chỗ nào cây kia nói sâu hơn thì ở đây trỏ sang.
+\subfile{00-map}
+\subfile{07-dac-trung-va-data-association/dac-trung-va-data-association}
+\subfile{08-mo-hinh-phan-du/mo-hinh-phan-du}
+\subfile{09-paradigm-uoc-luong-back-end/paradigm-uoc-luong-back-end}
+\subfile{10-khoi-tao/khoi-tao}
+\subfile{11-loop-closure-va-nhat-quan-toan-cuc/loop-closure-va-nhat-quan-toan-cuc}
+\subfile{12-relocalization/relocalization}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

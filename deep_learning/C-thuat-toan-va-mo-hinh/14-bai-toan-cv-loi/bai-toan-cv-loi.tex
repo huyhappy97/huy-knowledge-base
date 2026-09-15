@@ -1,0 +1,158 @@
+\documentclass[../../deep_learning.tex]{subfiles}
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: C/13 (backbone), B/09 (loss), B/07 (đánh giá). Mức độ: cốt lõi.
+\begin{document}
+\chapter{Bài toán CV lõi: nhận dạng, phát hiện, phân vùng (Core Vision Tasks: Recognition, Detection, Segmentation)}
+\ptrtarget{C/14}\ptrtarget{C/14-bai-toan-cv-loi}
+\dependency{\ptr{C/13-kien-truc-backbone} (backbone, stride, attention); \ptr{B/09-thiet-ke-ham-mat-mat} (loss đa nhiệm, mất cân bằng); \ptr{B/07-chia-du-lieu-va-danh-gia} (mAP, mIoU, đánh giá theo lát). \T{3}}
+
+\begin{tomtat}
+Chương này lắp các ``đầu'' bài toán lên trên backbone của chương trước, và đọc toàn bộ lịch sử detection lẫn segmentation theo một trục duy nhất: từng bước nuốt các heuristic bên ngoài vào bên trong mạng, tức biến một khối không nhận gradient thành một khối được tối ưu cho đúng mục tiêu cuối. Đọc xong bạn phát biểu được một bài toán thị giác mới dưới dạng đúng, chọn được họ mô hình từ ràng buộc chứ không từ bảng xếp hạng, và đọc được một bảng so sánh detector với đúng mức hoài nghi. Nếu chỉ nhớ một điều: những chi tiết không được viết trong abstract --- cách gán mẫu, tỉ lệ mẫu dương/âm, lịch huấn luyện --- thường giải thích chênh lệch kết quả nhiều hơn hình vẽ kiến trúc ở trang đầu.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mô hình và huấn luyện}{mô hình là một hàm có hàng triệu tham số biến ảnh thành dự đoán; huấn luyện là chỉnh dần các tham số đó để dự đoán khớp nhãn, bằng cách đi ngược hướng \emph{gradient} của hàm mất mát.}
+\kn{hàm mất mát (loss function)}{một số duy nhất đo mức sai của dự đoán. Đây là thứ định nghĩa ``đúng'' nghĩa là gì, nên đổi hàm mất mát là đổi bài toán chứ không phải đổi mô hình.}
+\kn{backbone, neck, head}{backbone biến ảnh thành lưới đặc trưng; neck trộn các lưới ở nhiều độ phân giải; head là phần nhỏ phía trên sinh ra đầu ra của một bài toán cụ thể. Ba bài toán khác nhau thường dùng chung backbone và chỉ khác head.}
+\kn{chân trị (ground truth)}{đáp án do người gán cho mỗi ảnh --- khung, mask, hay nhãn lớp. Mô hình chỉ học được đúng những gì nhãn nói, kể cả khi nhãn sai.}
+\kn{IoU}{diện tích giao chia diện tích hợp của hai vùng; bằng 1 khi trùng khít, 0 khi rời nhau. Nó là đơn vị đo cơ bản của cả detection lẫn segmentation.}
+\kn{mAP và mIoU}{hai thước đo tổng: mAP cho detection (diện tích dưới đường precision--recall, trung bình theo lớp và theo ngưỡng IoU), mIoU cho segmentation (IoU trung bình theo lớp).}
+\kn{heuristic}{một quy tắc viết tay, không có tham số học được, do đó không nhận gradient và không tự chỉnh theo lỗi cuối. Ví dụ: NMS, ngưỡng IoU khi gán mẫu, công thức chọn tầng của FPN.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao thay đúng một quy tắc gán mẫu --- một hàm chục dòng nằm trong code, không có trong abstract --- lại đổi kết quả nhiều hơn thay cả backbone?}
+\h{R-CNN chạy backbone hai nghìn lần mỗi ảnh, Fast R-CNN chạy một lần. Vì sao bản một lần lại \emph{chính xác hơn} chứ không chỉ nhanh hơn?}
+\h{NMS chỉ là một vòng lặp xoá khung trùng. Vì sao suốt mười năm không ai ``nuốt'' được nó vào mạng, trong khi selective search thì nuốt được ngay?}
+\h{Nếu bỏ đúng một phép làm tròn toạ độ mà chất lượng mask nhảy vọt, điều đó nói gì về việc bạn nên tin phần nào của một paper?}
+\h{Semantic, instance và panoptic segmentation từng là ba code base riêng. Việc chúng gộp được vào một mô hình là dấu hiệu của cái gì?}
+\end{khoigoi}
+
+Chương trước cho bạn cái máy trích đặc trưng; chương này hỏi phải gắn cái gì lên trên nó để trả lời những câu hỏi mà thế giới thật đặt ra. Ba câu hỏi kinh điển --- \emph{ảnh này là gì}, \emph{có những vật gì ở đâu}, \emph{mỗi pixel thuộc về cái gì} --- trông như ba mức độ chi tiết tăng dần của cùng một bài toán. Nhưng chỉ câu thứ nhất có đầu ra kích thước cố định, và chính điều đó chia đôi chương này: mọi khó khăn kỹ thuật của detection và segmentation đều bắt nguồn từ việc đầu ra là một \emph{tập hợp} có lực lượng thay đổi, thứ mà bộ máy gradient không biết chấm điểm trực tiếp.
+
+Lịch sử của lĩnh vực này, đọc theo đúng trục, là một câu chuyện duy nhất: \textbf{từng bước nuốt các heuristic bên ngoài vào bên trong mạng}. Selective search bị RPN nuốt, thiết kế đa tỉ lệ thủ công bị FPN nuốt, lấy mẫu cứng bị focal loss nuốt, NMS bị Hungarian matching nuốt. Mỗi lần nuốt, một khối vốn không nhận được gradient trở thành một khối được tối ưu cho đúng mục tiêu cuối, và gần như lần nào hệ thống cũng vừa nhanh hơn vừa chính xác hơn. Đọc theo mạch đó, bạn không chỉ nhớ được lịch sử mà còn đoán được bước tiếp theo của bất kỳ dòng mô hình nào: hãy liệt kê những gì vẫn còn nằm ngoài.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  b/.style={draw=steel,fill=bluebg,rounded corners=2pt,align=center,inner sep=6pt,text width=3.1cm},
+  h/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,align=center,inner sep=5pt,text width=3.1cm},
+  e/.style={-{Latex[length=2.4mm]},draw=steel,thick},
+  capt/.style={font=\scriptsize\itshape,color=tiercol,align=center,text width=3.3cm}]
+\node[b] (bb) at (0,0) {\textbf{Backbone}\\ \footnotesize ResNet, ConvNeXt, ViT};
+\node[b] (nk) at (4.3,0) {\textbf{Neck}\\ \footnotesize FPN, BiFPN, encoder đa tỉ lệ};
+\node[h] (h1) at (9.0,2.3) {\textbf{Head} phân loại\\ \footnotesize một vector \(K\) chiều};
+\node[h] (h2) at (9.0,0) {\textbf{Head} detection\\ \footnotesize tập khung + nhãn};
+\node[h] (h3) at (9.0,-2.3) {\textbf{Head} segmentation\\ \footnotesize mask theo pixel hoặc theo truy vấn};
+\node[b] (post) at (13.6,0) {\textbf{Hậu xử lý}\\ \footnotesize NMS, ngưỡng, ghép mask};
+\draw[e] (bb) -- (nk);
+\draw[e] (nk) -- (h1); \draw[e] (nk) -- (h2); \draw[e] (nk) -- (h3);
+\draw[e] (h2) -- (post);
+\node[capt] at (0,-1.7) {chung cho mọi bài toán; chương 13};
+\node[capt] at (4.3,-1.7) {giải bài toán đa tỉ lệ};
+\node[capt,text width=3.6cm] at (13.6,-1.9) {phần còn sót ngoài gradient --- mục 1 và 2};
+\end{tikzpicture}}
+\caption{Giải phẫu chung của một hệ thống thị giác hiện đại. Ba đầu bài toán khác nhau dùng chung backbone và neck; cái phân biệt chúng là \emph{dạng đầu ra} và do đó là hàm mất mát. Khối hậu xử lý bên phải là phần duy nhất không nhận gradient, và toàn bộ chương này là câu chuyện thu nhỏ khối đó lại.}
+\label{fig:backbone-neck-head}
+\end{figure}
+
+Hình~\ref{fig:backbone-neck-head} là bản đồ nên giữ trong đầu suốt chương: mỗi khi gặp một mô hình mới, hãy hỏi nó thay đổi khối nào trong bốn khối này.
+
+Chương chia làm bốn mục theo đúng thứ tự phụ thuộc đó. Mục~1 đi hết dòng hai giai đoạn, nơi mẫu hình ``nuốt heuristic'' hiện ra rõ nhất và nơi các khái niệm nền --- anchor, RoI, NMS --- được định nghĩa cho cả chương. Mục~2 bỏ giai đoạn đề xuất để lấy tốc độ, và đúng lúc đó một vấn đề mới lộ ra mà mục~1 chưa hề gặp: mất cân bằng foreground--background, thứ được giải quyết ở tầng hàm mất mát chứ không ở tầng kiến trúc. Mục~2 cũng là nơi đặt bài học trung tâm của cả chương: cách gán mẫu cho các vị trí dự đoán --- thành phần hiếm khi nằm trong abstract và thường nằm trong code --- giải thích phần lớn chênh lệch giữa hai detector, nhiều hơn cả kiến trúc. Mục~3 chuyển sang segmentation. Ở đó cùng một mâu thuẫn ``ngữ nghĩa sâu chống lại định vị chính xác'' được tấn công từ bốn phía. Mục kết thúc bằng một lần đổi phát biểu, hợp nhất semantic, instance và panoptic. Lần đổi phát biểu đó mượn nguyên ý tưởng dự đoán tập hợp của mục~2, nên hai mục phải đọc theo thứ tự. Mục~4 gom các bài toán lân cận mà kỹ sư gặp hằng ngày: pose, OCR, retrieval, cùng hai chế độ phân bố dữ liệu mà mọi con số tổng đều che giấu.
+
+Nếu bạn chỉ có thời gian cho một phần, hãy đọc mục~2. Nó chứa cái mà roadmap gọi là bài học lặp lại của cả lĩnh vực, và nó thay đổi cách bạn đọc mọi bảng kết quả detection về sau.
+
+\subfile{00-map}
+\subfile{01-detection-hai-giai-doan/detection-hai-giai-doan}
+\subfile{02-detection-mot-giai-doan/detection-mot-giai-doan}
+\subfile{03-segmentation/segmentation}
+\subfile{04-bai-toan-lan-can/bai-toan-lan-can}
+
+\section{Thực hành}
+Chương này là chương dễ thực hành nhất của cả cây, vì mọi khẳng định trong đó đều kiểm chứng được trong vài giờ trên một GPU tầm trung. Hãy tận dụng: đọc mười paper detection không dạy bạn được bằng một lần tự tay đổi cách gán mẫu và nhìn con số nhúc nhích.
+
+\begin{description}
+\item[Repo và tài nguyên.] Về detection, \repo{roboflow/rf-detr} là dòng DETR thực dụng nhất tại thời điểm viết (giấy phép Apache 2.0, backbone DINOv2 nên khá bền với vật bị che); \repo{ultralytics} YOLO11/YOLO26 nhanh và hợp với thiết bị biên nhưng dùng giấy phép \textbf{AGPL-3.0}, hãy kiểm tra kỹ trước khi đưa vào sản phẩm đóng; \repo{lyuwenyu/RT-DETR} và RTMDet trong \repo{open-mmlab/mmdetection} (MIT) là hai lựa chọn trung dung. Về segmentation, SAM 3 cho phân vùng theo prompt trên cả ảnh lẫn video, Mask2Former và SegFormer cho tập nhãn đóng, còn \repo{MIC-DKFZ/nnUNet} là baseline y tế rất khó đánh bại. Open-vocabulary: Grounding DINO, Grounded-SAM. Khung làm việc: \repo{facebookresearch/detectron2}, \repo{open-mmlab/mmsegmentation}, \repo{qubvel-org/segmentation\_models.pytorch}. Soi lỗi: \repo{voxel51/fiftyone} để nhìn tận mắt, \repo{dbolya/tide} để tách mAP thành các loại lỗi. Danh sách này chốt tại tháng 9/2026 và tên mô hình dẫn đầu sẽ cũ trong 6--12 tháng, trong khi các repo hạ tầng (detectron2, mmdetection, fiftyone) bền hơn nhiều --- hãy đầu tư thời gian theo tỉ lệ đó.
+\item[Câu hỏi kiểm tra hiểu.] Vì sao DETR bản gốc hội tụ chậm hơn Faster R-CNN nhiều lần, và hai bản sửa lớn tấn công vào nguyên nhân nào? Nếu hai detector chênh nhau 2 mAP, bạn làm thế nào để biết chênh lệch đó đến từ kiến trúc hay đến từ cách gán mẫu và công thức huấn luyện? Khi nào một mô hình nền tảng zero-shot vẫn thua một mô hình nhỏ fine-tune, và dấu hiệu nào cho bạn biết điều đó trước khi đo?
+\item[Mini project (vài giờ đến hai ngày).] Huấn luyện RF-DETR và một biến thể YOLO trên cùng một tập dữ liệu tự thu, với cùng ngân sách thời gian chứ không phải cùng số epoch. So sánh mAP, độ trễ trung bình \emph{và} phương sai độ trễ, dung lượng mô hình, và giấy phép. Kết thúc bằng một khuyến nghị viết cho một tình huống triển khai cụ thể, trong đó nêu rõ ràng buộc nào loại bỏ phương án nào.
+\end{description}
+
+\begin{onbai}
+\ar[3]{Anchor}{Khung chữ nhật mẫu, kích thước và tỉ số cạnh định sẵn, rải đều trên mọi vị trí của feature map. Mô hình đoán \emph{độ lệch} so với anchor gần nhất chứ không đoán khung từ số không. Nó mã hoá thống kê hình dạng của tập dữ liệu gốc, nên đổi miền ảnh là phải thiết kế lại.}
+\ar[3]{RPN}{Mạng con trượt trên chính feature map của backbone, mỗi vị trí trả về độ khách quan và độ lệch khung. Nó thay selective search, và vì dùng chung backbone nên chi phí sinh đề xuất gần như bằng không.}
+\ar[2]{Vì sao Fast R-CNN vừa nhanh hơn vừa chính xác hơn R-CNN?}{Nhanh hơn vì backbone chạy một lần thay vì hai nghìn lần, đưa chi phí từ \(O(N)\) lượt backbone về \(O(1)\). Chính xác hơn vì phân loại và hồi quy khung gộp vào một hàm mất mát huấn luyện một pha, nên mọi khối cùng tối ưu cho mục tiêu cuối.}
+\ar[2]{RoIAlign}{Phép cắt đặc trưng theo vùng, lấy mẫu song tuyến tại toạ độ thực thay vì làm tròn về ô nguyên. Ở stride 16, làm tròn dịch biên tới 3 pixel ảnh, đủ để phá nhánh mask; bỏ nó đi thì nhánh mask mới chạy được.}
+\ar[2]{Vì sao vật nhỏ bị thiệt kép trước khi có FPN?}{Tầng sâu có ngữ nghĩa mạnh nhưng độ phân giải thô, tầng nông thì ngược lại. Vật nhỏ cần cả hai mà không tầng nào cho đủ. FPN gộp chúng bằng nhánh đi xuống cộng kết nối ngang \(1\times1\).}
+\ar[2]{Recall đề xuất thấp mà độ chính xác trên đề xuất vẫn cao --- nguyên nhân?}{Tập anchor lệch miền: nó không phủ dải tỉ lệ hay tỉ số cạnh của dữ liệu mới. Phân biệt với detector kém bằng cách đo riêng recall của giai đoạn một; nếu recall đó thấp thì lỗi nằm ở anchor, không ở bộ phân loại.}
+\ar[3]{Triệt phi cực đại (NMS)}{Bước hậu xử lý giữ khung điểm cao nhất rồi xoá mọi khung chồng lấn quá ngưỡng IoU. Nó không học được vì nó xét quan hệ \emph{giữa} các dự đoán. Hỏng trong cảnh đông: hai vật cùng lớp chồng nhau thì chắc chắn mất một.}
+\ar[3]{Gán mẫu}{Quy tắc quyết định vị trí dự đoán nào phải học vật nào. Nó nằm trong định nghĩa hàm mất mát chứ không phải trong kiến trúc, nên đổi nó là đổi bài toán tối ưu. Đây là thành phần giải thích phần lớn chênh lệch giữa các detector.}
+\ar[3]{Focal loss}{Cross-entropy nhân thêm hệ số \((1-p_t)^{\gamma}\) để nén đóng góp của mẫu đã đúng. Với \(\gamma=2\), một anchor nền chắc chắn bị hạ hơn bốn bậc, nên \(10^5\) mẫu nền hết chi phối gradient. Hỏng trên nhãn nhiễu: mẫu gán sai trông y hệt mẫu khó.}
+\ar[2]{Vì sao chỉ detector một giai đoạn cần focal loss?}{Vì giai đoạn đề xuất đã ngầm lọc hàng chục nghìn vị trí xuống còn vài trăm, tức đã cân bằng lại tập mẫu. Bỏ nó đi thì tỉ lệ nền trên vật quay về cỡ \(10^3\) tới \(10^4\), và mẫu dễ nhấn chìm tín hiệu học.}
+\end{onbai}
+
+\begin{onbai}[Active recall --- phần 2]
+\ar[2]{ATSS}{Cách gán mẫu chọn ngưỡng IoU riêng cho từng vật: lấy \(k\) ứng viên gần tâm nhất, tính trung bình và độ lệch chuẩn IoU của chúng, dùng \(\mu+\sigma\) làm ngưỡng. Nó cho thấy sau khi thống nhất gán mẫu, khác biệt anchor với anchor-free gần như biến mất.}
+\ar[2]{SimOTA}{Cách gán mẫu phát biểu việc chọn mẫu dương thành bài toán vận tải tối ưu trên toàn ảnh, chi phí là tổ hợp loss phân loại và loss hồi quy. Ưu điểm là phân xử được vùng chồng lấn; nhược điểm là vô nghĩa ở giai đoạn đầu huấn luyện nên phải kèm bước khởi động.}
+\ar[3]{Ghép cặp Hungary}{Phép gán một--một giữa \(N\) truy vấn và các vật thật, tìm phép ghép có tổng chi phí nhỏ nhất. Vì chỉ một truy vấn được thưởng cho mỗi vật, mô hình tự học không sinh trùng lặp, và NMS hết lý do tồn tại. Giá là hội tụ chậm.}
+\ar[1]{\(\mathrm{AP}_{50}\) cao nhưng \(\mathrm{AP}_{75}\) thấp --- nguyên nhân?}{Định vị kém, không phải phân loại kém. Thường vì NMS xếp hạng bằng điểm phân loại, nên khung tự tin về nhãn nhưng lệch vị trí xoá mất khung đúng hơn. Phân biệt bằng TIDE: nếu lỗi định vị chiếm phần lớn thì đúng là nguyên nhân này.}
+\ar[2]{Output stride}{Tỉ lệ thu nhỏ giữa ảnh và feature map. Output stride 32 nghĩa là mỗi ô đặc trưng đại diện cho một mảng \(32\times32\) pixel, nên sai số định vị biên có sàn cỡ chục pixel. Hạ nó một nửa thì lượng kích hoạt gấp bốn.}
+\ar[2]{Vì sao tích chập giãn không làm mất độ phân giải?}{Vì nó chèn khoảng trống giữa các trọng số thay vì thu nhỏ ảnh. Kernel \(3\times3\) giãn \(r\) có trường tiếp nhận hiệu dụng \(3+2(r-1)\), trong khi số ô đầu ra giữ nguyên. Cái giá là bộ nhớ, vì độ phân giải không giảm.}
+\ar[2]{Vì sao ba tầng cùng giãn 2 bỏ sót nửa số pixel?}{Vì mọi vị trí lấy mẫu rơi vào cùng một lớp chẵn lẻ, nên trường tiếp nhận trông rộng mà thực chất thưa. Đó là hiệu ứng lưới, và cách chữa là chọn dãy tỉ lệ giãn nguyên tố cùng nhau.}
+\ar[3]{Mask classification}{Phát biểu coi đầu ra là một tập truy vấn, mỗi truy vấn trả một mask nhị phân cộng một nhãn lớp, ghép với chân trị bằng ghép cặp Hungary. Nhờ nó semantic, instance và panoptic chỉ còn khác nhau ở cách đọc tập mask, dùng chung một mô hình.}
+\ar[2]{Heatmap}{Bản đồ xác suất cho mỗi keypoint, lấy argmax làm vị trí. Nó biểu diễn được sự mơ hồ khi khớp bị che, điều mà hồi quy toạ độ không làm được. Giá là bộ nhớ, cộng sai số lượng tử hoá \(\pm2\) pixel ở stride 4.}
+\ar[1]{Số tổng đẹp --- mAP cao, mIoU \(0{,}85\) --- nhưng lớp vật nhỏ gần như bằng 0?}{Vì cả hai thước đo đều trung bình theo diện tích bên trong mỗi lớp, nên vật tí hon đóng góp gần như bằng không, và một lớp hiếm bị các lớp lớn che lấp. Phân biệt bằng cách báo cáo theo lát kích thước vật; nếu chỉ lát nhỏ nhất sập thì đúng là nguyên nhân này.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{\repo{detectron2}, \repo{mmdetection}}{Hiện thực trực tiếp mạch hai giai đoạn: RPN, RoIAlign, FPN, và các bộ gán mẫu thay thế được}{Hạ tầng, bền hơn tên mô hình dẫn đầu rất nhiều}
+\ud{Họ RT-DETR / RF-DETR (2024--2026)}{Dùng dự đoán tập hợp và ghép cặp Hungary để bỏ hẳn NMS, cộng attention biến dạng để chữa hội tụ chậm}{Dòng detector không NMS thực dụng tính tới 9/2026}
+\ud{Ultralytics YOLO}{Bộ gán mẫu động kiểu SimOTA/TAL là một trong những thứ đóng góp nhiều nhất vào chênh lệch giữa các phiên bản}{Được cho là vậy dựa trên code; ghi chú phát hành không phải lúc nào cũng nêu rõ}
+\ud{Segment Anything (SAM, và SAM 3 tính tới 9/2026)}{Segmentation theo prompt --- bỏ ràng buộc tập nhãn cố định, giữ nguyên đầu ra dạng mask}{Đang được dùng làm bộ gán nhãn bán tự động trong nhiều pipeline dữ liệu}
+\ud{\repo{nnUNet}}{U-Net với skip connection, cấu hình tự động theo tập dữ liệu; vẫn là baseline rất khó đánh bại trong ảnh y tế}{Bằng chứng rằng kiến trúc 2015 chưa hề lỗi thời khi ràng buộc là ít dữ liệu}
+\ud{\repo{tide}, \repo{fiftyone}}{Tách mAP thành lỗi phân loại, định vị, trùng lặp, nền --- hiện thực của ý ``một con số tổng che giấu chế độ hỏng''}{Công cụ chẩn đoán, không phải mô hình}
+\end{ungdung}
+
+\begin{duan}{Lọc vật thể động bằng segmentation trước khi vào frontend SLAM}{1--2 ngày}
+\dmt trả lời một câu hỏi kỹ thuật cụ thể thay vì một câu hỏi học thuật: đưa một mô hình phân vùng có sẵn vào trước frontend để vứt bỏ đặc trưng nằm trên người đi lại, thì quỹ đạo có tốt lên \emph{vượt sàn nhiễu} của chính harness của bạn không?
+\ddl một chuỗi EuRoC có người di chuyển trong khung hình, hoặc một chuỗi tự quay trong hành lang có người qua lại; chân trị lấy từ hệ bắt chuyển động hoặc từ một lần chạy tham chiếu. Mô hình phân vùng dùng sẵn, không huấn luyện lại --- đây là bài toán tích hợp, không phải bài toán huấn luyện.
+\dbc (1) chạy mô hình phân vùng ngoại tuyến trên cả chuỗi, lưu mask nhị phân của các lớp động (người, xe) ra đĩa để không làm nhiễu phép đo thời gian; (2) chèn một bước lọc vào ngay sau khối trích đặc trưng: bỏ mọi đặc trưng có tâm rơi vào mask; (3) chạy cấu hình gốc và cấu hình có lọc, \emph{mỗi cấu hình ít nhất ba lần}, ghi ATE bằng \repo{evo}; (4) ghi thêm hai số phụ mỗi lần chạy: số đặc trưng còn lại trung bình mỗi khung hình, và số khung hình mất bám.
+\dxk bạn có một bảng ATE trung bình và độ lệch chuẩn cho cả hai cấu hình trên ít nhất ba lần chạy mỗi bên, và phát biểu được một trong hai kết luận có bằng chứng: ``cải thiện lớn hơn hai lần độ lệch chuẩn nên không phải nhiễu'', hoặc ``cải thiện nằm trong sàn nhiễu nên chưa kết luận được''. Kèm một câu giải thích dựa trên hai số phụ: nếu ATE tệ đi, có phải vì mask ăn mất quá nhiều đặc trưng ở vùng giàu kết cấu không?
+\dnv \ptr{E/24} cho cách đọc chênh lệch trong nhiễu; \ptr{B/07} cho giao thức đánh giá và việc không được chọn lần chạy đẹp nhất; kết quả của bài này là baseline cho mini project của chương 15.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì quy tắc gán mẫu nằm trong \emph{định nghĩa} hàm mất mát chứ không trong mô hình: đổi nó là đổi bài toán tối ưu, trong khi đổi backbone chỉ đổi cách giải cùng một bài toán. ATSS cho thấy sau khi thống nhất gán mẫu, khác biệt anchor / anchor-free gần như biến mất.}
+\tl{Vì chạy backbone một lần cho phép gộp phân loại và hồi quy khung vào một hàm mất mát duy nhất huấn luyện một pha; ở R-CNN ba pha rời rạc, mỗi pha tối ưu cho mục tiêu của riêng nó nên không pha nào tối ưu cho kết quả cuối.}
+\tl{Vì NMS thao tác trên \emph{quan hệ giữa các dự đoán}, trong khi hàm mất mát của các kiến trúc đó chấm điểm từng dự đoán độc lập --- không có chỗ để gắn gradient. Gỡ được nó đòi hỏi đổi phát biểu sang dự đoán tập hợp với ghép cặp một--một, chứ không phải thêm một khối mới.}
+\tl{Rằng chi tiết cài đặt có thể là biến quyết định chứ không phải chi tiết phụ, nên phần đáng soi kỹ nhất của một paper thường là code và bảng ablation, không phải sơ đồ kiến trúc ở trang đầu.}
+\tl{Rằng ta đã tìm được phát biểu đúng. Khi ba bài toán trở thành ba cách hậu xử lý cùng một tập mask, đơn vị mà mô hình nói tới là một mask kèm một nhãn. Đơn vị đó khớp với cấu trúc thật của bài toán, không còn là quy ước của từng code base.}
+\end{traloi}
+
+\begin{dongian}
+Bạn làm rơi chùm chìa khoá trong một căn phòng và nhờ một người máy tìm hộ. Cách hiển nhiên là bảo nó ``nhìn cả phòng rồi nói chìa nằm ở đâu'', nhưng người máy không làm được: có hôm một chùm chìa, có hôm ba chùm, có hôm không có chùm nào, mà nó thì chỉ biết trả lời những câu hỏi có hình dạng cố định.
+
+Mẹo của cả chương này là chia phòng thành hàng trăm nghìn ô vuông nhỏ rồi hỏi mỗi ô đúng hai câu giống hệt nhau: ``trong ô này có thứ gì không'' và ``nếu có thì mép của nó cách đây bao xa''. Bây giờ mọi câu hỏi đều cùng một dạng, nên người máy học được. Toàn bộ lịch sử của lĩnh vực là chuyện đưa dần những việc con người vẫn phải làm tay vào bên trong phần mà máy tự chỉnh được. Những việc đó là: khoanh trước vùng đáng nhìn, chọn cỡ ô, và dọn các câu trả lời trùng nhau.
+
+Cái giá có hai khoản. Thứ nhất, hàng chục ô cạnh nhau cùng nói ``có'', nên phải có một bước dọn trùng, và bước dọn ấy chính là chỗ hai chùm chìa nằm sát nhau bị nhập làm một. Thứ hai, cái luật quyết định ô nào \emph{được phép} nói ``có'' cho chùm chìa nào là do người đặt ra, nằm ngoài phần máy học --- và đổi luật đó thường làm kết quả thay đổi nhiều hơn đổi cả cái máy.
+
+\chuadongian{vì sao một luật chọn ô lại tốt hơn luật khác thì tới nay chủ yếu vẫn là kết quả đo được chứ chưa có lời giải thích gọn; ai nói chắc chắn về điều này là đang nói quá.}
+\motcau{Chia bài toán thành hàng trăm nghìn câu hỏi giống hệt nhau thì máy học được --- nhưng luật chấm điểm cho những câu hỏi ấy mới là thứ quyết định kết quả.}
+\end{dongian}
+
+\subsection*{Tổng kết chương}
+Ta đã đi từ R-CNN, nơi mạng chỉ làm mỗi việc phân loại một mẩu ảnh, tới các hệ thống mà gần như mọi quyết định đều nằm trong tầm với của gradient. Trục xuyên suốt là ranh giới giữa phần học được và phần cố định, và mỗi thế hệ đẩy ranh giới đó xuống thấp hơn. Hai thứ còn sót lại là NMS và cách gán mẫu. Chúng sót lại không ngẫu nhiên: một cái thao tác trên quan hệ \emph{giữa} các dự đoán, cái kia nằm trong chính định nghĩa của loss. Cả hai chỉ gỡ được bằng cách đổi phát biểu bài toán. DETR và Mask2Former là hai lần đổi phát biểu như vậy, và điều đáng chú ý là chúng dùng chung một ý tưởng: dự đoán một tập hợp và ghép một--một.
+
+Bài học thực dụng thì nằm ở chỗ khác và quan trọng hơn: phần quyết định kết quả thường không phải phần được viết trong bài. Cách gán mẫu, tỉ lệ mẫu dương/âm, lịch huấn luyện, ngưỡng NMS --- những thứ này giải thích chênh lệch mAP nhiều hơn hình vẽ kiến trúc trên trang đầu. Mang thói quen đó sang mọi chương sau: trước khi tin một cải tiến, hỏi xem có gì khác đã thay đổi cùng lúc.
+
+Còn bỏ ngỏ hai hướng. Thứ nhất, mọi thứ trong chương này chạy trên một ảnh tĩnh; thêm chiều thời gian sinh ra ba vấn đề hoàn toàn mới và đó là \ptr{C/15-thi-giac-khong-thoi-gian}. Thứ hai, khi tập nhãn không còn cố định, câu hỏi chuyển từ ``kiến trúc nào'' sang ``pretraining trên nguồn giám sát nào'', và đó là \ptr{C/18-pretraining-va-foundation}.
+\begin{tukiem}
+\item Trục của chương là nuốt dần heuristic vào trong mạng. Selective search, RoIPooling và NMS bị nuốt ở ba thời điểm rất khác nhau --- điều gì ở mỗi heuristic quyết định nó dễ hay khó nuốt?
+\item Quy tắc gán mẫu xuất hiện ở cả detection hai giai đoạn, một giai đoạn và Hungarian matching của DETR. Ba cách gán đó khác nhau ở giả định nào về quan hệ giữa dự đoán và chân trị, và giả định nào hỏng khi vật thể chen chúc?
+\item Mất cân bằng lớp trong detection và mất cân bằng lớp trong segmentation đều được chữa bằng cách đổi hàm mất mát, nhưng vì hai lý do khác nhau. Hai lý do đó là gì, và vì sao cùng một liều focal loss lại nguy hiểm ở một bên hơn bên kia?
+\item Hệ của bạn chạy detector rồi mới cắt vùng cho head tư thế hoặc OCR. Kiểu hỏng nào của giai đoạn đầu bị thước đo của từng khối che giấu, và bạn đo cả chuỗi bằng cách nào?
+\item Hộp, mặt nạ, heatmap khớp và nhúng metric learning là bốn cách phát biểu đầu ra. Với mỗi cách, chỗ nào trong đó là một phép lượng tử hoá hay làm tròn, và cái giá của nó lộ ra ở loại vật thể nào?
+\item Vì sao việc ba bài segmentation gộp được vào một mô hình lại là bằng chứng về \emph{phát biểu bài toán}, trong khi việc detection vẫn tách hai nhánh anchor và anchor-free thì không nói lên điều tương tự?
+\item Bạn nhận một bảng so sánh detector với mọi dòng cùng backbone. Ba chi tiết nào không nằm trong bảng vẫn đủ sức đảo thứ tự, và bạn hỏi tác giả câu nào trước?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

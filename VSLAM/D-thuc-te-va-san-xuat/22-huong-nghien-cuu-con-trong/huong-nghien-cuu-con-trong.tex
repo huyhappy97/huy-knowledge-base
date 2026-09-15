@@ -1,0 +1,206 @@
+% ---------------------------------------------------------------------------
+% Chương 22 — Tám hướng còn khoảng trống
+% Tạo: 2026-09-13 | Phụ thuộc: toàn bộ cây
+% Mức độ: QUAN TRỌNG (mức 2). Chương DUY NHẤT chạm địa hạt nghiên cứu.
+% CẢNH BÁO PHƯƠNG PHÁP (quan trọng nhất của chương):
+%   Chương này KHÔNG đạt chuẩn research-rules.md. Nó KHÔNG dựa trên một khảo sát có
+%   hệ thống (không search-log, không ma trận tổng hợp, không đủ chỉ tiêu 25-40 công trình
+%   mỗi hướng). Nó là danh sách các chỗ TÔI CHO LÀ còn trống, dựa trên việc đọc rải rác
+%   và trên lập luận cấu trúc từ các chương trước.
+%   Vì vậy mỗi hướng được kèm: (a) mức chắc chắn của tôi; (b) PHÉP KIỂM để xác minh
+%   nó có thật là khoảng trống không. Đây là phần quan trọng nhất của mỗi mục.
+% ---------------------------------------------------------------------------
+\documentclass[../../vslam.tex]{subfiles}
+\begin{document}
+\chapter{Tám hướng còn khoảng trống (Eight Open Directions)}
+\ptrtarget{D/22}\ptrtarget{D/22-huong-nghien-cuu-con-trong}
+\dependency{Toàn bộ cây. Mỗi hướng dưới đây mọc ra từ một vấn đề cụ thể đã nêu ở một chương trước, và phần ``từ đâu ra'' của mỗi mục trỏ về chương đó.}
+
+\begin{tomtat}
+Chương này là chương duy nhất trong cây chạm vào địa hạt nghiên cứu, và nó mở đầu bằng một cảnh báo về chính nó: \emph{nó chưa đạt chuẩn của \code{research-rules.md}}. Nó không dựa trên một khảo sát có hệ thống --- không có nhật ký tìm kiếm, không có ma trận tổng hợp, không đạt chỉ tiêu số công trình cho bất kỳ hướng nào. Nó là danh sách các chỗ mà \emph{tôi cho là} còn trống, dựa trên việc đọc rải rác và trên lập luận cấu trúc từ hai mươi mốt chương trước. Vì vậy mỗi hướng được trình bày theo một khuôn cố định gồm bốn phần: \emph{từ đâu ra} (vấn đề cụ thể ở chương nào), \emph{vì sao tôi cho là còn trống}, \emph{mức chắc chắn của tôi}, và --- phần quan trọng nhất --- \emph{phép kiểm} để xác minh nó có thật là khoảng trống hay chỉ là chỗ tôi chưa đọc tới. Tám hướng, xếp theo mức tôi tin là chúng còn trống và đáng làm. Nếu chỉ nhớ một điều: \emph{trước khi chọn bất kỳ hướng nào, hãy chạy phép kiểm của nó} --- vì cách nhanh nhất để lãng phí một năm là phát minh lại thứ người ta đã giải quyết ba năm trước.
+\end{tomtat}
+
+\begin{cambay}
+\textbf{Cảnh báo về chính chương này, và nó là phần quan trọng nhất cần đọc.}
+
+Theo \code{research-rules.md}, một khảo sát đạt chuẩn cần: nhật ký tìm kiếm tái lập được; sàng ít nhất \(25\)--\(40\) công trình cho mỗi chủ đề; ít nhất ba nhóm nghiên cứu độc lập; ma trận tổng hợp viết theo cột; và mọi khẳng định lõi tựa vào một nguồn mức A hoặc hai nguồn mức B độc lập.
+
+\textbf{Chương này không đạt bất kỳ điều kiện nào trong số đó.} Nó được viết từ lập luận cấu trúc và từ việc đọc rải rác, không từ một khảo sát. Điều đó nghĩa là:
+
+\emph{Rủi ro chính}: một ``khoảng trống'' ở đây có thể đã được lấp bởi các công trình tôi chưa đọc. Đây là rủi ro có thật và không nhỏ, đặc biệt với các hướng liên quan tới học máy, nơi tài liệu tăng rất nhanh.
+
+\emph{Cách dùng đúng}: coi mỗi mục dưới đây là một \textbf{giả thuyết cần kiểm}, không phải một kết luận. Mỗi mục kèm một phép kiểm cụ thể, và phép kiểm ấy nên được chạy \emph{trước} khi đầu tư thời gian vào hướng đó.
+
+\emph{Việc cần làm nếu dùng chương này để chọn đề tài thật}: nâng hướng đã chọn lên thành một dự án \code{survey/} đúng chuẩn --- bước 0 tới bước 4 của \code{research-rules.md} --- rồi mới quyết. Chương này chỉ là bước chọn \emph{ứng viên}, không phải bước kết luận.
+\end{cambay}
+
+\section{Vì sao một danh sách như thế này lại có giá trị}
+\ptrtarget{D/22/01}
+
+Nếu chương này không đạt chuẩn khảo sát, vì sao viết nó?
+
+Vì nó làm một việc mà một khảo sát không làm: nó \emph{nối các vấn đề đã gặp trong cây thành các câu hỏi}. Hai mươi mốt chương trước liên tục chạm vào các chỗ mà tôi phải viết ``chưa có lời giải tốt'' --- bài toán lifelong ở \ptr{C/13}, bệnh quá tự tin ở \ptr{A/06}, perceptual aliasing ở \ptr{B/11}. Những chỗ ấy rải rác và dễ quên; gom chúng lại là một việc có giá trị riêng.
+
+Theo \code{research-rules.md} mục~7, một câu hỏi nghiên cứu tốt mọc ra từ một vấn đề thật chứ không từ cảm hứng ngẫu nhiên. Tám mục dưới đây đều mọc ra từ một vấn đề đã gặp, và phần ``từ đâu ra'' của mỗi mục là bằng chứng cho điều đó.
+
+Tiêu chí xếp thứ tự: \emph{mức tôi tin là nó còn trống}, nhân với \emph{mức tôi tin là nó đáng giải}. Hai yếu tố ấy độc lập --- một bài toán có thể còn trống vì nó không đáng giải.
+
+\section{Hướng 1 --- Hiệu chuẩn trực tuyến có ý thức observability}
+\ptrtarget{D/22/02}
+
+\emph{Từ đâu ra}: \ptr{C/14} mục~3. Hiệu chuẩn trực tuyến cần một cổng quyết định khi nào cập nhật tham số nào, và các cơ chế hiện có còn thô sơ: hoặc cập nhật mù quáng, hoặc dùng các quy tắc thủ công dựa trên một đại lượng chuyển động duy nhất.
+
+\emph{Bài toán cụ thể}: cho một hệ đang chạy, quyết định \emph{theo thời gian thực} tham số nào đang quan sát được đủ để cập nhật. Cần một chỉ số rẻ, một ngưỡng có cơ sở, và một cơ chế chuyển đổi mượt giữa cập nhật và đóng băng.
+
+\emph{Vì sao tôi cho là còn trống}: các công trình tôi biết \cite{maye2013selfsupervised,schneider2019observability} thiết lập ý tưởng nhưng dừng ở mức phân tích phổ, vốn đắt cho thời gian thực. Phần lớn hệ mã nguồn mở hoặc không có cổng hoặc dùng ngưỡng thủ công.
+
+\emph{Mức chắc chắn}: trung bình. Ý tưởng đã có; điều tôi cho là còn trống là một cơ chế \emph{thực dụng và được kiểm chứng}.
+
+\emph{Phép kiểm}: tìm các công trình sau 2020 với từ khoá ``observability-aware calibration'', ``degeneracy-aware state estimation'', ``online extrinsic gating''. Kiểm xem có công trình nào (a) chạy thời gian thực, (b) có ngưỡng suy ra từ nguyên lý chứ không chỉnh tay, và (c) được đánh giá bằng \emph{tính nhất quán} chứ chỉ bằng độ chính xác. Nếu cả ba đã có, hướng này đã được lấp.
+
+\section{Hướng 2 --- Bất định đáng tin}
+\ptrtarget{D/22/03}
+
+\emph{Từ đâu ra}: \ptr{A/06} mục~4 và \ptr{C/17} mục~4. SLAM quá tự tin một cách hệ thống, và bốn nguồn của nó đều khó chữa bằng phân tích.
+
+\emph{Bài toán cụ thể}: một hiệp phương sai mà module phía trên \emph{dùng được} --- tức có ANEES gần số chiều trên dữ liệu thật, không chỉ trong mô phỏng, và trong các điều kiện khó chứ không chỉ điều kiện tốt.
+
+\emph{Vì sao tôi cho là còn trống}: hai lý do cấu trúc đã nêu ở \ptr{C/17} mục~4A. Nó khó đo (cần chân trị và thống kê), nên không có chỉ số dễ công bố; và một bài cải thiện ATE dễ đăng hơn một bài cải thiện tính trung thực.
+
+\emph{Mức chắc chắn}: \textbf{cao} --- đây là hướng tôi tin nhất trong tám hướng. Lý do: tôi có thể chỉ ra bốn cơ chế cụ thể gây quá tự tin (\ptr{A/06} mục~4B) và không cơ chế nào có lời giải sạch.
+
+\emph{Phép kiểm}: khảo sát xem có bao nhiêu công trình SLAM báo cáo NEES hoặc ANEES bên cạnh ATE. Nếu tỉ lệ rất thấp thì hướng còn trống được xác nhận theo một chiều --- ít người đo, nên ít người cải thiện. Bổ sung: tìm các công trình về ``uncertainty calibration'' trong học máy và kiểm xem chúng đã được áp dụng cho SLAM chưa.
+
+\emph{Ghi chú}: hướng này có một ưu điểm phương pháp đáng kể --- \emph{nó có một chỉ số rõ ràng} (ANEES) và một tiêu chí thành công rõ ràng (gần số chiều). Nhiều hướng khác trong danh sách này thiếu điều đó.
+
+\section{Hướng 3 --- Bản đồ sống lâu trong thế giới thay đổi}
+\ptrtarget{D/22/04}
+
+\emph{Từ đâu ra}: \ptr{C/13} mục~4C và \ptr{B/12} mục~4C. Gần như mọi hệ SLAM giả định thế giới tĩnh ở thang thời gian dài, và đó là giả định sai nhất trong triển khai thực tế.
+
+\emph{Bài toán cụ thể}: phân biệt ``bản đồ sai'' với ``tôi ở sai chỗ'' --- hai kết luận cho cùng triệu chứng và đòi hai hành động ngược nhau. Và cái vòng luẩn quẩn: để biết bản đồ sai, phải chắc mình ở đúng chỗ; để chắc mình ở đúng chỗ, phải tin bản đồ.
+
+\emph{Vì sao tôi cho là còn trống}: các cách tiếp cận hiện có đều là cách phá vòng một cách thô --- quên theo thời gian, đếm phiếu qua nhiều lần đi qua, lưu nhiều phiên bản --- và không cách nào giải quyết trường hợp thay đổi cấu trúc lớn.
+
+\emph{Mức chắc chắn}: cao về việc nó là vấn đề \emph{đau nhất} trong triển khai; trung bình về việc nó còn trống, vì tôi biết có một nhánh công trình về lifelong SLAM mà tôi chưa khảo sát.
+
+\emph{Phép kiểm}: đây là hướng có phép kiểm rõ ràng nhất vì nó có một chỉ tiêu tự nhiên. Tìm xem có hệ nào \emph{duy trì được tỉ lệ relocalization ổn định qua nhiều tháng} trong một môi trường thay đổi thật, được kiểm định độc lập. Bộ dữ liệu để kiểm: OpenLORIS \cite{shi2020openloris} và các bộ nhiều phiên tương tự. Nếu không hệ nào làm được, hướng còn trống.
+
+\emph{Ghi chú}: hướng này cần dữ liệu dài hạn, vốn khó thu --- và đó vừa là rào cản vừa là lý do nó còn trống. Mini project ở \ptr{C/13} là một cách bắt đầu thu.
+
+\section{Hướng 4 --- Dự đoán thất bại thay vì phục hồi sau}
+\ptrtarget{D/22/05}
+
+\emph{Từ đâu ra}: \ptr{D/19} mục~6. Mọi cơ chế hiện có là \emph{phản ứng}: phát hiện sau khi đã mất bám, rồi phục hồi.
+
+\emph{Bài toán cụ thể}: dự đoán \emph{trước} vài giây rằng hệ thống sắp mất bám, để module phía trên có thể hành động --- robot đi chậm lại, quay về vùng đã biết, hoặc chuyển chế độ trước khi hỏng.
+
+\emph{Vì sao tôi cho là còn trống}: các đại lượng cần thiết đã có sẵn (\ptr{D/19} khối \emph{Cần nhớ}) và chúng thay đổi \emph{trước} khi hỏng --- số đặc trưng giảm, số điều kiện tăng. Việc nối chúng thành một bộ dự đoán là một bài toán chuỗi thời gian thông thường. Tôi không biết công trình nào làm điều này một cách hệ thống trong SLAM.
+
+\emph{Mức chắc chắn}: trung bình. Ý tưởng đủ hiển nhiên khiến tôi ngờ rằng ai đó đã làm, và việc tôi không biết có thể chỉ phản ánh việc tôi chưa tìm.
+
+\emph{Phép kiểm}: tìm với từ khoá ``failure prediction SLAM'', ``predictive tracking failure'', ``proactive relocalization''. Nếu có công trình, kiểm xem chúng dự đoán trước bao lâu và với tỉ lệ báo động giả nào --- vì một bộ dự đoán báo trước \(0{,}2\) giây thì vô dụng cho việc ra quyết định.
+
+\emph{Ghi chú}: hướng này có lợi thế là \emph{dữ liệu dễ có} --- mọi lần mất bám trong bất kỳ chuỗi nào đều là một mẫu, và bộ nghịch cảnh ở \ptr{D/19} mini project sinh ra chúng có chủ đích.
+
+\section{Hướng 5 --- Bất định được truyền đúng qua ranh giới học/hình học}
+\ptrtarget{D/22/06}
+
+\emph{Từ đâu ra}: \ptr{C/17} mục~4B và \ptr{B/08} mục~4C. Kiến trúc lai là hướng đúng, nhưng phần lớn công trình nối hai khối một cách lỏng lẻo: mô hình học được cho một phép đo, và hiệp phương sai của phép đo ấy được đặt bằng một hằng số chỉnh tay.
+
+\emph{Bài toán cụ thể}: một mô hình học được sinh ra phép đo \emph{kèm hiệp phương sai đã hiệu chuẩn}, và hiệp phương sai ấy đúng cả khi dữ liệu nằm ngoài phân bố huấn luyện.
+
+\emph{Vì sao tôi cho là còn trống}: vế cuối là phần khó và là phần tôi cho là chưa giải. Một mô hình biết mình không chắc khi gặp cảnh lạ đòi hỏi phát hiện ngoài phân bố, và đó là bài toán mở trong chính học máy.
+
+\emph{Mức chắc chắn}: trung bình-cao. Cao về việc bài toán chưa giải; trung bình về việc nó là một khoảng trống \emph{riêng của SLAM} --- có thể nó chỉ là bài toán chung của học máy được nhìn qua lăng kính SLAM.
+
+\emph{Phép kiểm}: hai bước. Một, tìm trong tài liệu học máy các công trình về hiệu chuẩn bất định và phát hiện ngoài phân bố sau 2023 --- nếu có tiến bộ lớn thì hướng này trở thành việc \emph{áp dụng} chứ không phải \emph{nghiên cứu}. Hai, kiểm xem có công trình SLAM nào dùng hiệp phương sai học được trong đồ thị nhân tử và \emph{đo ANEES} của kết quả.
+
+\emph{Ghi chú}: hướng này gắn chặt với hướng 2, và chúng có thể là một --- hoặc nên được làm cùng nhau.
+
+\section{Hướng 6 --- Xử lý suy biến có nguyên tắc}
+\ptrtarget{D/22/07}
+
+\emph{Từ đâu ra}: \ptr{A/05} mục~2C và \ptr{A/01} mục~6. Việc phát hiện và xử lý chuyển động suy biến hiện chủ yếu là heuristic: các ngưỡng thủ công cho parallax, cho tỉ số điểm số mô hình, cho số điều kiện.
+
+\emph{Bài toán cụ thể}: một khung thống nhất để (a) phát hiện hướng suy biến theo thời gian thực với chi phí chấp nhận được, (b) phân biệt ba loại suy biến ở \ptr{A/05} mục~2C, và (c) quyết định hành động --- đóng băng biến nào, dùng mô hình nào, hay từ chối.
+
+\emph{Vì sao tôi cho là còn trống}: mỗi hệ thống tự xử lý theo cách riêng với các ngưỡng riêng, và không có một khung chung. Đặc biệt phần (b) --- phân biệt ba loại --- tôi không biết cài đặt nào làm một cách tường minh.
+
+\emph{Mức chắc chắn}: trung bình. Có nhiều công trình về observability phân tích; điều tôi cho là còn trống là một khung \emph{chạy được và thống nhất}.
+
+\emph{Phép kiểm}: kiểm xem các thư viện lớn (GTSAM, Ceres, g2o) có cung cấp một cơ chế báo hướng suy biến không, và các hệ SLAM lớn có dùng nó không. Nếu mỗi hệ vẫn tự cài ngưỡng riêng thì khoảng trống được xác nhận. Bổ sung: tìm ``degeneracy detection'' trong tài liệu LiDAR SLAM, nơi vấn đề này (hành lang dài) gay gắt hơn và có thể đã được giải tốt hơn.
+
+\section{Hướng 7 --- Hệ tự nhận biết lệch và tự sửa}
+\ptrtarget{D/22/08}
+
+\emph{Từ đâu ra}: \ptr{C/14} mục~4B và \ptr{D/21} mục~2D. Một thiết bị ở hiện trường phải tự biết hiệu chuẩn của nó đã trôi và tự xử lý, vì không ai mang target tới nhà khách hàng.
+
+\emph{Bài toán cụ thể}: một vòng khép kín gồm phát hiện trôi (không có target, không có chân trị), phân biệt nguyên nhân (nhiệt so với va đập so với lão hoá), tự sửa khi có thể, và báo khi không.
+
+\emph{Vì sao tôi cho là còn trống}: các mảnh đã có --- hiệu chuẩn trực tuyến, phân tích phần dư --- nhưng tôi không biết một hệ nào ghép chúng thành một vòng khép kín có đánh giá.
+
+\emph{Mức chắc chắn}: trung bình-thấp. Đây có thể là một vấn đề \emph{kỹ thuật} đã được các công ty giải quyết mà không công bố, chứ không phải một khoảng trống nghiên cứu.
+
+\emph{Phép kiểm}: khác với các hướng khác, phép kiểm ở đây không phải tìm trong tài liệu học thuật mà là tìm trong \emph{tài liệu kỹ thuật của sản phẩm} --- các thiết bị AR và robot thương mại có công bố cách xử lý trôi hiệu chuẩn không. Nếu có thì đây là vấn đề đã giải nhưng không công bố, và giá trị nghiên cứu thấp hơn giá trị kỹ thuật.
+
+\section{Hướng 8 --- Biểu diễn neural cho localization thực dụng}
+\ptrtarget{D/22/09}
+
+\emph{Từ đâu ra}: \ptr{C/16} mục~4B. 3DGS cho hình ảnh đẹp nhưng ba điểm chặn cho robot: không trả lời được truy vấn occupancy, tốn bộ nhớ và cần GPU, và chế độ hỏng chưa được hiểu.
+
+\emph{Bài toán cụ thể}: một biểu diễn neural mà từ đó \emph{trích xuất được ESDF tin cậy}, chạy trong ngân sách của một SoC nhúng, và có chế độ hỏng dự đoán được.
+
+\emph{Vì sao tôi cho là còn trống}: phần lớn công trình tối ưu cho chất lượng render, không cho truy vấn hình học. Ba điểm chặn ở \ptr{C/16} mục~4B đều còn.
+
+\emph{Mức chắc chắn}: \textbf{thấp} --- đây là hướng tôi ít chắc nhất, vì lĩnh vực chuyển động rất nhanh và đánh giá của tôi chốt tại 9/2026. Rất có thể một hoặc cả ba điểm chặn đã được giải trong thời gian tôi viết chương này.
+
+\emph{Phép kiểm}: rà lại tài liệu 3DGS-SLAM sau mỗi sáu tháng, và kiểm cụ thể ba điểm: có công trình nào trích xuất occupancy hoặc ESDF từ Gaussian với đánh giá định lượng không; có công trình nào chạy trên phần cứng nhúng không; có công trình nào phân tích chế độ hỏng không.
+
+\begin{cannho}
+\textbf{Cách dùng danh sách này, theo thứ tự.}
+
+\emph{Một --- chạy phép kiểm trước.} Mỗi mục có một phép kiểm cụ thể. Chạy nó mất vài ngày và nó có thể tiết kiệm một năm. Cách nhanh nhất để lãng phí thời gian là phát minh lại thứ đã được giải quyết.
+
+\emph{Hai --- nếu phép kiểm xác nhận khoảng trống, nâng lên thành khảo sát đúng chuẩn.} \code{research-rules.md} bước 0 tới bước 4: dựng khung câu hỏi, săn nguồn theo giao thức lăn cầu tuyết, sàng theo mức tin A/B/C, đọc ba lượt, lập ma trận tổng hợp. Chỉ sau bước đó mới đủ cơ sở để chọn.
+
+\emph{Ba --- ưu tiên các hướng có chỉ số rõ ràng.} Hướng 2 (ANEES gần số chiều) và hướng 3 (tỉ lệ relocalization ổn định qua tháng) có tiêu chí thành công đo được. Các hướng thiếu điều đó khó chứng minh tiến bộ, và một bài toán không đo được là một bài toán không giải được.
+
+\emph{Bốn --- ưu tiên các hướng mà bạn có dữ liệu.} Hướng 3 và 4 cần dữ liệu dài hạn và dữ liệu thất bại; nếu bạn đang vận hành thiết bị thật thì bạn có lợi thế mà phòng thí nghiệm không có --- và đó là lợi thế đáng khai thác hơn là cố cạnh tranh ở chỗ mọi người đều mạnh.
+
+Và một gợi ý cuối, thuộc về \ptr{E/24}: một bài toán ứng dụng cụ thể mà bạn đang làm thường là chỗ tốt hơn để bắt đầu so với một hướng trong danh sách này --- vì nó có ràng buộc thật, có dữ liệu thật, và có tiêu chí thành công thật.
+\end{cannho}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{D/22/10}
+
+Chương này khác các chương khác: mệnh đề của nó không phải một khẳng định kỹ thuật mà là \emph{tám phán đoán về trạng thái của lĩnh vực}, và mỗi phán đoán đã kèm mức chắc chắn cùng phép kiểm riêng ở mục tương ứng.
+
+Mệnh đề bao trùm --- \emph{tám hướng này còn trống} --- bị bác bỏ từng phần bởi chính các phép kiểm ấy. Tôi \emph{kỳ vọng} ít nhất hai trong tám sẽ bị bác bỏ khi kiểm nghiêm túc, và hai ứng viên có khả năng nhất là hướng 4 (dự đoán thất bại --- ý tưởng đủ hiển nhiên) và hướng 8 (3DGS --- lĩnh vực chuyển động quá nhanh).
+
+Có một mệnh đề thứ hai, ẩn hơn và đáng nêu: \emph{rằng một danh sách như thế này có giá trị}. Nó bị bác bỏ nếu việc chọn đề tài nghiên cứu từ một danh sách viết sẵn cho kết quả tệ hơn việc chọn từ một vấn đề bạn đang thật sự gặp. Tôi \emph{nghiêng về} khả năng đó --- và tôi đã nói điều đó ở cuối khối \emph{Cần nhớ}. Danh sách này hữu ích nhất không phải như một thực đơn để chọn mà như một \emph{bản đồ để nhận ra} rằng vấn đề bạn đang gặp trùng với một chỗ mà lĩnh vực cũng chưa giải.
+
+Và một cảnh báo cuối, nhắc lại từ đầu chương vì nó quan trọng: chương này được viết \emph{không có khảo sát}. Nếu bạn dùng nó để chọn đề tài mà không chạy phép kiểm, bạn đang dựa vào phán đoán của một người đọc rải rác --- và theo chính \code{research-rules.md} mục~8, đó là đúng thứ không nên tin.
+
+\section{Kết nối}
+\ptrtarget{D/22/11}
+
+Chương này nối ngược về gần như toàn bộ cây, và bảng dưới đây là bản đồ ấy.
+
+Hướng 1 về \ptr{C/14} và \ptr{A/05}. Hướng 2 về \ptr{A/06} và \ptr{C/18}. Hướng 3 về \ptr{C/13} và \ptr{B/12}. Hướng 4 về \ptr{D/19}. Hướng 5 về \ptr{C/17} và \ptr{B/08}. Hướng 6 về \ptr{A/05} và \ptr{A/01}. Hướng 7 về \ptr{C/14} và \ptr{D/21}. Hướng 8 về \ptr{C/16}.
+
+Nối xuống dưới: \ptr{E/24-lo-trinh} giai đoạn năm là chỗ chương này được dùng, và nó nêu rõ quy trình --- chọn một hướng, đọc \(20\)--\(30\) công trình gần nhất \emph{của riêng hướng đó}, tái hiện hai tới ba baseline, rồi mới đề xuất. Thứ tự ấy quan trọng: tái hiện baseline trước khi đề xuất là cách duy nhất biết mình đang đứng ở đâu.
+
+Nối sang \code{research-rules.md}: chương này là bước \emph{trước} bước 0 của tài liệu đó. Nó chọn ứng viên; \code{research-rules.md} bắt đầu từ việc dựng khung câu hỏi cho ứng viên đã chọn. Nhầm hai bước --- coi chương này là kết quả của một khảo sát --- là lỗi phương pháp nghiêm trọng nhất có thể mắc với nó.
+
+\begin{tukiem}
+\item Vì sao chương này không đạt chuẩn \code{research-rules.md}, và điều đó đổi cách dùng nó thế nào?
+\item Với mỗi hướng, phần nào của mục là quan trọng nhất và vì sao?
+\item Hướng nào tôi chắc chắn nhất và hướng nào ít chắc nhất? Nêu lý do của cả hai.
+\item Vì sao hướng 2 và hướng 3 được đề nghị ưu tiên, và tiêu chí chung của chúng là gì?
+\item Hướng 7 có phép kiểm khác các hướng khác. Khác thế nào, và điều đó nói gì về bản chất của hướng ấy?
+\item Nêu bốn bước dùng danh sách này, và nói bước nào tiết kiệm nhiều thời gian nhất.
+\item Vì sao một vấn đề bạn đang thật sự gặp thường là chỗ tốt hơn để bắt đầu so với một hướng trong danh sách?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

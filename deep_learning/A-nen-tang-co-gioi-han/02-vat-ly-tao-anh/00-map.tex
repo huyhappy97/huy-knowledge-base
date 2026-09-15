@@ -1,0 +1,55 @@
+% ============================================================================
+%  A/02-vat-ly-tao-anh/00-map.tex — bản đồ chương
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ chương --- Vật lý tạo ảnh và mô hình camera}
+
+\begin{tomtat}
+Bản đồ này nói chương 2 gồm bốn mục nào, và vì sao chúng xếp theo đường đi của tín hiệu từ photon tới quyết định. Nó cũng nói mục nào phụ thuộc mục nào, và phần nào là cốt lõi so với phần nào chỉ cần biết là có. Đọc xong bạn quyết định được trong một phút nên vào mục nào trước cho nhu cầu hiện tại. Nếu chỉ nhớ một điều: thứ tự bốn mục \emph{là} thứ tự nhân quả của tín hiệu thật, nên đọc lệch thứ tự thì sẽ phải quay lại. Luận điểm gộp của cả chương là domain gap sinh ra dọc chuỗi này, trước khi kiến trúc kịp có ý kiến.
+\end{tomtat}
+
+\subsection*{A. Chương này có gì}
+
+\begin{itemize}
+\item \textbf{\code{01-anh-sang-va-nhieu}} --- phơi sáng, dải động, nhiễu shot so với nhiễu đọc, mô hình phương sai affine, vì sao ảnh thiếu sáng làm mô hình sập.
+\item \textbf{\code{02-isp-va-khong-gian-mau}} --- khử khảm, cân bằng trắng, gamma, ánh xạ tone, nén JPEG; RAW so với sRGB; các không gian màu RGB, HSV, YUV, Lab và augmentation nào có nghĩa vật lý.
+\item \textbf{\code{03-camera-va-hinh-hoc-nhieu-view}} --- pinhole, ma trận nội tại, méo và hiệu chuẩn; ràng buộc epipolar, homography, tam giác hoá, PnP.
+\item \textbf{\code{04-cam-bien-khac-va-domain-gap}} --- depth, thermal, event, LiDAR, radar và inductive bias riêng của mỗi loại; nguồn gốc domain gap.
+\end{itemize}
+
+\subsection*{B. Vì sao chia và xếp thứ tự như vậy}
+Bốn mục được xếp theo \emph{đường đi vật lý của tín hiệu}, không theo độ khó hay theo lịch sử. Photon tới cảm biến ở mục 1. Chuỗi xử lý trong máy ảnh biến đổi tín hiệu ấy ở mục 2. Mục 3 nối ảnh kết quả lại với hình học ba chiều. Mục 4 áp cùng khung phân tích cho các cảm biến khác, rồi tổng kết thành luận điểm về domain gap. Cách xếp này có một lợi ích cụ thể: mỗi mục trả lời đúng câu hỏi mà mục trước để lại, nên mạch đọc không bị đứt. Hình~\ref{fig:map-ch2} tóm tắt quan hệ đó.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.5cm and 0.8cm,
+  m/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.6cm},
+  o/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.6cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.5cm}]
+\node[m] (a) {\textbf{1.} Ánh sáng\\và nhiễu};
+\node[m,right=of a] (b) {\textbf{2.} ISP và\\không gian màu};
+\node[m,right=of b] (c) {\textbf{3.} Camera và\\hình học nhiều view};
+\node[o,right=of c] (d) {\textbf{4.} Cảm biến khác\\và domain gap};
+\draw[ar] (a) -- node[lb,below=1pt] {nhiễu bị biến dạng ra sao} (b);
+\draw[ar] (b) -- node[lb,below=1pt] {ảnh nối với thế giới 3D} (c);
+\draw[ar] (c) -- node[lb,below=1pt] {áp cùng khung cho cảm biến khác} (d);
+\end{tikzpicture}}
+\caption{Bốn mục của chương 2 xếp theo đường đi của tín hiệu. Mục 4 (tô khác màu) không phải một chủ đề mới mà là phần tổng quát hoá: nó áp lại khung phân tích của ba mục đầu cho các cảm biến khác, rồi rút ra luận điểm chung về domain gap.}
+\label{fig:map-ch2}
+\end{figure}
+
+\subsection*{C. Phụ thuộc}
+Cả chương phụ thuộc \ptr{A/01/04-hinh-hoc-va-tin-hieu}. Phần toạ độ đồng nhất và \(SE(3)\) là ngôn ngữ của mục 3. Phần lấy mẫu và aliasing giải thích vì sao khử khảm là bài toán khôi phục, và vì sao undistort làm mờ ảnh. Bên trong chương, mục 2 dùng mô hình nhiễu của mục 1, và mục 4 tổng quát hoá cả ba mục trước; mục 3 thì tương đối độc lập với mục 1 và 2, nên có thể đọc trước nếu nhu cầu hiện tại là hình học.
+
+\subsection*{D. Cốt lõi hay tham khảo}
+\begin{itemize}
+\item \textbf{Cốt lõi --- phải nắm chắc:} quan hệ \(\mathrm{SNR}=\sqrt{N}\) và mô hình \(\operatorname{Var}=aI+b\) (mục 1); tính phi tuyến của gamma cùng hệ quả với augmentation (mục 2); quy tắc cập nhật ma trận nội tại sau resize và crop, cùng công thức sai số độ sâu \(Z^2/(fB)\) (mục 3); luận điểm domain gap và mạch bốn bước thu hẹp nó (mục 4).
+\item \textbf{Tham khảo --- biết là có, tra khi cần:} chi tiết các thuật toán khử khảm, công thức chuyển đổi giữa các không gian màu, mô hình méo bậc cao, và thông số kỹ thuật cụ thể của từng dòng cảm biến. Nhóm cuối cùng này bán rã nhanh nhất trong cả chương.
+\end{itemize}
+
+\subsection*{E. Riêng với người đọc đã làm SLAM}
+Mục 3 phần lớn là ôn tập, nhưng có ba chỗ mới đáng dừng: quy tắc cập nhật \(K\) khi ảnh bị resize hoặc crop trong dataloader (bug im lặng phổ biến nhất khi ghép mạng vào pipeline hình học); sự khác biệt giữa hình học cổ điển ``hỏng ồn ào'' và mô hình học được ``hỏng im lặng''; và lý do các mô hình độ sâu đơn ảnh dự đoán độ sâu tương đối. Ngược lại, mục 1 và mục 2 gần như hoàn toàn mới với người xuất thân từ ước lượng trạng thái. Chúng giải thích một trải nghiệm quen thuộc mà kinh nghiệm SLAM không giải thích nổi: vì sao hệ thống mất track ngay khi trời tối.
+\end{document}

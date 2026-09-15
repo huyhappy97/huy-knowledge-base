@@ -1,0 +1,261 @@
+% ============================================================================
+%  C/18-luong-va-ghep-doi — file chương
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+%  Dependency: C/17, A/04. Mức độ: cốt lõi ở mô hình hoá, tham khảo ở cài đặt nâng cao.
+% ============================================================================
+\documentclass[../../algorithm.tex]{subfiles}
+\begin{document}
+\chapter{Luồng cực đại và ghép đôi (Max Flow, Matching, Min Cut)}
+\ptrtarget{C/18}\ptrtarget{C/18-luong-va-ghep-doi}
+\dependency{\ptr{C/17} bắt buộc --- toàn bộ chương này là mô hình đồ thị mở rộng; \ptr{A/04} cho tính dừng của Ford--Fulkerson và cho chứng minh định lý luồng cực đại--lát cắt nhỏ nhất.}
+
+\begin{tomtat}
+Luồng cực đại là ví dụ mạnh nhất trong quyển sách này cho sức mạnh của việc mô hình hoá: rất nhiều bài không hề nói tới ``dòng chảy'' --- phân công người vào việc, chọn dự án có lợi nhất, phân đoạn ảnh, kiểm tra một đội bóng còn cơ hội vô địch --- đều quy về đúng một mô hình. Trung tâm lý thuyết của chương là định lý luồng cực đại bằng lát cắt nhỏ nhất, một sự trùng khớp giữa bài toán tối đa và bài toán tối thiểu; đó cũng là lý do luồng vừa cho lời giải vừa cho \emph{chứng cứ} rằng lời giải là tối ưu. Chương tập trung vào mô hình hoá và các mẹo dựng đồ thị, còn phần cài đặt chỉ ở mức đủ dùng. Nếu chỉ nhớ một điều: khi đề bài có ``sức chứa'', ``mỗi thứ dùng một lần'', hoặc ``chọn một trong hai phía sao cho ít mâu thuẫn nhất'', hãy nghĩ tới luồng.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mạng luồng}{đồ thị có hướng với một đỉnh nguồn, một đỉnh đích, mỗi cạnh có sức chứa. Luồng là cách gán giá trị cho các cạnh sao cho không vượt sức chứa và mọi đỉnh trung gian có lượng vào bằng lượng ra.}
+\kn{đồ thị thặng dư}{đồ thị phụ ghi lại phần sức chứa còn lại và các cạnh ngược cho phép ``rút lại'' luồng đã đẩy --- ý tưởng then chốt làm thuật toán đúng.}
+\kn{đường tăng luồng}{đường từ nguồn tới đích trong đồ thị thặng dư; còn đường như vậy thì luồng còn tăng được.}
+\kn{lát cắt}{cách chia tập đỉnh thành hai phần, một chứa nguồn một chứa đích; giá của lát cắt là tổng sức chứa các cạnh đi từ phần nguồn sang phần đích.}
+\kn{ghép đôi}{tập cạnh đôi một không chung đỉnh. Ghép đôi cực đại trên đồ thị hai phía quy về luồng cực đại với mọi sức chứa bằng 1.}
+\kn{phủ đỉnh}{tập đỉnh chạm tới mọi cạnh. Trên đồ thị hai phía, phủ đỉnh nhỏ nhất bằng ghép đôi lớn nhất --- định lý Kőnig.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao luồng cực đại lại đúng bằng lát cắt nhỏ nhất --- hai bài toán trông không liên quan gì tới nhau?}
+\h{Cạnh ngược trong đồ thị thặng dư cho phép ``hoàn tác'' luồng đã đẩy. Nếu bỏ chúng đi thì thuật toán hỏng ở đâu?}
+\h{Bài phân công \(n\) người vào \(n\) việc không nhắc gì tới dòng chảy. Vì sao nó lại là bài luồng?}
+\h{Ford--Fulkerson có thể không dừng với sức chứa vô tỉ. Điều đó nói gì về vai trò của ``đại lượng giảm'' trong chứng minh tính dừng?}
+\h{Vì sao trong phân đoạn ảnh, người ta lại đi tìm \emph{lát cắt nhỏ nhất} chứ không tìm luồng?}
+\end{khoigoi}
+
+Chương trước kết thúc bằng nhận xét rằng đường đi ngắn nhất hỏi về \emph{một} đường. Nhưng rất nhiều bài toán thực tế hỏi về nhiều đối tượng cùng lúc, cạnh tranh nhau một nguồn lực có hạn: nhiều gói tin cùng chạy qua một mạng có băng thông giới hạn, nhiều người cùng được phân vào nhiều việc mà mỗi việc chỉ nhận một người, nhiều đường ống cùng dẫn nước qua các van có sức chứa khác nhau.
+
+Mô hình luồng ra đời cho đúng lớp bài toán đó, và điều làm nó có giá trị vượt xa mục đích ban đầu là một hiện tượng lặp đi lặp lại: những bài toán trông chẳng liên quan gì tới dòng chảy hoá ra lại có cùng cấu trúc. Vì vậy chương này sẽ dành phần lớn trọng lượng cho câu hỏi \emph{nhận diện và dựng mô hình}, và chỉ nói về thuật toán ở mức đủ để bạn chọn đúng và cài được.
+
+\section{Luồng, lát cắt, và một sự trùng khớp đáng kinh ngạc}
+
+Bài toán: cho mạng với sức chứa trên mỗi cạnh, đẩy nhiều nhất bao nhiêu đơn vị từ nguồn tới đích?
+
+Thuật toán cơ bản rất trực giác: tìm một đường từ nguồn tới đích còn chỗ trống, đẩy thêm luồng dọc đường đó, lặp lại. Điều duy nhất không hiển nhiên --- và là ý tưởng then chốt của cả lý thuyết --- là mỗi khi đẩy \(x\) đơn vị qua một cạnh, ta phải thêm một \emph{cạnh ngược} sức chứa \(x\) vào đồ thị thặng dư. Cạnh ngược cho phép các bước sau ``rút lại'' quyết định cũ nếu nó hoá ra không tối ưu.
+
+Vì sao cần? Vì nếu không có nó, thuật toán trở thành tham lam không hối tiếc, và như chương \ptr{C/15} đã chỉ ra, tham lam sai khi lựa chọn hôm nay phá huỷ khả năng tương lai. Đường đi đầu tiên có thể chiếm mất một cạnh hẹp mà lẽ ra nên để dành cho luồng khác. Cạnh ngược biến thuật toán tham lam thành thuật toán có khả năng tự sửa, và đó chính xác là điều làm nó tối ưu.
+
+Kết quả trung tâm là \emph{định lý luồng cực đại bằng lát cắt nhỏ nhất}: giá trị luồng lớn nhất đúng bằng giá của lát cắt nhỏ nhất. Chiều dễ hiểu ngay: mọi luồng đều phải đi qua mọi lát cắt, nên luồng không thể vượt giá của lát cắt nào. Chiều khó là chứng minh tồn tại một lát cắt \emph{đạt} giá trị đó, và nó có một chứng minh rất đẹp: khi thuật toán dừng vì không còn đường tăng, hãy lấy tập đỉnh còn tới được từ nguồn trong đồ thị thặng dư --- tập đó chính là một lát cắt có giá bằng luồng hiện tại.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=1.0cm,
+  v/.style={circle,draw=steel,fill=bluebg,inner sep=0pt,minimum size=7mm,font=\scriptsize},
+  ar/.style={-{Latex[length=2mm]},draw=steel,thick,font=\scriptsize},
+  cut/.style={dashed,very thick,color=reddark}]
+\node[v] (s) at (0,1.4) {\(s\)};
+\node[v] (a) at (2.4,2.6) {\(a\)};
+\node[v] (b) at (2.4,0.2) {\(b\)};
+\node[v] (c) at (5.0,2.6) {\(c\)};
+\node[v] (d) at (5.0,0.2) {\(d\)};
+\node[v] (t) at (7.4,1.4) {\(t\)};
+\draw[ar] (s) -- node[above left=-2pt] {10} (a);
+\draw[ar] (s) -- node[below left=-2pt] {8} (b);
+\draw[ar] (a) -- node[above] {4} (c);
+\draw[ar] (a) -- node[right,pos=0.35] {6} (d);
+\draw[ar] (b) -- node[below] {9} (d);
+\draw[ar] (c) -- node[above right=-2pt] {10} (t);
+\draw[ar] (d) -- node[below right=-2pt] {5} (t);
+\draw[cut] (3.7,3.6) -- (3.7,-0.7);
+\node[font=\scriptsize,color=reddark,anchor=north] at (3.7,-0.8) {lát cắt: \(4+6+9\)};
+\node[font=\scriptsize,color=tiercol,anchor=west,text width=3.6cm] at (8.0,1.4)
+  {Mọi luồng đều phải đi qua mọi lát cắt, nên luồng \(\le\) giá lát cắt nhỏ nhất --- và đẳng thức luôn đạt được.};
+\end{tikzpicture}
+\caption{Một mạng luồng và một lát cắt. Lát cắt vừa là chặn trên cho luồng vừa là \emph{lời giải} của nhiều bài toán mô hình hoá (mục 4). Khi thuật toán dừng, tập đỉnh còn tới được từ \(s\) trong đồ thị thặng dư cho đúng một lát cắt đạt giá trị luồng.}
+\label{fig:flow-cut}
+\end{figure}
+
+\begin{trucgiac}
+Vì sao một bài toán tối đa lại bằng một bài toán tối thiểu? Đây là hiện tượng \emph{đối ngẫu}, và nó phổ biến hơn nhiều người nghĩ. Trực giác: luồng là ``đẩy được bao nhiêu'', lát cắt là ``chặn tốn ít nhất bao nhiêu''. Mỗi lát cắt là một \emph{bằng chứng} chặn trên cho luồng; nếu tìm được lát cắt có giá bằng đúng luồng hiện tại thì hai bên kẹp nhau và cả hai đều tối ưu. Đây là lý do luồng có tính chất hiếm: nó không chỉ cho lời giải mà còn cho \emph{chứng cứ kiểm tra được} rằng lời giải là tối ưu. Cùng hiện tượng xuất hiện trong quy hoạch tuyến tính, trong lý thuyết trò chơi, và trong nhiều bài tối ưu tổ hợp khác.
+\end{trucgiac}
+
+\section{Ba thuật toán và giả thiết của chúng}
+
+\emph{Ford--Fulkerson} là khung chung: cứ tìm đường tăng bất kỳ. Chi phí phụ thuộc cách chọn đường: với sức chứa nguyên, mỗi vòng tăng ít nhất một đơn vị nên số vòng bị chặn bởi giá trị luồng --- đó là \emph{đại lượng giảm} theo nghĩa chương \ptr{A/04}. Nhưng nếu sức chứa là số vô tỉ thì các bước tăng có thể nhỏ dần vô hạn và thuật toán \emph{không dừng}. Đây là một ví dụ hiếm và rất đáng nhớ về việc chứng minh tính dừng phụ thuộc vào giả thiết số học chứ không chỉ vào cấu trúc.
+
+\emph{Edmonds--Karp} chỉ định thêm một quy tắc: luôn chọn đường tăng \emph{ngắn nhất} bằng duyệt rộng. Điều đó cho chặn \Ob{nm^2} độc lập với sức chứa, và giải quyết luôn vấn đề tính dừng. Bài học phương pháp rất đáng chú ý: một thuật toán không có đảm bảo tốt trở nên có đảm bảo chỉ nhờ \emph{cố định thứ tự lựa chọn}.
+
+\emph{Dinic} nhanh hơn nhiều và là lựa chọn thực tế: nó xây đồ thị phân tầng bằng duyệt rộng, rồi đẩy luồng chặn trên đồ thị đó bằng duyệt sâu. Chi phí \Ob{n^2m} nói chung, và \Ob{m\sqrt{n}} trên mạng đơn vị của bài ghép đôi hai phía. Chỉ giả thiết mọi sức chứa bằng 1 chưa đủ để suy ra chặn này trên mạng tổng quát; cấu trúc vào/ra của các đỉnh trung gian cũng quan trọng\cite{kactl}. Trong thực hành thi đấu, Dinic gần như luôn là lựa chọn đúng.
+
+\section{Ghép đôi hai phía và ba định lý anh em}
+
+Trường hợp riêng quan trọng nhất: đồ thị hai phía, mọi sức chứa bằng 1. Bài toán ghép đôi cực đại --- phân công nhiều người vào nhiều việc sao cho số cặp lớn nhất --- quy về luồng bằng cách thêm nguồn nối tới mọi đỉnh trái và đích nhận từ mọi đỉnh phải.
+
+Ba định lý đi kèm, và chúng đáng thuộc vì chúng biến bài toán này thành bài toán khác:
+
+\emph{Định lý Kőnig:} trên đồ thị hai phía, ghép đôi lớn nhất bằng phủ đỉnh nhỏ nhất. Hệ quả: bài ``chọn ít đỉnh nhất chạm mọi cạnh'' --- vốn NP-khó trên đồ thị tổng quát --- lại giải được trong thời gian đa thức trên đồ thị hai phía.
+
+\emph{Hệ quả về tập độc lập:} tập độc lập lớn nhất bằng \(n\) trừ ghép đôi lớn nhất. Rất nhiều bài ``chọn nhiều ô nhất trên bàn cờ sao cho không có hai ô xung khắc'' rơi vào đúng đây.
+
+\emph{Định lý Hall:} tồn tại ghép đôi bão hoà phía trái khi và chỉ khi mọi tập con \(S\) của phía trái có số láng giềng ít nhất bằng \(|S|\). Đây là công cụ để \emph{chứng minh} một phân công là bất khả thi, chứ không chỉ để tìm phân công.
+
+Với bài phân công có \emph{chi phí} --- mỗi người làm mỗi việc tốn một giá khác nhau, tìm phân công tổng chi phí nhỏ nhất --- ta cần luồng chi phí nhỏ nhất hoặc thuật toán Hungarian\cite{kuhn1955}. Với \(n \le 20\), quy hoạch động mặt nạ bit (\ptr{C/16}) thường ngắn hơn và đủ nhanh; với \(n\) lớn hơn thì phải dùng thuật toán chuyên.
+
+\section{Mô hình hoá: nơi chương này thật sự trả công}
+
+Đây là mục quan trọng nhất. Dưới đây là các mẫu dựng mô hình hay gặp, kèm dấu hiệu nhận biết trên đề.
+
+\emph{Mẫu 1 --- phân công.} Dấu hiệu: hai loại đối tượng, mỗi phần tử một loại ghép với một phần tử loại kia. Đồ thị hai phía, sức chứa 1.
+
+\emph{Mẫu 2 --- ràng buộc ở đỉnh.} Dấu hiệu: ``mỗi thành phố chỉ đi qua một lần'', ``mỗi máy xử lý tối đa \(k\) việc''. Tách đỉnh thành hai nửa nối bởi một cạnh có sức chứa bằng đúng giới hạn đó --- kỹ thuật đã nhắc ở \ptr{C/17} và ở đây nó thành công cụ chính.
+
+\emph{Mẫu 3 --- chọn dự án có lợi nhất.} Dấu hiệu: có các dự án cho lợi nhuận, mỗi dự án đòi hỏi một số thiết bị tốn chi phí, thiết bị dùng chung được. Đây là bài đóng lớn nhất, và nó quy về lát cắt nhỏ nhất: nối nguồn tới dự án với sức chứa bằng lợi nhuận, nối thiết bị tới đích với sức chứa bằng chi phí, nối dự án tới thiết bị nó cần với sức chứa vô hạn. Lợi nhuận lớn nhất bằng tổng lợi nhuận trừ lát cắt nhỏ nhất.
+
+\emph{Mẫu 4 --- chia hai phía sao cho ít mâu thuẫn nhất.} Dấu hiệu: mỗi đối tượng phải được gán một trong hai nhãn; gán sai nhãn cho một đối tượng tốn một giá; hai đối tượng kề nhau mà khác nhãn cũng tốn một giá. Đây chính là mô hình lát cắt nhỏ nhất, và nó là nền của phân đoạn ảnh bằng cắt đồ thị.
+
+Mẫu 4 đáng được nói kỹ vì nó là cầu nối đẹp giữa chương này và thị giác máy tính. Khi ta muốn tách vật thể khỏi nền trong một bức ảnh, mỗi điểm ảnh phải nhận nhãn ``vật'' hoặc ``nền''. Mỗi điểm ảnh có một chi phí gán nhãn dựa trên màu của nó, và hai điểm ảnh kề nhau có một chi phí nếu chúng nhận nhãn khác nhau --- phần này thể hiện giả định rằng vùng ảnh thường liền mạch. Tổng chi phí đúng bằng giá của một lát cắt trong đồ thị mà đỉnh là điểm ảnh, nên tìm cách gán nhãn tốt nhất chính là tìm lát cắt nhỏ nhất. Đây là lý do câu hỏi mở đầu thứ năm có câu trả lời: người ta quan tâm tới \emph{lát cắt} vì lát cắt chính là lời giải, còn luồng chỉ là phương tiện tính ra nó.
+
+\begin{cambay}
+Cạm bẫy phổ biến nhất khi dùng luồng không phải cài sai thuật toán mà là \emph{dựng sai mô hình}, và cái sai đó im lặng: chương trình chạy, cho ra một con số, và con số đó trả lời một bài toán khác. Hai cách phòng. Thứ nhất, sau khi dựng xong, hãy kiểm tra bằng lời: ``một đơn vị luồng trong mô hình này tương ứng với cái gì trong bài toán thật?'' --- nếu không trả lời được bằng một câu thì mô hình sai. Thứ hai, stress test với vét cạn trên dữ liệu rất nhỏ (\ptr{E/25}), vì mô hình sai gần như luôn lộ ra ở \(n \le 5\).
+\end{cambay}
+
+
+\section{Cạnh ngược là quyền sửa một quyết định cũ}
+
+Cho hai người \(L_1,L_2\) và hai việc \(R_1,R_2\); các cặp hợp lệ là \(L_1R_1,L_1R_2,L_2R_1\).
+Nếu ghép \(L_1R_1\) trước, \(L_2\) chưa có việc. Hình~\ref{fig:review-residual} cho thấy đường tăng dùng cạnh ngược để sửa cặp cũ.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[every node/.style={circle,draw=steel,fill=bluebg,minimum size=9mm},
+ every edge/.style={draw=steel,thick,-{Latex}}]
+\node (l2) at (0,0){\(L_2\)}; \node (r1) at (3,0){\(R_1\)};
+\node (l1) at (6,0){\(L_1\)}; \node (r2) at (9,0){\(R_2\)};
+\path (l2) edge node[draw=none,fill=white,above,font=\scriptsize]{thêm cặp} (r1)
+ (r1) edge[draw=reddark,dashed] node[draw=none,fill=white,above,font=\scriptsize]{huỷ cặp cũ} (l1)
+ (l1) edge node[draw=none,fill=white,above,font=\scriptsize]{thêm cặp} (r2);
+\end{tikzpicture}
+\caption{Đường tăng xen kẽ \(L_2\to R_1\to L_1\to R_2\), lược bỏ nguồn và đích. Cạnh nét đứt là cạnh dư ngược của cặp đang ghép. Kết quả có hai cặp \(L_2R_1,L_1R_2\), tăng từ 1 lên 2.}
+\label{fig:review-residual}
+\end{figure}
+
+Khi đẩy \(\Delta\) qua cạnh dư \(u\to v\), giảm sức chứa dư cạnh đó và tăng cạnh đối ứng cùng lượng.
+Chỉ xoá bớt sức chứa chiều thuận sẽ biến thuật toán thành lựa chọn không thể sửa và có thể dừng ở luồng chưa cực đại.
+Trong cài đặt, lưu chỉ số cạnh đối ứng; hai cạnh gốc ngược chiều vẫn phải có các cặp cạnh dư riêng để xử lý chính xác đa cạnh.
+Sau khi chạy, kiểm sức chứa, bảo toàn luồng ở đỉnh trung gian và giá trị lát cắt từ các đỉnh còn tới được trong mạng dư.
+
+\section{Biên giới hiện nay: từ đường tăng tới tối ưu hoá liên tục}
+
+Dinic là lựa chọn thực hành, nhưng câu hỏi ``luồng cực đại thật sự tốn bao nhiêu'' có một lịch sử dài và vừa có bước ngoặt, và bước ngoặt ấy đáng kể lại vì nó đến từ một hướng hoàn toàn khác.
+
+Suốt nửa thế kỷ, mọi cải tiến đều nằm trong khuôn tổ hợp: vẫn là đường tăng, luồng chặn, đẩy và gán nhãn, chỉ khác ở cách chọn và cách tổ chức dữ liệu. Đỉnh của dòng ấy là kết quả của Orlin\cite{orlin2013}, đưa luồng cực đại về \Ob{nm} cho mọi cặp \(n, m\) --- con số mà nhiều người xem là điểm dừng tự nhiên của lối tiếp cận tổ hợp.
+
+Bước ngoặt đến khi người ta ngừng coi luồng là bài toán tổ hợp. Nhìn từ tối ưu hoá, tìm luồng cực đại là giải một bài quy hoạch tuyến tính có cấu trúc rất đặc biệt, và người ta có thể đi tới lời giải bằng những bước \emph{liên tục} --- mỗi bước giải một bài toán dòng điện trên mạng, rồi sửa dần. Chen, Kyng, Liu, Peng, Probst Gutenberg và Sachdeva\cite{chen2022} hoàn thiện hướng này: luồng cực đại và luồng chi phí nhỏ nhất trên đồ thị có hướng với sức chứa và chi phí nguyên bị chặn đa thức, giải được trong thời gian \(m^{1+o(1)}\) --- \emph{gần tuyến tính}, tức là chỉ hơn chi phí đọc dữ liệu vào một thừa số dưới mọi luỹ thừa. Bài được trao giải bài báo xuất sắc tại FOCS 2022.
+
+Hai điều đáng học ở đây, và không điều nào là ``hãy cài thuật toán này''.
+
+Thứ nhất, về phương pháp: bước nhảy có được nhờ \emph{đổi ngôn ngữ} --- rời khuôn tổ hợp sang khuôn tối ưu hoá liên tục --- chứ không nhờ tinh chỉnh khuôn cũ. Và điều mỉa mai đẹp đẽ là cái làm cho hướng liên tục chạy được lại chính là cấu trúc dữ liệu động: mỗi bước liên tục chỉ rẻ nếu ta duy trì được thông tin về đồ thị đang thay đổi mà không tính lại từ đầu, đúng loại công việc của phần B. Lý thuyết thuật toán hiện đại có hình dạng như vậy: tối ưu hoá liên tục ở tầng trên, cấu trúc dữ liệu ở tầng dưới.
+
+Thứ hai, về cách đọc kết quả: \(m^{1+o(1)}\) giấu một thừa số dưới đa thức có thể rất lớn ở kích thước thật, nên trong mọi kỳ thi và gần như mọi hệ thống, Dinic vẫn là lựa chọn đúng, và ghép đôi hai phía vẫn nên dùng Hopcroft--Karp\cite{hopcroft1973} với \Ob{m\sqrt{n}}. Nhưng kết quả này đổi một điều quan trọng cho \emph{người mô hình hoá}: phát biểu lại bài toán của mình thành luồng chi phí nhỏ nhất giờ đây là một phép quy dẫn ``gần như miễn phí'' về mặt lý thuyết, nên rào cản còn lại chỉ là mô hình có đúng hay không --- đúng thông điệp của mục 4.
+
+\section{Gốc rễ: mạng đường sắt Liên Xô và một bài toán về hôn nhân}
+
+Bài toán luồng cực đại có một nguồn gốc rất cụ thể và ít người biết. Năm 1955, trong bối cảnh Chiến tranh Lạnh, hai nhà nghiên cứu tại RAND Corporation là Harris và Ross viết một báo cáo phân tích năng lực vận chuyển của mạng đường sắt Liên Xô và các nước Đông Âu. Bài toán họ quan tâm có hai mặt: mạng này chuyển được tối đa bao nhiêu hàng, và --- mặt được nhấn mạnh hơn --- \emph{cần cắt những tuyến nào, tốn ít nhất bao nhiêu, để chặn dòng vận chuyển}. Nghĩa là bài toán lát cắt nhỏ nhất được đặt ra như một bài toán quân sự, đồng thời với bài toán luồng cực đại.
+
+Ford và Fulkerson, cũng tại RAND, đưa ra thuật toán và chứng minh định lý luồng cực đại bằng lát cắt nhỏ nhất vào năm 1956. Sự trùng khớp giữa hai bài toán --- một của bên vận chuyển, một của bên phá hoại --- vì thế không phải phát hiện lý thuyết thuần tuý mà là câu trả lời cho một câu hỏi thực tế được đặt ra từ cả hai phía cùng lúc. Đây là ví dụ mẫu mực cho việc bối cảnh sinh ra khái niệm: hai nửa của định lý đối ngẫu ứng với hai bên của một tình huống thật.
+
+Nhánh ghép đôi thì cổ hơn và đến từ toán học thuần tuý. Kőnig chứng minh định lý về ghép đôi và phủ đỉnh trên đồ thị hai phía năm 1931; Hall đưa ra điều kiện tồn tại ghép đôi bão hoà năm 1935, trong một bài toán thường được kể dưới cái tên ``định lý hôn nhân''. Cả hai kết quả ra đời trước khi có máy tính và không nhằm mục đích thuật toán nào. Đến năm 1955, Kuhn kết hợp các ý tưởng của Kőnig và Egerváry thành một thuật toán cho bài toán phân công --- và ông đặt tên nó là ``phương pháp Hungary'' để ghi công hai nhà toán học Hungary đó\cite{kuhn1955}, một cử chỉ hiếm thấy trong việc đặt tên thuật toán.
+
+Cuối cùng, một liên hệ hiện đại đáng chú ý: đầu những năm 2000, giới thị giác máy tính phát hiện ra rằng bài toán gán nhãn ảnh với ràng buộc trơn có thể giải \emph{chính xác} bằng lát cắt nhỏ nhất, thay vì bằng các phương pháp lặp không có đảm bảo. Điều này biến một thuật toán vận trù học của thập niên 1950 thành công cụ chủ lực cho phân đoạn ảnh và cho ước lượng độ sâu từ ảnh lập thể trong suốt một thập kỷ, cho tới khi học sâu thay đổi bức tranh.
+
+\begin{gocre}
+\gr{1931 --- Kőnig}{Quan hệ giữa ghép đôi và phủ đỉnh trên đồ thị hai phía.}{Định lý Kőnig; biến bài phủ đỉnh trên đồ thị hai phía thành bài đa thức.}
+\gr{1935 --- Hall}{Khi nào thì ghép được mọi phần tử của một phía?}{Điều kiện Hall; công cụ để chứng minh \emph{bất khả thi}, không chỉ để tìm lời giải.}
+\gr{1955 --- Harris \& Ross (RAND)}{Năng lực mạng đường sắt Liên Xô, và cần cắt tuyến nào để chặn.}{Bài toán luồng cực đại và lát cắt nhỏ nhất được đặt ra cùng lúc, từ hai phía của một tình huống thật.}
+\gr{1955 --- Kuhn}{Bài toán phân công người vào việc với chi phí.}{Phương pháp Hungary, dựa trên kết quả của Kőnig và Egerváry.}
+\gr{1956 --- Ford \& Fulkerson}{Cần thuật toán và cần biết khi nào dừng được.}{Thuật toán đường tăng và định lý luồng cực đại bằng lát cắt nhỏ nhất --- luồng vừa cho lời giải vừa cho chứng cứ tối ưu.}
+\gr{1970--72 --- Dinic; Edmonds \& Karp}{Ford--Fulkerson có thể rất chậm hoặc không dừng.}{Cố định thứ tự chọn đường (ngắn nhất trước) cho chặn độc lập với sức chứa; Dinic thêm đồ thị phân tầng, cho \Ob{m\sqrt{n}} trên mạng đơn vị.}
+\gr{Đầu thập niên 2000 --- thị giác máy tính}{Gán nhãn điểm ảnh với ràng buộc trơn, các phương pháp lặp không có đảm bảo.}{Cắt đồ thị cho lời giải \emph{chính xác} cho một lớp bài năng lượng; luồng trở thành công cụ chủ lực của phân đoạn ảnh và ảnh lập thể suốt một thập kỷ.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Thị giác máy tính}{Cắt đồ thị cho phân đoạn ảnh và ảnh lập thể}{Mô hình mẫu 4 ở mục 4: chi phí gán nhãn cộng chi phí khác nhãn giữa hai điểm kề. Điểm đáng nhớ: đây là một trong số ít bài năng lượng trong thị giác máy tính có lời giải \emph{tối ưu toàn cục} trong thời gian đa thức.}
+\lh{Quy hoạch tuyến tính}{Đối ngẫu: bài cực đại và bài cực tiểu có cùng giá trị tối ưu}{Luồng--lát cắt là một trường hợp riêng đẹp của đối ngẫu tuyến tính. Ý tưởng chung rất mạnh: nghiệm của bài đối ngẫu là \emph{chứng cứ} cho tính tối ưu của bài gốc.}
+\lh{Kinh tế học}{Bài toán vận tải, phân bổ nguồn lực, thị trường ghép cặp}{Cùng mô hình; ghép cặp ổn định (bệnh viện--bác sĩ nội trú, trường--học sinh) là họ hàng gần và đã được dùng trong các hệ thống phân bổ thật.}
+\lh{Mạng máy tính}{Băng thông, định tuyến đa đường, độ tin cậy mạng}{Bài toán gốc. Số đường đi rời cạnh giữa hai đỉnh bằng luồng cực đại với mọi sức chứa bằng 1 --- định lý Menger, một cách phát biểu khác của cùng kết quả.}
+\lh{Thể thao, lập lịch}{Đội nào còn cơ hội vô địch}{Bài toán loại trừ: dựng mạng phân phối các trận còn lại; nếu luồng không bão hoà thì đội đang xét chắc chắn bị loại. Ví dụ điển hình cho việc bài toán không có ``dòng chảy'' nào vẫn là bài luồng.}
+\lh{Sản xuất}{Lập lịch máy, phân công ca}{Ràng buộc ở đỉnh (mỗi máy tối đa \(k\) việc) xử lý bằng tách đỉnh; ràng buộc cận dưới (mỗi ca phải có ít nhất 2 người) xử lý bằng luồng có cận dưới.}
+\lh{SLAM và robot}{Chọn tập ràng buộc nhất quán, phân công nhiệm vụ cho đội robot}{Phân công nhiệm vụ nhiều robot là bài ghép đôi có trọng số --- đúng bài toán Hungarian. Việc chọn tập quan sát nhất quán thì gần với các bài chọn tập con hơn (\ptr{C/15}), nhưng khi ràng buộc là ``mỗi điểm mốc ghép với đúng một quan sát'' thì lại quay về ghép đôi.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Vì mỗi lát cắt là một \emph{chặn trên} cho mọi luồng --- luồng nào cũng phải đi qua nó --- nên luồng cực đại không vượt lát cắt nhỏ nhất. Chiều còn lại được chứng minh bằng cách xây dựng: khi thuật toán dừng vì không còn đường tăng, tập các đỉnh còn tới được từ nguồn trong đồ thị thặng dư tạo thành một lát cắt có giá đúng bằng luồng hiện tại. Hai bên kẹp nhau nên bằng nhau. Đây là hiện tượng đối ngẫu, và ý nghĩa thực dụng là luồng cho ta cả lời giải lẫn chứng cứ kiểm tra được rằng nó tối ưu.}
+\tl{Thuật toán trở thành tham lam không hối tiếc và sẽ cho kết quả dưới mức tối ưu. Đường tăng đầu tiên có thể chiếm một cạnh hẹp mà lẽ ra nên dành cho luồng khác, và không có cách nào sửa. Cạnh ngược cho phép các bước sau rút lại một phần quyết định cũ, biến thuật toán thành có khả năng tự sửa --- đúng thứ mà chương \ptr{C/15} nói là điều kiện để tham lam đúng, chỉ ở đây ta đạt được bằng cách thêm khả năng hối tiếc thay vì bằng chứng minh.}
+\tl{Vì bài phân công có đúng cấu trúc ``mỗi bên dùng một lần'': dựng đồ thị hai phía, nguồn nối tới mọi người với sức chứa 1, mỗi người nối tới các việc họ làm được, mỗi việc nối tới đích với sức chứa 1. Sức chứa 1 trên các cạnh từ nguồn và tới đích chính là cách mã hoá ràng buộc ``mỗi người một việc, mỗi việc một người''. Một đơn vị luồng tương ứng với một cặp được ghép --- và câu này chính là bài kiểm tra ở khối \emph{Cạm bẫy}.}
+\tl{Nó cho thấy tính dừng không phải là hệ quả tự nhiên của việc ``mỗi bước đều cải thiện''. Với sức chứa nguyên, mỗi bước tăng ít nhất một đơn vị nên có một đại lượng nguyên không âm giảm --- và đó là chứng minh dừng. Với sức chứa vô tỉ, các bước tăng có thể nhỏ dần theo cấp số nhân và tổng hội tụ về một giá trị nhỏ hơn tối ưu, nên thuật toán chạy mãi. Đại lượng giảm phải bị chặn dưới bởi một lượng dương cố định, không chỉ đơn thuần là ``giảm''.}
+\tl{Vì trong bài phân đoạn ảnh, \emph{lát cắt chính là lời giải}: nó nói mỗi điểm ảnh thuộc phía nào, tức là được gán nhãn gì. Luồng chỉ là phương tiện để tính ra lát cắt nhỏ nhất, và giá trị luồng chỉ là tổng chi phí. Đây là một chỗ đáng nhớ về mặt tư duy: khi mô hình hoá bằng luồng, hãy luôn hỏi bạn cần \emph{giá trị} hay cần \emph{cấu hình} --- và nếu cần cấu hình thì nó thường nằm ở phía lát cắt.}
+\end{traloi}
+
+\begin{dongian}
+Hãy hình dung một hệ thống ống nước: một bể nguồn, một bể đích, và nhiều đoạn ống nối nhau, mỗi đoạn chịu được một lưu lượng tối đa. Câu hỏi là bơm được nhiều nhất bao nhiêu nước từ nguồn tới đích.
+
+Cách làm rất tự nhiên: tìm một đường ống còn chỗ trống từ nguồn tới đích, bơm thêm nước vào đó, rồi lặp lại. Chỉ có một mẹo phải nhớ, và đó là điểm tinh tế duy nhất của cả chương: mỗi khi đã bơm nước qua một đoạn ống, hãy ghi nhớ rằng ta \emph{có quyền rút lại} phần nước đó nếu về sau thấy nên dùng ống ấy cho luồng khác. Không có quyền rút lại thì lần bơm đầu tiên có thể lỡ chiếm mất một đoạn ống hẹp quan trọng, và ta bị kẹt ở kết quả không tốt nhất.
+
+Điều đẹp nhất của bài toán này là một sự trùng khớp. Nếu bạn hỏi ngược lại --- ``muốn chặn hoàn toàn dòng nước thì phải cắt những đoạn ống nào cho ít tốn kém nhất'' --- thì câu trả lời của bài chặn đúng bằng câu trả lời của bài bơm. Trực giác thì rõ: mọi giọt nước đều phải đi qua chỗ hẹp nhất, nên chỗ hẹp nhất quyết định lượng nước. Điều đáng giá là chiều ngược lại cũng đúng, nên khi tìm ra cách chặn rẻ nhất là bạn có luôn bằng chứng rằng không thể bơm nhiều hơn.
+
+Và đây là lý do mô hình này quan trọng hơn hẳn phạm vi ống nước. Bài phân công nhân viên vào công việc chính là bài này với mỗi ống chịu được đúng một đơn vị. Bài tách vật thể khỏi nền trong ảnh cũng là bài này: mỗi điểm ảnh phải chọn một trong hai phía, và ``chi phí cắt'' chính là chi phí đặt ranh giới. Khi bạn thấy đề bài nói tới sức chứa, hoặc ``mỗi thứ dùng một lần'', hoặc ``chia hai phía sao cho ít mâu thuẫn nhất'' --- hãy nghĩ tới ống nước.
+\motcau{Cắt chỗ hẹp nhất và bơm nhiều nhất là hai câu hỏi cho cùng một đáp số.}
+\chuadongian{Việc dựng đúng mô hình cho một bài mới vẫn đòi kinh nghiệm; mẫu ở mục 4 chỉ phủ những dạng hay gặp, không phủ hết.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Ý tưởng then chốt của thuật toán}{Cạnh ngược trong đồ thị thặng dư: cho phép rút lại luồng đã đẩy, biến tham lam thành thuật toán tự sửa được.}
+\ar[3]{Định lý luồng--lát cắt}{Luồng cực đại bằng lát cắt nhỏ nhất; lát cắt là chặn trên, và tập đỉnh tới được từ nguồn khi thuật toán dừng cho lát cắt đạt đúng giá trị đó.}
+\ar[3]{Dấu hiệu bài luồng trên đề}{Có ``sức chứa''; ``mỗi thứ dùng đúng một lần''; ``phân công hai loại đối tượng''; ``chia hai phía sao cho ít mâu thuẫn nhất''.}
+\ar[3]{Ghép đôi hai phía}{Quy về luồng với mọi sức chứa 1; Dinic cho \Ob{m\sqrt{n}}. Một đơn vị luồng \(=\) một cặp được ghép.}
+\ar[3]{Định lý Kőnig và hệ quả}{Trên đồ thị hai phía: ghép đôi lớn nhất \(=\) phủ đỉnh nhỏ nhất; tập độc lập lớn nhất \(=\) \(n\) trừ ghép đôi lớn nhất.}
+\ar[3]{Bốn mẫu mô hình hoá}{Phân công; tách đỉnh khi ràng buộc ở đỉnh; chọn dự án (bài đóng lớn nhất) qua lát cắt; gán nhãn hai phía với chi phí trơn.}
+\ar[2]{Vì sao Ford--Fulkerson có thể không dừng}{Với sức chứa vô tỉ, các bước tăng nhỏ dần vô hạn; đại lượng giảm phải bị chặn dưới bởi một lượng dương cố định.}
+\ar[2]{Edmonds--Karp}{Luôn chọn đường tăng ngắn nhất (duyệt rộng) \(\Rightarrow\) \Ob{nm^2}, độc lập với sức chứa. Bài học: cố định thứ tự lựa chọn tạo ra đảm bảo.}
+\ar[2]{Định lý Hall}{Ghép bão hoà phía trái tồn tại khi và chỉ khi mọi tập con \(S\) có ít nhất \(|S|\) láng giềng --- dùng để chứng minh \emph{bất khả thi}.}
+\ar[2]{Bài phân công có chi phí}{Luồng chi phí nhỏ nhất hoặc Hungarian; với \(n\le20\) thì quy hoạch động mặt nạ bit thường ngắn hơn (\ptr{C/16}).}
+\ar[2]{Cạm bẫy lớn nhất}{Dựng sai mô hình, và sai im lặng. Kiểm bằng câu ``một đơn vị luồng tương ứng với cái gì'' và bằng stress test ở \(n\le5\).}
+\ar[1]{Định lý Menger}{Số đường đi rời cạnh giữa hai đỉnh bằng số cạnh ít nhất phải bỏ để ngắt liên thông --- một cách phát biểu khác của định lý luồng--lát cắt.}
+\ar[1]{Luồng cực đại tốn bao nhiêu}{Dòng tổ hợp dừng ở \Ob{nm} (2013); hướng tối ưu hoá liên tục cộng cấu trúc dữ liệu động cho \(m^{1+o(1)}\) (2022). Thực hành vẫn là Dinic, và ghép đôi hai phía vẫn là Hopcroft--Karp.}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Tôi nên cài thuật toán luồng nào cho thi đấu?}{Dinic là một lựa chọn khởi đầu thực dụng. Nó đủ nhanh cho gần như mọi bài có giới hạn hợp lý, đặc biệt mạnh trên mạng ghép đôi hai phía nơi nó cho \Ob{m\sqrt{n}}. Edmonds--Karp đáng biết về mặt lý thuyết nhưng chậm hơn nhiều trong thực tế. Ford--Fulkerson thuần tuý thì đừng dùng vì chi phí phụ thuộc sức chứa. Hãy có sẵn một bản Dinic đã stress test trong thư viện riêng (\ptr{A/02}).}
+\qa{Làm sao xử lý ràng buộc ``mỗi đỉnh chỉ đi qua một lần''?}{Tách đỉnh: mỗi đỉnh \(v\) thành \(v_{\text{vào}}\) và \(v_{\text{ra}}\), nối bởi một cạnh sức chứa 1 (hoặc bằng giới hạn của đỉnh). Mọi cạnh vào \(v\) nay nối tới \(v_{\text{vào}}\), mọi cạnh ra khỏi \(v\) xuất phát từ \(v_{\text{ra}}\). Kỹ thuật này chuyển ràng buộc từ đỉnh sang cạnh --- nơi mô hình luồng biểu diễn được --- và nó là một trong hai ba mẹo cần thuộc của chương.}
+\qa{Bài của tôi cần mỗi cạnh có cả cận dưới lẫn cận trên. Làm sao?}{Đó là bài luồng có cận dưới, và có một phép biến đổi chuẩn: với mỗi cạnh có cận dưới \(l\), trừ \(l\) khỏi sức chứa và bù lại bằng cách thêm luồng cưỡng bức vào hai đầu qua một nguồn và đích phụ. Sau biến đổi, việc tồn tại luồng hợp lệ tương đương với việc mạng phụ bão hoà. Kỹ thuật này không khó nhưng nhiều chi tiết, nên hãy cài một lần cho kỹ và cất vào thư viện.}
+\qa{Vì sao bài chọn dự án lại là lát cắt chứ không phải luồng?}{Vì cái ta cần là \emph{tập dự án được chọn}, tức là một cách chia đỉnh thành hai phía --- đúng định nghĩa của lát cắt. Cách dựng: nguồn nối tới mỗi dự án với sức chứa bằng lợi nhuận, mỗi thiết bị nối tới đích với sức chứa bằng chi phí, và dự án nối tới thiết bị nó cần với sức chứa vô hạn. Cạnh vô hạn bảo đảm không thể chọn dự án mà không trả tiền thiết bị. Lợi nhuận lớn nhất bằng tổng lợi nhuận trừ giá lát cắt nhỏ nhất.}
+\qa{Khi nào bài ghép đôi \emph{không} quy về luồng được?}{Khi đồ thị không phải hai phía. Ghép đôi cực đại trên đồ thị tổng quát cần thuật toán Blossom của Edmonds, phức tạp hơn hẳn và hiếm khi xuất hiện trong thi đấu. Đây cũng là chỗ ranh giới lý thuyết thú vị: nhiều bài dễ trên đồ thị hai phía lại khó hơn hẳn hoặc NP-khó trên đồ thị tổng quát --- phủ đỉnh là ví dụ rõ nhất (\ptr{D/23}).}
+\qa{Tôi dựng mô hình xong nhưng không chắc đúng. Kiểm thế nào?}{Ba bước, theo thứ tự rẻ dần. Một, trả lời bằng lời câu ``một đơn vị luồng ứng với gì'' và ``một lát cắt ứng với gì'' --- nếu ấp úng thì mô hình sai. Hai, thử tay một ví dụ \(n=2\) hoặc \(n=3\) và so với đáp án tính tay. Ba, stress test với vét cạn trên \(n \le 5\). Bước ba tốn mười phút và bắt được gần như mọi lỗi mô hình --- rẻ hơn nhiều so với ngồi đọc lại code.}
+\qa{Luồng chi phí nhỏ nhất khác luồng cực đại thế nào về mặt tư duy?}{Luồng cực đại hỏi ``đẩy được bao nhiêu''; luồng chi phí nhỏ nhất hỏi ``đẩy đúng lượng này với tổng chi phí nhỏ nhất''. Thuật toán chuẩn thay việc tìm đường tăng bất kỳ bằng việc tìm đường tăng \emph{rẻ nhất} --- tức là chạy Bellman--Ford hoặc Dijkstra với thế năng trên đồ thị thặng dư. Điều cần chú ý: đồ thị thặng dư có cạnh ngược với chi phí âm, nên Dijkstra thuần tuý không dùng được và phải chuyển đổi trọng số (\ptr{C/17}).}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Ghép đôi cực đại trên đồ thị hai phía}{CSES ``School Dance''\cite{cses}}{Dựng mạng và chạy Dinic; giải thích ý nghĩa của mỗi đơn vị luồng.}
+\bt[2]{Luồng cực đại cơ bản}{CSES ``Download Speed''\cite{cses}}{Chú ý cạnh song song và cạnh hai chiều.}
+\bt[2]{Số đường đi rời cạnh giữa hai đỉnh}{CSES ``Distinct Routes''\cite{cses}}{Sức chứa 1; truy vết các đường sau khi có luồng.}
+\bt[2]{Phủ đỉnh nhỏ nhất và tập độc lập lớn nhất trên đồ thị hai phía}{Bài kinh điển}{Dùng định lý Kőnig; dựng phủ đỉnh từ ghép đôi bằng cách duyệt xen kẽ.}
+\bt[2]{Đặt quân xe trên bàn cờ có ô cấm sao cho không ăn nhau}{Bài kinh điển}{Hàng và cột là hai phía --- một bài mà mô hình hoá là toàn bộ lời giải.}
+\bt[3]{Bài chọn dự án có lợi nhuận lớn nhất}{Bài kinh điển}{Lát cắt nhỏ nhất với cạnh vô hạn; tính lợi nhuận bằng tổng trừ lát cắt.}
+\bt[3]{Phân công với chi phí, \(n \le 200\)}{Bài kinh điển}{Luồng chi phí nhỏ nhất hoặc Hungarian; so với quy hoạch động mặt nạ bit ở \(n\le20\).}
+\bt[3]{Đội bóng nào còn cơ hội vô địch}{Bài kinh điển}{Bài loại trừ thể thao; ví dụ đẹp nhất cho việc bài không có ``dòng chảy'' nào vẫn là bài luồng.}
+\bt[3]{Phân đoạn ảnh nhị phân bằng lát cắt nhỏ nhất}{Bài tập ứng dụng}{Dựng chi phí gán nhãn và chi phí trơn; chạy trên ảnh nhỏ và xem kết quả bằng mắt.}
+\bt[3]{Luồng có cận dưới trên mỗi cạnh}{Bài thi đấu kinh điển}{Phép biến đổi chuẩn; cài một lần cho kỹ rồi cất vào thư viện riêng.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Luồng là chương mà công sức bỏ ra chủ yếu nằm ở việc \emph{dựng mô hình}, không ở việc cài thuật toán. Ba điều đáng mang theo: cạnh ngược là ý tưởng làm cho thuật toán tự sửa được; định lý luồng--lát cắt cho ta cả lời giải lẫn chứng cứ tối ưu; và bốn mẫu mô hình ở mục 4, đặc biệt mẫu ``gán nhãn hai phía với chi phí trơn'' vì nó xuất hiện ở những nơi bất ngờ nhất.
+
+Hai chương còn lại của phần C là hai công cụ cắt ngang, dùng được cho mọi chương trước. Chương \ptr{C/19} nói về một kỹ thuật có tỉ lệ ``biến bài khó thành bài dễ'' cao nhất trong cả quyển sách: khi bài toán tối ưu khó, hãy đổi nó thành bài toán kiểm tra và tìm nhị phân trên đáp án.
+\begin{docthem}
+\ct{Edmonds \& Karp, ``Theoretical Improvements in Algorithmic Efficiency for Network Flow Problems''}{Journal of the ACM, 1972}{Đọc để thấy một thuật toán không có đảm bảo trở nên có đảm bảo chỉ nhờ cố định thứ tự chọn đường tăng.}
+\ct{Hopcroft \& Karp, ``An \(n^{5/2}\) Algorithm for Maximum Matchings in Bipartite Graphs''}{SIAM Journal on Computing, 1973}{Thuật toán ghép đôi nên dùng trong thực hành; đọc phần lập luận về các pha đường tăng ngắn nhất.}
+\ct[2]{Orlin, ``Max Flows in \(O(nm)\) Time, or Better''}{STOC, 2013}{Điểm dừng của dòng thuật toán tổ hợp; đọc phần mở đầu để có bản đồ lịch sử các cận.}
+\ct[2]{Chen, Kyng, Liu, Peng, Probst Gutenberg, Sachdeva, ``Maximum Flow and Minimum-Cost Flow in Almost-Linear Time''}{FOCS, 2022 (Best Paper)}{Chỉ cần đọc mục giới thiệu: nó nói rõ vì sao hướng liên tục thắng và cấu trúc dữ liệu động đóng vai trò gì.}
+\ct[2]{Ahuja, Magnanti, Orlin, \emph{Network Flows}}{Prentice-Hall, 1993}{Sách tra cứu cho các biến thể mô hình hoá: luồng chi phí nhỏ nhất, luồng có cận dưới, bài toán vận tải.}
+\end{docthem}
+
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,241 @@
+% ============================================================================
+%  B/06-cau-truc-lap-luan — file chương
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+%  Dependency: B/05, A/03. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../english.tex]{subfiles}
+\begin{document}
+\chapter{Cấu trúc lập luận trong văn học thuật (How Academic Arguments Are Built)}
+\ptrtarget{B/06}\ptrtarget{B/06-cau-truc-lap-luan}
+\dependency{\ptr{B/05} cho tầng đọc kỹ --- chương này cung cấp công cụ để trả lời câu hỏi ``đoạn này làm gì''; \ptr{A/03} cho việc tách câu.}
+
+\begin{tomtat}
+Một bài báo không phải một chuỗi câu mà là một \emph{bộ khung}: có khẳng định chính, có bằng chứng, có các giả định nối bằng chứng với khẳng định, và có những chỗ tác giả tự giới hạn hoặc phản bác trước. Chương này dạy cách nhìn ra bộ khung đó. Nội dung gồm: cấu trúc một đoạn học thuật; bảng các từ nối và ý nghĩa thật của chúng; mô hình Toulmin để tách một lập luận thành các thành phần kiểm tra được; ba nước đi chuẩn của phần mở đầu bài báo; và cách vẽ lại lập luận thành sơ đồ. Nếu chỉ nhớ một điều: nghĩa của một câu phụ thuộc vào \emph{vai trò} của nó trong lập luận --- cùng một câu có thể là khẳng định chính, là bằng chứng, hoặc là quan điểm của người khác mà tác giả sắp phản bác.
+\end{tomtat}
+
+\begin{nentang}
+\kn{khẳng định (claim)}{điều tác giả muốn bạn tin sau khi đọc xong. Một bài báo thường có một khẳng định chính và vài khẳng định phụ.}
+\kn{bằng chứng (evidence)}{dữ liệu, kết quả thí nghiệm, trích dẫn, hoặc chứng minh được đưa ra để đỡ cho khẳng định.}
+\kn{giả định nối (warrant)}{nguyên tắc ngầm giải thích vì sao bằng chứng đó lại đỡ được khẳng định đó. Thường không nói ra, và là chỗ lập luận hay yếu nhất.}
+\kn{hạn định (qualifier)}{từ hoặc cụm thu hẹp phạm vi và mức chắc chắn của khẳng định: \emph{in most cases}, \emph{under these assumptions}, \emph{may}.}
+\kn{siêu diễn ngôn (metadiscourse)}{những từ ngữ không nói về nội dung mà nói về \emph{chính bài viết}: \emph{first}, \emph{in sum}, \emph{as noted above}, \emph{however}.}
+\kn{câu chủ đề (topic sentence)}{câu nêu ý chính của một đoạn, thường đứng đầu đoạn trong văn học thuật tiếng Anh.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao đọc hiểu từng câu vẫn có thể không nắm được lập luận của cả bài?}
+\h{\emph{However} và \emph{on the other hand} đều dịch là ``tuy nhiên''. Chúng khác nhau thế nào, và khác biệt đó quan trọng ở đâu?}
+\h{Chỗ yếu nhất của một lập luận thường nằm ở phần \emph{không được viết ra}. Làm sao tìm ra nó?}
+\h{Phần mở đầu của gần như mọi bài báo đều theo cùng một khuôn ba bước. Khuôn đó là gì, và biết nó giúp bạn đọc nhanh hơn thế nào?}
+\h{Làm sao kiểm tra rằng mình đã nắm đúng lập luận, chứ không phải chỉ nhớ các kết quả rời rạc?}
+\end{khoigoi}
+
+Hãy thử một thí nghiệm. Đọc câu sau, tách khỏi ngữ cảnh:
+
+\begin{quote}
+\emph{Deep networks require large annotated datasets.}
+\end{quote}
+
+Câu này nghĩa là gì? Câu hỏi đó chưa trả lời được, vì nó phụ thuộc vào \emph{vai trò} của câu trong bài. Nếu nó đứng ở phần mở đầu sau cụm \emph{It is widely believed that}, đó là quan điểm phổ biến mà tác giả sắp phản bác. Nếu nó đứng sau \emph{Our results confirm that}, đó là kết luận của chính họ. Nếu nó đứng sau \emph{Unlike prior work, we do not assume that}, đó là một giả định mà bài này bác bỏ. Ba trường hợp, ba nghĩa gần như trái ngược, cùng một câu.
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ nhất và là lý do chương này tồn tại: hiểu từng câu là chưa đủ, vì nghĩa thật của một câu học thuật được quyết định bởi vị trí của nó trong bộ khung lập luận. May mắn là bộ khung đó có quy ước rõ ràng và có tín hiệu bề mặt để nhận ra.
+
+\section{Đoạn văn học thuật: một ý, ba phần}
+
+Đơn vị của lập luận không phải câu mà là đoạn. Một đoạn học thuật viết tốt có ba phần.
+
+\emph{Câu chủ đề} nêu ý chính, thường ở đầu đoạn. Trong văn học thuật tiếng Anh, quy ước này khá chặt --- chặt tới mức bạn có thể đọc riêng câu đầu của mọi đoạn trong một phần và dựng được dàn ý của cả phần đó. Đây là một mẹo đọc rất hiệu quả và là lý do đọc thăm dò ở \ptr{B/05} hoạt động được.
+
+\emph{Phần phát triển} đưa bằng chứng, ví dụ, hoặc lập luận đỡ cho câu chủ đề. Đây là phần dài nhất và là phần bạn có thể đọc nhanh nếu đã nắm câu chủ đề.
+
+\emph{Câu nối} ở cuối đoạn hoặc đầu đoạn sau, báo hiệu quan hệ với đoạn tiếp theo.
+
+Hệ quả cho việc đọc: nếu bạn đọc một đoạn và không tìm được câu chủ đề, có hai khả năng --- hoặc đoạn đó viết kém, hoặc ý chính nằm ở câu cuối (cách viết quy nạp, ít gặp hơn nhưng vẫn dùng khi tác giả muốn dẫn dắt). Hãy kiểm câu cuối trước khi kết luận rằng bạn không hiểu.
+
+\section{Từ nối: chúng thực sự nói gì}
+
+Từ nối là bộ xương lộ ra ngoài của lập luận. Người học thường biết nghĩa dịch của chúng nhưng không biết \emph{quan hệ lôgic} chính xác mà chúng báo hiệu --- và đó là chỗ mất thông tin.
+
+\begin{center}\footnotesize
+\rowcolors{2}{white}{tblalt}
+\begin{longtable}{@{}L{3.4cm}L{4.4cm}L{6.4cm}@{}}
+\toprule
+\textbf{Từ nối} & \textbf{Quan hệ báo hiệu} & \textbf{Sắc thái và cách dùng}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Từ nối} & \textbf{Quan hệ báo hiệu} & \textbf{Sắc thái và cách dùng (tiếp)}\\
+\midrule
+\endhead
+\emph{however} & Trái với \emph{kỳ vọng} vừa tạo ra & Mạnh; báo hiệu tác giả sắp nói điều ngược lại điều bạn vừa nghĩ\\
+\emph{nevertheless / nonetheless} & Nhượng bộ rồi vẫn giữ ý & Trang trọng; ``dù điều kia đúng, kết luận của tôi vẫn đứng''\\
+\emph{on the other hand} & Hai mặt của cùng một vấn đề & Không phải phản bác; nó cân bằng, thường đi cặp với \emph{on the one hand}\\
+\emph{in contrast} & So sánh hai đối tượng khác nhau & Trung tính; dùng khi so hai phương pháp, hai nhóm dữ liệu\\
+\emph{thus / hence / therefore} & Hệ quả lôgic & \emph{Thus} và \emph{hence} trang trọng hơn; báo hiệu bước suy luận, không phải chỉ nối tiếp thời gian\\
+\emph{consequently} & Hệ quả nhân quả thực tế & Thiên về kết quả có thật hơn là suy luận hình thức\\
+\emph{moreover / furthermore} & Thêm bằng chứng cùng chiều & Báo hiệu ``còn một lý do nữa'', không phải chuyển ý\\
+\emph{in addition} & Thêm thông tin & Nhẹ hơn \emph{moreover}; ít mang tính lập luận\\
+\emph{indeed / in fact} & Củng cố mạnh hơn điều vừa nói & Cẩn thận: \emph{in fact} đôi khi báo hiệu \emph{sửa lại} điều vừa nói\\
+\emph{that is / i.e.} & Diễn đạt lại chính xác hơn & Phần sau là cùng một điều, nói khác đi --- không phải ví dụ\\
+\emph{for instance / e.g.} & Ví dụ minh hoạ & Phần sau là \emph{một trường hợp}, không phải định nghĩa\\
+\emph{while / whereas} & Đối lập hai vế song song & \emph{While} còn nghĩa thời gian --- ngữ cảnh phân biệt\\
+\emph{although / despite} & Nhượng bộ & Vế nhượng bộ luôn là vế \emph{phụ}; ý chính nằm ở vế kia\\
+\emph{arguably} & Có thể lập luận rằng & Dấu hiệu tác giả biết đây là điểm tranh cãi\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+Ba lưu ý đọc. \emph{Một:} \emph{however} không chỉ báo tương phản mà báo tương phản với \emph{kỳ vọng} --- nên khi gặp nó, hãy tự hỏi ``tác giả nghĩ tôi vừa kỳ vọng điều gì''; câu trả lời thường cho biết tác giả đang định vị bài của họ ở đâu. \emph{Hai:} vế \emph{although} luôn là vế phụ, nên khi câu dài bắt đầu bằng \emph{Although}, ý chính nằm ở nửa sau --- đúng như ví dụ ở \ptr{A/03}. \emph{Ba:} \emph{thus} và \emph{therefore} báo hiệu một bước suy luận, và đó là chỗ đáng dừng lại kiểm: bước suy luận đó có hợp lệ không, hay có một giả định ngầm ở giữa?
+
+\section{Mô hình Toulmin: tách một lập luận thành phần}
+
+Khi cần kiểm tra một lập luận chứ không chỉ hiểu nó, mô hình của Toulmin là công cụ gọn và thực dụng nhất. Nó tách lập luận thành sáu thành phần, trong đó ba thành phần đầu gần như luôn có mặt và ba thành phần sau thì hay bị giấu.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.6cm and 1.1cm,
+  b/.style={draw=steel,fill=bluebg,rounded corners=2.5pt,inner sep=5.5pt,align=center,font=\scriptsize,text width=3.1cm},
+  h/.style={draw=accent,fill=amberbg,rounded corners=2.5pt,inner sep=5.5pt,align=center,font=\scriptsize,text width=3.1cm},
+  r/.style={draw=reddark,fill=redbg,rounded corners=2.5pt,inner sep=5.5pt,align=center,font=\scriptsize,text width=3.1cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=tiercol,align=center}]
+\node[b] (e) {\textbf{Bằng chứng}\\{\scriptsize sai số giảm 30\% trên ba bộ dữ liệu}};
+\node[b,right=2.6cm of e] (c) {\textbf{Khẳng định}\\{\scriptsize phương pháp của chúng tôi tốt hơn}};
+\node[h,below=0.85cm of e] (w) {\textbf{Giả định nối}\\{\scriptsize ba bộ dữ liệu này đại diện cho các tình huống thực tế}};
+\node[h,below=0.85cm of c] (q) {\textbf{Hạn định}\\{\scriptsize \emph{in these settings}, \emph{typically}}};
+\node[r,right=1.0cm of q] (reb) {\textbf{Phản bác trước}\\{\scriptsize \emph{unless the scene is textureless}}};
+\draw[ar] (e) -- node[lb,above=0pt] {do đó} (c);
+\draw[ar] (w) -- (e);
+\draw[ar] (q) -- (c);
+\draw[ar] (reb) -- (c);
+\end{tikzpicture}
+\caption{Mô hình Toulmin áp cho một khẳng định kỹ thuật. Bằng chứng và khẳng định luôn hiện diện trên bề mặt; \emph{giả định nối} --- lý do vì sao bằng chứng đó đỡ được khẳng định đó --- thì hầu như không bao giờ được viết ra, và đó chính là chỗ lập luận yếu nhất. Đây là câu trả lời cho câu hỏi mở đầu thứ ba: muốn tìm chỗ yếu, hãy hỏi ``điều gì phải đúng thì bước từ bằng chứng sang khẳng định mới hợp lệ''.}
+\label{fig:toulmin}
+\end{figure}
+
+Cách dùng thực hành khi đọc một bài báo: với khẳng định chính, viết ra ba dòng --- bằng chứng là gì, giả định nối là gì, hạn định là gì. Dòng thứ hai bạn phải tự viết vì tác giả không viết; và chính việc phải tự viết nó là bài kiểm tra tốt nhất xem bạn có hiểu lập luận hay không.
+
+\section{Ba nước đi của phần mở đầu}
+
+Phần mở đầu của bài báo khoa học có một khuôn lặp lại tới mức có thể mô tả thành ba nước đi, và biết khuôn này giúp bạn đọc phần mở đầu trong hai phút thay vì mười.
+
+\emph{Nước đi 1 --- xác lập lãnh địa.} Tác giả nói chủ đề này quan trọng và đã có nhiều nghiên cứu. Tín hiệu ngôn ngữ: \emph{has received considerable attention}, \emph{is widely used in}, \emph{plays a central role in}.
+
+\emph{Nước đi 2 --- tạo khoảng trống.} Tác giả chỉ ra cái còn thiếu. Đây là nước đi quan trọng nhất và là chỗ chứa lập luận thật của bài. Tín hiệu: \emph{however}, \emph{little attention has been paid to}, \emph{remains an open problem}, \emph{these approaches assume\ldots{} which does not hold when\ldots}
+
+\emph{Nước đi 3 --- lấp khoảng trống.} Tác giả nói bài này làm gì. Tín hiệu: \emph{In this paper, we propose}, \emph{Our contributions are threefold}.
+
+Với người đọc, mẹo là: \emph{đọc kỹ nước đi 2}. Nó cho bạn biết tác giả tự định vị bài của họ ở đâu so với công trình trước, và nó thường là chỗ duy nhất trong bài nói rõ \emph{vì sao} bài này cần tồn tại. Với người viết, ba nước đi này là dàn ý sẵn có cho phần mở đầu của chính bạn --- chi tiết ở \ptr{C/13}.
+
+\begin{mauau}[Mẫu câu cho ba nước đi mở đầu]
+\mc{Xác lập lãnh địa}{X has become a standard component of modern Y systems.}{Trung tính; tránh mở đầu quá rộng kiểu ``Since the dawn of\ldots''}
+\mc{Xác lập lãnh địa}{Recent work has shown that X can substantially improve Y.}{Kèm trích dẫn ngay sau}
+\mc{Tạo khoảng trống}{However, these methods assume that\ldots{}, an assumption that rarely holds in\ldots}{Cách tạo khoảng trống mạnh nhất: chỉ ra một giả định bị vi phạm}
+\mc{Tạo khoảng trống}{Little attention has been paid to the case where\ldots}{Lịch sự; không nói ai đó sai, chỉ nói chưa ai xét}
+\mc{Tạo khoảng trống}{While X works well for A, its behaviour under B remains unclear.}{Nhượng bộ trước rồi mới nêu thiếu sót}
+\mc{Lấp khoảng trống}{In this paper, we address this gap by\ldots}{Nối trực tiếp với khoảng trống vừa nêu}
+\mc{Lấp khoảng trống}{We make three contributions. First,\ldots{} Second,\ldots{} Third,\ldots}{Đánh số giúp người đọc và người phản biện}
+\end{mauau}
+
+\section{Vẽ lại lập luận và phép thử ``vậy thì sao''}
+
+Câu hỏi mở đầu thứ năm hỏi cách kiểm tra rằng bạn đã nắm lập luận. Có hai công cụ.
+
+\emph{Công cụ một --- sơ đồ khẳng định.} Vẽ khẳng định chính ở trên cùng; dưới nó là các khẳng định phụ đỡ cho nó; dưới nữa là bằng chứng cho từng khẳng định phụ. Nếu bạn vẽ được sơ đồ này mà không mở lại bài, bạn đã nắm lập luận. Nếu có nhánh nào bạn không biết đặt ở đâu, đó là chỗ bạn chưa hiểu --- hoặc chỗ tác giả viết lỏng.
+
+\emph{Công cụ hai --- phép thử ``vậy thì sao'' và ``vì sao''.} Đọc một khẳng định và hỏi \emph{so what} --- nếu đúng thì kéo theo điều gì; rồi hỏi \emph{why} --- vì sao tin được. Câu trả lời cho \emph{so what} phải là khẳng định ở tầng trên trong sơ đồ; câu trả lời cho \emph{why} phải là bằng chứng ở tầng dưới. Nếu bạn không trả lời được câu nào trong hai câu, phần đó của lập luận chưa rõ với bạn.
+
+\begin{cannho}
+Khi đọc kỹ một bài, hãy viết ra ba dòng trước khi đóng bài lại: (i) khẳng định chính, một câu, bằng lời của bạn; (ii) bằng chứng chính, một câu; (iii) giả định nối mà tác giả \emph{không} viết ra. Dòng thứ ba là dòng khó nhất và cũng là dòng cho biết bạn đã đọc ở tầng phản biện hay chưa.
+\end{cannho}
+
+\section{Gốc rễ: từ lôgic hình thức tới lập luận thực tế}
+
+Mô hình ở mục 4 ra đời từ một sự bất mãn có tính học thuật. Giữa thế kỷ 20, lôgic hình thức thống trị cách người ta nghĩ về lập luận: một lập luận tốt là một suy diễn hợp lệ từ tiền đề. Nhưng Stephen Toulmin nhận ra rằng gần như không lập luận thực tế nào --- trong luật, trong y học, trong khoa học thực nghiệm --- có dạng đó. Lập luận thật luôn kèm hạn định (\emph{thường thì}, \emph{trong hầu hết trường hợp}), luôn dựa trên những nguyên tắc nối không được phát biểu, và luôn có thể bị bác bởi các trường hợp ngoại lệ. Năm 1958 ông đề xuất một mô hình mô tả lập luận \emph{như nó thực sự diễn ra}\cite{toulmin1958}.
+
+Điều đáng nói với người đọc tài liệu khoa học: chính vì lập luận thực nghiệm không phải suy diễn hình thức nên phần \emph{giả định nối} mới quan trọng tới vậy. Khi một bài báo báo cáo rằng phương pháp mới tốt hơn trên ba bộ dữ liệu, không có bước suy diễn hình thức nào đưa từ đó tới ``phương pháp này tốt hơn''; cầu nối là một giả định về tính đại diện của dữ liệu. Toulmin cho ta cái tên và vị trí của cầu nối đó.
+
+Nhánh thứ hai đến từ ngôn ngữ học. Năm 1976, Halliday và Hasan phân tích các cơ chế làm cho một văn bản trở thành một chỉnh thể chứ không phải chuỗi câu rời rạc\cite{halliday1976}: lặp từ, đại từ quy chiếu, từ nối, và các quan hệ từ vựng. Công trình đó biến ``mạch văn'' từ một cảm giác mơ hồ thành các cơ chế đếm được --- và nó là nền cho cả phần đọc ở chương này lẫn phần viết ở \ptr{C/12}.
+
+Nhánh thứ ba là nghiên cứu về thể loại. Phân tích hàng trăm phần mở đầu bài báo, Swales chỉ ra rằng chúng theo một khuôn ổn định tới mức mô tả được thành các nước đi\cite{swales1990}. Phát hiện này có giá trị kép: nó giúp người đọc dự đoán cấu trúc, và nó cho người viết --- đặc biệt người viết tiếng Anh không phải tiếng mẹ đẻ --- một dàn ý đã được cộng đồng chấp nhận. Đó cũng là lý do các bộ sưu tập mẫu câu học thuật\cite{manchesterphrasebank,swalesfeak2012} trở nên phổ biến: chúng không dạy bạn viết hay, chúng dạy bạn viết \emph{đúng quy ước thể loại}, và quy ước là thứ người phản biện đọc trước tiên.
+
+\begin{gocre}
+\gr{1958 --- Toulmin}{Lôgic hình thức không mô tả được lập luận thật trong luật, y học, khoa học.}{Mô hình sáu thành phần với hạn định và giả định nối --- công cụ để kiểm một lập luận thực nghiệm.}
+\gr{1976 --- Halliday \& Hasan}{``Mạch văn'' là một cảm giác mơ hồ, không phân tích được.}{Liệt kê các cơ chế liên kết cụ thể: quy chiếu, lặp, từ nối, quan hệ từ vựng --- nền của \ptr{C/12}.}
+\gr{1990 --- Swales}{Người viết không phải bản ngữ không biết quy ước thể loại, dù ngữ pháp tốt.}{Phân tích thể loại và mô hình ba nước đi cho phần mở đầu; biến quy ước ngầm thành thứ dạy được.}
+\gr{Thập niên 1990--2000 --- Hyland}{Văn học thuật tưởng khách quan nhưng đầy dấu hiệu thái độ.}{Siêu diễn ngôn: các phương tiện tác giả dùng để dẫn dắt người đọc và định vị mình --- cầu nối sang \ptr{B/08}.}
+\gr{Thập niên 2000--nay --- ngân hàng mẫu câu}{Người viết quốc tế cần khuôn diễn đạt đúng quy ước.}{Các bộ sưu tập mẫu câu theo chức năng\cite{manchesterphrasebank}: không dạy viết hay, dạy viết đúng thể loại.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Toán học}{Cấu trúc bổ đề--định lý--chứng minh}{Cùng bộ khung: bổ đề là bằng chứng, định lý là khẳng định, và các bước suy diễn là giả định nối --- chỉ khác là trong toán, giả định nối được viết ra đầy đủ. Đọc bài báo thực nghiệm khó hơn chính vì phần đó bị giấu.}
+\lh{Luật}{Lập luận pháp lý: sự kiện, quy phạm, áp dụng}{Đây là lĩnh vực mà Toulmin lấy làm nguồn cảm hứng. ``Quy phạm'' chính là giả định nối, và trong luật nó \emph{bắt buộc} phải nêu rõ --- một mô hình tốt để bắt chước khi viết.}
+\lh{Đánh giá mã nguồn}{Nhận xét kiểu ``điều này sẽ hỏng khi\ldots''}{Chính là nước đi tạo khoảng trống ở mục 5, thu nhỏ: chỉ ra một giả định bị vi phạm trong một tình huống cụ thể. Cách viết nhận xét lịch sự mà rõ ràng cũng dùng đúng các mẫu ở \ptr{B/08}.}
+\lh{Đề xuất dự án và báo cáo kỹ thuật}{Bối cảnh, vấn đề, giải pháp, kết quả}{Cùng ba nước đi của Swales, đổi tên. Nếu bạn viết được phần mở đầu bài báo, bạn viết được phần mở đầu một đề xuất --- và ngược lại.}
+\lh{Tranh luận và phản biện}{Xác định luận điểm và bằng chứng của đối phương}{Sơ đồ khẳng định ở mục 6 là công cụ chuẩn: trước khi phản bác, hãy vẽ lại lập luận của họ và tìm giả định nối --- công kích giả định nối hiệu quả hơn công kích bằng chứng.}
+\lh{Học máy và diễn giải mô hình}{Bằng chứng đỡ cho kết luận tới đâu}{Vấn đề ``giả định nối'' xuất hiện gay gắt: một con số trên tập kiểm tra không tự động suy ra hành vi trên dữ liệu thật. Toulmin cho một khung để nói rõ điều đó thay vì bỏ lửng.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Vì nghĩa của một câu học thuật phụ thuộc vào \emph{vai trò} của nó trong lập luận, mà vai trò thì không nằm trong bản thân câu. Cùng một câu có thể là quan điểm phổ biến sắp bị bác, là kết luận của tác giả, hoặc là một giả định mà bài này loại bỏ --- ba nghĩa gần như trái ngược. Muốn đọc đúng, bạn phải theo dõi bộ khung: cái gì là khẳng định, cái gì là bằng chứng, cái gì là ý người khác.}
+\tl{\emph{However} báo tương phản với \emph{kỳ vọng} mà câu trước vừa tạo ra --- nó thường mở đầu cho việc tác giả nêu vấn đề hoặc định vị bài của mình. \emph{On the other hand} thì cân bằng hai mặt của cùng một vấn đề và không mang tính phản bác; nó thường đi cặp với \emph{on the one hand}. Khác biệt quan trọng khi đọc phần mở đầu: \emph{however} gần như luôn đánh dấu nước đi ``tạo khoảng trống'', tức chỗ chứa lý do tồn tại của bài.}
+\tl{Ở \emph{giả định nối}: nguyên tắc ngầm giải thích vì sao bằng chứng đó đỡ được khẳng định đó. Nó hầu như không bao giờ được viết ra, vì tác giả coi là hiển nhiên. Cách tìm: viết bằng chứng và khẳng định ra hai dòng, rồi hỏi ``điều gì phải đúng thì bước từ dòng trên xuống dòng dưới mới hợp lệ''. Câu trả lời thường là một giả định về tính đại diện của dữ liệu, về điều kiện vận hành, hoặc về việc chỉ số đo được có phản ánh đúng thứ ta quan tâm hay không.}
+\tl{Ba nước đi: xác lập lãnh địa (chủ đề quan trọng, đã có nhiều nghiên cứu); tạo khoảng trống (cái còn thiếu, thường mở đầu bằng \emph{however}); và lấp khoảng trống (bài này làm gì). Biết khuôn giúp bạn đọc có định hướng: bạn nhảy thẳng tới nước đi 2 vì đó là chỗ chứa lập luận thật và là chỗ tác giả nói rõ nhất vì sao bài này cần tồn tại. Với người viết, ba nước đi là dàn ý sẵn có (\ptr{C/13}).}
+\tl{Bằng hai công cụ. Vẽ sơ đồ khẳng định --- khẳng định chính ở trên, khẳng định phụ ở giữa, bằng chứng ở dưới --- mà không mở lại bài; chỗ nào bạn không biết đặt vào đâu là chỗ chưa hiểu. Và phép thử hai câu hỏi: với mỗi khẳng định, hỏi \emph{so what} (nếu đúng thì kéo theo gì --- câu trả lời phải là tầng trên) và \emph{why} (vì sao tin được --- câu trả lời phải là tầng dưới).}
+\end{traloi}
+
+\begin{dongian}
+Một bài báo không phải một dãy câu mà là một cái khung. Có một điều tác giả muốn bạn tin, có những bằng chứng họ đưa ra, và có những chỗ họ tự giới hạn lại. Nếu chỉ đọc từng câu mà không thấy cái khung, bạn sẽ nhớ được các con số mà không biết chúng để làm gì.
+
+Có một cách rất nhanh để thấy khung: đọc riêng câu đầu của mỗi đoạn. Trong tiếng Anh học thuật, câu đầu đoạn gần như luôn là ý chính, nên chuỗi các câu đầu chính là dàn ý của cả phần.
+
+Các từ nối là biển chỉ đường, và nên đọc chúng cẩn thận vì chúng nói cho bạn biết đang rẽ hướng nào. \emph{However} báo rằng điều sắp nói ngược với điều bạn vừa nghĩ --- đây thường là chỗ tác giả chỉ ra cái còn thiếu trong nghiên cứu trước, tức là chỗ quan trọng nhất phần mở đầu. \emph{Thus} báo một bước suy luận, và đó là chỗ nên dừng lại hỏi ``bước này có chắc không''. \emph{Although} báo rằng vế này chỉ là nhượng bộ, còn ý chính nằm ở vế kia.
+
+Điều cuối cùng, và là điều hữu ích nhất: chỗ yếu của một lập luận hầu như không nằm ở phần được viết ra. Khi ai đó nói ``chúng tôi đo được sai số giảm 30\% trên ba bộ dữ liệu, vậy phương pháp của chúng tôi tốt hơn'', có một giả định ngầm ở giữa: ba bộ dữ liệu đó đại diện cho tình huống thực tế. Giả định đó không được viết ra, và nó chính là chỗ đáng hỏi nhất.
+
+Vậy khi đọc xong một bài quan trọng, hãy viết ba dòng: họ khẳng định gì, họ đưa bằng chứng gì, và \emph{điều gì phải đúng} thì bằng chứng đó mới đỡ được khẳng định. Dòng thứ ba bạn phải tự viết --- và viết được nó nghĩa là bạn đã thật sự đọc hiểu.
+\motcau{Nghĩa của một câu nằm ở vai trò của nó trong lập luận, không nằm trong bản thân câu.}
+\chuadongian{Không phải bài nào cũng có lập luận rõ ràng; với bài viết lỏng, việc bạn không dựng được sơ đồ là thông tin về bài chứ không về bạn.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Vì sao hiểu từng câu vẫn chưa đủ}{Nghĩa phụ thuộc vai trò trong lập luận: cùng một câu có thể là ý người khác sắp bị bác, kết luận của tác giả, hoặc giả định bị loại bỏ.}
+\ar[3]{Cấu trúc đoạn học thuật}{Câu chủ đề (thường đầu đoạn) \(\rightarrow\) phần phát triển \(\rightarrow\) câu nối. Đọc riêng các câu đầu đoạn cho bạn dàn ý cả phần.}
+\ar[3]{\emph{However} so với \emph{on the other hand}}{\emph{However} tương phản với kỳ vọng, thường mở nước đi ``tạo khoảng trống''. \emph{On the other hand} cân bằng hai mặt, không phản bác.}
+\ar[3]{Mô hình Toulmin}{Bằng chứng \(\rightarrow\) khẳng định, nối bởi \emph{giả định nối}; kèm hạn định và phản bác trước. Giả định nối hầu như không được viết ra và là chỗ yếu nhất.}
+\ar[3]{Cách tìm giả định nối}{Viết bằng chứng và khẳng định thành hai dòng, rồi hỏi ``điều gì phải đúng thì bước này mới hợp lệ''.}
+\ar[3]{Ba nước đi mở đầu}{Xác lập lãnh địa \(\rightarrow\) tạo khoảng trống (\emph{however}, \emph{little attention}) \(\rightarrow\) lấp khoảng trống (\emph{in this paper}). Đọc kỹ nước đi 2.}
+\ar[2]{\emph{Thus / therefore}}{Báo một bước suy luận, không phải nối tiếp thời gian --- chỗ đáng dừng lại kiểm tính hợp lệ.}
+\ar[2]{\emph{Although / despite}}{Vế nhượng bộ là vế phụ; ý chính nằm ở vế kia. Câu bắt đầu bằng \emph{Although} thì trọng tâm ở nửa sau.}
+\ar[2]{\emph{i.e.} so với \emph{e.g.}}{\emph{i.e.} là nói lại chính điều đó cho chính xác hơn; \emph{e.g.} là một ví dụ trong nhiều trường hợp.}
+\ar[2]{Sơ đồ khẳng định}{Khẳng định chính trên, khẳng định phụ giữa, bằng chứng dưới. Vẽ được mà không mở lại bài nghĩa là đã nắm lập luận.}
+\ar[2]{Phép thử \emph{so what} và \emph{why}}{\emph{So what} dẫn lên tầng trên của sơ đồ; \emph{why} dẫn xuống tầng dưới. Không trả lời được câu nào nghĩa là chỗ đó chưa rõ.}
+\ar[1]{Siêu diễn ngôn}{Các từ nói về chính bài viết chứ không về nội dung: \emph{first}, \emph{in sum}, \emph{as noted above} --- chúng là biển chỉ đường, đọc chúng để định vị.}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Tôi đọc phần mở đầu mà không thấy khoảng trống ở đâu. Có phải bài viết kém không?}{Có thể, nhưng hãy kiểm ba chỗ trước khi kết luận. Một, tìm từ \emph{however}, \emph{yet}, \emph{nevertheless} --- khoảng trống gần như luôn theo ngay sau. Hai, tìm các cụm phủ định nhẹ: \emph{little attention}, \emph{few studies}, \emph{remains unclear}, \emph{has not been investigated}. Ba, tìm câu mô tả một giả định của công trình trước kèm điều kiện nó không đúng. Nếu cả ba đều không có thì đúng là bài viết lỏng --- và đó là một thông tin đáng ghi lại khi đánh giá bài.}
+\qa{Làm sao phân biệt khẳng định của tác giả với ý của người khác?}{Bằng các dấu hiệu quy chiếu nguồn: trích dẫn kèm theo, các động từ báo cáo (\emph{Smith et al.\ argue that}), và các cụm khái quát hoá (\emph{It is widely assumed that}, \emph{The conventional view holds that}). Cẩn thận với đoạn dài chỉ có một trích dẫn ở cuối --- toàn bộ đoạn có thể là ý của nguồn đó. Khi tác giả chuyển sang ý của mình, họ hầu như luôn báo hiệu: \emph{In contrast, we argue}, \emph{Our position is that}.}
+\qa{Từ nối trong bài của tôi bị nhận xét là dùng sai. Sửa thế nào?}{Kiểm ba lỗi phổ biến nhất. Một, dùng \emph{however} cho quan hệ chỉ là thêm thông tin --- lúc đó phải là \emph{in addition} hoặc \emph{moreover}. Hai, dùng \emph{therefore} khi thực ra chỉ là trình tự thời gian --- \emph{then} hoặc \emph{next} mới đúng. Ba, nhồi từ nối vào mọi câu; văn học thuật tốt dùng chúng \emph{tiết chế}, vì mạch chủ yếu đến từ trật tự thông tin chứ không từ từ nối (\ptr{C/12}). Mẹo kiểm nhanh: bỏ từ nối đi và xem quan hệ có còn rõ không --- nếu còn rõ thì bỏ luôn.}
+\qa{Có nên tin phần \emph{limitations} của bài báo không?}{Nên đọc kỹ nhưng đừng coi là đầy đủ. Phần hạn chế phục vụ hai mục đích cùng lúc: trung thực khoa học, và \emph{phòng thủ} trước phản biện --- tác giả nêu trước những hạn chế mà họ đã có câu trả lời. Vì vậy hạn chế nghiêm trọng nhất thường \emph{không} nằm ở đó. Cách bù: tự tìm giả định nối theo mục 4, và so danh sách của bạn với danh sách của tác giả; phần chênh lệch là phần đáng chú ý.}
+\qa{Ba nước đi của Swales có áp dụng cho mọi ngành không?}{Khuôn chung thì áp dụng rộng, nhưng chi tiết thay đổi theo ngành và theo tạp chí. Trong các ngành thực nghiệm, nước đi 2 thường là một giả định bị vi phạm hoặc một điều kiện chưa được thử. Trong toán học lý thuyết, nó có thể là một câu hỏi mở. Trong ngành ứng dụng, nó thường là một nhu cầu thực tế chưa được đáp ứng. Cách học nhanh nhất cho ngành của bạn: đọc mười phần mở đầu trong đúng tạp chí bạn nhắm tới và ghi lại cách họ tạo khoảng trống.}
+\qa{Khi viết, tôi nên đặt câu chủ đề ở đầu đoạn luôn à?}{Trong văn học thuật tiếng Anh thì gần như luôn nên. Lý do là kỳ vọng của người đọc: họ đọc câu đầu để quyết định đọc tiếp hay lướt, và người phản biện đọc rất nhanh. Cách viết quy nạp --- dẫn dắt rồi mới nêu ý ở cuối --- có chỗ dùng, ví dụ khi kết luận gây tranh cãi và bạn muốn người đọc theo lập luận trước. Nhưng đó là ngoại lệ có chủ ý, không phải mặc định.}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Đọc riêng câu đầu của mọi đoạn trong một phần bài báo và dựng dàn ý}{Tài liệu ngành}{So dàn ý của bạn với các đề mục thật; chỗ lệch cho biết đoạn nào viết lỏng.}
+\bt[1]{Gạch chân mọi từ nối trong hai trang và ghi quan hệ mỗi từ báo hiệu}{Tài liệu ngành}{Chú ý riêng các chỗ \emph{however} --- tự hỏi tác giả nghĩ bạn vừa kỳ vọng gì.}
+\bt[2]{Áp mô hình Toulmin cho khẳng định chính của một bài}{Tài liệu ngành}{Bắt buộc viết ra giả định nối --- phần tác giả không viết.}
+\bt[2]{Phân tích ba nước đi trong năm phần mở đầu}{Bài báo ngành}{Ghi lại các mẫu câu tạo khoảng trống; đây là ngân hàng mẫu cho bài viết của bạn.}
+\bt[2]{Vẽ sơ đồ khẳng định cho một bài đã đọc kỹ, không mở lại bài}{Bài tập tổng hợp}{Chỗ không đặt được vào sơ đồ là chỗ cần đọc lại.}
+\bt[3]{Viết phần mở đầu ba đoạn cho một bài giả định của bạn}{Bài tập viết}{Dùng đúng ba nước đi và các mẫu câu ở mục 5; sau đó nhờ người khác chỉ ra khoảng trống nằm ở câu nào.}
+\bt[3]{Tìm một bài mà bạn không đồng ý và viết một đoạn phản biện}{Bài tập viết}{Công kích \emph{giả định nối} chứ không công kích bằng chứng; dùng mẫu câu lịch sự ở \ptr{B/08}.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Chương này cho ba công cụ đọc bộ khung: cấu trúc đoạn với câu chủ đề, bảng từ nối với quan hệ thật của chúng, và mô hình Toulmin để tách một lập luận thành phần kiểm tra được. Điều đáng mang theo nhất là thói quen tìm \emph{giả định nối} --- phần không được viết ra, và cũng là phần quyết định lập luận có đứng vững hay không.
+
+Chương tiếp theo áp toàn bộ bộ công cụ này vào loại tài liệu bạn đọc nhiều nhất: bài báo khoa học. Nó cho một quy trình ba lượt có ngân sách thời gian rõ ràng, chỉ ra mỗi phần của bài báo thực sự nói gì, và cho một mẫu ghi chú giúp bạn còn dùng được sau sáu tháng (\ptr{B/07}).
+\end{document}

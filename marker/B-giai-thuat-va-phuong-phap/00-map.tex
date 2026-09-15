@@ -1,0 +1,25 @@
+% 00-map.tex — bản đồ Phần B: có gì, mức đầu tư, thứ tự đọc.
+% Ngày tạo: 2026-09-13 | Sửa gần nhất: 2026-09-13 | Ôn gần nhất: chưa
+% Dependency: ../00-map.tex | Mức độ: điều hướng
+\documentclass[../marker.tex]{subfiles}
+\begin{document}
+\begin{table}[H]\centering\small
+\caption{Bản đồ Phần B: các chương, dòng ngân sách tương ứng, và mức đầu tư.}
+\begin{tabularx}{\linewidth}{@{}L{0.8cm}L{3.7cm}YL{1.6cm}@{}}
+\toprule
+\textbf{Ch.} & \textbf{Thư mục} & \textbf{Nội dung --- và nó quyết định dòng nào của ngân sách} & \textbf{Mức}\\
+\midrule
+7 & \code{07-detection-pipeline} & AprilTag 2/3, ArUco, ChArUco, Deltille, marker tròn, detector học sâu. \emph{Quyết định: có phát hiện được không, và \(\sigma\) thô là bao nhiêu} & \muc{2}\\
+8 & \code{08-corner-refinement} & \code{cornerSubPix}, saddle point, line fit có trọng số, moment/Zernike, conic, ECC. \emph{Quyết định: \(\sigma\) --- và \(\sigma\) quyết định mọi thứ} & \muc{3}\\
+9 & \code{09-multi-marker-constellation} & PnP hợp nhất, bố trí không đồng phẳng, board, nested multi-scale, BA để đo constellation, trọng số, loại ngoại lai. \emph{Quyết định: hệ số nhân hình học --- đòn bẩy lớn nhất} & \muc{3}\\
+10 & \code{10-xu-ly-ambiguity} & Hai nghiệm IPPE và tỉ số residual, ngưỡng từ chối, nhất quán thời gian, fuse IMU, đường tiếp cận nghiêng. \emph{Quyết định: có bị lỗi thô đánh lừa không} & \muc{3}\\
+11 & \code{11-uoc-luong-theo-thoi-gian} & Trung bình trên đa tạp, EKF trên \(SE(3)\) với đo là góc, factor graph, fixed-lag, hiệp phương sai từ Hessian. \emph{Quyết định: \(\sigma\) giảm theo \(1/\sqrt{N}\)} & \muc{2}\\
+12 & \code{12-calibration-cho-docking} & Intrinsic chất lượng cao, kiểm residual có cấu trúc, chọn mô hình méo, hand-eye, đo constellation bằng BA, trôi nhiệt, tự hiệu chuẩn. \emph{Quyết định: các hằng số có đúng không} & \muc{3}\\
+13 & \code{13-docking-control} & Teach-by-showing, IBVS, PBVS, hybrid, stop-and-go, coarse-to-fine, nonholonomic, dung sai cơ khí. \emph{Quyết định: sai số nào thật sự tới mũi robot} & \muc{3}\\
+14 & \code{14-dieu-kien-quan-sat-va-anh-sang} & Chống loá, backlit/IR, khoá exposure, global shutter, che khuất và bẩn, chống báo sai. \emph{Quyết định: \(\sigma\) có ổn định không} & \muc{2}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent Đọc tuần tự nếu muốn hiểu chuỗi đo. Nhưng nếu đang phải ra quyết định thiết kế, hãy đọc theo thứ tự đòn bẩy: 13 trước (nó có thể làm nhẹ toàn bộ phần còn lại), rồi 9, rồi 12. Chương 7 đặt đầu vì nó là chỗ chuỗi bắt đầu, không phải vì nó quan trọng nhất --- thực tế nó là chương có đòn bẩy thấp nhất trong tám chương, và điều đó đáng ngạc nhiên đủ để nói thẳng ra.
+\end{document}

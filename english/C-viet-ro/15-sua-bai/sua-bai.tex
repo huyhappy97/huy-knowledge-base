@@ -1,0 +1,238 @@
+% ============================================================================
+%  C/15-sua-bai — file chương
+%  Ngày tạo: 2026-09-07 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+%  Dependency: C/11, C/12, C/13, C/14. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../english.tex]{subfiles}
+\begin{document}
+\chapter{Sửa bài: quy trình, không phải cảm hứng (Revision)}
+\ptrtarget{C/15}\ptrtarget{C/15-sua-bai}
+\dependency{Cả bốn chương \ptr{C/11}--\ptr{C/14}; chương này biến chúng thành quy trình.}
+
+\begin{tomtat}
+Chương này nói về phần công việc chiếm nhiều thời gian nhất của người viết giỏi và ít được dạy nhất. Ý trung tâm: viết và sửa là hai việc dùng hai kiểu chú ý khác nhau, và cố làm cả hai cùng lúc khiến bạn làm dở cả hai. Nội dung gồm: vì sao phải tách nháp khỏi sửa; bốn lượt sửa theo thứ tự từ lớn tới nhỏ và lý do thứ tự đó không đảo được; danh sách kiểm rút từ bốn chương trước; cách đọc bài của chính mình như người lạ; và cách xử lý nhận xét của người khác. Nếu chỉ nhớ một điều: đừng bắt đầu sửa từ câu chữ --- nếu cấu trúc sai, mọi câu bạn mài giũa đều có thể bị xoá ở lượt sau.
+\end{tomtat}
+
+\begin{nentang}
+\kn{bản nháp}{bản viết ra để có ý trên giấy; chất lượng câu chữ không phải mục tiêu.}
+\kn{sửa cấu trúc}{thay đổi thứ tự, thêm bớt, gộp tách các phần và đoạn.}
+\kn{sửa câu chữ}{làm rõ từng câu và mối nối --- \ptr{C/11} và \ptr{C/12}.}
+\kn{soát lỗi}{lượt cuối: chính tả, dấu câu, số liệu, tham chiếu, định dạng.}
+\kn{lời nguyền tri thức}{hiện tượng bạn không thấy được chỗ khó hiểu vì bạn đã biết ý mình định nói.}
+\kn{sửa theo lượt}{mỗi lượt chỉ tìm một loại vấn đề, thay vì tìm mọi thứ cùng lúc.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao không nên vừa viết vừa sửa câu cho hay?}
+\h{Bốn lượt sửa theo thứ tự nào, và vì sao thứ tự đó không đảo được?}
+\h{Bạn đọc lại bài mình và thấy mọi thứ đều rõ, nhưng người khác lại kêu khó hiểu. Cơ chế nào gây ra chuyện này, và làm sao khắc phục?}
+\h{Nhận được mười nhận xét mâu thuẫn nhau từ ba người. Xử lý ra sao?}
+\h{Khi nào thì dừng sửa?}
+\end{khoigoi}
+
+Có một câu mà gần như mọi người viết chuyên nghiệp đều nói theo cách này hay cách khác: viết chính là viết lại. Người mới nghe thường hiểu nó như một lời động viên. Thực ra nó là một mô tả kỹ thuật về quy trình.
+
+Lý do nằm ở chỗ viết và sửa đòi hai kiểu chú ý ngược nhau. Khi viết nháp, bạn cần tạo ra --- gạt bỏ phê phán, để ý chảy ra, chấp nhận câu xấu. Khi sửa, bạn cần phê phán --- nhìn cái đã viết như một người ngoài, tìm chỗ hỏng. Chuyển qua lại giữa hai chế độ này sau mỗi câu là cách chắc chắn để vừa viết chậm vừa viết dở: bạn dừng mạch ý để mài một câu mà rất có thể sẽ bị xoá.
+
+Đó là câu trả lời cho câu hỏi mở đầu thứ nhất, và nó dẫn tới nguyên tắc tổ chức của cả chương: \emph{tách hai việc ra, và trong việc sửa cũng tách tiếp theo lượt}.
+
+\section{Bốn lượt, theo thứ tự}
+
+Câu hỏi mở đầu thứ hai. Bốn lượt đi từ đơn vị lớn nhất tới nhỏ nhất.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.42cm,
+  m/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=5pt,align=left,font=\small,text width=10.2cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=accent,thick},
+  lb/.style={font=\scriptsize\itshape,color=tiercol,align=left,text width=2.5cm}]
+\node[m] (l1) {\textbf{Lượt 1 --- Nội dung.} Có đủ ý chưa? Ý nào thừa? Kết luận có được số liệu chống đỡ không?};
+\node[m,below=of l1] (l2) {\textbf{Lượt 2 --- Cấu trúc.} Thứ tự các phần và đoạn có đúng không? Mỗi đoạn có đúng một ý? (\ptr{C/13})};
+\node[m,below=of l2] (l3) {\textbf{Lượt 3 --- Câu và mạch.} Ai làm gì (\ptr{C/11}); cũ trước mới sau (\ptr{C/12}); mức cam kết (\ptr{C/14}).};
+\node[m,below=of l3] (l4) {\textbf{Lượt 4 --- Soát lỗi.} Chính tả, dấu câu, số liệu, tham chiếu, hình bảng, định dạng.};
+\draw[ar] (l1) -- (l2); \draw[ar] (l2) -- (l3); \draw[ar] (l3) -- (l4);
+\node[lb,right=0.18cm of l1.east] {xoá cả đoạn ở đây là bình thường};
+\node[lb,right=0.18cm of l4.east] {chỉ làm khi ba lượt trên đã xong};
+\end{tikzpicture}
+\caption{Bốn lượt sửa. Thứ tự không đảo được vì mỗi lượt có thể xoá bỏ công của lượt sau: mài câu ở một đoạn rồi xoá cả đoạn đó ở lượt cấu trúc là lãng phí thuần tuý.}
+\label{fig:bon-luot-sua}
+\end{figure}
+
+Vì sao thứ tự không đảo được? Vì các lượt có quan hệ một chiều: quyết định ở lượt trên có thể xoá bỏ hoàn toàn công việc của lượt dưới, nhưng không ngược lại. Nếu bạn đánh bóng câu chữ của một đoạn rồi phát hiện đoạn đó thừa, công đánh bóng mất trắng --- và tệ hơn, bạn sẽ thấy tiếc và giữ lại một đoạn đáng xoá. Đây là một cái bẫy tâm lý có thật: công sức đã bỏ ra khiến người ta bảo vệ những phần đáng bỏ.
+
+\begin{cambay}
+Cái bẫy phổ biến nhất khi sửa là bắt đầu từ câu đầu tiên và đi tuần tự xuống, sửa mọi thứ gặp phải. Cách này khiến bạn sửa rất kỹ hai trang đầu và gần như không sửa gì ở phần cuối --- đúng chỗ mà bản nháp thường yếu nhất vì bạn viết nó khi đã mệt. Sửa theo \emph{lượt} tránh được cả hai vấn đề: mỗi lượt bạn quét toàn bài tìm một loại vấn đề, nên công sức phân bố đều.
+\end{cambay}
+
+\section{Danh sách kiểm}
+
+Bốn chương trước cho một danh sách kiểm dùng được. Bảng dưới là bản rút gọn; mỗi dòng là một câu hỏi trả lời được bằng có hoặc không.
+
+\begin{center}\footnotesize
+\rowcolors{2}{white}{tblalt}
+\begin{longtable}{@{}L{1.6cm}L{6.4cm}L{6.4cm}@{}}
+\toprule
+\textbf{Lượt} & \textbf{Câu hỏi kiểm} & \textbf{Cách làm máy móc}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Lượt} & \textbf{Câu hỏi kiểm} & \textbf{Cách làm máy móc (tiếp)}\\
+\midrule
+\endhead
+1 & Bài có một câu trả lời rõ cho ``vì sao đáng làm''? & Viết khoảng trống thành một câu; nếu không viết được thì chưa có\\
+1 & Mọi kết luận đều có số liệu chống đỡ? & Với mỗi câu ở phần thảo luận, chỉ ra bảng hoặc hình tương ứng\\
+2 & Mỗi đoạn tóm được thành một câu? & Viết câu tóm bên lề từng đoạn; đoạn phải dùng ``và'' thì tách\\
+2 & Đọc riêng các câu đầu đoạn có ra dàn ý không? & Chép các câu đầu đoạn thành một danh sách và đọc\\
+3 & Câu nào giấu hành động trong danh từ? & Quét hậu tố \emph{-tion}, \emph{-ment}, \emph{-ance}, \emph{-ity} (\ptr{C/11})\\
+3 & Đầu mỗi câu có nối được với câu trước? & Gạch phần trước động từ chính và đọc riêng chuỗi đó (\ptr{C/12})\\
+3 & Mức cam kết có khớp bằng chứng? & Xếp từng khẳng định vào sáu bậc (\ptr{C/14})\\
+3 & Có \emph{this} nào đứng trơ trọi? & Tìm kiếm chuỗi ``This '' và kiểm từng chỗ\\
+4 & Số trong bài khớp số trong bảng? & Đối chiếu từng con số được nhắc trong văn\\
+4 & Mọi hình bảng đều được nhắc trong văn? & Tìm kiếm từng nhãn tham chiếu\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+Điểm chung của cột thứ ba đáng chú ý: mọi mục đều làm được một cách \emph{máy móc}, không cần cảm giác ngôn ngữ. Đó là chủ ý. Cảm giác ngôn ngữ là thứ bạn chưa có đủ khi viết bằng ngoại ngữ, và cũng là thứ không đáng tin khi đọc bài của chính mình --- lý do ở mục ngay sau.
+
+\section{Đọc bài mình như người lạ}
+
+Câu hỏi mở đầu thứ ba chạm vào cơ chế quan trọng nhất của việc sửa. Khi đọc lại bài mình, bạn không đọc cái trên giấy --- bạn đọc cái trong đầu bạn. Ý bạn định nói lấp đầy mọi chỗ trống, mọi mối nối thiếu, mọi đại từ mơ hồ. Đây thường được gọi là \emph{lời nguyền tri thức}: khi đã biết một điều, bạn rất khó hình dung trạng thái không biết nó.
+
+Không có cách nào xoá được hiệu ứng này, nhưng có bốn cách lách, xếp theo hiệu quả tăng dần.
+
+\emph{Cách một --- để nguội.} Đặt bài xuống ít nhất một ngày, tốt hơn là vài ngày. Trí nhớ về ý định phai đi, và bạn bắt đầu đọc được cái thật sự trên giấy.
+
+\emph{Cách hai --- đổi hình thức.} In ra giấy, đổi phông chữ, đọc trên màn hình khác. Não bộ xử lý văn bản quen thuộc theo lối mòn; đổi hình thức phá lối mòn đó.
+
+\emph{Cách ba --- đọc to.} Rất hiệu quả và ít người làm. Câu quá dài khiến bạn hụt hơi. Mạch gãy khiến giọng bạn vấp. Từ lặp nghe rõ ngay. Đọc to bắt bạn xử lý từng từ thay vì lướt.
+
+\emph{Cách bốn --- đọc ngược.} Với lượt soát lỗi, đọc từ câu cuối lên câu đầu. Cách này phá hoàn toàn mạch nghĩa, nên bạn không thể lướt theo nội dung và buộc phải nhìn từng câu như một đơn vị riêng. Kỳ quặc nhưng hiệu quả cho lỗi chính tả và dấu câu.
+
+\begin{cannho}
+Một biến thể mạnh của cách ba: dùng công cụ đọc văn bản thành tiếng và nghe bài của bạn. Nó không bỏ qua chỗ nào, không tự sửa trong đầu như bạn, và đọc đúng cái trên giấy. Nghe một đoạn của mình bị máy đọc lên là cách nhanh nhất để phát hiện câu nặng --- máy sẽ đọc đúng những chỗ mà bạn vẫn tự đọc trơn tru.
+\end{cannho}
+
+\section{Xử lý nhận xét của người khác}
+
+Câu hỏi mở đầu thứ tư. Nhận xét từ nhiều người thường mâu thuẫn, và cách xử lý phổ biến --- sửa theo từng nhận xét một --- dẫn tới một bài chắp vá.
+
+Có một nguyên tắc rất hữu ích, được nhiều biên tập viên và người viết chuyên nghiệp diễn đạt theo những cách gần giống nhau: \emph{người đọc gần như luôn đúng khi nói chỗ nào có vấn đề, và thường sai khi nói phải sửa thế nào}. Lý do rõ ràng khi nghĩ kỹ: họ có thẩm quyền tuyệt đối về trải nghiệm đọc của chính họ --- nếu họ khựng lại ở đoạn ba thì đoạn ba \emph{có} vấn đề. Nhưng họ không biết ý định của bạn, nên đề xuất sửa của họ chỉ là một phỏng đoán.
+
+Từ đó ra quy trình bốn bước cho một tập nhận xét.
+
+\emph{Bước một --- tách quan sát khỏi đề xuất.} ``Chỗ này tôi không hiểu'' là quan sát; ``nên thêm một hình'' là đề xuất. Ghi lại quan sát, tạm bỏ đề xuất.
+
+\emph{Bước hai --- gom theo vị trí.} Nếu ba người cùng khựng ở một chỗ, chỗ đó chắc chắn hỏng, dù ba người nêu ba lý do khác nhau.
+
+\emph{Bước ba --- phân loại theo lượt.} Nhận xét về nội dung xử lý trước, câu chữ để sau --- đúng thứ tự ở mục 1. Một nhận xét kiểu ``câu này khó đọc'' có thể biến mất khi bạn viết lại cả đoạn ở lượt cấu trúc.
+
+\emph{Bước bốn --- tự quyết cách sửa.} Bạn là người biết mình định nói gì. Đôi khi cách sửa đúng chẳng liên quan gì tới đề xuất của người nhận xét.
+
+Còn nhận xét mâu thuẫn thật sự thì sao --- một người bảo quá chi tiết, một người bảo thiếu chi tiết? Thường đó là dấu hiệu bạn chưa xác định rõ \emph{người đọc mục tiêu}. Chọn một nhóm người đọc và sửa nhất quán theo nhóm đó; mâu thuẫn thường tan.
+
+\section{Khi nào dừng}
+
+Câu hỏi mở đầu thứ năm nghe như một câu hỏi mềm nhưng có câu trả lời khá cụ thể.
+
+Có ba tín hiệu dừng. \emph{Tín hiệu một:} một lượt sửa toàn bài chỉ ra vài thay đổi nhỏ, và các thay đổi đó không làm bài rõ hơn mà chỉ khác đi. Bạn đã hết vấn đề thật và bắt đầu di chuyển từ ngữ cho vui. \emph{Tín hiệu hai:} bạn phát hiện mình sửa một chỗ theo hướng A hôm nay, hướng ngược lại hôm qua. Đó là dấu hiệu chỗ đó không có phương án tốt hơn rõ rệt. \emph{Tín hiệu ba, thực dụng nhất:} lợi ích thêm được từ một giờ sửa nữa đã nhỏ hơn lợi ích từ một giờ dành cho việc khác --- thí nghiệm tiếp theo, hoặc bài tiếp theo.
+
+Điều đáng nói: bài viết không bao giờ ``xong'' theo nghĩa hoàn hảo, và người viết nhiều đều biết điều đó. Cái họ có không phải tiêu chuẩn hoàn hảo mà là một tiêu chuẩn \emph{đủ tốt} rõ ràng, cộng với khả năng dừng lại khi đạt.
+
+\section{Gốc rễ: từ cảm hứng tới quy trình}
+
+Quan niệm rằng viết là việc của cảm hứng --- ngồi xuống và văn tuôn ra --- có gốc từ hình ảnh lãng mạn về nhà văn hình thành trong thế kỷ 19. Nó gây hại đặc biệt cho người viết học thuật, vì nó khiến họ hiểu sự vất vả của bản nháp đầu là dấu hiệu thiếu năng lực, trong khi thực ra đó là trạng thái bình thường của mọi người viết.
+
+Cách nhìn ngược lại --- viết là một quy trình gồm nhiều giai đoạn khác nhau --- hình thành trong nghiên cứu về dạy viết từ những năm 1970 và 1980, và được truyền lại trong các sách hướng dẫn viết học thuật hiện nay\cite{silvia2007,booth2016}. Điểm mấu chốt của dòng nghiên cứu đó không phải là ``hãy sửa nhiều hơn'' mà là một quan sát về \emph{khác biệt giữa người mới và người có kinh nghiệm}: khi được yêu cầu sửa bài, người mới chủ yếu thay từ và sửa lỗi, còn người có kinh nghiệm sắp xếp lại và viết lại cả phần. Nói cách khác, người mới sửa ở lượt 3 và 4; người có kinh nghiệm sửa ở lượt 1 và 2. Đó chính là lý do bốn lượt ở mục 1 được xếp theo thứ tự đó --- nó dạy bạn làm cái mà người có kinh nghiệm làm.
+
+Ý tưởng tách chế độ tạo ra khỏi chế độ phê phán còn xuất hiện ở nhiều lĩnh vực khác dưới các tên gọi khác nhau: trong sáng tạo nhóm, quy tắc không phê phán ý tưởng trong giai đoạn nêu ý; trong thiết kế, phân biệt giai đoạn mở rộng và giai đoạn thu hẹp phương án. Sự trùng lặp này gợi ý rằng vấn đề không nằm ở viết lách mà ở một hạn chế chung của chú ý: đánh giá và sinh ra khó chạy song song.
+
+Còn lời nguyền tri thức ở mục 3 thì được mô tả trong nghiên cứu tâm lý và kinh tế học hành vi như một thiên lệch bền vững\cite{pinker2014}: người biết một thông tin đánh giá quá cao khả năng người khác cũng biết nó. Điều quan trọng cho bạn là hệ quả thực hành --- vì đây là thiên lệch chứ không phải sự cẩu thả, nên không thể khắc phục bằng cách ``cố gắng khách quan hơn''. Chỉ có các thủ thuật ở mục 3 và người đọc thật.
+
+\begin{gocre}
+\gr{Thế kỷ 19 --- hình ảnh nhà văn cảm hứng}{Ai viết được và vì sao?}{Quan niệm viết là tài năng bẩm sinh; khiến người mới hiểu sai sự vất vả của bản nháp.}
+\gr{1970--80s --- nghiên cứu quy trình viết}{Người viết giỏi thật sự làm gì?}{Người mới sửa từ ngữ; người có kinh nghiệm sắp xếp lại \(\Rightarrow\) thứ tự bốn lượt ở mục 1.}
+\gr{Tách sinh ra khỏi phê phán}{Vì sao vừa viết vừa sửa lại chậm?}{Hai chế độ chú ý khó chạy song song --- cùng nguyên lý với quy tắc không phê phán khi nêu ý tưởng.}
+\gr{Lời nguyền tri thức\cite{pinker2014}}{Vì sao người biết lại giải thích tệ?}{Thiên lệch bền vững, không sửa được bằng cố gắng \(\Rightarrow\) cần thủ thuật và người đọc thật.}
+\gr{Chi phí chìm}{Vì sao khó xoá đoạn mình đã mài kỹ?}{Công đã bỏ khiến ta bảo vệ phần đáng bỏ \(\Rightarrow\) lý do phải sửa cấu trúc trước câu chữ.}
+\gr{Biên tập chuyên nghiệp\cite{zinsser2006}}{Nhận xét của người đọc đáng tin tới đâu?}{Đúng về chỗ hỏng, không đáng tin về cách sửa \(\Rightarrow\) quy trình bốn bước ở mục 4.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Lập trình}{Tái cấu trúc mã và rà soát mã}{Cùng nguyên tắc: đổi cấu trúc trước, làm đẹp sau; và cùng bài học về nhận xét --- người rà soát đúng về chỗ khó hiểu, không nhất thiết đúng về cách sửa.}
+\lh{Nghiên cứu}{Bản nháp thí nghiệm và phân tích}{Chạy phân tích trước khi cố định cách trình bày; cùng logic ``đừng đánh bóng cái có thể bị xoá''.}
+\lh{Thiết kế}{Mở rộng rồi thu hẹp phương án}{Tách sinh ra khỏi đánh giá, giống hệt tách nháp khỏi sửa.}
+\lh{Nhiếp ảnh và dựng phim}{Chụp nhiều rồi chọn}{Chấp nhận tỉ lệ bỏ cao ở giai đoạn tạo; giá trị nằm ở khâu chọn và cắt.}
+\lh{Kinh tế học hành vi}{Chi phí chìm}{Giải thích vì sao khó xoá đoạn đã mài kỹ --- và vì sao thứ tự lượt sửa lại là biện pháp phòng, không phải lời khuyên đạo đức.}
+\lh{Dạy học}{Vì sao chuyên gia dạy khó hiểu}{Cùng lời nguyền tri thức ở mục 3; và cùng cách chữa: thử với người thật thay vì tự đánh giá.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Vì viết và sửa dùng hai kiểu chú ý ngược nhau: viết nháp cần tạo ra và gạt phê phán, sửa cần phê phán và nhìn như người ngoài. Chuyển qua lại sau mỗi câu làm bạn vừa chậm vừa dở --- bạn dừng mạch ý để mài một câu mà rất có thể sẽ bị xoá ở lượt cấu trúc. Cách làm đúng là tách hai việc, và trong việc sửa lại tách tiếp theo lượt.}
+\tl{Nội dung \(\rightarrow\) cấu trúc \(\rightarrow\) câu và mạch \(\rightarrow\) soát lỗi. Thứ tự không đảo được vì quan hệ một chiều: quyết định ở lượt trên có thể xoá bỏ hoàn toàn công của lượt dưới nhưng không ngược lại. Nếu bạn đánh bóng câu chữ một đoạn rồi phát hiện đoạn đó thừa, công đó mất trắng --- và tệ hơn, chi phí đã bỏ khiến bạn muốn giữ lại một đoạn đáng xoá.}
+\tl{Lời nguyền tri thức: khi đọc lại bài mình, bạn không đọc cái trên giấy mà đọc cái trong đầu bạn --- ý định lấp đầy mọi mối nối thiếu và mọi đại từ mơ hồ. Đây là thiên lệch nên không sửa được bằng cách cố gắng khách quan hơn. Bốn cách lách, theo hiệu quả tăng dần: để bài nguội ít nhất một ngày; đổi hình thức (in ra, đổi phông); đọc to hoặc cho máy đọc lên; và đọc ngược từ câu cuối cho lượt soát lỗi.}
+\tl{Nguyên tắc nền: người đọc gần như luôn đúng khi nói chỗ nào có vấn đề, và thường sai khi nói phải sửa thế nào --- vì họ có thẩm quyền tuyệt đối về trải nghiệm đọc của họ nhưng không biết ý định của bạn. Quy trình: tách quan sát khỏi đề xuất và giữ lại quan sát; gom theo vị trí (ba người khựng cùng chỗ thì chỗ đó hỏng); phân loại theo lượt và xử nội dung trước; rồi tự quyết cách sửa. Nếu nhận xét mâu thuẫn thật sự, thường là bạn chưa xác định rõ người đọc mục tiêu.}
+\tl{Ba tín hiệu. Một lượt sửa toàn bài chỉ ra vài thay đổi nhỏ mà chúng không làm bài rõ hơn, chỉ khác đi. Bạn sửa một chỗ theo hướng ngược với hôm qua --- dấu hiệu chỗ đó không có phương án tốt hơn rõ rệt. Và tín hiệu thực dụng nhất: một giờ sửa nữa đem lại ít hơn một giờ dành cho việc khác. Bài viết không bao giờ hoàn hảo; cái người viết nhiều có là một tiêu chuẩn ``đủ tốt'' rõ ràng cộng khả năng dừng khi đạt.}
+\end{traloi}
+
+\begin{dongian}
+Có một hiểu lầm khiến việc viết trở nên khổ hơn cần thiết: nghĩ rằng người viết giỏi ngồi xuống và viết ra câu hay ngay lần đầu. Họ không làm vậy. Bản nháp đầu của họ cũng lộn xộn. Khác biệt nằm ở chỗ họ có một quy trình sửa.
+
+Điều quan trọng nhất là \emph{đừng vừa viết vừa sửa}. Hai việc này dùng hai kiểu tập trung ngược nhau: viết cần thả cho ý chảy ra, sửa cần bới lỗi. Làm xen kẽ thì bạn vừa mất mạch vừa mài những câu mà lát nữa sẽ xoá.
+
+Khi sửa, hãy đi từ to xuống nhỏ, đúng bốn bước này:
+
+Bước một, nội dung: có đủ ý chưa, ý nào thừa, kết luận có số liệu đỡ không. Bước hai, cấu trúc: thứ tự các phần có hợp lý không, mỗi đoạn có đúng một ý không. Bước ba, câu chữ: câu có rõ ai làm gì không, các câu có nối được với nhau không. Bước bốn, soát lỗi: chính tả, số liệu, tham chiếu hình bảng.
+
+Thứ tự này quan trọng, không phải hình thức. Nếu bạn mài giũa từng câu ở bước ba trước, rồi ở bước hai phát hiện cả đoạn đó nên bỏ, bạn mất công --- và tệ hơn, vì đã mất công nên bạn sẽ tiếc và giữ lại một đoạn đáng bỏ.
+
+Còn một khó khăn nữa: đọc lại bài mình, bạn thấy cái gì cũng rõ. Đó là vì bạn đang đọc ý trong đầu bạn chứ không phải chữ trên giấy. Không cố gắng nào chữa được chuyện này, nhưng có mấy mẹo hiệu quả: để bài nguội một ngày; in ra giấy hoặc đổi phông; và nhất là \emph{đọc to} --- câu dài làm bạn hụt hơi, chỗ gãy mạch làm bạn vấp, từ lặp nghe rõ ngay.
+
+Cuối cùng, về nhận xét của người khác: khi ai đó nói ``chỗ này khó hiểu'', hãy tin họ --- không ai hiểu trải nghiệm đọc của họ hơn họ. Nhưng khi họ nói ``nên sửa thế này'', hãy chỉ coi là gợi ý, vì họ không biết bạn định nói gì. Nhận xét cho bạn biết \emph{chỗ hỏng}; cách sửa là việc của bạn.
+\motcau{Sửa từ to xuống nhỏ, và đừng sửa khi đang viết.}
+\chuadongian{Biết khi nào dừng sửa là phán đoán, và nó cải thiện chủ yếu qua việc viết nhiều bài chứ không qua quy tắc.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Vì sao tách viết khỏi sửa}{Hai chế độ chú ý ngược nhau; làm xen kẽ thì vừa chậm vừa dở.}
+\ar[3]{Bốn lượt}{Nội dung \(\rightarrow\) cấu trúc \(\rightarrow\) câu và mạch \(\rightarrow\) soát lỗi.}
+\ar[3]{Vì sao thứ tự không đảo}{Lượt trên có thể xoá công của lượt dưới; chi phí đã bỏ khiến bạn giữ phần đáng bỏ.}
+\ar[3]{Lời nguyền tri thức}{Đọc lại bài mình là đọc ý trong đầu, không phải chữ trên giấy.}
+\ar[3]{Bốn cách lách}{Để nguội; đổi hình thức; đọc to; đọc ngược khi soát lỗi.}
+\ar[2]{Bẫy sửa tuần tự}{Đi từ câu đầu xuống khiến hai trang đầu rất kỹ, phần cuối gần như không sửa.}
+\ar[2]{Danh sách kiểm phải máy móc}{Vì cảm giác ngôn ngữ chưa đủ khi viết bằng ngoại ngữ và không đáng tin với bài của chính mình.}
+\ar[2]{Nguyên tắc về nhận xét}{Người đọc đúng về chỗ hỏng, thường sai về cách sửa.}
+\ar[2]{Bốn bước xử lý nhận xét}{Tách quan sát khỏi đề xuất; gom theo vị trí; phân loại theo lượt; tự quyết cách sửa.}
+\ar[2]{Nhận xét mâu thuẫn}{Thường là dấu hiệu chưa xác định rõ người đọc mục tiêu.}
+\ar[2]{Ba tín hiệu dừng}{Thay đổi chỉ khác chứ không rõ hơn; sửa qua sửa lại ngược hướng; giờ sửa kém giá trị hơn giờ làm việc khác.}
+\ar[1]{Người mới và người có kinh nghiệm}{Người mới sửa từ ngữ (lượt 3--4); người có kinh nghiệm sắp xếp lại (lượt 1--2).}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Tôi không có thời gian sửa bốn lượt. Bỏ lượt nào?}{Bỏ lượt 3 trước, giữ lượt 1, 2 và 4. Lý do: lỗi cấu trúc khiến người đọc không hiểu bài, còn câu hơi nặng chỉ khiến họ đọc chậm --- thiệt hại khác hẳn nhau. Và lượt 4 không bỏ được vì lỗi số liệu hay tham chiếu sai làm mất uy tín ngay lập tức. Nếu chỉ có một giờ, hãy dùng nó cho lượt 2 và lượt 4.}
+\qa{Bản nháp đầu của tôi tệ tới mức tôi ngại đọc lại. Bình thường không?}{Bình thường, và đây là chỗ hiểu lầm về ``cảm hứng'' gây hại nhất. Bản nháp đầu tệ là trạng thái mặc định của mọi người viết; cái bạn so sánh nó với --- những bài đã xuất bản --- là sản phẩm sau nhiều lượt sửa và nhiều vòng phản biện. So bản nháp của bạn với bản đã in của người khác là so hai thứ khác loại. Cách thực hành: đặt cho bản nháp đầu một mục tiêu duy nhất là ``có đủ ý trên giấy''.}
+\qa{Tôi nên nhờ ai đọc bài?}{Hai loại người đọc cho hai loại thông tin, và nên có cả hai. Người trong ngành phát hiện lỗi nội dung và các khoảng trống lập luận. Người ngoài ngành nhưng có nền khoa học phát hiện chỗ khó hiểu mà người trong ngành lướt qua vì họ tự lấp bằng kiến thức nền --- đúng chỗ mà lời nguyền tri thức của bạn cũng đang hoạt động. Câu hỏi nên hỏi họ không phải ``có hay không'' mà ``chỗ nào bạn phải đọc lại''.}
+\qa{Dùng mô hình ngôn ngữ để sửa bài có nên không?}{Có ích cho lượt 3 và lượt 4, và ít có ích cho lượt 1 và 2 --- vì chúng không biết dữ liệu của bạn, không biết cộng đồng bạn gửi bài, và có xu hướng làm câu văn trơn tru theo một giọng chung. Rủi ro cụ thể cần cảnh giác: chúng hay nâng mức cam kết khi ``viết lại cho hay hơn'', đúng cái mà \ptr{C/14} cảnh báo. Cách dùng an toàn: hỏi chúng \emph{chỗ nào} khó hiểu thay vì bảo chúng viết lại. \ptr{E/20} nói kỹ hơn.}
+\qa{Sửa bài có làm mất giọng riêng của tôi không?}{Không, nếu bạn sửa theo bốn lượt. Giọng riêng nằm ở lựa chọn ý, ở cách đặt vấn đề, ở ví dụ bạn chọn --- những thứ thuộc lượt 1 và 2, và việc sửa hầu như chỉ củng cố chúng. Cái bị mất đi ở lượt 3 là các thói quen câu chữ, mà phần lớn không phải giọng riêng: chúng là nhiễu. Nếu bạn thấy bài sau khi sửa nghe không giống mình, khả năng cao là bạn đã sửa theo đề xuất của người khác thay vì tự quyết --- lỗi ở bước bốn của mục 4.}
+\qa{Có nên giữ các bản nháp cũ không?}{Nên, và vì hai lý do thực dụng. Thứ nhất, đôi khi bạn sửa một đoạn theo hai hướng rồi nhận ra bản đầu tốt hơn; không có bản cũ thì không quay lại được. Thứ hai, đọc lại bản nháp của bài trước sau vài tháng cho bạn thấy rất rõ tiến bộ của mình và những tật lặp lại --- một dạng phản hồi mà bạn không lấy được từ đâu khác. Dùng hệ quản lý phiên bản nếu bạn viết bằng văn bản thuần.}
+\qa{Người viết chuyên nghiệp sửa bao nhiêu lượt?}{Không có con số chuẩn, và hỏi số lượt ít hữu ích hơn hỏi \emph{loại} lượt. Điều đáng chú ý hơn là tỉ lệ thời gian: với nhiều người viết có kinh nghiệm, thời gian sửa vượt xa thời gian viết nháp. Nếu tỉ lệ của bạn đang ngược lại --- viết nháp lâu, sửa qua loa --- thì đó là chỗ có nhiều lợi ích nhất để thay đổi, hơn là cố viết nháp cho hay hơn.}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Viết một bản nháp 300 từ trong 20 phút, không sửa một chữ nào}{Tự chọn}{Mục tiêu duy nhất: có đủ ý trên giấy. Chấp nhận câu xấu.}
+\bt[1]{Đọc to một trang bài của bạn và đánh dấu mọi chỗ bạn vấp}{Bài viết của bạn}{Không sửa gì trong lúc đọc, chỉ đánh dấu.}
+\bt[2]{Sửa bản nháp ở bài 1 theo đúng bốn lượt, ghi lại số thay đổi mỗi lượt}{Bài viết của bạn}{Nếu lượt 1 và 2 không có thay đổi nào, khả năng cao bạn đang né chúng.}
+\bt[2]{Áp toàn bộ danh sách kiểm ở mục 2 cho một phần bài của bạn}{Bài viết của bạn}{Làm máy móc từng dòng; ghi lại dòng nào bắt được nhiều lỗi nhất.}
+\bt[2]{Nhờ hai người đọc và tách nhận xét của họ thành quan sát và đề xuất}{Bài viết của bạn}{Xem có chỗ nào cả hai cùng khựng không.}
+\bt[3]{Lấy một bài bạn viết sáu tháng trước và sửa lại theo bốn lượt}{Bài viết của bạn}{Khoảng cách thời gian làm lời nguyền tri thức yếu hẳn --- bạn sẽ thấy nhiều thứ mới.}
+\bt[3]{Trong ba bài liên tiếp, đo tỉ lệ thời gian viết nháp so với thời gian sửa}{Bài viết của bạn}{Nếu tỉ lệ nghiêng về viết nháp, thử đảo lại ở bài thứ tư và so kết quả.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Phần C khép lại ở đây. Năm chương cho bốn nguyên tắc và một quy trình để áp chúng: ai làm gì trong câu, cũ trước mới sau giữa các câu, đáp đúng khuôn ở cấp bài, mức cam kết khớp bằng chứng, và bốn lượt sửa từ lớn xuống nhỏ.
+
+Phần B và phần C cùng nhau đã phủ hai kỹ năng chính bạn nhắm tới: đọc để lấy đúng ý, và viết để người khác lấy đúng ý của bạn. Nhưng cả hai đều dựa trên một giả định mà ta chưa xét kỹ --- rằng bạn chọn được \emph{đúng từ}. Khi hai từ gần nghĩa, cái gì quyết định chọn cái nào? Vì sao \emph{make a decision} nghe tự nhiên còn \emph{do a decision} thì không, dù không luật ngữ pháp nào cấm? Và vì sao các ẩn dụ trong một ngành lại định hình cách người trong ngành đó nghĩ? Phần D đi vào ba câu hỏi đó, bắt đầu từ \ptr{D/16}.
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

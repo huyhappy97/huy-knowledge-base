@@ -1,0 +1,85 @@
+% ============================================================================
+%  07-hoc-va-giu — Học và giữ kiến thức nền dài hạn
+%  Ngày tạo: 2026-09-09 | Sửa gần nhất: 2026-09-09 | Ôn gần nhất: chưa
+%  Dependency: 01 (cỡ hiệu ứng), 02. Mức độ: CỐT LÕI.
+% ============================================================================
+\documentclass[../hieu-suat.tex]{subfiles}
+\begin{document}
+\chapter{Học và giữ: bốn kỹ thuật đã đo được, và những kỹ thuật nên bỏ}
+\ptrtarget{07}\ptrtarget{07-hoc-va-giu}
+\dependency{\ptr{01} (đọc cỡ hiệu ứng), \ptr{02} (đây là vòng phản hồi duy nhất trong bài học mà môi trường \emph{đã} tử tế sẵn).}
+
+\begin{tomtat}
+Đây là chương có bằng chứng mạnh nhất trong cả bài học, vì việc học tài liệu có thể kiểm bằng thí nghiệm gán ngẫu nhiên --- một môi trường tử tế theo nghĩa của chương \ptr{02}. Kết luận gọn: hai kỹ thuật đứng đầu bảng là \emph{tự truy hồi} và \emph{giãn cách}; kỹ thuật xen kẽ đứng thứ ba; và ba kỹ thuật phổ biến nhất trong thực tế --- đọc lại, tô đậm, tóm tắt --- nằm ở nhóm hiệu quả thấp. Điều khó chịu là chúng ta có xu hướng chọn đúng những kỹ thuật kém, vì chúng tạo cảm giác trôi chảy. Nếu chỉ nhớ một điều: cảm giác ``đọc lại thấy nhớ hơn'' là ảo giác ngắn hạn đã được đo trực tiếp, và nó đảo chiều sau vài ngày.
+\end{tomtat}
+
+\begin{khoigoi}
+\h{Đọc lại và tự kiểm tra, cái nào cho nhớ lâu hơn --- và câu trả lời có phụ thuộc thời điểm kiểm tra không?}
+\h{Khoảng cách giữa các lần ôn nên là bao nhiêu?}
+\h{Nếu tôi ``học kiểu hình ảnh'' thì có nên đổi tài liệu sang dạng hình ảnh không?}
+\end{khoigoi}
+
+\section{Xếp hạng theo bằng chứng}
+
+Dunlosky và cộng sự \cite{dunlosky2013} khảo sát mười kỹ thuật học phổ biến và xếp hạng theo mức hữu dụng: \emph{luyện tập truy hồi} (tự kiểm tra) và \emph{luyện tập giãn cách} được xếp mức cao nhất, vì chúng có ích cho nhiều lứa tuổi, nhiều loại tài liệu và nhiều bối cảnh; \emph{chất vấn tinh tiết}, \emph{tự giải thích} và \emph{học xen kẽ} ở mức trung bình; còn \emph{tóm tắt}, \emph{tô đậm}, \emph{đọc lại}, \emph{mnemonics từ khoá} và \emph{tưởng tượng hình ảnh} ở mức thấp \nD{}.
+
+\section{Truy hồi: kết quả đảo chiều theo thời gian}
+
+Roediger và Karpicke \cite{roediger2006} cho sinh viên đọc một đoạn văn rồi hoặc đọc lại, hoặc làm bài nhớ lại, với tổng thời gian như nhau; sau đó kiểm tra ở ba mốc. Khi kiểm tra sau 5 phút, nhóm đọc lại tốt hơn. Khi kiểm tra sau 2 ngày và sau 1 tuần, nhóm đã tự truy hồi tốt hơn rõ rệt \nD{}. Nghĩa là cảm giác ``đọc lại hiệu quả hơn'' không phải bịa --- nó đúng trong vài phút, và sai ở mọi khoảng thời gian mà tôi thực sự quan tâm.
+
+Karpicke và Roediger \cite{karpicke2008} tách rõ hơn: sau khi người học đã nhớ được một mục lần đầu, việc \emph{học lại} mục đó gần như không thêm gì, còn việc \emph{truy hồi lại} nó mới tạo ra khác biệt --- sau một tuần, nhóm tiếp tục tự kiểm tra nhớ khoảng 80\% trong khi nhóm tiếp tục học lại nhớ khoảng 36\% \nD{}.
+
+\begin{cambay}
+Sinh viên biết điều này vẫn không làm. Khảo sát 177 sinh viên đại học cho thấy phần lớn chọn đọc lại vở và giáo trình, rất ít người tự kiểm tra \cite{karpicke2009} \nD{}; các tác giả giải thích bằng \emph{ảo giác về năng lực}: đọc lại tạo cảm giác trôi chảy, và cảm giác đó bị nhầm với trí nhớ \nT{}. Đây chính là cạm bẫy siêu nhận thức mà chương \ptr{05} mô tả ở một dạng khác.
+\end{cambay}
+
+\section{Giãn cách: khoảng cách tối ưu phụ thuộc thời gian muốn nhớ}
+
+Cepeda và cộng sự \cite{cepeda2006} tổng hợp 317 thí nghiệm và tìm thấy quan hệ then chốt: khoảng cách giữa các lần học và khoảng thời gian tới lúc kiểm tra \emph{tác động cùng nhau} --- khoảng cách tối ưu tăng lên khi khoảng thời gian muốn nhớ tăng; và lịch giãn dần cho kết quả tốt hơn lịch đều \nD{}.
+
+Áp dụng cho cây tài liệu của tôi \nM{}: nếu mục tiêu là nhớ sau nhiều tháng thì lịch ôn hợp lý không phải mỗi ngày mà là \emph{vài ngày \(\rightarrow\) hai tuần \(\rightarrow\) hai tháng \(\rightarrow\) nửa năm}, và mỗi lần ôn phải là một lần \emph{truy hồi} (trả lời bảng active recall cuối chương mà không nhìn), không phải một lần đọc lại.
+
+\section{Xen kẽ: khó hơn lúc luyện, tốt hơn lúc kiểm tra}
+
+Rohrer, Dedrick và Stershic \cite{rohrer2015} chạy một thí nghiệm trong lớp học thật suốt ba tháng: cùng một lượng bài tập, chỉ khác cách sắp xếp --- theo khối (mỗi buổi một loại) hay xen kẽ (trộn các loại). Bài kiểm tra không báo trước diễn ra 1 ngày hoặc 30 ngày sau buổi ôn cuối. Xen kẽ cho điểm cao hơn ở cả hai mốc, với cỡ hiệu ứng \(d = 0{,}42\) và \(d = 0{,}79\) \nD{} --- và điều đáng chú ý là hiệu ứng \emph{lớn hơn} ở mốc xa hơn.
+
+Cơ chế \nT{}: khi bài tập được xếp theo khối, người học không phải \emph{chọn} phương pháp, vì bối cảnh đã nói sẵn phải dùng cái gì; xen kẽ buộc phải nhận diện loại bài trước rồi mới giải --- đúng thứ mà tình huống thật đòi hỏi. Nối với \ptr{03}: đây là cùng một luận điểm về biểu diễn theo cấu trúc sâu, nhìn từ phía luyện tập.
+
+\section{Một thứ nên bỏ hẳn}
+
+Giả thuyết \emph{phong cách học} --- rằng dạy theo đúng ``kiểu học'' của mỗi người (hình ảnh, thính giác, vận động) sẽ cho kết quả tốt hơn --- là giả thuyết phổ biến nhất và cũng là giả thuyết không có bằng chứng đỡ. Pashler và cộng sự \cite{pashler2008} rà soát tài liệu và kết luận rằng dạng thí nghiệm cần thiết để kiểm giả thuyết ``khớp kiểu học'' hầu như không được thực hiện, và trong số ít nghiên cứu có thiết kế đúng thì kết quả không ủng hộ nó \nD{}. Thời gian dành cho việc chuyển tài liệu sang ``đúng kiểu của mình'' nên chuyển sang tự kiểm tra.
+
+\section{Lịch làm việc rút ra}
+
+\begin{enumerate}
+\item Mỗi chương trong cây tài liệu kết thúc bằng bảng truy hồi; \textbf{ôn nghĩa là che cột phải và trả lời}, không phải đọc lại chương.
+\item Lịch ôn giãn dần: 3 ngày \(\rightarrow\) 2 tuần \(\rightarrow\) 2 tháng \(\rightarrow\) 6 tháng, ghi ngày ôn gần nhất ở đầu file \cite{cepeda2006}.
+\item Khi ôn, \textbf{trộn} các chương thuộc nhánh khác nhau thay vì đi tuần tự \cite{rohrer2015}.
+\item Với kiến thức kỹ thuật, dạng truy hồi mạnh nhất là \emph{tự cài lại từ đầu} một thành phần nhỏ mà không nhìn mã cũ \nM{} --- nó vừa là truy hồi vừa cho phản hồi đúng/sai ngay lập tức, tức thoả cùng lúc hai điều kiện của \ptr{02}.
+\item Không tô đậm, không đọc lại như một hoạt động ôn tập chính \cite{dunlosky2013}.
+\end{enumerate}
+
+\begin{traloi}
+\tl{Phụ thuộc thời điểm: đọc lại thắng khi kiểm tra sau 5 phút, tự truy hồi thắng rõ rệt sau 2 ngày và 1 tuần \cite{roediger2006}; sau một tuần khoảng cách là 80\% so với 36\% \cite{karpicke2008}.}
+\tl{Tăng theo khoảng thời gian muốn nhớ, và lịch giãn dần tốt hơn lịch đều \cite{cepeda2006}.}
+\tl{Không. Giả thuyết khớp kiểu học không có bằng chứng đỡ khi được kiểm bằng thiết kế thí nghiệm đúng \cite{pashler2008}.}
+\end{traloi}
+
+\begin{tukiem}
+\item Vì sao kết quả của Roediger và Karpicke lại là bằng chứng về \emph{siêu nhận thức} chứ không chỉ về trí nhớ?
+\item Hai kỹ thuật xếp hạng cao nhất và ba kỹ thuật xếp hạng thấp là gì \cite{dunlosky2013}?
+\item Cỡ hiệu ứng của xen kẽ ở mốc 30 ngày là bao nhiêu, và vì sao nó lớn hơn ở mốc 1 ngày?
+\item Thiết kế lịch ôn cho một chương bạn vừa viết trong cây \code{my\_study}, kèm ngày cụ thể.
+\end{tukiem}
+
+\begin{onbai}
+\ar[3]{Hai kỹ thuật hạng cao}{Luyện tập truy hồi và luyện tập giãn cách \cite{dunlosky2013}.}
+\ar[3]{80\% vs 36\%}{Sau một tuần: tiếp tục tự kiểm tra so với tiếp tục học lại \cite{karpicke2008}.}
+\ar[3]{Đảo chiều theo thời gian}{Đọc lại thắng ở 5 phút; truy hồi thắng ở 2 ngày và 1 tuần \cite{roediger2006}.}
+\ar[3]{Khoảng cách ôn}{Tăng theo thời gian muốn nhớ; giãn dần tốt hơn đều \cite{cepeda2006}.}
+\ar[2]{Xen kẽ}{\(d=0{,}42\) ở 1 ngày và \(0{,}79\) ở 30 ngày, lớp học thật, 3 tháng \cite{rohrer2015}.}
+\ar[2]{Ảo giác năng lực}{Trôi chảy khi đọc lại bị nhầm với trí nhớ; đa số sinh viên vẫn chọn đọc lại \cite{karpicke2009}.}
+\ar[1]{Phong cách học}{Không có bằng chứng cho giả thuyết khớp kiểu học \cite{pashler2008}.}
+\end{onbai}
+
+\end{document}

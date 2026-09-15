@@ -1,0 +1,96 @@
+% ============================================================================
+%  01-nen-tang — Nền tảng tối thiểu để đọc bằng chứng về việc học
+%  Ngày tạo: 2026-09-09 | Sửa gần nhất: 2026-09-09 | Ôn gần nhất: chưa
+%  Dependency: không. Mức độ: tham khảo — đọc theo nhu cầu.
+%  Kiểm chứng: không có công thức lõi nào ngoài định nghĩa d (cửa b: ví dụ số tay).
+% ============================================================================
+\documentclass[../hieu-suat.tex]{subfiles}
+\begin{document}
+\chapter{Nền tảng tối thiểu: đọc bằng chứng về việc học}
+\ptrtarget{01}\ptrtarget{01-nen-tang}
+\dependency{không --- đây là chương mở đầu. Chỉ nên đọc \emph{theo nhu cầu}: quay lại đúng mục cần khi một chương sau đưa ra một con số mà bạn không biết diễn giải.}
+
+\begin{tomtat}
+Chín chương sau đều dựa vào các con số của tâm lý học nhận thức và của meta-science. Chương này dựng đủ nền để đọc những con số đó mà không bị lừa: cỡ hiệu ứng nói gì và không nói gì, khác biệt giữa nghiên cứu tương quan và nghiên cứu can thiệp, phân tích tổng hợp mạnh và yếu ở đâu, và vì sao một kết quả đăng ở tạp chí tốt vẫn có thể sai. Nếu chỉ nhớ một điều: \emph{phần trăm phương sai được giải thích} là câu trả lời cho một câu hỏi rất hẹp, và gần như luôn bị đọc thành một câu trả lời rộng hơn nhiều so với những gì dữ liệu cho phép.
+\end{tomtat}
+
+\begin{nentang}
+\kn{trí nhớ làm việc (working memory)}{lượng thông tin giữ và thao tác được cùng lúc trong đầu; nhỏ và gần như không luyện to ra được, nên mọi kỹ thuật hiệu quả đều đi đường vòng là \emph{đóng gói} thông tin lại chứ không mở rộng bộ nhớ.}
+\kn{chunk}{một cụm thông tin đã được nén thành một đơn vị duy nhất nhờ kinh nghiệm; ``bàn cờ này là thế Sicilian'' chiếm một ô nhớ, trong khi ``quân này ở ô này'' chiếm hai mươi ô.}
+\kn{tải nhận thức (cognitive load)}{tổng công việc mà trí nhớ làm việc đang gánh; chia thành phần thuộc về bản chất bài toán và phần do cách trình bày gây ra một cách không cần thiết.}
+\kn{mã hoá và truy hồi (encoding, retrieval)}{đưa thông tin vào trí nhớ, và lấy nó ra. Hai việc khác nhau, luyện việc này không tự động luyện việc kia --- đây là gốc của gần như mọi kết quả ở chương 7.}
+\kn{siêu nhận thức (metacognition)}{việc theo dõi và điều khiển chính quá trình nhận thức của mình: tôi đang hiểu hay chỉ thấy quen? tôi đang tiến hay đang đi lạc?}
+\kn{chuyển giao (transfer)}{áp dụng được thứ đã học sang tình huống mới. Chuyển giao gần (bài tương tự) thường xảy ra; chuyển giao xa hiếm và không tự động.}
+\kn{cỡ hiệu ứng (effect size)}{con số nói \emph{hiệu ứng lớn bao nhiêu}, tách khỏi câu hỏi \emph{nó có khác không một cách có ý nghĩa thống kê hay không}.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Một phương pháp ``giải thích 26\% phương sai'' --- 74\% còn lại là tài năng bẩm sinh?}
+\h{Vì sao một tương quan mạnh giữa số giờ luyện tập và trình độ lại gần như không nói gì về việc \emph{tôi} nên luyện tập thế nào?}
+\h{Khi nào một con số duy nhất trong một bài báo tốt là đủ để đổi cách làm việc của mình?}
+\end{khoigoi}
+
+\section{Cỡ hiệu ứng: con số duy nhất đáng đọc}
+
+Trong các chương sau, hầu hết kết quả sẽ đến ở một trong ba dạng: hiệu số chuẩn hoá \(d\), tương quan \(r\), hoặc \emph{phần trăm phương sai được giải thích} (\(R^2\), thường viết dưới dạng ``giải thích 21\% phương sai''). Ba dạng này nói ba chuyện khác nhau và bị lẫn với nhau thường xuyên.
+
+\textbf{Hiệu số chuẩn hoá} \(d\) là chênh lệch trung bình giữa hai nhóm, chia cho độ lệch chuẩn chung:
+\[
+d \;=\; \frac{\bar{x}_1 - \bar{x}_2}{s}.
+\]
+Nó trả lời: \emph{nếu bốc ngẫu nhiên một người ở mỗi nhóm, chênh lệch điển hình lớn cỡ nào so với mức dao động tự nhiên giữa các cá nhân?} Ví dụ nhỏ tính tay được: nhóm học xen kẽ đạt trung bình 70 điểm, nhóm học theo khối đạt 60, độ lệch chuẩn 20 \(\Rightarrow d = 0{,}5\). Quy ước thường dùng --- và chỉ là quy ước, không phải quy luật --- coi 0{,}2 là nhỏ, 0{,}5 là vừa, 0{,}8 là lớn. Để có trực giác: với \(d = 0{,}8\), khoảng 79\% người ở nhóm được can thiệp vượt trung vị của nhóm đối chứng \nM{} (suy trực tiếp từ giả định phân phối chuẩn, không phải một kết quả thực nghiệm).
+
+\textbf{Phần trăm phương sai được giải thích} trả lời một câu hỏi hẹp hơn nhiều: trong \emph{mẫu này}, với \emph{cách đo này}, biến thiên của biến X đi kèm bao nhiêu phần biến thiên của kết quả. Nó không nói phần còn lại thuộc về cái gì. Đây là chỗ hiểu sai phổ biến nhất trong toàn bộ tranh cãi về luyện tập ở chương 2, và có ba lý do khiến phần ``còn lại'' không được phép gọi là tài năng bẩm sinh \nM{}: sai số đo của cả hai biến chiếm một phần; \emph{hạn chế khoảng giá trị} chiếm một phần khác (nếu chỉ khảo sát nhạc công chuyên nghiệp thì mọi người đều đã luyện rất nhiều, nên biến thiên số giờ bị bóp lại và tương quan tụt xuống một cách giả tạo); và mọi yếu tố chưa được đưa vào mô hình --- chất lượng người thầy, chất lượng chứ không phải số lượng của việc luyện tập --- rơi hết vào phần dư.
+
+\begin{cambay}
+``Giải thích 26\% phương sai'' \emph{không} có nghĩa ``luyện tập quyết định 26\% trình độ''. Nó có nghĩa: trong tập dữ liệu đó, với thước đo số giờ luyện tập đó, hiệp phương sai giữa hai biến chiếm 26\% phương sai của biến kết quả. Đổi cách đo biến dự báo là con số đổi.
+\end{cambay}
+
+\section{Tương quan so với can thiệp: câu hỏi đầu tiên phải hỏi}
+
+Khi đọc bất kỳ khẳng định nào về việc học, câu hỏi đầu tiên không phải ``con số bao nhiêu'' mà ``ai gán điều kiện cho ai''. Có hai loại nghiên cứu, và chúng cho phép rút ra hai loại kết luận khác hẳn nhau.
+
+\textbf{Nghiên cứu tương quan} quan sát người ta trong tự nhiên rồi đo mối liên hệ: hỏi các nhạc công đã luyện bao nhiêu giờ, rồi so với trình độ hiện tại. Khảo sát này không cho biết chiều nhân quả. Người luyện nhiều thành giỏi, hay người có sẵn năng khiếu và được khích lệ nên chịu luyện nhiều hơn, hay cả hai --- dữ liệu tương quan không phân biệt được. Phân tích tổng hợp của Macnamara và cộng sự \cite{macnamara2014} thuộc loại này.
+
+\textbf{Nghiên cứu can thiệp} gán ngẫu nhiên người học vào các điều kiện khác nhau rồi đo kết quả: nửa lớp ôn bằng cách đọc lại, nửa còn lại ôn bằng cách tự kiểm tra, cùng thời lượng, cùng bài kiểm tra cuối \cite{roediger2006,karpicke2008}. Chỉ loại này mới cho phép nói ``làm X gây ra kết quả Y''.
+
+Hệ quả thực hành \nM{}: những khuyến nghị đáng thay đổi hành vi nhất trong bài học này đều đến từ can thiệp có gán ngẫu nhiên --- truy hồi, giãn cách, xen kẽ (chương 7), xét mặt đối lập (chương 5). Những phần dựa trên tương quan hoặc quan sát --- chương 9 gần như toàn bộ --- phải đọc như bản đồ địa hình, không phải như chỉ dẫn.
+
+\section{Phân tích tổng hợp mạnh và yếu ở đâu}
+
+Phân tích tổng hợp (meta-analysis) gộp cỡ hiệu ứng của nhiều nghiên cứu để có một ước lượng chính xác hơn. Nó mạnh vì tăng cỡ mẫu và vì buộc người viết phải nêu tiêu chí chọn bài rõ ràng. Nó yếu ở ba chỗ mà người đọc phải tự kiểm: các nghiên cứu được gộp có thực sự đo cùng một thứ không (\emph{tính không đồng nhất}); những nghiên cứu cho kết quả âm có được đăng và được tìm thấy không (\emph{thiên lệch công bố}); và định nghĩa của biến độc lập có bị nới rộng khi gộp không --- chính điểm này là tâm của tranh cãi ở chương 2 \cite{macnamara2014,ericsson2021}.
+
+\section{Vì sao một bài báo tốt vẫn có thể sai}
+
+Ioannidis \cite{ioannidis2005} chỉ ra bằng một mô hình xác suất rằng tỉ lệ kết quả công bố đúng giảm khi nghiên cứu có cỡ mẫu nhỏ, cỡ hiệu ứng nhỏ, nhiều quan hệ được thử mà ít được chọn lọc trước, và nhiều tự do trong thiết kế và phân tích \nT{}. Simmons và cộng sự \cite{simmons2011} biến lập luận đó thành trình diễn cụ thể: bằng cách khai thác \emph{các bậc tự do của người nghiên cứu} --- quyết định lúc nào dừng thu dữ liệu, biến kiểm soát nào đưa vào, mã hoá thế nào --- họ tạo ra bằng chứng ``có ý nghĩa thống kê'' cho một giả thuyết hiển nhiên sai \nD{}, rồi đề xuất giải pháp bằng công bố minh bạch: sáu yêu cầu cho tác giả và bốn hướng dẫn cho người phản biện.
+
+Đây là lý do \code{refs.bib} của khảo sát này gắn mức tin A/B/C cho từng công trình, và vì sao trong các chương sau tôi luôn nói rõ một kết quả \emph{đã được lặp lại độc lập} hay mới chỉ có một lần. Với một kết quả đơn lẻ, dù đăng ở tạp chí hàng đầu, mức phản ứng hợp lý là thử áp dụng trên chính mình và tự đo --- không phải viết lại toàn bộ cách làm việc.
+
+\begin{cannho}
+Bốn câu hỏi để đọc bất kỳ khẳng định nào về việc học: \textbf{(1)} tương quan hay can thiệp? \textbf{(2)} cỡ hiệu ứng bao nhiêu, đo bằng thước nào? \textbf{(3)} đã có ai lặp lại độc lập chưa? \textbf{(4)} mẫu là ai, và tôi có giống họ ở điểm quyết định không?
+\end{cannho}
+
+\begin{traloi}
+\tl{Không. 74\% còn lại gồm sai số đo, hạn chế khoảng giá trị của mẫu, và mọi yếu tố chưa đưa vào mô hình --- trong đó có \emph{chất lượng} của việc luyện tập, thứ mà thước đo ``số giờ'' không chạm tới.}
+\tl{Vì tương quan không nói chiều nhân quả, và vì nó mô tả biến thiên \emph{giữa các cá nhân} trong một mẫu, chứ không mô tả điều gì xảy ra khi \emph{một người} đổi cách luyện tập. Câu hỏi của tôi là câu hỏi can thiệp.}
+\tl{Khi kết quả đến từ can thiệp có gán ngẫu nhiên, đã được lặp lại độc lập, cỡ hiệu ứng đủ lớn để thấy được ở quy mô một người, và chi phí thử thấp. Nếu thiếu một trong bốn, hãy thử như một thí nghiệm cá nhân có ghi chép, đừng cải tổ toàn bộ nếp làm việc.}
+\end{traloi}
+
+\begin{tukiem}
+\item Vì sao \emph{hạn chế khoảng giá trị} làm tương quan giữa luyện tập và trình độ trông nhỏ hơn thực tế, và điều đó ảnh hưởng thế nào tới cách đọc con số 26\%?
+\item Cho hai nhóm có trung bình 70 và 60, độ lệch chuẩn 20. Tính \(d\). Nếu độ lệch chuẩn là 5 thì \(d\) bằng bao nhiêu, và điều đó đổi kết luận thực hành thế nào?
+\item Nêu một khẳng định trong lĩnh vực của bạn mà bạn tin, rồi phân loại: nó dựa trên tương quan, can thiệp, hay chỉ là quan sát cá nhân của một người có uy tín?
+\item ``Các bậc tự do của người nghiên cứu'' xuất hiện ở đâu trong quy trình chạy benchmark SLAM của chính bạn?
+\end{tukiem}
+
+\begin{onbai}
+\ar[3]{Cỡ hiệu ứng \(d\)}{Chênh lệch trung bình chia độ lệch chuẩn chung. Quy ước 0,2 / 0,5 / 0,8 = nhỏ / vừa / lớn.}
+\ar[3]{``Giải thích X\% phương sai''}{Chỉ nói về hiệp biến thiên trong mẫu đó với thước đo đó. Phần dư \emph{không phải} tài năng bẩm sinh.}
+\ar[3]{Tương quan vs can thiệp}{Chỉ can thiệp có gán ngẫu nhiên mới cho phép nói ``làm X gây ra Y''.}
+\ar[2]{Hạn chế khoảng giá trị}{Mẫu toàn người đã luyện nhiều \(\Rightarrow\) biến thiên bị bóp \(\Rightarrow\) tương quan tụt giả tạo.}
+\ar[2]{Thiên lệch công bố}{Kết quả âm ít được đăng \(\Rightarrow\) phân tích tổng hợp lệch về phía dương.}
+\ar[2]{Bậc tự do của người nghiên cứu}{Mọi lựa chọn tuỳ ý trong thu và phân tích dữ liệu; đủ để tạo ``ý nghĩa thống kê'' cho giả thuyết sai \cite{simmons2011}.}
+\ar[1]{Chuyển giao xa}{Hiếm và không tự động --- đừng giả định kỹ năng học ở nơi này tự chảy sang nơi khác.}
+\end{onbai}
+
+\end{document}

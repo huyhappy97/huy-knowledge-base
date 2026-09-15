@@ -1,0 +1,163 @@
+% ============================================================================
+%  A/02-vat-ly-tao-anh/03-camera-va-hinh-hoc-nhieu-view
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: A/01/04 (toạ độ đồng nhất, SE(3)). Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Mô hình camera và hình học nhiều view (Camera Models and Multi-View Geometry)}
+\ptrtarget{A/02-vat-ly-tao-anh/03}\ptrtarget{A/02-vat-ly-tao-anh/03-camera-va-hinh-hoc-nhieu-view}\ptrtarget{A/02/03}\ptrtarget{A/02/03-camera-va-hinh-hoc-nhieu-view}
+\dependency{\ptr{A/01-toan-toi-thieu/04-hinh-hoc-va-tin-hieu} (toạ độ đồng nhất, \(SE(3)\), nội suy và lấy mẫu --- undistort và warp đều là phép lấy mẫu lại).}
+
+\begin{tomtat}
+Mục này nối pixel với thế giới thực: mô hình pinhole, ma trận nội tại, méo ống kính và hiệu chuẩn, rồi ràng buộc epipolar, homography, tam giác hoá và PnP. Đọc xong bạn biết ma trận nội tại đổi thế nào khi resize hay crop ảnh. Quên chỗ đó là bug im lặng số một khi ghép mạng vào pipeline hình học. Bạn cũng tính được sai số độ sâu ứng với một pixel sai lệch thị sai, và gọi tên được các cấu hình suy biến làm tam giác hoá vô nghĩa. Nếu chỉ nhớ một điều: \emph{camera không đo điểm, nó đo tia}. Độ sâu bị xoá ngay lúc chụp. Mọi phép khôi phục 3D vì thế phải mua lại thông tin đó, bằng một điểm nhìn thứ hai, một chuyển động, hoặc một prior học từ dữ liệu.
+\end{tomtat}
+
+\begin{nentang}
+\kn{pixel và toạ độ ảnh}{ảnh là một lưới ô vuông; toạ độ \((u,v)\) đếm cột và hàng, gốc quy ước ở góc trên trái. Đơn vị của mọi đại lượng ``trong ảnh'' --- tiêu cự, thị sai --- đều là pixel, không phải mét.}
+\kn{toạ độ đồng nhất}{thêm một thành phần vào vector toạ độ để phép tịnh tiến và phép chiếu viết được dưới dạng nhân ma trận: điểm \((x,y)\) viết thành \((x,y,1)\), và hai vector tỉ lệ với nhau chỉ cùng một điểm.}
+\kn{ma trận nội tại \(K\) (intrinsics)}{ma trận \(3\times3\) chứa tiêu cự tính bằng pixel \((f_x,f_y)\) và toạ độ tâm ảnh \((c_x,c_y)\); nó biến một tia trong hệ toạ độ camera thành toạ độ pixel. Nó thuộc về \emph{camera}, không thuộc về cảnh.}
+\kn{ma trận ngoại tại (extrinsics)}{phép quay và tịnh tiến đưa toạ độ thế giới về hệ toạ độ camera --- tức là tư thế của camera. Nó thuộc về \emph{lần chụp}, không thuộc về camera.}
+\kn{méo ống kính (distortion)}{sai lệch làm đường thẳng ngoài đời cong trên ảnh, mạnh nhất ở rìa; mô hình phổ biến dùng vài hệ số đa thức theo bán kính. ``Undistort'' là lấy mẫu lại ảnh để bù sai lệch đó.}
+\kn{hiệu chuẩn (calibration)}{quá trình ước lượng \(K\) và các hệ số méo bằng cách chụp một vật đã biết hình dạng, thường là bàn cờ, ở nhiều tư thế.}
+\kn{thị sai (disparity) và đường cơ sở (baseline trong stereo)}{với hai camera đặt cách nhau một khoảng \(B\) (đường cơ sở), cùng một điểm 3D rơi vào hai vị trí lệch nhau \(d\) pixel trên hai ảnh; \(d\) gọi là thị sai và độ sâu là \(Z=fB/d\).}
+\kn{RANSAC}{thủ tục ước lượng chịu được dữ liệu rác: rút ngẫu nhiên tập nhỏ điểm, dựng giả thuyết, đếm số điểm khớp, lặp nhiều lần và giữ giả thuyết được ủng hộ nhất. Cần nó vì ghép đặc trưng luôn có một tỉ lệ ghép sai.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Với người đã làm SLAM, phần lớn nội dung dưới đây là ôn tập. Trọng tâm vì thế được đặt ở chỗ khác: \emph{cái gì thay đổi khi một mạng nơ-ron được ghép vào pipeline hình học}. Ba câu hỏi cụ thể dẫn dắt cả mục. Thứ nhất, mô hình học được có được phép ``quên'' hình học không --- và nếu không thì hình học vào mô hình bằng đường nào? Thứ hai, những phép biến đổi ảnh mà ta dùng vô tư khi huấn luyện (resize, crop, warp) làm gì với các đại lượng hình học đi kèm? Thứ ba, khi hình học suy biến, mô hình học được có sập theo không, hay nó ``đoán'' và cho ra một con số trông hợp lý nhưng sai?
+
+\textbf{Học xong mục này thì làm được gì mà trước đó không làm được?} Cập nhật đúng ma trận nội tại sau mọi phép biến đổi ảnh; đọc một paper 3D và biết ngay nó giả định biết \(K\) hay không, cần bao nhiêu view, và suy biến ở cấu hình nào; và ước lượng bằng con số xem một hệ stereo cho sai số độ sâu bao nhiêu ở tầm mà bạn quan tâm.
+
+\begin{trucgiac}
+Camera là một cái máy đóng dấu: nó lấy tất cả những gì nằm trên một tia xuất phát từ tâm quang học và đóng chúng chồng lên nhau vào đúng một pixel. Phép đóng dấu ấy không mất mát về \emph{hướng} --- một pixel xác định chính xác một tia --- nhưng xoá sạch thông tin về \emph{khoảng cách dọc theo tia}. Vì vậy mọi kỹ thuật 3D đều là một cách mua lại đúng chiều thông tin đã bị xoá. Cách thứ nhất là đóng dấu lần thứ hai từ chỗ khác: stereo hoặc chuyển động. Cách thứ hai là dùng hiểu biết sẵn có về thế giới, chẳng hạn kích thước vật quen thuộc hay mặt đất phẳng. Một mạng ước lượng độ sâu đơn ảnh đã học đúng loại hiểu biết thứ hai; nó không phá vỡ định luật nào cả.
+\end{trucgiac}
+
+\subsection{B. Pinhole, nội tại, và chỗ mọi người làm sai}
+Mô hình pinhole nói rằng một điểm 3D trong hệ toạ độ camera chiếu xuống ảnh theo
+\[
+u = f_x\frac{X}{Z} + c_x, \qquad v = f_y\frac{Y}{Z} + c_y .
+\]
+Nói bằng lời: \emph{toạ độ pixel chỉ phụ thuộc \emph{tỉ số} giữa các toạ độ ngang và độ sâu} --- nhân cả cảnh lên gấp đôi và đẩy ra xa gấp đôi thì ảnh không đổi một pixel nào. Đó là gốc rễ của tính \vn{nhập nhằng thang đo}{scale ambiguity} trong mọi hệ đơn ảnh và đơn camera. Nó cũng là lý do các mô hình độ sâu đơn ảnh hiện đại dự đoán độ sâu \emph{tương đối} chứ không phải mét \cite{ranftl2022midas}.
+
+
+\lk{C}{hệ quả của}{mô hình độ sâu đơn ảnh dự đoán độ sâu \emph{tương đối} chính vì phép chiếu xoá thang đo tuyệt đối}
+\textbf{Ví dụ tính tay.} Với \(f = 500\) pixel, một vật cao \(1\) m ở khoảng cách \(10\) m cao \(500\times 1/10 = 50\) pixel trên ảnh. Cùng vật đó ở \(50\) m chỉ còn \(10\) pixel --- và đây là lý do vật ở xa không phải ``khó nhận dạng hơn một chút'' mà là \emph{gần như không còn thông tin}: mọi kiến trúc, mọi augmentation đều không tạo ra được các pixel không tồn tại.
+
+Chỗ mọi người làm sai, và làm sai rất im lặng, là quên rằng \(K\) gắn với \emph{hệ toạ độ pixel} nên nó phải đổi theo mọi phép biến đổi ảnh:
+
+\begin{itemize}
+\item \textbf{Thu nhỏ ảnh với hệ số \(s\)} --- mọi phần tử liên quan pixel nhân với \(s\): \(f_x' = s f_x\), \(f_y' = s f_y\), \(c_x' = s c_x\), \(c_y' = s c_y\) (với quy ước tâm pixel, còn có một lượng hiệu chỉnh nửa pixel; sai ở đó ít khi chết người nhưng sai ở hệ số \(s\) thì chết ngay).
+\item \textbf{Cắt ảnh từ điểm \((x_0,y_0)\)} --- tiêu cự \emph{không đổi}, chỉ tâm ảnh dịch: \(c_x' = c_x - x_0\), \(c_y' = c_y - y_0\). Đây là chỗ hay bị bỏ sót nhất vì crop trông ``vô hại''.
+\item \textbf{Letterbox} --- vừa co vừa đệm, nên phải áp cả hai luật trên theo đúng thứ tự.
+\item \textbf{Lật ngang} --- \(c_x' = W - 1 - c_x\), và nếu bài toán có tính trái--phải thì nhãn cũng phải lật theo.
+\end{itemize}
+
+Méo ống kính thì được ước lượng cùng \(K\) trong bước hiệu chuẩn, thường bằng phương pháp bàn cờ của Zhang \cite{zhang2000flexible}. Chỉ số sức khoẻ của một lần hiệu chuẩn là \emph{sai số tái chiếu trung bình}; theo kinh nghiệm thực hành, dưới nửa pixel là bình thường với camera phổ thông, miễn bàn cờ được chụp ở đủ nhiều tư thế. Vượt quá một pixel là dấu hiệu có gì đó sai: ảnh mờ, bàn cờ không phẳng, hoặc mô hình méo không đủ bậc. Lưu ý một điều mà lý thuyết ít nói: hiệu chuẩn \emph{trôi}. Nhiệt độ, rung động, và nhất là ống kính có lấy nét tự động đều làm \(K\) thay đổi theo thời gian, nên một bộ tham số hiệu chuẩn từ năm ngoái không đáng tin bằng bạn nghĩ.
+
+\subsection{C. Nhiều view: bốn công cụ và điều kiện dùng của chúng}
+Khi có từ hai ảnh trở lên, thông tin về độ sâu quay lại --- nhưng chỉ dưới những điều kiện rất cụ thể. Hình~\ref{fig:epipolar} minh hoạ ràng buộc cơ bản nhất.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[>=Stealth,scale=1.0]
+  \coordinate (C1) at (0,0);
+  \coordinate (C2) at (6,0.5);
+  \coordinate (P) at (3.2,3.0);
+  \fill[inkblue] (C1) circle (1.6pt) node[below left,font=\footnotesize] {\(C_1\)};
+  \fill[inkblue] (C2) circle (1.6pt) node[below right,font=\footnotesize] {\(C_2\)};
+  \fill[reddark] (P) circle (1.8pt) node[above,font=\footnotesize] {\(X\)};
+  \draw[steel,thick] (C1) -- (P);
+  \draw[steel,thick] (C2) -- (P);
+  \draw[rulecol,thick,dashed] (C1) -- (C2) node[midway,below,font=\footnotesize,color=steel] {đường cơ sở \(B\)};
+  % image planes
+  \draw[inkblue,thick] (1.0,1.55) -- (2.3,0.55);
+  \draw[inkblue,thick] (4.7,1.35) -- (6.0,2.35);
+  \node[font=\footnotesize,inkblue] at (1.15,0.75) {ảnh 1};
+  \node[font=\footnotesize,inkblue] at (5.9,1.35) {ảnh 2};
+  \fill[reddark] (1.62,1.07) circle (1.4pt);
+  \fill[reddark] (5.28,1.81) circle (1.4pt);
+  \draw[reddark,thick] (4.85,1.5) -- (5.85,2.25) node[right,font=\footnotesize,yshift=2pt] {đường epipolar};
+  \draw[decorate,decoration={brace,amplitude=4pt},reddark] (3.35,2.95) -- (3.9,1.9);
+  \node[font=\footnotesize,reddark,align=left] at (4.7,2.9) {độ sâu chưa biết\\nằm dọc tia};
+\end{tikzpicture}
+\caption{Ràng buộc epipolar. Một pixel ở ảnh 1 xác định một tia; ảnh của cả tia đó trên ảnh 2 là một \emph{đường thẳng}. Giá trị thực dụng: bài toán tìm điểm tương ứng co từ tìm kiếm hai chiều xuống một chiều --- và nếu biết \(K\) của cả hai camera thì ràng buộc này còn cho ra tư thế tương đối giữa hai lần chụp.}
+\label{fig:epipolar}
+\end{figure}
+
+Bốn công cụ hay dùng, đặt cạnh nhau trong Bảng~\ref{tab:nhieu-view}; cột cuối là cột phải thuộc.
+
+\begin{table}[H]\centering\small
+\caption{Bốn công cụ hình học nhiều view. Biết ``hỏng khi nào'' quan trọng hơn biết công thức, vì các cấu hình suy biến xuất hiện thường xuyên trong dữ liệu thật.}
+\label{tab:nhieu-view}
+\begin{tabularx}{\linewidth}{@{}L{2.1cm}L{3.0cm}YL{4.1cm}@{}}
+\toprule
+\textbf{Công cụ} & \textbf{Cơ chế} & \textbf{Giả định} & \textbf{Hỏng khi nào}\\
+\midrule
+Homography & Ánh xạ \(3\times3\) giữa hai ảnh của cùng mặt phẳng & Cảnh là một mặt phẳng, \emph{hoặc} camera chỉ xoay tại chỗ & Cảnh có độ sâu thật và camera có tịnh tiến --- lúc đó không tồn tại homography đúng, và ước lượng cho ra một phép biến đổi ``trung bình'' sai ở mọi nơi\\
+Ma trận cơ bản / bản chất & Ràng buộc epipolar giữa hai view & Cảnh cứng; ma trận bản chất còn cần biết \(K\) & Camera chỉ xoay không tịnh tiến (tư thế tương đối không xác định được thang đo lẫn hướng tịnh tiến); cảnh phẳng làm bài toán suy biến\\
+Tam giác hoá & Giao hai tia từ hai tâm quang học & Đã biết tư thế tương đối và ghép điểm đúng & Đường cơ sở ngắn so với khoảng cách: hai tia gần song song nên giao điểm cực nhạy với nhiễu\\
+PnP & Tư thế từ các cặp điểm 3D--2D & Đã biết \(K\) và có ít nhất ba cặp không thẳng hàng & Các điểm 3D gần đồng phẳng hoặc gần thẳng hàng; ghép sai điểm (phải bọc trong RANSAC)\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Cấu hình suy biến của tam giác hoá đáng được định lượng, vì nó quyết định thiết kế phần cứng. Từ \(Z = fB/d\), đạo hàm cho
+\[
+\left|\frac{\partial Z}{\partial d}\right| = \frac{Z^2}{fB},
+\]
+nghĩa là \emph{sai số độ sâu tăng theo bình phương khoảng cách}. Lấy \(f=500\) pixel và \(B=0{,}1\) m. Một pixel sai lệch thị sai gây sai số \(0{,}5\) m ở khoảng cách 5 m. Cũng một pixel ấy gây sai số \(2\) m ở 10 m, và \(8\) m ở 20 m. Hình~\ref{fig:sai-so-do-sau} vẽ đường cong đó. Muốn đo xa hơn thì phải tăng đường cơ sở hoặc tiêu cự, và cả hai đều kéo theo cái giá riêng: đường cơ sở dài làm vùng nhìn chung hẹp lại và làm bài toán ghép điểm khó hơn, tiêu cự dài làm trường nhìn hẹp lại.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.8\linewidth,height=4.4cm,domain=2:25,samples=100,
+  xlabel={khoảng cách \(Z\) (m)},ylabel={sai số độ sâu (m)},
+  label style={font=\footnotesize},tick label style={font=\scriptsize},
+  legend style={font=\scriptsize,at={(0.02,0.98)},anchor=north west,draw=rulecol},ymin=0,ymax=13]
+\addplot[inkblue,very thick] {x^2/50};
+\addlegendentry{\(B=0{,}1\) m}
+\addplot[steel,dashed,thick] {x^2/250};
+\addlegendentry{\(B=0{,}5\) m}
+\end{axis}
+\end{tikzpicture}
+\caption{Sai số độ sâu ứng với một pixel sai lệch thị sai, với \(f=500\) pixel. Quan hệ bình phương nghĩa là mọi hệ stereo đều có một ``tầm dùng được'' rất rõ; ngoài tầm đó, con số độ sâu trả về vẫn có nhưng không còn nghĩa. Đây là lý do một hệ stereo đường cơ sở ngắn không dùng được cho vật ở xa dù thuật toán khớp điểm hoàn hảo.}
+\label{fig:sai-so-do-sau}
+\end{figure}
+
+\begin{mach}[Mạch 3 --- khôi phục 3D: mỗi bước gỡ một nút thắt và tạo một nút mới]
+\item \vd{một ảnh không cho biết độ sâu.} \gp chụp thêm ảnh thứ hai từ vị trí khác và dùng ràng buộc epipolar. \gd cảnh cứng và có tịnh tiến giữa hai lần chụp. \gia mất thang đo tuyệt đối nếu chỉ có một camera; phải ghép điểm được, tức cảnh phải có kết cấu.
+\item \vd{ghép điểm luôn có một tỉ lệ ghép sai.} \gp bọc mọi ước lượng trong RANSAC. \gia chi phí tăng, và có ngưỡng phải chọn; ngưỡng quá chặt thì loại cả điểm đúng, quá lỏng thì mô hình sai vẫn được chấp nhận.
+\item \vd{hai view cho kết quả nhiễu và không nhất quán toàn cục.} \gp gộp nhiều view lại và tinh chỉnh đồng thời --- đúng là \vn{hiệu chỉnh chùm tia}{bundle adjustment}, và \repo{COLMAP} \cite{schoenberger2016colmap} là bản cài đặt tham chiếu. \gia bài toán tối ưu lớn, cần khởi tạo tốt, và vẫn nhập nhằng thang đo nếu không có đường cơ sở thật hay cảm biến khác.
+\item \vd{cảnh không có kết cấu, hoặc chỉ có một ảnh, hoặc không biết \(K\).} \gp thay ràng buộc hình học bằng prior học từ dữ liệu --- độ sâu đơn ảnh \cite{ranftl2022midas}, hoặc dòng hồi quy trực tiếp bản đồ điểm từ ảnh không cần nội tại như DUSt3R \cite{wang2024dust3r}. \gia kết quả chỉ đáng tin trong phạm vi phân phối dữ liệu huấn luyện, và mô hình \emph{không} báo cho bạn biết khi nó ra ngoài phạm vi đó --- nó vẫn trả về một con số trông hợp lý.
+\end{mach}
+
+\subsection{D. Giới hạn và trường hợp hỏng}
+\begin{itemize}
+\item \textbf{Nhập nhằng thang đo là định luật, không phải khuyết điểm.} Một camera đơn không bao giờ tự cho ra mét. Mọi hệ thống trông như làm được điều đó đều đang mượn thông tin từ nơi khác: IMU, bánh xe, chiều cao camera đã biết, hay kích thước điển hình của vật thể học từ dữ liệu.
+\item \textbf{Rolling shutter phá giả định ``một ảnh ứng với một tư thế''} vì mỗi hàng pixel chụp ở một thời điểm khác nhau; hiệu ứng này lớn hẳn lên khi camera quay nhanh, và làm cả hiệu chuẩn lẫn tam giác hoá lệch có hệ thống.
+\item \textbf{Undistort và warp là phép lấy mẫu lại,} nên chúng chịu đúng bài toán aliasing ở \ptr{A/01/04}: warp ảnh nhiều lần liên tiếp làm mờ tích luỹ; nên gộp các phép biến đổi thành một rồi lấy mẫu một lần.
+\item \textbf{Mô hình học được che giấu cấu hình suy biến.} Hình học cổ điển thất bại một cách \emph{ồn ào} --- ma trận suy biến, RANSAC không tìm đủ inlier. Mô hình học được thất bại một cách \emph{im lặng}: nó vẫn trả về độ sâu cho một bức tường trắng trơn. Với hệ thống an toàn thì đây là khác biệt quan trọng nhất giữa hai cách tiếp cận, và là lý do người ta vẫn giữ một tầng kiểm tra hình học phía sau mô hình.
+\lk{E}{đối lập với}{ước lượng bất định và \en{conformal prediction} tồn tại để mô hình học được cũng biết ``hỏng ồn ào'' như hình học cổ điển}
+
+\end{itemize}
+
+\begin{cambay}
+Resize ảnh mà quên cập nhật \(K\) là bug im lặng phổ biến nhất khi ghép mạng vào pipeline hình học. Nó không gây exception và không làm loss tăng vọt. Nó chỉ làm mọi phép chiếu lệch một hệ số không đổi. Triệu chứng hiện ra ở tận cuối chuỗi, dưới dạng ``quỹ đạo bị co lại'' hay ``độ sâu sai một hệ số''. Phép kiểm rẻ nhất: chiếu vài điểm 3D đã biết xuống ảnh đã biến đổi và nhìn bằng mắt xem chúng có rơi đúng chỗ không, trước khi tin bất kỳ con số nào phía sau.
+\end{cambay}
+
+\begin{cannho}
+Camera đo tia, không đo điểm. Độ sâu bị xoá ngay lúc chụp, và chỉ mua lại được bằng một điểm nhìn thứ hai hoặc bằng prior. Và \(K\) gắn với hệ toạ độ pixel --- mọi resize, crop, letterbox, lật đều phải cập nhật nó. \T{1}
+\end{cannho}
+
+\subsection{E. Kết nối}
+Mục này dùng trực tiếp toạ độ đồng nhất và \(SE(3)\) từ \ptr{A/01/04}, và phần lấy mẫu của mục đó giải thích vì sao undistort làm mờ ảnh. Nó là tiền đề của \ptr{A/02/04}, nơi các cảm biến khác được so sánh chính bằng ``chúng đo trực tiếp cái gì mà camera phải suy ra''. Theo chiều ngang, đây là nền của toàn bộ nhánh 3D ở \code{C}: ước lượng độ sâu, dựng lại cảnh, biểu diễn trường bức xạ \cite{mildenhall2020nerf}. Tất cả các phương pháp đó đều bắt đầu bằng một bước ước lượng tư thế bằng hình học cổ điển. Sách nền đầy đủ: \cite{hartley2004}, và bản trình bày dễ vào hơn ở \cite{szeliski2022}.
+
+\begin{tukiem}
+\item Bạn resize ảnh còn một nửa rồi crop \(64\) pixel từ mép trái --- ma trận nội tại mới bằng bao nhiêu, và bước nào không làm đổi tiêu cự?
+\item Vì sao homography chỉ đúng cho cảnh phẳng hoặc camera xoay tại chỗ, và nếu áp nó cho cảnh có độ sâu thì sai lệch hiện ra ở đâu?
+\item Với \(f=500\) pixel và \(B=0{,}1\) m, sai số độ sâu ứng với một pixel thị sai ở khoảng cách 20 m là bao nhiêu, và điều đó đặt giới hạn gì lên thiết kế hệ stereo?
+\item Camera chỉ xoay tại chỗ giữa hai lần chụp --- tam giác hoá hỏng ở chỗ nào, và vì sao đây lại là cấu hình rất hay gặp trong dữ liệu thật?
+\item Một mạng ước lượng độ sâu đơn ảnh không vi phạm định luật vật lý nào --- vậy thông tin về độ sâu mà nó dùng đến từ đâu, và điều đó dự báo nó hỏng ở loại cảnh nào?
+\item Vì sao hình học cổ điển ``hỏng ồn ào'' còn mô hình học được ``hỏng im lặng'', và hệ quả với thiết kế một hệ thống an toàn là gì?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

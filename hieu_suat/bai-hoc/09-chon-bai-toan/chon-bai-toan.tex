@@ -1,0 +1,76 @@
+% ============================================================================
+%  09-chon-bai-toan — Chọn bài toán và chiến lược dài hạn
+%  Ngày tạo: 2026-09-09 | Sửa gần nhất: 2026-09-09 | Ôn gần nhất: chưa
+%  Dependency: 02, 08. Mức độ: BIẾT LÀ CÓ — bằng chứng yếu nhất trong cả bài học.
+% ============================================================================
+\documentclass[../hieu-suat.tex]{subfiles}
+\begin{document}
+\chapter{Chọn bài toán: chương có hệ quả lớn nhất và bằng chứng yếu nhất}
+\ptrtarget{09}\ptrtarget{09-chon-bai-toan}
+\dependency{\ptr{02}, \ptr{08}. Đọc chương này như bản đồ địa hình, không phải như chỉ dẫn --- lý do ở mục cuối.}
+
+\begin{tomtat}
+Không có thí nghiệm gán ngẫu nhiên nào về việc chọn đề tài nghiên cứu, và sẽ không bao giờ có. Vì vậy chương này chỉ gồm quan sát của người trong nghề, mô hình thống kê trên dữ liệu lịch sử, và vài hệ quả suy ra từ các chương trước --- tôi ghi rõ nhãn cho từng loại. Ba ý đáng mang theo: hiệu suất tích luỹ theo kiểu lãi kép nên chênh lệch nhỏ và đều quan trọng hơn nỗ lực dồn dập; số công trình chất lượng cao có xu hướng là hàm của tổng số công trình hoàn thành, nên hoàn thành nhiều lần thử là một chiến lược chứ không phải sự thiếu tập trung; và tín hiệu chấp nhận của hội nghị quá nhiễu để dùng làm la bàn.
+\end{tomtat}
+
+\begin{khoigoi}
+\h{Làm việc chăm hơn 10\% thì hơn được bao nhiêu về dài hạn?}
+\h{Nên làm ít dự án cho thật kỹ, hay hoàn thành nhiều lần thử?}
+\h{Một bài bị từ chối nói lên điều gì về chất lượng ý tưởng?}
+\end{khoigoi}
+
+\section{Quan sát của người trong nghề}
+
+Bài nói của Hamming \cite{hamming1986} là nguồn được trích nhiều nhất về chủ đề này. Ông xuất phát từ câu hỏi vì sao rất ít nhà khoa học tạo ra đóng góp lớn, dựa trên ba mươi năm quan sát ở Bell Labs, phỏng vấn đồng nghiệp và đọc tiểu sử các nhà khoa học lớn. Ba luận điểm chính \nT{} --- và cần nhớ đây là quan sát cá nhân, không phải nghiên cứu có đối chứng: tri thức và năng suất tích luỹ như \emph{lãi kép}, nên hai người năng lực tương đương mà một người làm nhiều hơn mười phần trăm thì về lâu dài chênh lệch sản phẩm lớn hơn gấp đôi; phần lớn người làm khoa học không dành thời gian cho \emph{những bài toán quan trọng} của lĩnh vực mình, và điều đó là lựa chọn chứ không phải số phận; và cánh cửa mở --- làm việc theo cách để người khác dễ đến trao đổi --- tương quan với đóng góp lớn.
+
+\begin{cambay}
+Con số ``hơn 10\% thì gấp đôi'' là một minh hoạ tu từ về lãi kép, không phải một phép đo \nM{}. Trích nó như bằng chứng định lượng là đúng kiểu sai lầm mà chương \ptr{01} cảnh báo. Điều đáng giữ là \emph{dạng} của lập luận: nếu năng lực hôm nay quyết định tốc độ học ngày mai thì chênh lệch nhỏ và đều sẽ tích luỹ phi tuyến.
+\end{cambay}
+
+\section{Số lượng và chất lượng}
+
+Simonton \cite{simonton1997} xây một mô hình về quỹ đạo sự nghiệp sáng tạo, trong đó có \emph{quy tắc cơ hội ngang nhau}: số công trình được coi là xuất sắc có quan hệ tuyến tính với tổng số công trình một người tạo ra trong cùng thời kỳ, tức là tỉ lệ trúng trung bình khá ổn định và không tăng theo kinh nghiệm \nT{}. Đây là mô hình trên dữ liệu lịch sử, không phải can thiệp, và quy tắc này vẫn đang được tranh luận trong tài liệu về sáng tạo.
+
+Nếu quy tắc đó gần đúng, hệ quả thực hành là \nM{}: cách tăng số kết quả tốt không phải là cố chọn ``đúng'' ngay từ đầu --- vì tỉ lệ trúng khá ổn định --- mà là tăng số lần \emph{hoàn thành} một chu trình đầy đủ, đồng thời giảm chi phí mỗi lần thử. Điều này khớp với luận điểm gốc ở chương \ptr{02}: cái đếm được là số vòng phản hồi đã đóng.
+
+\section{Đừng lấy la bàn từ một tín hiệu nhiễu}
+
+Chương \ptr{08} đã cho con số: khoảng một nửa phương sai điểm phản biện là chủ quan, và chỉ khoảng một nửa bài được nhận sống sót ở một hội đồng độc lập khác \cite{cortes2021} \nD{}. Hệ quả cho việc chọn hướng \nM{}: một lần từ chối gần như không mang thông tin về giá trị của hướng đi, còn một lần chấp nhận cũng vậy. Tín hiệu đáng cập nhật niềm tin là kết quả tái lập được và việc người khác dùng lại công trình của mình.
+
+Ioannidis \cite{ioannidis2005} thêm một yếu tố ít được nhắc khi chọn đề tài: xác suất một phát hiện là đúng giảm khi có \emph{nhiều nhóm cùng đuổi theo cùng một hiệu ứng nóng}, vì khi đó khả năng ai đó đạt ngưỡng ý nghĩa nhờ may mắn tăng lên \nT{}. Suy ra \nM{}: một mảng ít đông đúc không chỉ dễ tạo đóng góp mới hơn, mà kết quả thu được ở đó còn có xác suất đúng cao hơn --- một lý do kỹ thuật, chứ không phải lý do tâm lý, để tránh đi theo đám đông.
+
+\section{Nguồn của hướng đi mới}
+
+Chương \ptr{06} đã cho dữ liệu: trong lab thật, kết quả bất ngờ xảy ra gần ngang kết quả đúng dự đoán, và chúng nhận được nhiều suy luận hơn hẳn từ cả người trình bày lẫn nhóm \cite{dunbar1997} \nD{}. Nói cách khác, nguồn đề tài mới giàu nhất không nằm ở việc đọc thêm để tìm khoảng trống, mà nằm trong chính những chỗ dữ liệu của mình không khớp dự đoán --- với điều kiện chúng được ghi lại thay vì bị sửa cho hết.
+
+\begin{cannho}
+Ba nguồn để chọn việc tiếp theo, theo thứ tự độ tin cậy của bằng chứng \nM{}: \textbf{(1)} chỗ dữ liệu của chính mình mâu thuẫn với dự đoán \cite{dunbar1997}; \textbf{(2)} khoảng trống lộ ra khi tổng hợp tài liệu theo cột (xem \code{../research-rules.md} mục 6); \textbf{(3)} phán đoán về ``bài toán quan trọng'' \cite{hamming1986} --- giá trị cao nhưng bằng chứng yếu nhất.
+\end{cannho}
+
+\section{Vì sao chương này phải đọc dè dặt}
+
+Toàn bộ chương dựa trên quan sát và mô hình tương quan; không có can thiệp gán ngẫu nhiên nào, và chọn mẫu thì thiên lệch nặng về phía người đã thành công (chúng ta không phỏng vấn những người làm y hệt vậy mà thất bại). Theo chuẩn ở chương \ptr{01}, mức phản ứng hợp lý là dùng nó để đặt câu hỏi cho chính mình, không phải để bắt chước một nếp làm việc \nM{}.
+
+\begin{traloi}
+\tl{Không ai đo. Lập luận lãi kép của Hamming \cite{hamming1986} là một cách nói về tích luỹ phi tuyến, không phải một phép đo --- và phải đọc đúng như vậy.}
+\tl{Bằng chứng nghiêng về phía hoàn thành nhiều chu trình: số công trình xuất sắc có xu hướng tỉ lệ với tổng số công trình \cite{simonton1997} \nT{}; kết hợp với \ptr{02}, việc cần tối ưu là chi phí mỗi vòng lặp.}
+\tl{Rất ít. Khoảng một nửa phương sai điểm là chủ quan \cite{cortes2021}; tín hiệu đáng tin là tái lập được và được dùng lại.}
+\end{traloi}
+
+\begin{tukiem}
+\item Vì sao con số ``10\% nhiều hơn thì gấp đôi sản phẩm'' không được phép trích như bằng chứng?
+\item Quy tắc cơ hội ngang nhau nói gì, và nó dẫn tới khuyến nghị thực hành nào khi kết hợp với chương \ptr{02}?
+\item Nêu ba nguồn để chọn việc tiếp theo, xếp theo độ tin cậy của bằng chứng.
+\item Vì sao chọn một mảng ít đông đúc lại làm tăng xác suất kết quả của bạn là đúng \cite{ioannidis2005}?
+\end{tukiem}
+
+\begin{onbai}
+\ar[2]{Lãi kép}{Năng lực hôm nay quyết định tốc độ học ngày mai \(\Rightarrow\) chênh lệch nhỏ và đều tích luỹ phi tuyến \cite{hamming1986} \nT{}.}
+\ar[2]{Quy tắc cơ hội ngang nhau}{Số công trình xuất sắc tỉ lệ với tổng số công trình; tỉ lệ trúng khá ổn định \cite{simonton1997}.}
+\ar[3]{Phản biện không phải la bàn}{Một lần từ chối hay chấp nhận mang rất ít thông tin \cite{cortes2021}.}
+\ar[2]{Mảng đông đúc}{Nhiều nhóm đuổi cùng một hiệu ứng \(\Rightarrow\) xác suất phát hiện đúng giảm \cite{ioannidis2005}.}
+\ar[3]{Nguồn đề tài giàu nhất}{Chỗ dữ liệu của chính mình không khớp dự đoán \cite{dunbar1997}.}
+\ar[1]{Cảnh báo phương pháp}{Cả chương là quan sát và tương quan, mẫu thiên lệch về người đã thành công.}
+\end{onbai}
+
+\end{document}

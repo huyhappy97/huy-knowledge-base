@@ -1,0 +1,66 @@
+% ============================================================================
+%  C/00-map.tex — bản đồ phần C
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../algorithm.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ phần C --- Chiến lược thiết kế}
+
+\begin{tomtat}
+Tám chương, tám khuôn tư duy, và mỗi khuôn có một \emph{dấu hiệu nhận biết} trên đề bài. Bản đồ này liệt kê tám dấu hiệu đó thành bảng để dùng lúc đang bí. Chuỗi phụ thuộc: 13 \(\rightarrow\) 14 \(\rightarrow\) 16 là mạch chính; 15 nên đọc ngay trước 16 để thấy ranh giới giữa tham lam và quy hoạch động; 17 là điều kiện tiên quyết của 18; 19 và 20 độc lập, đọc sớm được và nên đọc sớm.
+\end{tomtat}
+
+\subsection*{A. Bảng dấu hiệu: đề bài nói gì \(\rightarrow\) thử khuôn nào}
+\begin{center}\footnotesize
+\begin{tabularx}{\linewidth}{@{}L{5.6cm}L{2.2cm}Y@{}}
+\toprule
+\textbf{Dấu hiệu trên đề} & \textbf{Chương} & \textbf{Vì sao}\\
+\midrule
+\(n \le 20\text{--}25\), hỏi ``có tồn tại cách nào'' & 13 & không gian \(2^n\) còn duyệt nổi\\
+Bài chia đôi mà hai nửa không ảnh hưởng nhau & 14 & truy hồi \(T(n)=2T(n/2)+f(n)\)\\
+Xếp lịch, chọn nhiều nhất, luôn có ``cái tốt nhất hiện tại'' & 15 & thử đổi chỗ để chứng minh an toàn\\
+Đếm số cách, giá trị tối ưu, có trạng thái nhỏ & 16 & con bài toán lặp lại\\
+Quan hệ đôi một, đường đi, phụ thuộc & 17 & phát biểu lại thành đồ thị\\
+Phân công, sức chứa, ``mỗi bên dùng một lần'' & 18 & luồng cực đại hoặc ghép đôi\\
+``Nhỏ nhất của giá trị lớn nhất'', đáp án đơn điệu & 19 & nhị phân trên đáp án\\
+Bài tất định rắc rối, chỉ cần đúng với xác suất cao & 20 & ngẫu nhiên hoá\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection*{B. Vì sao chia như vậy}
+Tám khuôn này không phải tám chủ đề rời rạc mà là một cây quyết định. Gốc cây luôn là vét cạn: viết ra lời giải chậm nhưng chắc chắn đúng, rồi hỏi \emph{tại sao nó chậm}. Nếu chậm vì tính lại cùng một thứ nhiều lần, đi hướng quy hoạch động. Nếu chậm vì duyệt những nhánh chắc chắn không tối ưu, đi hướng tham lam hoặc cắt tỉa. Nếu chậm vì bài toán bị nhìn sai dạng, đi hướng mô hình hoá thành đồ thị hoặc luồng. Cách chia này giữ nguyên mạch suy nghĩ thật khi giải bài, thay vì trình bày tám thuật toán như tám hòn đảo.
+
+\subsection*{C. Phụ thuộc và thứ tự đọc}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.55cm and 0.9cm,
+  m/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=2.55cm},
+  o/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=2.55cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  ard/.style={-{Latex[length=2.2mm]},draw=tiercol,thick,dashed},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.2cm}]
+\node[m] (c13) {\textbf{13.} Vét cạn,\\quay lui};
+\node[m,right=of c13] (c14) {\textbf{14.} Chia\\để trị};
+\node[m,right=of c14] (c15) {\textbf{15.} Tham lam};
+\node[m,right=of c15] (c16) {\textbf{16.} Quy hoạch\\động};
+\node[m,below=1.0cm of c14] (c17) {\textbf{17.} Đồ thị};
+\node[m,right=of c17] (c18) {\textbf{18.} Luồng và\\ghép đôi};
+\node[o,left=of c17] (c19) {\textbf{19.} Tìm kiếm\\trên đáp án};
+\node[o,right=of c18] (c20) {\textbf{20.} Ngẫu\\nhiên hoá};
+\draw[ar] (c13) -- node[lb,above=0pt] {bỏ nhánh vô ích} (c14);
+\draw[ar] (c14) -- node[lb,above=0pt] {chọn cục bộ} (c15);
+\draw[ar] (c15) -- node[lb,above=0pt] {khi tham lam sai} (c16);
+\draw[ar] (c17) -- node[lb,above=0pt] {mở rộng mô hình} (c18);
+\draw[ar] (c16.south) -- node[lb,right=1pt,text width=1.9cm] {DP trên đồ thị} (c18.north);
+\draw[ard] (c13.south) -- (c17.north);
+\draw[ard] (c19) -- (c17);
+\draw[ard] (c20) -- (c18);
+\end{tikzpicture}
+\caption{Phụ thuộc giữa tám chương của phần C. Mạch trên là mạch ``khai thác cấu trúc đệ quy''; mạch dưới là mạch ``mô hình hoá''. Hai chương tô tím là công cụ cắt ngang, dùng được cho cả hai mạch.}
+\label{fig:map-C}
+\end{figure}
+
+\subsection*{D. Cốt lõi hay tham khảo}
+\textbf{Cốt lõi:} toàn bộ chương 15, 16, 17 và 19 --- bốn chương này chiếm tỉ lệ áp đảo trong mọi kỳ thi, phỏng vấn và cả công việc thật. Trong chương 13, phần cắt tỉa và gặp nhau ở giữa. Trong chương 14, phần đọc hệ thức truy hồi. \textbf{Tham khảo:} luồng chi phí nhỏ nhất và Hungarian ở chương 18; các tối ưu quy hoạch động nâng cao (divide and conquer optimization, Knuth optimization) ở chương 16; các thuật toán ngẫu nhiên chuyên sâu ở chương 20.
+\par\medskip Để đối chiếu cách chọn, xem hình đổi chỗ ở \ptr{C/15}, chiều duyệt ba lô ở \ptr{C/16}, phản ví dụ BFS/Dijkstra ở \ptr{C/17}, cạnh dư ngược ở \ptr{C/18} và vết chạy tìm kiếm đáp án ở \ptr{C/19}.
+\end{document}

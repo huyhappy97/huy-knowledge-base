@@ -1,0 +1,368 @@
+% ---------------------------------------------------------------------------
+% Chương 3 — Lie group và tối ưu trên đa tạp
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-13  |  Ôn gần nhất: —
+% Phụ thuộc: A/01 (phép chiếu, tư thế), A/02 (chuỗi pixel <- tia)
+% Mức độ: XƯƠNG SỐNG. Không có chương này thì mọi Jacobian ở A/04, B/09, C/14 là hộp đen.
+% Kiểm chứng công thức lõi:
+%   (1) Rodrigues: exp([phi]_x) = I + sin(t)/t [phi]_x + (1-cos t)/t^2 [phi]_x^2
+%       — cửa (a) tự dẫn từ [phi]_x^3 = -t^2 [phi]_x; cửa (b) ví dụ số mục 3C (quay 90 quanh z).
+%   (2) d(R p)/d(delta phi) = -[R p]_x với nhiễu loạn TRÁI
+%       — cửa (a) tự dẫn bằng khai triển bậc nhất; cửa (b) kiểm số ở mục 4B.
+%   (3) Adjoint: exp(Ad_T xi) = T exp(xi) T^{-1} — cửa (c) sola2018microlie, barfoot2017.
+%   (4) Jacobian của phần dư chiếu theo tư thế (2x6) — cửa (a) dẫn bằng quy tắc chuỗi ở mục 5.
+%   (5) Sim(3) có 7 bậc tự do (3+3+1) — cửa (a) đếm; cửa (c) strasdat2010scaledrift.
+% Ghi chú trung thực: mọi số trong chương là ký hiệu toán hoặc ví dụ tự đặt tính tay.
+%   KHÔNG có con số thực nghiệm nào.
+% ---------------------------------------------------------------------------
+\documentclass[../../vslam.tex]{subfiles}
+\begin{document}
+\chapter{Lie group và tối ưu trên đa tạp (Lie Groups and Manifold Optimization)}
+\ptrtarget{A/03}\ptrtarget{A/03-lie-group-va-toi-uu-tren-da-tap}
+\dependency{\ptr{A/01-hinh-hoc-da-thi} (tư thế \((R,\mathbf{t})\), phép chiếu); \ptr{A/02-mo-hinh-camera} (chuỗi từ điểm \(3\)D tới pixel --- chương này tính đạo hàm của đúng chuỗi đó). Chương tương ứng ở cây quán tính là \code{../IMU\_Fusion/} chương 2, nói kỹ hơn về \(SE_2(3)\) và bộ lọc bất biến; chỗ nào cây đó đã nói sâu thì ở đây chỉ nhắc.}
+
+\begin{tomtat}
+Chương này giải quyết một vấn đề mà hai chương trước đã dựng ra nhưng không giải được: tư thế camera \emph{không phải một véctơ}. Ma trận xoay có chín số nhưng chỉ ba bậc tự do, và chín số ấy bị ràng buộc bởi \(R^{\top}R = I\) --- một ràng buộc phi tuyến mà mọi bộ tối ưu không ràng buộc sẽ phá vỡ ngay ở bước đầu tiên. Chương giải quyết bằng cách dựng đúng bộ công cụ tối thiểu: nhóm Lie \(SO(3)\), \(SE(3)\), \(Sim(3)\) và đại số Lie tương ứng; ánh xạ \(\exp\) và \(\log\) nối hai thế giới; phép nhiễu loạn trái và phải; toán tử \(\boxplus\) và \(\boxminus\) biến một bước tối ưu thành một phép toán hợp lệ trên đa tạp; và Adjoint để chuyển nhiễu loạn giữa hai phía. Đích đến cụ thể và kiểm được: tự dẫn ra Jacobian \(2\times 6\) của phần dư chiếu theo tư thế camera, vì đó là khối xây dựng của mọi thứ ở \ptr{A/04} và \ptr{B/09}. Nếu chỉ nhớ một điều: \emph{ta không cộng vào tư thế, ta nhân một nhiễu loạn nhỏ vào nó} --- và toàn bộ phần còn lại là hệ quả kỹ thuật của câu đó.
+\end{tomtat}
+
+\begin{nentang}
+\kn{nhóm (group)}{một tập hợp với phép toán kết hợp có phần tử đơn vị và phần tử nghịch đảo. Tập các phép xoay là một nhóm: hợp hai phép xoay là một phép xoay, có phép xoay không, và mọi phép xoay đảo ngược được.}
+\kn{đa tạp (manifold)}{một không gian mà \emph{cục bộ} trông như không gian Euclid, nhưng toàn cục thì không. Mặt cầu là ví dụ chuẩn: quanh mỗi điểm nó phẳng như một tờ giấy, nhưng không có cách nào trải cả mặt cầu ra một tờ giấy.}
+\kn{nhóm Lie (Lie group)}{một nhóm đồng thời là một đa tạp trơn, với phép nhân và phép nghịch đảo trơn. \(SO(3)\) và \(SE(3)\) là hai ví dụ mà cả cây này dùng.}
+\kn{đại số Lie (Lie algebra)}{không gian tiếp tuyến của nhóm tại phần tử đơn vị --- một không gian \emph{véctơ} thật sự, nên cộng trừ được thoải mái. Với \(SO(3)\) nó là \(\mathfrak{so}(3)\), đồng nhất với \(\mathbb{R}^3\) qua toán tử \([\cdot]_\times\).}
+\kn{ánh xạ mũ (exponential map)}{phép biến một phần tử của đại số Lie (véctơ nhỏ, cộng được) thành một phần tử của nhóm (phép xoay, nhân được). Với \(SO(3)\) nó chính là công thức Rodrigues.}
+\kn{nhiễu loạn (perturbation)}{một phần tử nhóm rất gần đơn vị, dùng để biểu diễn một thay đổi nhỏ. Nhân nó vào bên trái hay bên phải cho hai quy ước khác nhau, và trộn hai quy ước là nguồn lỗi dấu phổ biến nhất trong lĩnh vực.}
+\kn{Adjoint}{ma trận chuyển một nhiễu loạn từ phía này sang phía kia: \(T \exp(\boldsymbol{\xi}^\wedge) = \exp((\mathrm{Ad}_T\boldsymbol{\xi})^\wedge)\,T\). Nó là công cụ để đổi giữa quy ước trái và phải mà không phải dẫn lại từ đầu.}
+\kn{retraction}{phép ánh xạ một bước đi trong không gian tiếp tuyến trở về đa tạp. Với nhóm Lie, \(\exp\) là một retraction tự nhiên và chính xác; với đa tạp tổng quát người ta dùng xấp xỉ rẻ hơn.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Bạn tham số hoá tư thế bằng chín phần tử của \(R\) và chạy Gauss-Newton. Sau mười vòng lặp, \(\det R = 0{,}94\). Chuyện gì đã xảy ra về mặt hình học, và vì sao ``chuẩn hoá lại sau mỗi bước'' là một cách chữa tồi chứ không phải một cách chữa tốt?}
+\h{Euler angle có đúng ba số cho ba bậc tự do --- tham số hoá tối thiểu, nghe như lựa chọn đúng. Vì sao không ai dùng nó trong bộ tối ưu SLAM, và hiện tượng gimbal lock thực chất là phát biểu gì về đa tạp?}
+\h{Nhiễu loạn trái và nhiễu loạn phải cho hai Jacobian khác nhau, khác cả dấu lẫn dạng. Hai kết quả tối ưu có khác nhau không? Nếu không thì vì sao phải chọn, và chọn sai thì hỏng ở đâu?}
+\h{Loop closure trong SLAM đơn mắt phải dùng \(Sim(3)\) chứ không phải \(SE(3)\). Bậc tự do thứ bảy đến từ đâu, và vì sao nó \emph{không} xuất hiện khi có stereo hoặc IMU?}
+\h{Jacobian của phần dư chiếu theo tư thế là một ma trận \(2\times 6\). Vì sao là \(6\) chứ không phải \(12\) hay \(16\), và con số đó nói gì về cách bộ giải nhìn bài toán?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{A/03/01}
+
+Hai chương trước dựng lên toàn bộ hình học và mô hình đo. Bây giờ đến lúc tối ưu, và ngay ở bước đầu tiên ta gặp một trở ngại mà không chương nào trước đó chuẩn bị cho.
+
+Bài toán MAP ở \ptr{A/04} sẽ có dạng quen thuộc: tìm \(\boldsymbol{\theta}\) cực tiểu hoá tổng bình phương phần dư. Gauss-Newton giải bằng cách lặp: tuyến tính hoá quanh ước lượng hiện tại, giải một hệ tuyến tính ra bước đi \(\delta\), rồi cập nhật \(\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} + \delta\). Bước cuối cùng --- phép cộng --- chính là chỗ mọi thứ vỡ.
+
+Vì tư thế camera không phải một véctơ. Nếu tôi lấy hai ma trận xoay hợp lệ và cộng chúng lại phần tử với phần tử, kết quả nói chung không phải ma trận xoay: nó không trực giao, định thức không bằng một, và nó biến một vật rắn thành một vật bị kéo méo. Tập các ma trận xoay không đóng dưới phép cộng. Nói bằng ngôn ngữ hình học: \emph{\(SO(3)\) là một mặt cong trong không gian chín chiều, và phép cộng đưa ta ra khỏi mặt}.
+
+Ai gặp bài toán này? Mọi người ước lượng hướng --- robot, hàng không, đồ hoạ, sinh học cấu trúc. Và lịch sử cho thấy ba cách chữa thiếu sót, mỗi cách hỏng theo một kiểu riêng đáng ghi nhớ.
+
+Cách thứ nhất: \emph{tham số hoá tối thiểu bằng Euler angle}. Ba số cho ba bậc tự do, cộng thoải mái. Nó hỏng vì \emph{gimbal lock} --- ở một số hướng, hai trong ba trục quay trùng nhau và mất một bậc tự do. Điều quan trọng cần hiểu là gimbal lock không phải một khiếm khuyết của cách đánh số mà là một phát biểu về topology: \(SO(3)\) không đồng phôi với bất kỳ vùng nào của \(\mathbb{R}^3\), nên \emph{mọi} tham số hoá ba số đều có kỳ dị ở đâu đó. Đổi thứ tự trục chỉ dịch chỗ kỳ dị đi, không xoá được nó.
+
+Cách thứ hai: \emph{tham số hoá dư bằng quaternion} với ràng buộc chuẩn bằng một. Không có kỳ dị, nhưng ràng buộc vẫn còn đó, và bộ tối ưu không ràng buộc vẫn phá nó. Chuẩn hoá lại sau mỗi bước thì chạy được, nhưng nó làm hỏng ma trận hiệp phương sai một cách tinh vi: hiệp phương sai bốn chiều mô tả một phân bố trong không gian bốn chiều, trong khi bất định thật chỉ có ba chiều, nên ma trận suy biến theo một hướng và nghịch đảo của nó không tồn tại. Với bộ ước lượng cần hiệp phương sai đáng tin (\ptr{A/06}), đây không phải chuyện nhỏ.
+
+Cách thứ ba: \emph{tối ưu có ràng buộc}. Đúng về nguyên tắc, nhưng nó vứt bỏ toàn bộ cấu trúc thưa mà \ptr{A/04} phụ thuộc vào, và làm bài toán chậm đi nhiều bậc độ lớn.
+
+Lời giải đúng gọn hơn cả ba, và nó là một trong những ý tưởng đẹp nhất trong cây. Đừng cộng vào tư thế --- \emph{nhân một nhiễu loạn nhỏ vào nó}. Nhiễu loạn được tham số hoá bằng một véctơ ba chiều (cộng trừ thoải mái, không kỳ dị vì nó luôn ở gần không), và phép nhân giữ ta ở đúng trên đa tạp. Bộ tối ưu làm việc trong không gian véctơ của nhiễu loạn; đa tạp chỉ xuất hiện ở bước cập nhật. Toàn bộ chương này là việc làm cho ý tưởng ấy chặt chẽ và tính ra được các đạo hàm cần thiết.
+
+\begin{trucgiac}
+Hình dung \(SO(3)\) là bề mặt của một quả cầu (không hoàn toàn đúng về topology, nhưng đúng về cái ta cần). Mỗi điểm trên mặt cầu là một hướng khả dĩ của camera.
+
+Bây giờ bạn đang ở một điểm và muốn đi tới điểm tốt hơn. Cộng một véctơ vào toạ độ \(3\)D của điểm hiện tại sẽ đưa bạn ra khỏi mặt cầu --- vào trong ruột hoặc ra ngoài không gian. Đó chính là điều xảy ra khi cộng vào ma trận xoay.
+
+Cách đúng: đặt một tờ giấy \emph{tiếp xúc} với mặt cầu tại chỗ bạn đang đứng. Trên tờ giấy đó, mọi thứ là hình học phẳng thông thường --- cộng véctơ, tính đạo hàm, giải hệ tuyến tính, tất cả đều hợp lệ. Bạn quyết định đi đâu \emph{trên tờ giấy}, rồi \emph{cuộn} tờ giấy trở lại mặt cầu để biết mình thật sự đến điểm nào. Phép cuộn ấy là \(\exp\); tờ giấy là đại số Lie; và việc đặt lại tờ giấy tại điểm mới sau mỗi bước là lý do mỗi vòng lặp Gauss-Newton phải tính lại Jacobian.
+
+Hai chi tiết đáng giữ. Một: tờ giấy chỉ xấp xỉ tốt \emph{gần} chỗ tiếp xúc, nên bước đi phải nhỏ --- đó chính là lý do trust region ở \ptr{A/04} tồn tại. Hai: có hai cách dán tờ giấy vào mặt cầu, ứng với nhiễu loạn trái và phải, và chúng cho hai hệ toạ độ khác nhau trên cùng tờ giấy. Kết quả cuối trùng nhau, nhưng công thức trung gian --- và ma trận hiệp phương sai --- thì không.
+\end{trucgiac}
+
+\section{\(SO(3)\): xoay}
+\ptrtarget{A/03/02}
+
+\subsection{A. Nhóm và đại số của nó}
+
+\[
+SO(3) \;=\; \{\, R \in \mathbb{R}^{3\times 3} \;:\; R^{\top}R = I,\ \det R = +1 \,\}.
+\]
+
+Điều kiện \(R^{\top}R = I\) là sáu phương trình độc lập (ma trận \(R^\top R\) đối xứng nên chỉ có sáu phần tử độc lập), nên từ chín tham số còn lại ba bậc tự do. Điều kiện \(\det R = +1\) loại phản xạ; nó không giảm thêm chiều mà chỉ chọn một trong hai thành phần liên thông.
+
+Đại số Lie \(\mathfrak{so}(3)\) là không gian tiếp tuyến tại \(I\). Lấy một đường cong \(R(t)\) trong nhóm với \(R(0) = I\), đạo hàm ràng buộc \(R^{\top}R = I\) theo \(t\) tại \(t=0\):
+\[
+\dot{R}^{\top}(0) + \dot{R}(0) = 0 ,
+\]
+tức \(\dot R(0)\) là ma trận \emph{phản đối xứng}. Vì sao bước này hợp lệ? Vì mọi đường cong nằm trong nhóm phải thoả ràng buộc tại mọi \(t\), nên đạo hàm của ràng buộc cũng phải bằng không --- đây là cách chuẩn để tìm không gian tiếp tuyến của một tập được định nghĩa bởi phương trình.
+
+Ma trận phản đối xứng \(3\times 3\) có đúng ba tham số độc lập, khớp với ba bậc tự do, và ta đồng nhất chúng với \(\mathbb{R}^3\) qua
+
+\[
+[\boldsymbol{\phi}]_\times \;=\;
+\begin{pmatrix} 0 & -\phi_3 & \phi_2 \\ \phi_3 & 0 & -\phi_1 \\ -\phi_2 & \phi_1 & 0 \end{pmatrix},
+\qquad
+[\boldsymbol{\phi}]_\times\, \mathbf{v} = \boldsymbol{\phi} \times \mathbf{v}.
+\]
+
+Ý nghĩa vật lý của \(\boldsymbol{\phi}\) đáng nói rõ vì nó làm mọi thứ sau dễ nhớ: \emph{hướng của nó là trục quay, độ lớn là góc quay tính bằng radian}. Đây là biểu diễn trục--góc, và nó là biểu diễn tự nhiên nhất của một phép xoay nhỏ.
+
+\subsection{B. Rodrigues: từ đại số sang nhóm}
+
+Ánh xạ mũ định nghĩa bằng chuỗi luỹ thừa \(\exp(A) = \sum_k A^k/k!\), nhưng với \([\boldsymbol{\phi}]_\times\) chuỗi ấy có dạng đóng, và việc tự dẫn nó là một bài tập đáng làm một lần.
+
+Đặt \(\vartheta = \|\boldsymbol{\phi}\|\) và \(\mathbf{a} = \boldsymbol{\phi}/\vartheta\). Tính chất then chốt là \([\mathbf{a}]_\times^3 = -[\mathbf{a}]_\times\) (kiểm trực tiếp bằng nhân ma trận, hoặc bằng đồng nhất thức \(\mathbf{a}\times(\mathbf{a}\times(\mathbf{a}\times\mathbf{v})) = -\mathbf{a}\times\mathbf{v}\) khi \(\|\mathbf{a}\|=1\)). Nhờ nó, mọi luỹ thừa bậc cao rút về bậc một và bậc hai, chuỗi tách thành hai chuỗi quen thuộc, và ta được
+
+\begin{equation}
+\exp([\boldsymbol{\phi}]_\times) \;=\; I \;+\; \frac{\sin\vartheta}{\vartheta}[\boldsymbol{\phi}]_\times \;+\; \frac{1-\cos\vartheta}{\vartheta^2}[\boldsymbol{\phi}]_\times^2 .
+\label{eq:a03-rodrigues}
+\end{equation}
+
+Đây là công thức Rodrigues. Tôi tự dẫn lại được toàn bộ (cửa a) và đối chiếu với \cite[§7.1]{barfoot2017} cùng \cite{sola2018microlie} (cửa c).
+
+Hai điều đáng ghi. Thứ nhất, \emph{kỳ dị số học tại \(\vartheta \to 0\)}: hai hệ số có dạng \(0/0\). Giới hạn tồn tại và hữu hạn (\(\sin\vartheta/\vartheta \to 1\), \((1-\cos\vartheta)/\vartheta^2 \to 1/2\)), nhưng tính trực tiếp trong số học dấu phẩy động sẽ mất độ chính xác nghiêm trọng khi \(\vartheta\) nhỏ. Mọi thư viện tốt chuyển sang khai triển Taylor dưới một ngưỡng; ngưỡng đặt ở đâu cho đúng là một câu hỏi tôi chưa trả lời được và nó nằm trong \code{99-chua-biet.md}. Thứ hai, và quan trọng hơn cho SLAM: \emph{trong bộ tối ưu, \(\vartheta\) luôn nhỏ}, vì ta chỉ dùng \(\exp\) cho nhiễu loạn. Nên trường hợp góc nhỏ không phải trường hợp biên hiếm gặp mà là trường hợp \emph{thường xuyên}, và cài đặt đúng nó không phải chuyện cầu toàn.
+
+Ánh xạ ngược \(\log\) lấy góc từ vết ma trận, \(\vartheta = \arccos\frac{\mathrm{tr}(R)-1}{2}\), rồi lấy trục từ phần phản đối xứng. Nó cũng có kỳ dị, ở \(\vartheta \to 0\) và ở \(\vartheta \to \pi\); trường hợp thứ hai hiếm trong nhiễu loạn nhưng xuất hiện khi tính \emph{sai lệch} giữa hai hướng cách xa nhau, chẳng hạn trong phần dư của pose graph ở \ptr{B/11}.
+
+\subsection{C. Ví dụ nhỏ tính tay}
+
+Lấy \(\boldsymbol{\phi} = (0, 0, \pi/2)\), tức xoay \(90^\circ\) quanh trục \(z\). Ở đây \(\vartheta = \pi/2\), \(\sin\vartheta = 1\), \(\cos\vartheta = 0\).
+
+\[
+[\boldsymbol{\phi}]_\times = \begin{pmatrix} 0 & -\pi/2 & 0 \\ \pi/2 & 0 & 0 \\ 0&0&0\end{pmatrix},
+\qquad
+[\boldsymbol{\phi}]_\times^2 = \begin{pmatrix} -\pi^2/4 & 0 & 0 \\ 0 & -\pi^2/4 & 0 \\ 0&0&0\end{pmatrix}.
+\]
+Thay vào~\eqref{eq:a03-rodrigues} với hệ số \(\sin\vartheta/\vartheta = 2/\pi\) và \((1-\cos\vartheta)/\vartheta^2 = 4/\pi^2\):
+\[
+R = I + \frac{2}{\pi}\begin{pmatrix} 0 & -\pi/2 & 0 \\ \pi/2 & 0 & 0 \\ 0&0&0\end{pmatrix}
++ \frac{4}{\pi^2}\begin{pmatrix} -\pi^2/4 & 0&0 \\ 0&-\pi^2/4&0 \\ 0&0&0\end{pmatrix}
+= \begin{pmatrix} 0 & -1 & 0 \\ 1 & 0 & 0 \\ 0&0&1\end{pmatrix}.
+\]
+Kiểm: ma trận này biến \((1,0,0)\) thành \((0,1,0)\), tức trục \(x\) quay sang trục \(y\) --- đúng là xoay \(90^\circ\) quanh \(z\) theo quy tắc bàn tay phải. Trực giao và định thức bằng một, kiểm trực tiếp. (Cửa kiểm chứng b.)
+
+\section{Nhiễu loạn: trái, phải, và vì sao phải chọn}
+\ptrtarget{A/03/03}
+
+\subsection{A. Hai quy ước}
+
+Muốn đạo hàm một hàm của \(R\), ta cần định nghĩa ``thay đổi nhỏ của \(R\)''. Có hai cách nhân một nhiễu loạn vào, và chúng \emph{không} tương đương:
+
+\[
+\text{trái: } R' = \exp([\delta\boldsymbol{\phi}]_\times)\,R,
+\qquad
+\text{phải: } R' = R\,\exp([\delta\boldsymbol{\phi}]_\times).
+\]
+
+Ý nghĩa vật lý khác nhau rõ rệt và đáng ghi nhớ theo cách này: \emph{nhiễu loạn trái là xoay thêm trong hệ toàn cục (hệ thế giới); nhiễu loạn phải là xoay thêm trong hệ cục bộ (hệ thân)}. Với một camera, nhiễu loạn phải tương ứng với ``camera tự xoay đầu nó một chút'', còn nhiễu loạn trái tương ứng với ``cả thế giới xoay quanh camera''.
+
+Hệ quả thực hành: một phép đo được biểu diễn tự nhiên trong hệ nào thì nên dùng nhiễu loạn của hệ đó, vì Jacobian sẽ gọn hơn và --- quan trọng hơn --- vì hiệp phương sai thu được sẽ diễn giải được. Với con quay hồi chuyển, vốn đo trong hệ thân, nhiễu loạn phải là tự nhiên. Với phần dư chiếu, cả hai đều dùng được và lựa chọn là thói quen thư viện: Sophus và Ceres thường dùng phải, nhiều tài liệu robot học dùng trái.
+
+\begin{cambay}
+Trộn hai quy ước trong cùng một hệ thống là nguồn lỗi dấu phổ biến nhất trong cả lĩnh vực, và nó là loại lỗi đặc biệt khó bắt.
+
+Lý do khó bắt: hệ thống \emph{vẫn hội tụ}. Gauss-Newton với Jacobian sai dấu ở một khối vẫn giảm hàm mục tiêu nếu các khối khác đúng, chỉ là chậm hơn và đi đường vòng. Bạn sẽ thấy hệ thống ``hơi kém ổn định'', ``cần nhiều vòng lặp hơn'', ``đôi khi phân kỳ với chuyển động nhanh'' --- những triệu chứng dễ bị quy cho tinh chỉnh tham số.
+
+Ba cách phòng, theo thứ tự hiệu quả. Một: \textbf{ghi quy ước ngay trong tên hàm} --- \code{Jacobian\_right}, \code{boxplus\_left} --- chứ không ghi trong comment, vì comment không được trình biên dịch kiểm. Hai: \textbf{kiểm mọi Jacobian bằng sai phân số} một lần khi viết, và giữ phép kiểm ấy lại như một unit test chạy mãi về sau; đây là cửa kiểm chứng (b) áp cho mã nguồn. Ba: khi phải đổi giữa hai quy ước, \textbf{dùng Adjoint} ở mục 4C thay vì dẫn lại bằng tay --- vì dẫn lại bằng tay chính là chỗ sai xảy ra.
+\end{cambay}
+
+\subsection{B. Đạo hàm cơ bản, tự dẫn được}
+
+Đây là đạo hàm nền của mọi thứ còn lại, và nó đáng tự dẫn lại vì nó chỉ mất ba dòng.
+
+Cần tính \(\partial (R\mathbf{p}) / \partial \delta\boldsymbol{\phi}\) với nhiễu loạn trái. Thay vào và khai triển \(\exp\) tới bậc nhất, dùng \(\exp([\delta\boldsymbol{\phi}]_\times) \approx I + [\delta\boldsymbol{\phi}]_\times\):
+\[
+\exp([\delta\boldsymbol{\phi}]_\times)\,R\,\mathbf{p}
+\;\approx\; (I + [\delta\boldsymbol{\phi}]_\times)\,R\,\mathbf{p}
+\;=\; R\mathbf{p} \;+\; \delta\boldsymbol{\phi} \times (R\mathbf{p})
+\;=\; R\mathbf{p} \;-\; [R\mathbf{p}]_\times\,\delta\boldsymbol{\phi}.
+\]
+Bước cuối dùng tính phản giao hoán của tích có hướng: \(\mathbf{a}\times\mathbf{b} = -\mathbf{b}\times\mathbf{a}\). Vậy
+
+\begin{equation}
+\frac{\partial (R\mathbf{p})}{\partial \delta\boldsymbol{\phi}}\bigg|_{\text{trái}} \;=\; -[R\mathbf{p}]_\times .
+\label{eq:a03-dRp}
+\end{equation}
+
+Với nhiễu loạn phải, làm tương tự cho \(-R\,[\mathbf{p}]_\times\). Hai kết quả liên hệ qua \([R\mathbf{v}]_\times = R[\mathbf{v}]_\times R^{\top}\), một đồng nhất thức đáng thuộc vì nó xuất hiện liên tục.
+
+Kiểm bằng số (cửa b): lấy \(R = I\), \(\mathbf{p} = (1,0,0)\), \(\delta\boldsymbol{\phi} = (0,0,\varepsilon)\) với \(\varepsilon = 10^{-4}\). Công thức~\eqref{eq:a03-dRp} dự đoán thay đổi \(-[\mathbf{p}]_\times\delta\boldsymbol{\phi} = -(1,0,0)\times(0,0,\varepsilon)\cdot(-1)\); tính trực tiếp \((1,0,0)\times(0,0,\varepsilon) = (0\cdot\varepsilon - 0\cdot 0,\; 0\cdot 0 - 1\cdot\varepsilon,\; 0) = (0,-\varepsilon,0)\), nên \(-[\mathbf{p}]_\times\delta\boldsymbol{\phi} = (0,\varepsilon,0)\). Mặt khác xoay \((1,0,0)\) quanh \(z\) một góc \(\varepsilon\) cho \((\cos\varepsilon, \sin\varepsilon, 0) \approx (1, \varepsilon, 0)\), tức thay đổi \((0,\varepsilon,0)\). Khớp.
+
+\section{\(SE(3)\), \(Sim(3)\) và Adjoint}
+\ptrtarget{A/03/04}
+
+\subsection{A. \(SE(3)\): xoay cộng tịnh tiến}
+
+\[
+T = \begin{pmatrix} R & \mathbf{t} \\ \mathbf{0}^{\top} & 1\end{pmatrix} \in SE(3),
+\qquad
+\boldsymbol{\xi} = \begin{pmatrix}\boldsymbol{\rho} \\ \boldsymbol{\phi}\end{pmatrix} \in \mathbb{R}^6 .
+\]
+
+Sáu bậc tự do: ba xoay, ba tịnh tiến. Ánh xạ mũ có dạng đóng nhưng phần tịnh tiến không đơn giản là \(\boldsymbol{\rho}\):
+\[
+\exp(\boldsymbol{\xi}^\wedge) = \begin{pmatrix} \exp([\boldsymbol{\phi}]_\times) & J_l(\boldsymbol{\phi})\,\boldsymbol{\rho} \\ \mathbf{0}^{\top} & 1\end{pmatrix},
+\]
+với \(J_l\) là \term{Jacobian trái} của \(SO(3)\) \cite[§7.1.5]{barfoot2017}. Chỗ này hay gây bối rối, nên đáng một câu giải thích: khi camera vừa xoay vừa tịnh tiến \emph{đồng thời và liên tục}, quỹ đạo là một đường xoắn ốc chứ không phải một đoạn thẳng, và \(J_l\) chính là hệ số hiệu chỉnh cho sự cong ấy. Với nhiễu loạn nhỏ, \(J_l \approx I\) và ta bỏ qua được --- đó là lý do nhiều cài đặt SLAM không bao giờ phải tính \(J_l\) một cách tường minh. Nó trở nên quan trọng khi cần \(\exp\) chính xác trên một khoảng lớn, chẳng hạn trong tiền tích phân IMU (\code{../IMU\_Fusion/} chương 7).
+
+\subsection{B. \(Sim(3)\): thêm tỉ lệ}
+
+\[
+S = \begin{pmatrix} s\,R & \mathbf{t} \\ \mathbf{0}^{\top} & 1\end{pmatrix},
+\qquad s > 0 .
+\]
+
+Bảy bậc tự do: ba xoay, ba tịnh tiến, một tỉ lệ. Nhóm này tồn tại trong SLAM vì một lý do rất cụ thể và rất thực dụng: trong SLAM đơn mắt, tỉ lệ là gauge tự do (\ptr{A/01} mục~3B) và nó \emph{trôi} theo thời gian. Khi đóng vòng --- phát hiện rằng ta đã quay lại chỗ cũ --- hai đầu của vòng nói chung có tỉ lệ khác nhau, và một phép biến đổi \(SE(3)\) không thể ghép chúng lại. Cần \(Sim(3)\) \cite{strasdat2010scaledrift}.
+
+Điều đáng nhấn mạnh, vì nó là một hệ quả trực tiếp của luận đề trung tâm: \emph{bậc tự do thứ bảy chỉ tồn tại khi tỉ lệ không quan sát được}. Với stereo, đường cơ sở cho ta mét; với VIO, gia tốc kế cho ta mét. Trong cả hai trường hợp, tỉ lệ là một đại lượng \emph{quan sát được} chứ không phải một gauge, nên pose graph dùng \(SE(3)\) --- và với VIO, nơi trọng lực còn ghim thêm roll và pitch, nó rút xuống chỉ còn bốn bậc tự do (\code{../IMU\_Fusion/} chương 5). Số bậc tự do của pose graph không phải một lựa chọn kỹ thuật mà là một hệ quả trực tiếp của việc cảm biến nào có mặt trong hệ.
+
+\subsection{C. Adjoint: chuyển nhiễu loạn giữa hai phía}
+
+Adjoint trả lời câu hỏi: một nhiễu loạn phải tương ứng với nhiễu loạn trái nào?
+
+\begin{equation}
+T \exp(\boldsymbol{\xi}^\wedge) \;=\; \exp\bigl((\mathrm{Ad}_T\,\boldsymbol{\xi})^\wedge\bigr)\, T .
+\label{eq:a03-adjoint}
+\end{equation}
+
+Với \(SE(3)\),
+\[
+\mathrm{Ad}_T = \begin{pmatrix} R & [\mathbf{t}]_\times R \\ \mathbf{0} & R \end{pmatrix} .
+\]
+Công thức này tôi lấy từ \cite{sola2018microlie} và \cite[§7.1.7]{barfoot2017} (cửa c); tôi kiểm được trường hợp riêng \(\mathbf{t} = 0\) cho \(\mathrm{Ad} = \mathrm{diag}(R,R)\) bằng suy dẫn trực tiếp.
+
+Adjoint có ba công dụng thực tế, và biết chúng tiết kiệm rất nhiều công. Một: \emph{đổi quy ước} mà không dẫn lại Jacobian --- viết một lần theo quy ước phải rồi chuyển bằng \(\mathrm{Ad}\). Hai: \emph{lan truyền hiệp phương sai} qua một phép biến đổi cứng, \(\Sigma' = \mathrm{Ad}_T\,\Sigma\,\mathrm{Ad}_T^{\top}\) --- đây là điều ta cần ở \ptr{A/06} khi chuyển bất định giữa các hệ quy chiếu. Ba: nó là thành phần của quy tắc chuỗi cho phép hợp thành hai tư thế, thứ mà pose graph ở \ptr{B/11} dùng ở mọi cạnh.
+
+\section{Jacobian của phần dư chiếu: đích đến của chương}
+\ptrtarget{A/03/05}
+
+Đây là chỗ mọi thứ hội tụ, và là thứ nên tự dẫn lại được trên giấy.
+
+Phần dư chiếu của landmark \(\mathbf{P}_w\) quan sát ở khung với tư thế \(T = (R,\mathbf{t})\):
+\[
+\mathbf{r} \;=\; \mathbf{z} \;-\; \pi\bigl(R\,\mathbf{P}_w + \mathbf{t}\bigr),
+\qquad \mathbf{r} \in \mathbb{R}^2 .
+\]
+
+Áp quy tắc chuỗi qua ba chặng, đúng như chuỗi ở \ptr{A/02} mục~2A đọc ngược lại.
+
+\emph{Chặng một --- đạo hàm của phép chiếu.} Với \(\mathbf{P}_c = (X,Y,Z)\) và \(\pi(\mathbf{P}_c) = (X/Z,\, Y/Z)\):
+\[
+\frac{\partial \pi}{\partial \mathbf{P}_c}
+= \begin{pmatrix} 1/Z & 0 & -X/Z^2 \\ 0 & 1/Z & -Y/Z^2 \end{pmatrix}
+= \frac{1}{Z}\begin{pmatrix} 1 & 0 & -X/Z \\ 0 & 1 & -Y/Z\end{pmatrix}.
+\]
+Dạng thứ hai đáng giữ vì nó cho thấy ngay hai điều: toàn bộ ma trận tỉ lệ với \(1/Z\) --- nên \emph{điểm càng xa thì ảnh hưởng lên phần dư càng nhỏ}, đúng như trực giác; và các phần tử phụ thuộc vào \(X/Z, Y/Z\) tức vị trí trên mặt phẳng chuẩn hoá, nên điểm ở rìa ảnh có Jacobian khác hẳn điểm ở tâm.
+
+\emph{Chặng hai --- đạo hàm của điểm camera theo nhiễu loạn tư thế.} Dùng nhiễu loạn trái, \(\mathbf{P}_c' = \exp(\boldsymbol{\xi}^\wedge)\,T\,\tilde{\mathbf{P}}_w\). Khai triển bậc nhất và dùng~\eqref{eq:a03-dRp}:
+\[
+\frac{\partial \mathbf{P}_c}{\partial \boldsymbol{\xi}}
+= \begin{pmatrix} I_{3\times 3} & -[\mathbf{P}_c]_\times \end{pmatrix} \in \mathbb{R}^{3\times 6},
+\]
+với thứ tự \(\boldsymbol{\xi} = (\boldsymbol{\rho}, \boldsymbol{\phi})\). Khối đầu là tịnh tiến --- dịch camera một đoạn thì điểm trong hệ camera dịch đúng đoạn đó, nên đạo hàm là đơn vị. Khối sau là xoay, đúng công thức~\eqref{eq:a03-dRp}.
+
+\emph{Kết quả:}
+\begin{equation}
+\frac{\partial \mathbf{r}}{\partial \boldsymbol{\xi}}
+= -\frac{1}{Z}\begin{pmatrix} 1 & 0 & -X/Z \\ 0 & 1 & -Y/Z\end{pmatrix}
+\begin{pmatrix} I & -[\mathbf{P}_c]_\times \end{pmatrix}
+\;\in\; \mathbb{R}^{2\times 6}.
+\label{eq:a03-jac}
+\end{equation}
+
+Dấu trừ đến từ việc \(\mathbf{r} = \mathbf{z} - \pi(\cdot)\). Với camera có méo, thêm một chặng \(\partial d/\partial \mathbf{x}\) ở giữa; với camera có \(K\) không tầm thường, thêm \(\partial \mathbf{p}/\partial \mathbf{x}_d\) --- cả hai là ma trận \(2\times 2\) và không đổi cấu trúc của lập luận.
+
+Tương tự, đạo hàm theo landmark là \(\partial\mathbf{r}/\partial\mathbf{P}_w = -\frac{\partial\pi}{\partial\mathbf{P}_c} R \in \mathbb{R}^{2\times 3}\).
+
+\begin{cannho}
+Công thức~\eqref{eq:a03-jac} là khối xây dựng của \textbf{mọi} thứ ở \ptr{A/04} và \ptr{B/09}. Ma trận Hessian của bundle adjustment, với hàng triệu phần tử khác không, được lắp từ các khối \(2\times 6\) và \(2\times 3\) này và không có gì khác.
+
+Ba điều đáng đọc ra từ nó, và cả ba đều có hệ quả thực hành. Thứ nhất, \textbf{hệ số \(1/Z\)}: điểm ở xa đóng góp ít thông tin về tịnh tiến --- đó là mục 6 của \ptr{A/01} phát biểu lại bằng ngôn ngữ đạo hàm, và là lý do tham số hoá nghịch đảo độ sâu ở \ptr{B/08} hợp lý hơn. Thứ hai, \textbf{cấu trúc \(2\times 6\)}: mỗi quan sát ràng buộc tư thế theo đúng hai chiều trong sáu, nên cần ít nhất ba điểm để xác định tư thế --- đó là lý do P3P cần đúng ba điểm. Thứ ba, \textbf{khối \([\mathbf{P}_c]_\times\)}: ảnh hưởng của xoay tỉ lệ với khoảng cách tới điểm, nên các điểm ở xa ràng buộc \emph{xoay} rất tốt dù ràng buộc tịnh tiến rất kém.
+
+Điều cuối cùng ấy là một trong những quan sát có giá trị nhất trong cả Phần~A: nó nói rằng đừng vứt điểm ở xa đi, mà hãy để hiệp phương sai của chúng phản ánh đúng sự bất đối xứng ấy.
+\end{cannho}
+
+\section{\(\boxplus\), \(\boxminus\) và vòng lặp tối ưu}
+\ptrtarget{A/03/06}
+
+Đặt mọi thứ lại với nhau. Định nghĩa hai toán tử nối đa tạp với không gian véctơ:
+\[
+T \boxplus \boldsymbol{\xi} \;=\; \exp(\boldsymbol{\xi}^\wedge)\,T,
+\qquad
+T_1 \boxminus T_2 \;=\; \log\bigl(T_1\,T_2^{-1}\bigr)^\vee .
+\]
+(Với quy ước trái; quy ước phải đổi thứ tự nhân.) \(\boxplus\) nhận một tư thế và một véctơ, trả về một tư thế; \(\boxminus\) nhận hai tư thế, trả về một véctơ. Chúng thay thế \(+\) và \(-\) ở mọi chỗ mà thuật toán tối ưu chuẩn dùng hai phép đó.
+
+Vòng lặp Gauss-Newton trên đa tạp trở thành:
+\begin{enumerate}
+\item Tính phần dư \(\mathbf{r}(\boldsymbol{\theta}_k)\) tại ước lượng hiện tại.
+\item Tính Jacobian \(H = \partial\mathbf{r}/\partial\boldsymbol{\xi}\) theo công thức~\eqref{eq:a03-jac} --- \emph{đây là Jacobian theo nhiễu loạn, không phải theo tham số}.
+\item Giải hệ chuẩn \(H^{\top}\Omega H\,\delta = -H^{\top}\Omega\,\mathbf{r}\) ra \(\delta \in \mathbb{R}^n\).
+\item Cập nhật \(\boldsymbol{\theta}_{k+1} = \boldsymbol{\theta}_k \boxplus \delta\).
+\end{enumerate}
+
+Bước 3 là đại số tuyến tính thuần tuý trong không gian véctơ --- mọi công cụ thưa ở \ptr{A/04} dùng được nguyên vẹn. Bước 4 là chỗ duy nhất đa tạp xuất hiện. Đây chính là điều làm cách tiếp cận này thắng: nó cô lập toàn bộ độ phức tạp hình học vào một dòng mã.
+
+Một hệ quả tinh tế đáng nêu vì nó liên quan tới \ptr{A/05}: vì Jacobian được tính tại điểm hiện tại và nhiễu loạn được định nghĩa \emph{quanh điểm đó}, hệ toạ độ của \(\delta\) \emph{đổi sau mỗi vòng lặp}. Điều này vô hại cho việc hội tụ nhưng có ý nghĩa cho tính nhất quán: khi ta marginalize một biến rồi sau đó tuyến tính hoá lại tại điểm khác, thông tin đã lưu không còn ở đúng hệ toạ độ nữa. Đó là gốc rễ của vấn đề nhất quán mà FEJ giải quyết, và cây \code{../IMU\_Fusion/} chương 5 nói kỹ về nó.
+
+\begin{ungdung}
+\ud{Sophus \repo{Sophus}}{\(SO(3)\), \(SE(3)\), \(Sim(3)\) với exp/log, Adjoint, Jacobian}{Thư viện mặc định trong hệ sinh thái C++ SLAM; đọc mã \code{SO3::exp} để thấy cách xử lý góc nhỏ}
+\ud{manif \repo{manif}}{Cùng phạm vi, API hiện đại hơn, Jacobian tường minh cho mọi phép toán}{Đi kèm \cite{sola2018microlie}, là tài liệu tham chiếu tốt nhất về quy ước}
+\ud{Ceres \code{Manifold}}{Trừu tượng hoá \(\boxplus\)/retraction; tự động ghép với auto-diff}{Minh hoạ trực tiếp mục 6 --- bộ giải chỉ cần biết \(\boxplus\), không cần biết gì về nhóm}
+\ud{GTSAM \cite{dellaert2017factorgraphs}}{Kiểu \code{Pose3} với \code{retract}/\code{localCoordinates}; Jacobian phân tích}{Cùng ý tưởng, đặt trong khung đồ thị nhân tử}
+\ud{ORB-SLAM3 \cite{campos2021orbslam3}}{\(Sim(3)\) cho loop closing mono, \(SE(3)\) khi có stereo hoặc IMU}{Xác nhận mục 4B: số bậc tự do phụ thuộc cảm biến, không phải lựa chọn tuỳ ý}
+\end{ungdung}
+
+\begin{duan}{Tự cài \(SE(3)\) và kiểm mọi Jacobian bằng sai phân số}{2 ngày}
+\dmt biến chương này từ kiến thức đọc được thành kiến thức kiểm được, và tạo ra bộ unit test mà bạn sẽ dùng lại suốt phần còn lại của cây.
+\ddl không cần dữ liệu ngoài; mọi thứ tự sinh.
+\dbc cài \(\exp\)/\(\log\) cho \(SO(3)\) và \(SE(3)\) \emph{có xử lý góc nhỏ bằng Taylor}; cài \(\boxplus\), \(\boxminus\), \(\mathrm{Ad}\); cài phần dư chiếu và Jacobian~\eqref{eq:a03-jac} theo \emph{cả hai} quy ước trái và phải; viết một hàm kiểm sai phân số trung tâm so sánh Jacobian phân tích với số, chạy trên vài trăm cấu hình ngẫu nhiên; đo sai lệch tương đối và tìm ngưỡng góc nhỏ mà dưới đó công thức Rodrigues trực tiếp mất độ chính xác.
+\dxk mọi Jacobian khớp sai phân số trong sai số tương đối \(10^{-6}\) trở xuống; bạn xác nhận được bằng số rằng Jacobian trái và phải \emph{khác nhau} nhưng liên hệ đúng qua \(\mathrm{Ad}\); và bạn có một con số cho ngưỡng góc nhỏ của chính cài đặt của mình --- con số đó là một mục trong \code{99-chua-biet.md} được trả lời.
+\dnv \ptr{A/04-uoc-luong-map-va-bundle-adjustment} lắp các Jacobian này thành ma trận thưa; \ptr{C/14-hieu-chuan-nhu-mot-nhanh-cua-slam} thêm biến hiệu chuẩn vào cùng chuỗi quy tắc chuỗi.
+\end{duan}
+
+\begin{traloi}
+\tl{Gauss-Newton đã đẩy \(R\) \emph{ra khỏi} đa tạp \(SO(3)\): phép cộng trong không gian chín chiều không giữ ràng buộc \(R^\top R = I\). Ma trận thu được không còn là phép xoay mà là một phép biến đổi tuyến tính có co giãn và trượt. Chuẩn hoá lại sau mỗi bước là cách chữa tồi vì ba lý do: bước đi mà bộ giải tính ra không còn là bước tối ưu sau khi bị chiếu về đa tạp; ma trận hiệp phương sai chín chiều mô tả một phân bố trong không gian mà bất định thật chỉ có ba chiều, nên nó suy biến; và bạn đang giải một bài toán chín biến khi bài toán chỉ có ba, làm hệ chuẩn thừa sáu hướng phẳng. Cách đúng là không bao giờ rời đa tạp: nhân nhiễu loạn thay vì cộng.}
+\tl{Vì gimbal lock không phải khiếm khuyết của cách đánh số mà là phát biểu về topology: \(SO(3)\) không đồng phôi với bất kỳ vùng mở nào của \(\mathbb{R}^3\), nên \emph{mọi} tham số hoá bằng ba số đều có kỳ dị ở đâu đó. Đổi thứ tự trục chỉ dịch chỗ kỳ dị, không xoá được. Ở gần kỳ dị, Jacobian gần suy biến và bộ tối ưu mất một hướng --- đúng kiểu hỏng im lặng ở \ptr{A/05}. Cách thoát là dùng tham số hoá \emph{dư} (ma trận hoặc quaternion) cho trạng thái nhưng tham số hoá \emph{tối thiểu} cho nhiễu loạn, vì nhiễu loạn luôn ở gần không nên không bao giờ chạm kỳ dị.}
+\tl{Kết quả tối ưu \emph{trùng nhau} --- cùng một cực tiểu, vì hai quy ước chỉ là hai hệ toạ độ trên cùng một không gian tiếp tuyến. Phải chọn vì hai lý do. Một: trộn hai quy ước trong cùng hệ thống cho Jacobian sai dấu, và triệu chứng là hội tụ chậm hoặc đôi khi phân kỳ chứ không phải lỗi rõ ràng --- rất khó bắt. Hai: \emph{ma trận hiệp phương sai} thì khác nhau, vì nó được biểu diễn trong hệ toạ độ tương ứng; chuyển giữa hai hệ phải dùng \(\mathrm{Ad}\), và quên chuyển thì con số bất định sai mà không có dấu hiệu.}
+\tl{Bậc tự do thứ bảy là \emph{tỉ lệ}, và nó tồn tại vì trong SLAM đơn mắt tỉ lệ là gauge tự do --- camera đo hướng, nên nhân đôi cả thế giới không đổi ảnh nào (\ptr{A/01} mục 3B). Tỉ lệ ấy trôi theo thời gian, nên khi đóng vòng hai đầu có tỉ lệ khác nhau và \(SE(3)\) không ghép được. Với stereo, đường cơ sở cho mét; với VIO, gia tốc kế cho mét --- trong cả hai trường hợp tỉ lệ là đại lượng \emph{quan sát được} chứ không phải gauge, nên \(SE(3)\) đủ. Với VIO còn giảm tiếp xuống bốn bậc vì trọng lực ghim roll và pitch.}
+\tl{Là \(6\) vì đó là số bậc tự do của \(SE(3)\), và Jacobian được tính theo \emph{nhiễu loạn} chứ không theo tham số --- nhiễu loạn sống trong đại số Lie sáu chiều, không phải trong mười sáu phần tử của ma trận thuần nhất. Con số đó nói rằng bộ giải nhìn bài toán ở đúng số chiều thật của nó: hệ chuẩn có đúng sáu ẩn cho mỗi tư thế, không có hướng phẳng giả tạo nào, và ma trận thông tin không suy biến vì lý do tham số hoá. Số \(2\) ở hàng nói mỗi quan sát ràng buộc tư thế theo đúng hai chiều, nên cần tối thiểu ba điểm --- chính là lý do P3P cần ba.}
+\end{traloi}
+
+\begin{dongian}
+Tưởng tượng bạn đang đứng trên mặt đất và muốn đi tới một chỗ tốt hơn ở gần đó. Bạn nhìn xuống chân, thấy dốc nghiêng về hướng nào, rồi bước một bước theo hướng đó.
+
+Bây giờ nếu Trái Đất là một quả cầu, có một điều bạn \emph{không} làm: bạn không cộng một véctơ vào toạ độ ba chiều của mình, vì làm thế sẽ đưa bạn xuống lòng đất hoặc lên trời. Bạn đi \emph{dọc theo mặt đất}. Mặt đất quanh chân bạn phẳng như một tờ giấy, nên bạn nghĩ bằng hình học phẳng thông thường --- rẽ trái bao nhiêu, đi bao xa --- và điều đó hoàn toàn hợp lệ trong phạm vi vài bước chân.
+
+Đó là toàn bộ chương này. Hướng của camera cũng sống trên một mặt cong như vậy. Bạn không được phép cộng thẳng vào nó. Bạn tính xem nên xoay thêm bao nhiêu quanh trục nào --- ba con số, hoàn toàn bình thường, cộng trừ thoải mái --- rồi \emph{áp} phép xoay nhỏ đó vào hướng hiện tại. Kết quả chắc chắn vẫn là một hướng hợp lệ, vì xoay một hướng thì được một hướng.
+
+Hai chi tiết còn lại cũng đơn giản như vậy. Thứ nhất, ``tờ giấy'' chỉ phẳng ở gần chân bạn, nên bước phải nhỏ --- bước quá dài thì tính toán phẳng không còn đúng, và bộ giải phải tự hãm lại. Thứ hai, có hai cách hiểu ``xoay thêm một chút'': xoay so với thế giới, hay xoay so với chính mình. Hai cách đều đúng và đều dùng được, nhưng chúng là hai ngôn ngữ khác nhau, và nói lẫn lộn hai ngôn ngữ trong cùng một câu thì ra câu vô nghĩa. Phần lớn lỗi dấu trong lĩnh vực này là đúng chuyện đó.
+
+\chuadongian{chỗ không rút gọn được là \emph{vì sao} công thức Rodrigues có đúng dạng ấy, và vì sao phần tịnh tiến của \(\exp\) trên \(SE(3)\) lại cần thêm hệ số \(J_l\). Hai thứ đó không có hình ảnh trực quan gọn gàng; chúng là kết quả của việc cộng dồn vô hạn các phép xoay nhỏ, và cách duy nhất để thật sự tin là tự dẫn lại chuỗi luỹ thừa một lần.}
+\motcau{Không cộng vào hướng --- xoay thêm một chút vào hướng; và ``một chút'' thì cộng trừ thoải mái được.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{A/03/07}
+
+Mệnh đề chính --- \emph{mọi tham số hoá \(SO(3)\) bằng ba số đều có kỳ dị} --- là một định lý topology, không phải một quan sát thực nghiệm. Nó bị bác bỏ nếu ai đó trình bày một tham số hoá ba số trơn, song ánh, không kỳ dị trên toàn \(SO(3)\). Điều đó bất khả vì \(SO(3)\) không đồng phôi với vùng mở nào của \(\mathbb{R}^3\); tôi đối chiếu phát biểu này với \cite{sola2018microlie} và \cite{barfoot2017} (cửa c) nhưng \emph{không} tự chứng minh được phần topology, và đó là một khoản nợ được ghi trong \code{99-chua-biet.md}.
+
+Mệnh đề thứ hai --- \emph{Jacobian~\eqref{eq:a03-jac} đúng} --- dễ kiểm nhất và mini project chính là phép kiểm: sai phân số phải khớp trong sai số \(10^{-6}\). Nếu không khớp, hoặc công thức sai hoặc quy ước bị trộn --- và phép kiểm không phân biệt được hai khả năng đó, nên phải kiểm cả hai quy ước.
+
+Mệnh đề thứ ba --- \emph{chọn quy ước không đổi kết quả tối ưu nhưng đổi hiệp phương sai} --- bị bác bỏ nếu một thí nghiệm cho thấy hai quy ước hội tụ về hai cực tiểu khác nhau trên cùng dữ liệu và cùng khởi đầu. Tôi cho là không xảy ra với bài toán trơn và bước đủ nhỏ, nhưng tôi \emph{ngờ} rằng với LM và damping mạnh, hai quy ước có thể đi hai đường khác nhau và rơi vào hai cực tiểu địa phương khác nhau trong bài toán không lồi. Đây là điều tôi chưa kiểm và chưa tìm được nguồn khẳng định \emph{(tôi suy ra, chưa đối chiếu nguồn)}.
+
+\section{Kết nối}
+\ptrtarget{A/03/08}
+
+Nối lên trên: \ptr{A/01-hinh-hoc-da-thi} cho phép chiếu và \ptr{A/02-mo-hinh-camera} cho chuỗi đầy đủ tới pixel; chương này tính đạo hàm của đúng chuỗi ấy, nên ba chương hợp thành một khối và nên ôn cùng nhau.
+
+Nối xuống dưới. \ptr{A/04-uoc-luong-map-va-bundle-adjustment} là nơi Jacobian~\eqref{eq:a03-jac} được lắp thành ma trận thưa và nơi vòng lặp ở mục~6 trở thành bundle adjustment thật. \ptr{A/05-observability-gauge-va-suy-bien} dùng ngôn ngữ nhiễu loạn để phát biểu phép ``dịch cả thế giới, xoay cả thế giới'' một cách chính xác --- không có chương này thì lập luận gauge ở đó chỉ là hình ảnh. \ptr{A/06-bat-dinh-va-lan-truyen-sai-so} dùng Adjoint để lan truyền hiệp phương sai qua các phép biến đổi cứng, và nhấn mạnh rằng hiệp phương sai trên đa tạp phải hiểu là hiệp phương sai \emph{của nhiễu loạn}, không phải của tham số.
+
+Nối sang các phần sau. \ptr{B/09-paradigm-uoc-luong-back-end} dùng \(Sim(3)\) cho pose graph mono và \(SE(3)\) cho các trường hợp còn lại. \ptr{B/11-loop-closure-va-nhat-quan-toan-cuc} là ứng dụng rõ nhất của \(Sim(3)\): hiệu chỉnh trôi tỉ lệ khi đóng vòng. \ptr{C/14-hieu-chuan-nhu-mot-nhanh-cua-slam} mở rộng quy tắc chuỗi ở mục~5 để bao gồm cả tham số nội và ngoại --- và điều đáng chú ý là cấu trúc lập luận không đổi chút nào, chỉ dài thêm một chặng.
+
+Nối ngang: \code{../IMU\_Fusion/} chương 2 bàn cùng chủ đề với trọng tâm khác --- nó đi sâu vào \(SE_2(3)\) và tính chất group-affine, thứ cần cho bộ lọc bất biến nhưng không cần cho SLAM thuần thị giác. Nếu bạn cần InEKF thì đọc ở đó; chương này cố ý dừng ở \(Sim(3)\).
+
+\begin{tukiem}
+\item Vì sao không thể cộng thẳng vào ma trận xoay, và vì sao ``chuẩn hoá lại sau mỗi bước'' không phải cách chữa đúng?
+\item Tự dẫn lại \(\partial(R\mathbf{p})/\partial\delta\boldsymbol{\phi}\) cho nhiễu loạn trái, không nhìn bài. Rồi giải thích dấu trừ đến từ đâu.
+\item Nhiễu loạn trái và phải khác nhau về ý nghĩa vật lý thế nào, và tình huống nào khiến bạn buộc phải chọn một cái cụ thể?
+\item Trong công thức~\eqref{eq:a03-jac}, hệ số \(1/Z\) nói gì về đóng góp của điểm xa, và khối \([\mathbf{P}_c]_\times\) nói gì về đóng góp của chúng cho thành phần xoay? Hai điều đó có mâu thuẫn nhau không?
+\item Vì sao pose graph của SLAM mono cần \(Sim(3)\) trong khi VIO chỉ cần bốn bậc tự do? Trả lời bằng ngôn ngữ quan sát được, không bằng ngôn ngữ cài đặt.
+\item Adjoint làm gì, và nêu ba tình huống cụ thể mà không có nó bạn sẽ phải dẫn lại công thức bằng tay.
+\item Ba giả thiết ngầm của cách tiếp cận nhiễu loạn là gì --- kể cả cái không ai nói ra --- và bỏ mỗi cái thì hỏng ở đâu?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

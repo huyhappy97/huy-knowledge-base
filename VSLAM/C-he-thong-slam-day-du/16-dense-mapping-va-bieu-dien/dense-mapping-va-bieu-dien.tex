@@ -1,0 +1,265 @@
+% ---------------------------------------------------------------------------
+% Chương 16 — Dense mapping và biểu diễn
+% Tạo: 2026-09-13 | Phụ thuộc: A/01 (triangulation), A/06 (sigma_z), C/13 (kích thước)
+% Mức độ: QUAN TRỌNG (mức 2). Chương HẾT HẠN NHANH NHẤT cùng với ch17. Chốt 9/2026.
+% Kiểm chứng:
+%   (1) SGM: tối ưu năng lượng 2D xấp xỉ bằng nhiều đường 1D — cửa (c) hirschmuller2008sgm.
+%   (2) TSDF: trung bình có trọng số của hàm khoảng cách có dấu bị cắt — cửa (c) newcombe2011kinectfusion.
+%   (3) Dense map không cải thiện pose accuracy so với sparse — cửa (a) lập luận: thông tin
+%       về pose nằm ở các điểm có gradient, vốn đã được sparse khai thác.
+%   (4) 3DGS: biểu diễn bằng các Gaussian dị hướng, render khả vi — cửa (c) kerbl20233dgs.
+% Ghi chú trung thực: KHÔNG dẫn con số so sánh chất lượng giữa các phương pháp dense
+%   (phụ thuộc dataset và metric). Phần NeRF/3DGS ghi rõ là ảnh chụp tại 9/2026.
+% ---------------------------------------------------------------------------
+\documentclass[../../vslam.tex]{subfiles}
+\begin{document}
+\chapter{Dense mapping và biểu diễn (Dense Mapping and Representation)}
+\ptrtarget{C/16}\ptrtarget{C/16-dense-mapping-va-bieu-dien}
+\dependency{\ptr{A/01-hinh-hoc-da-thi} (triangulation, stereo); \ptr{A/06-bat-dinh-va-lan-truyen-sai-so} (\(\sigma_z \approx z^2\sigma_d/(bf)\) --- quan hệ này quyết định chất lượng mọi bản đồ dày); \ptr{C/13-quan-ly-ban-do} (bài toán kích thước, ở đây gay gắt hơn nhiều bậc).}
+
+\begin{tomtat}
+Bản đồ thưa gồm vài nghìn điểm đủ để định vị nhưng không đủ để \emph{làm gì với thế giới}. Một robot cần biết chỗ nào đi được; một hệ AR cần biết bề mặt ở đâu để đặt vật ảo lên; một hệ quét cần một mô hình có thể in ra. Chương này về các biểu diễn dày và về một câu hỏi mà ít ai hỏi thẳng: \emph{ai cần chúng, để làm gì, và cái giá là bao nhiêu?} Nội dung có bốn phần. Một: lấy độ sâu dày từ ảnh --- stereo, multi-view, và giới hạn vật lý mà không thuật toán nào vượt qua được. Hai: bốn họ biểu diễn cổ điển --- TSDF, surfel, octree, mesh --- với tiêu chí chọn dựa trên \emph{việc bạn định dùng bản đồ để làm gì}, không dựa trên chất lượng hình ảnh. Ba: các biểu diễn học được --- NeRF và Gaussian splatting --- là hướng nóng nhất hiện nay, với một đánh giá thẳng thắn về chỗ chúng đã tốt và chỗ chưa. Bốn: một đánh đổi mà tài liệu hay bỏ qua. Nếu chỉ nhớ một điều: \emph{bản đồ dày đẹp hơn nhưng độ chính xác tư thế thường không hơn bản đồ thưa} --- và hiểu vì sao là hiểu được vị trí đúng của cả chương này trong một hệ thống.
+\end{tomtat}
+
+\begin{nentang}
+\kn{bản đồ thưa (sparse map)}{tập vài nghìn tới vài trăm nghìn điểm \(3\)D rời rạc, mỗi điểm ứng với một đặc trưng ảnh. Đủ để định vị, không đủ để mô tả bề mặt.}
+\kn{bản đồ dày (dense map)}{biểu diễn mô tả \emph{bề mặt} hoặc \emph{thể tích} của cảnh, không chỉ vài điểm rời rạc. Tốn bộ nhớ hơn hàng trăm tới hàng nghìn lần.}
+\kn{TSDF}{\emph{truncated signed distance function} --- mỗi voxel lưu khoảng cách có dấu tới bề mặt gần nhất, cắt ở một ngưỡng. Bề mặt là tập mức không. Hợp nhất nhiều lượt quét bằng trung bình có trọng số.}
+\kn{surfel}{một mảnh bề mặt nhỏ có vị trí, pháp tuyến, bán kính và màu. Biểu diễn không cần lưới, nên dễ biến dạng khi bản đồ được hiệu chỉnh.}
+\kn{octree}{cấu trúc cây chia không gian thành tám phần đệ quy, chỉ chia sâu ở chỗ có nội dung. Tiết kiệm bộ nhớ cho không gian phần lớn là trống.}
+\kn{ESDF}{\emph{euclidean signed distance field} --- mỗi voxel lưu khoảng cách tới chướng ngại gần nhất. Đây là thứ mà bộ lập kế hoạch đường đi thật sự cần, không phải một mô hình đẹp.}
+\kn{NeRF}{\emph{neural radiance field} --- biểu diễn cảnh bằng một mạng ánh xạ từ (vị trí, hướng nhìn) sang (màu, mật độ), render bằng ray marching.}
+\kn{3D Gaussian Splatting}{biểu diễn cảnh bằng hàng triệu Gaussian \(3\)D dị hướng có màu và độ trong, render bằng phép chiếu và trộn --- nhanh hơn NeRF nhiều bậc vì không cần lấy mẫu dọc tia.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Bản đồ dày dùng nhiều dữ liệu hơn bản đồ thưa hàng trăm lần. Vì sao nó thường \emph{không} cho tư thế chính xác hơn?}
+\h{Bộ lập kế hoạch đường đi của bạn cần biết chỗ nào đi được. Nêu biểu diễn nó thật sự cần, và nói vì sao một mesh đẹp không phải câu trả lời.}
+\h{Stereo cho độ sâu ở mọi pixel có vân. Nêu ba vùng mà nó chắc chắn thất bại, và nói vì sao đó là giới hạn vật lý chứ không phải giới hạn thuật toán.}
+\h{3D Gaussian Splatting cho hình ảnh đẹp hơn hẳn TSDF với cùng dữ liệu. Nêu ba lý do vì sao một robot sản phẩm năm 2026 có thể vẫn nên dùng TSDF.}
+\h{Bạn có một bản đồ dày và loop closure vừa xảy ra, dịch chuyển các keyframe đi vài mét. Chuyện gì phải xảy ra với bản đồ dày, và vì sao đó là vấn đề khó hơn với TSDF so với với surfel?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{C/16/01}
+
+Mọi chương trước làm việc với bản đồ thưa: vài nghìn điểm \(3\)D, mỗi điểm ứng với một góc hoặc một đốm trong ảnh. Bản đồ ấy đủ cho việc định vị --- đó là toàn bộ nội dung Phần~B --- và nó rẻ.
+
+Nó không đủ cho gần như mọi thứ khác. Một robot không thể lập kế hoạch đường đi từ một đám mây điểm thưa, vì giữa hai điểm có thể là không gian trống hoặc có thể là một bức tường và bản đồ không nói. Một hệ AR không thể đặt một vật ảo lên bàn nếu nó không biết mặt bàn ở đâu. Một hệ quét không thể xuất ra một mô hình.
+
+Bài toán gốc: \emph{từ cùng những ảnh ấy, dựng một mô tả bề mặt hoặc thể tích của cảnh}.
+
+Ai gặp bài toán này? Ba nhóm với ba yêu cầu rất khác nhau, và gộp chúng là một lỗi phổ biến vì nó dẫn tới việc chọn sai biểu diễn.
+
+\emph{Nhóm một --- điều hướng.} Robot cần biết chỗ nào đi được. Yêu cầu: đúng về mặt an toàn (thà báo có chướng ngại khi không có còn hơn ngược lại), cập nhật nhanh, và ở một biểu diễn mà bộ lập kế hoạch dùng trực tiếp được. \emph{Không} cần đẹp.
+
+\emph{Nhóm hai --- tương tác.} AR, robot gắp vật. Cần bề mặt chính xác ở vùng quan tâm, với pháp tuyến. Cần đẹp ở mức đủ để không gây khó chịu.
+
+\emph{Nhóm ba --- tái tạo.} Quét để lưu trữ, để in \(3\)D, để dựng mô hình. Cần chính xác và đẹp; \emph{không} cần thời gian thực.
+
+Ba nhóm ấy dẫn tới ba lựa chọn biểu diễn khác nhau, và phần lớn nhầm lẫn trong lĩnh vực này đến từ việc đọc một bài báo viết cho nhóm ba rồi áp dụng cho nhóm một.
+
+Có một câu hỏi thứ hai, ít được hỏi thẳng và quan trọng hơn: \emph{bản đồ dày có giúp việc định vị không?} Trực giác nói có --- nhiều dữ liệu hơn thì tốt hơn. Mục~4 lập luận rằng câu trả lời chủ yếu là \emph{không}, và hiểu vì sao là hiểu được vị trí đúng của cả chương này.
+
+\begin{trucgiac}
+Hình dung sự khác nhau giữa một tấm bản đồ du lịch và một mô hình sa bàn.
+
+Bản đồ du lịch có vài chục ký hiệu: nhà thờ ở đây, ga tàu ở kia, ngã tư ở đó. Nó đủ để bạn biết mình đang ở đâu và đi hướng nào. Nó nhẹ, bạn gấp bỏ túi được, và nó không nói gì về việc vỉa hè cao bao nhiêu centimet.
+
+Sa bàn thì mô phỏng cả thành phố --- từng bức tường, từng bậc thềm. Nó nặng, tốn công dựng, nhưng nó trả lời được những câu mà bản đồ không trả lời được: cái xe đẩy của tôi có qua được chỗ này không? Cái kệ này có đủ chỗ đặt vật kia không?
+
+Hai thứ phục vụ hai mục đích, và đây là chỗ trực giác hay sai: \emph{sa bàn không giúp bạn định vị tốt hơn bản đồ}. Để biết mình đang ở đâu, bạn vẫn nhìn nhà thờ và ga tàu --- những thứ dễ nhận. Cả một bức tường phẳng của sa bàn không nói gì thêm về vị trí của bạn, vì mọi chỗ trên bức tường ấy trông như nhau.
+
+Đó là toàn bộ mục 4 của chương, phát biểu bằng hình ảnh: thông tin về \emph{vị trí} nằm ở những chỗ \emph{khác biệt}, và bản đồ thưa đã lấy hết những chỗ ấy rồi. Phần dày thêm vào là phần \emph{không khác biệt} --- hữu ích để biết hình dạng thế giới, vô ích để biết mình ở đâu trong đó.
+
+Còn một chuyện nữa. Khi bạn phát hiện mình vẽ sai và phải kéo bản đồ cho đúng (loop closure), thì với tấm bản đồ du lịch, bạn chỉ cần dịch vài chục ký hiệu. Với sa bàn, bạn phải \emph{làm lại} cả một vùng --- và đó là lý do bản đồ dày khó sống chung với SLAM hơn nhiều so với vẻ ngoài.
+\end{trucgiac}
+
+\section{Lấy độ sâu dày}
+\ptrtarget{C/16/02}
+
+\subsection{A. Stereo và giới hạn vật lý}
+
+Với cặp stereo đã hiệu chỉnh, bài toán là tìm disparity cho \emph{mọi} pixel. Khác với \ptr{B/07}, nơi ta chọn vài trăm điểm tốt, ở đây ta phải xử lý cả những pixel không có gì đặc biệt.
+
+SGM \cite{hirschmuller2008sgm} là phương pháp cổ điển vẫn được dùng rộng rãi, và ý tưởng của nó đáng biết. Bài toán đúng là tối ưu một hàm năng lượng hai chiều với số hạng dữ liệu (độ khớp) và số hạng trơn (disparity của pixel cạnh nhau nên gần nhau) --- nhưng tối ưu năng lượng \(2\)D là NP-khó. SGM xấp xỉ bằng cách tối ưu chính xác dọc \emph{nhiều đường một chiều} qua mỗi pixel rồi cộng chi phí lại. Rẻ, song song hoá tốt, và chất lượng đủ cho hầu hết ứng dụng.
+
+Ba vùng mà stereo \emph{chắc chắn} thất bại, và đây là câu trả lời cho câu hỏi mở đầu thứ ba --- điều quan trọng là cả ba là giới hạn \emph{vật lý}, không phải giới hạn thuật toán.
+
+\emph{Một --- vùng không có vân.} Một bức tường trắng: mọi pixel trong một hàng trông giống hệt nhau, nên không có thông tin nào xác định disparity. Không thuật toán nào tạo ra thông tin từ chỗ không có; cái tốt nhất có thể làm là \emph{nội suy} từ biên và \emph{thừa nhận} rằng đó là nội suy.
+
+\emph{Hai --- vùng bị che khuất.} Một phần cảnh nhìn thấy từ camera trái nhưng bị che với camera phải. Không có tương ứng nào tồn tại. Phát hiện được bằng kiểm tra trái-phải, và câu trả lời đúng là đánh dấu ``không biết''.
+
+\emph{Ba --- bề mặt phản chiếu hoặc trong suốt.} Gương, kính, nước, kim loại bóng. Ở đây tệ hơn hai trường hợp trên: khớp điểm \emph{thành công} nhưng nó khớp với ảnh phản chiếu, nên độ sâu thu được là độ sâu của một vật không tồn tại ở đó. Đây là kiểu hỏng im lặng, và nó là lý do robot đâm vào cửa kính.
+
+Ngoài ba vùng ấy, có một giới hạn định lượng chi phối mọi thứ: \(\sigma_z \approx z^2\sigma_d/(bf)\) từ \ptr{A/06}. Nó nói rằng dù thuật toán hoàn hảo, chất lượng độ sâu suy giảm theo bình phương khoảng cách. Một bản đồ dày ở xa là một bản đồ dày \emph{sai}, và vẽ nó ra trông vẫn đẹp.
+
+\subsection{B. Multi-view và độ sâu học được}
+
+Với nhiều khung thay vì hai, ta có multi-view stereo. Lợi ích: nhiều đường cơ sở khác nhau nên nhiều tầm độ sâu được phục vụ tốt; và nhiều góc nhìn nên ít bị che khuất hơn. PatchMatch stereo và các biến thể là chuẩn cho tái tạo ngoại tuyến.
+
+Độ sâu học được (\ptr{B/08} mục~4C) giải quyết được vấn đề vùng không có vân --- vì mô hình mang tiên nghiệm về việc các bề mặt thường trông thế nào. Đây là một đóng góp thật và là chỗ học máy giúp rõ ràng.
+
+Cảnh báo vẫn như ở \ptr{B/08}: kết quả \emph{trông} chắc chắn ở mọi pixel, kể cả những pixel mà hình học không nói gì. Một bản đồ dày hoàn toàn từ độ sâu học được là một bản đồ mà một phần là phép đo và một phần là phỏng đoán, \emph{không có gì phân biệt hai phần}. Với ứng dụng an toàn --- robot tránh chướng ngại --- đó là điều nguy hiểm. Cách xử lý đúng: giữ hai kênh, một cho giá trị và một cho nguồn gốc (đo được hay suy ra), và để bộ lập kế hoạch đối xử với chúng khác nhau.
+
+\section{Bốn họ biểu diễn cổ điển}
+\ptrtarget{C/16/03}
+
+\begin{table}[H]\centering\small
+\caption{Bốn họ biểu diễn. Cột ``dùng cho'' là tiêu chí chọn đúng --- chọn theo việc bạn định làm gì với bản đồ, không theo chất lượng hình ảnh.}
+\label{tab:c16-repr}
+\begin{tabularx}{\linewidth}{@{}L{1.9cm}L{3.0cm}L{3.1cm}Y@{}}
+\toprule
+\textbf{Biểu diễn} & \textbf{Cơ chế} & \textbf{Dùng cho} & \textbf{Hỏng ở}\\
+\midrule
+TSDF & Voxel lưu khoảng cách có dấu; bề mặt là tập mức không; hợp nhất bằng trung bình có trọng số & Tái tạo bề mặt chất lượng cao; quét trong nhà & Bộ nhớ theo thể tích; \textbf{khó biến dạng khi loop closure}\\
+Surfel & Các mảnh bề mặt rời có vị trí, pháp tuyến, bán kính & Khi bản đồ phải \emph{biến dạng} --- ElasticFusion & Không có bề mặt liền; khó truy vấn ``điểm này trống hay đặc''\\
+Octree / occupancy & Chia không gian đệ quy; mỗi ô lưu xác suất bị chiếm & \textbf{Điều hướng} --- trả lời trực tiếp ``chỗ này đi được không'' & Không mô tả bề mặt chính xác; độ phân giải hữu hạn\\
+Mesh & Lưới tam giác & Hiển thị, in \(3\)D, mô phỏng vật lý & Đắt để cập nhật gia tăng; khó xử lý topology thay đổi\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Hai điểm đáng nói kỹ hơn bảng.
+
+\subsection{A. Điều hướng cần ESDF, không cần mesh}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ hai, và là một trong những nhầm lẫn tốn kém nhất trong lĩnh vực.
+
+Bộ lập kế hoạch đường đi không cần biết bề mặt trông thế nào. Nó cần trả lời hai câu: \emph{điểm này có trống không?} và \emph{điểm này cách chướng ngại gần nhất bao xa?} Câu thứ hai đặc biệt quan trọng vì phần lớn bộ lập kế hoạch hiện đại dùng một hàm chi phí dựa trên khoảng cách tới chướng ngại, và chúng cần cả \emph{gradient} của hàm đó.
+
+ESDF trả lời trực tiếp cả hai. Một mesh đẹp thì không --- để trả lời ``cách chướng ngại bao xa'' từ một mesh, bạn phải tính khoảng cách tới tam giác gần nhất, và làm điều đó hàng nghìn lần mỗi chu kỳ lập kế hoạch là quá đắt.
+
+Bài học tổng quát: \emph{chọn biểu diễn theo truy vấn bạn cần trả lời, không theo cái trông giống thế giới nhất}. Một bản đồ occupancy độ phân giải thô mà trả lời truy vấn trong micro giây hữu ích hơn một mesh hoàn hảo mà mỗi truy vấn tốn mili giây.
+
+\subsection{B. Vấn đề biến dạng khi loop closure}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ năm, và là vấn đề kỹ thuật khó nhất của bản đồ dày.
+
+Khi loop closure xảy ra (\ptr{B/11}), các keyframe dịch chuyển --- có thể vài mét. Bản đồ thưa xử lý dễ: mỗi landmark gắn với một keyframe neo, nên nó dịch theo. Bản đồ dày thì khó, và mức khó phụ thuộc vào biểu diễn.
+
+\emph{Với TSDF}, dữ liệu được \emph{hợp nhất} vào một lưới voxel cố định trong không gian. Sau khi các keyframe dịch, lưới ấy không còn đúng --- và không có cách nào ``dịch'' một lưới voxel đã trộn dữ liệu từ nhiều góc nhìn. Cách duy nhất đúng là \emph{tích hợp lại từ đầu} từ các khung gốc, tức phải lưu toàn bộ ảnh độ sâu, tức tốn bộ nhớ khổng lồ. Các cách thoả hiệp: chia bản đồ thành các khối gắn với keyframe (mỗi khối dịch theo keyframe của nó, chấp nhận các đường nối không khớp), hoặc chỉ tích hợp lại vùng bị ảnh hưởng nhiều nhất.
+
+\emph{Với surfel}, mỗi surfel gắn với một keyframe nên nó dịch theo một cách tự nhiên --- đây chính là lý do ElasticFusion \cite{whelan2016elasticfusion} chọn surfel. Cái giá là mất bề mặt liền và khó trả lời truy vấn thể tích.
+
+Đây là một ví dụ rõ về việc \emph{lựa chọn biểu diễn bị chi phối bởi một yêu cầu hệ thống mà tài liệu về biểu diễn không nhắc tới}. Nếu bạn đọc một bài về TSDF mà không nghĩ tới loop closure, bạn sẽ chọn nó rồi phát hiện vấn đề sau nhiều tháng.
+
+\section{Biểu diễn học được: ảnh chụp tại 9/2026}
+\ptrtarget{C/16/04}
+
+\begin{cambay}
+\textbf{Mục này chốt tại tháng 9/2026 và là phần hết hạn nhanh nhất của cả cây.} Lĩnh vực này chuyển động rất nhanh; mọi đánh giá dưới đây nên được rà lại sau sáu tháng.
+
+Ngoài ra, tôi \textbf{không dẫn con số so sánh chất lượng} giữa các phương pháp. Lý do như ở \ptr{B/07}: các chỉ số (PSNR, độ chính xác bề mặt) phụ thuộc mạnh vào bộ dữ liệu và vào cách đo, và các bài báo trong lĩnh vực này thường so với baseline được cài lại chứ không phải số công bố gốc --- đúng cờ đỏ ở \code{research-rules.md} mục 4. Điều tôi đưa ra là đánh giá về \emph{cơ chế} và về \emph{mức trưởng thành cho sản phẩm}, và cả hai đều là phán đoán của tôi chứ không phải kết quả đo.
+\end{cambay}
+
+\subsection{A. NeRF-SLAM}
+
+iMAP \cite{sucar2021imap} và NICE-SLAM \cite{zhu2022niceslam} thay biểu diễn tường minh bằng một mạng: cảnh là các trọng số của mạng, và cả tư thế lẫn trọng số được tối ưu cùng lúc bằng phần dư quang trắc --- về bản chất là một phương pháp direct (\ptr{B/08}) với một biểu diễn cấu trúc rất khác.
+
+Cái được: biểu diễn liên tục, nội suy tự nhiên vào vùng chưa quan sát, bộ nhớ không tỉ lệ với thể tích.
+
+Cái mất, và đây là ba điểm quyết định cho sản phẩm: \emph{chậm} --- render cần lấy mẫu nhiều điểm dọc mỗi tia; \emph{quên} --- một mạng huấn luyện tăng dần có xu hướng quên vùng cũ khi học vùng mới, và cách chữa (giữ lại các khung cũ để huấn luyện lại) làm mất lợi thế bộ nhớ; và \emph{không có bảo đảm} --- không cách nào biết một vùng trong biểu diễn là phép đo hay là ảo giác nội suy.
+
+\subsection{B. 3D Gaussian Splatting}
+
+3DGS \cite{kerbl20233dgs} thay mạng bằng hàng triệu Gaussian \(3\)D dị hướng có màu và độ trong, render bằng phép chiếu và trộn theo thứ tự độ sâu. Điểm quyết định: \emph{không cần lấy mẫu dọc tia}, nên nhanh hơn NeRF nhiều bậc trong khi chất lượng hình ảnh tương đương hoặc hơn.
+
+SplaTAM \cite{keetha2024splatam} và MonoGS \cite{matsuki2024monogs} đưa nó vào SLAM: Gaussian là bản đồ, và tư thế được ước lượng bằng cách tối ưu phần dư quang trắc qua render khả vi.
+
+Đây là hướng nóng nhất tại thời điểm chốt, và lý do dễ hiểu: nó cho hình ảnh đẹp hơn mọi biểu diễn cổ điển với cùng dữ liệu, và nó đủ nhanh để nghĩ tới thời gian thực.
+
+Ba lý do vì sao một robot sản phẩm năm 2026 vẫn có thể nên dùng TSDF --- đây là câu trả lời cho câu hỏi mở đầu thứ tư.
+
+\emph{Một --- truy vấn.} 3DGS tối ưu cho việc \emph{render}, không cho việc trả lời ``điểm này có trống không''. Một đám Gaussian không phải một hàm occupancy, và trích xuất bề mặt hoặc ESDF từ nó là một bước thêm, không rẻ và không được bảo đảm. Với điều hướng, đây là điểm chặn.
+
+\emph{Hai --- bộ nhớ và phần cứng.} Hàng triệu Gaussian, mỗi cái vài chục tham số, cộng với việc render cần GPU. Với một robot dịch vụ chạy trên SoC nhúng, đây là ngân sách không có.
+
+\emph{Ba --- tính dự đoán được và độ trưởng thành.} Chế độ hỏng của TSDF đã được hiểu rõ sau mười lăm năm; chế độ hỏng của 3DGS-SLAM thì chưa. Với sản phẩm, đây là lập luận nặng ký, và nó là cùng lập luận với việc chọn ORB thay vì SuperPoint ở \ptr{B/07} mục~2B.
+
+Đánh giá thẳng thắn của tôi tại 9/2026: 3DGS là một bước tiến thật và rất có thể là tương lai của biểu diễn cảnh; nó \emph{chưa} là lựa chọn cho một robot điều hướng chạy trên phần cứng hạn chế. Với nhóm ba --- tái tạo ngoại tuyến --- nó đã rất mạnh. \ptr{D/22} xếp ``3DGS cho localization thực dụng'' làm một trong tám khoảng trống, và lý do nằm ở ba điểm trên.
+
+\section{Đánh đổi bị bỏ qua}
+\ptrtarget{C/16/05}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ nhất, và là mục mà tôi cho là có giá trị cao nhất của chương.
+
+\emph{Bản đồ dày thường không cho tư thế chính xác hơn bản đồ thưa.} Điều này phản trực giác và đáng dẫn ra lý do.
+
+Thông tin về tư thế nằm ở đâu? Quay lại Jacobian ở \ptr{A/03}: một quan sát đóng góp vào ma trận thông tin tỉ lệ với \emph{gradient} của hàm đo. Với phần dư quang trắc, pixel không có gradient đóng góp \emph{đúng bằng không} (\ptr{B/08} mục~2B). Với phần dư chiếu, một điểm không phân biệt được với lân cận của nó không cho tương ứng đáng tin.
+
+Nói cách khác: \emph{thông tin về tư thế tập trung ở những chỗ có cấu trúc}, và một front-end thưa tốt đã lấy gần hết những chỗ ấy. Phần dày thêm vào chủ yếu là các vùng trơn --- chúng cho biết \emph{hình dạng} bề mặt giữa các điểm đã biết, nhưng chúng không thêm ràng buộc mạnh cho tư thế.
+
+Có ngoại lệ và đáng nêu rõ để công bằng. Trong môi trường rất nghèo đặc trưng --- một hành lang trắng có gradient rất yếu nhưng khác không --- direct method dày khai thác được phần thông tin ít ỏi mà front-end thưa bỏ qua, vì detector cần một cực đại rõ ràng để tồn tại. Đây là lợi thế thật của direct, đã nêu ở \ptr{B/08} mục~2A. Nhưng đó là lợi thế của \emph{phần dư dày}, không phải của \emph{bản đồ dày} --- hai thứ khác nhau: ta có thể dùng phần dư dày để ước lượng tư thế mà vẫn chỉ lưu một bản đồ thưa.
+
+Kết luận thiết kế, và nó gọn: \emph{xây bản đồ dày vì bạn cần nó cho một truy vấn cụ thể --- điều hướng, tương tác, hiển thị --- không phải vì bạn kỳ vọng nó cải thiện định vị}. Nếu mục tiêu là định vị chính xác hơn, hãy đầu tư vào front-end (\ptr{B/07}), vào hiệu chuẩn (\ptr{C/14}), hoặc vào quản lý bản đồ (\ptr{C/13}) --- ba chỗ đó cho lợi ích lớn hơn nhiều trên mỗi đơn vị công sức.
+
+\begin{ungdung}
+\ud{OctoMap \cite{hornung2013octomap}}{Octree occupancy có xác suất; truy vấn nhanh}{Lựa chọn mặc định cho điều hướng; mục 3A}
+\ud{KinectFusion \cite{newcombe2011kinectfusion}}{TSDF thời gian thực trên GPU}{Công trình khai sinh dòng TSDF; đọc để hiểu cơ chế hợp nhất}
+\ud{ElasticFusion \cite{whelan2016elasticfusion}}{Surfel để bản đồ biến dạng được khi loop closure}{Mục 3B --- lựa chọn biểu diễn bị chi phối bởi yêu cầu hệ thống}
+\ud{NICE-SLAM \cite{zhu2022niceslam}}{NeRF phân cấp cho SLAM}{Mục 4A; chú ý vấn đề quên và tốc độ}
+\ud{SplaTAM \cite{keetha2024splatam}, MonoGS \cite{matsuki2024monogs}}{3DGS-SLAM với render khả vi}{Mục 4B; ảnh chụp tại 9/2026, rà lại sau sáu tháng}
+\ud{SGM trong OpenCV}{Stereo dày cổ điển, chạy được trên CPU}{Mục 2A; vẫn là baseline đáng tin cho sản phẩm}
+\end{ungdung}
+
+\begin{duan}{Đo xem bản đồ dày có cải thiện định vị không --- trên dữ liệu của chính bạn}{3 ngày}
+\dmt kiểm mệnh đề ở mục 5 thay vì tin nó, và đồng thời đo cái giá thật của bản đồ dày.
+\ddl một chuỗi RGB-D có chân trị (TUM-RGBD), cộng một chuỗi tự quay trong môi trường \emph{nghèo đặc trưng} --- một hành lang trắng, một phòng trống. Chuỗi thứ hai là chỗ ngoại lệ ở mục 5 có thể xuất hiện.
+\dbc chạy ba cấu hình trên cùng dữ liệu: (a) SLAM thưa thuần (ORB-SLAM3 RGB-D), (b) SLAM thưa \(+\) dựng TSDF \emph{sau} khi đã có tư thế, (c) một hệ dày dùng phần dư quang trắc dày để ước lượng tư thế; đo ATE, bộ nhớ, thời gian mỗi khung cho cả ba; rồi làm một loop closure và đo thời gian cùng chất lượng của việc cập nhật bản đồ dày.
+\dxk bạn có một bảng ba cấu hình với bốn cột. Bạn phải quan sát được: (1) trên chuỗi có đặc trưng tốt, ATE của (a) và (c) gần nhau trong khi bộ nhớ chênh nhau hai bậc --- xác nhận mục 5; (2) trên chuỗi nghèo đặc trưng, (c) có thể thắng rõ --- xác nhận ngoại lệ; (3) chi phí cập nhật bản đồ dày sau loop closure lớn hơn bạn nghĩ, và đó là con số ít ai công bố.
+\dnv \ptr{C/13-quan-ly-ban-do} cho bài toán kích thước ở quy mô này; \ptr{D/20-toi-uu-hieu-nang-va-he-thong} cho ngân sách bộ nhớ thật trên phần cứng nhúng.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì thông tin về tư thế tập trung ở những chỗ \emph{có cấu trúc}, và một front-end thưa tốt đã lấy gần hết những chỗ ấy. Theo Jacobian ở \ptr{A/03}, đóng góp vào ma trận thông tin tỉ lệ với gradient của hàm đo; pixel không có gradient đóng góp đúng bằng không. Phần dày thêm vào chủ yếu là các vùng trơn --- chúng cho biết \emph{hình dạng} bề mặt giữa các điểm đã biết nhưng không thêm ràng buộc mạnh cho tư thế. Ngoại lệ: môi trường rất nghèo đặc trưng, nơi gradient yếu nhưng khác không và detector thưa không tồn tại được. Nhưng đó là lợi thế của \emph{phần dư dày}, không phải của \emph{bản đồ dày} --- ta có thể dùng phần dư dày mà vẫn chỉ lưu bản đồ thưa.}
+\tl{Nó cần một trường khoảng cách --- ESDF --- trả lời trực tiếp hai câu: điểm này có trống không, và cách chướng ngại gần nhất bao xa (kèm gradient, vì phần lớn bộ lập kế hoạch hiện đại dùng hàm chi phí theo khoảng cách). Một mesh đẹp không phải câu trả lời vì để tính khoảng cách tới chướng ngại từ mesh, bạn phải tìm tam giác gần nhất, và làm điều đó hàng nghìn lần mỗi chu kỳ là quá đắt. Bài học tổng quát: \emph{chọn biểu diễn theo truy vấn bạn cần trả lời, không theo cái trông giống thế giới nhất}.}
+\tl{Ba vùng: (a) \emph{không có vân} --- mọi pixel trong một hàng giống hệt nhau nên không có thông tin xác định disparity; (b) \emph{bị che khuất} --- không tương ứng nào tồn tại; (c) \emph{phản chiếu hoặc trong suốt} --- tệ nhất, vì khớp \emph{thành công} nhưng khớp với ảnh phản chiếu, cho độ sâu của một vật không có ở đó, tức hỏng im lặng. Cả ba là giới hạn vật lý vì thông tin \emph{không tồn tại trong dữ liệu} --- không thuật toán nào tạo ra thông tin từ chỗ không có. Cái tốt nhất có thể làm với (a) là nội suy và \emph{thừa nhận} rằng đó là nội suy; với (b) là đánh dấu ``không biết''; với (c) thì chưa có lời giải tốt.}
+\tl{(1) \emph{Truy vấn}: 3DGS tối ưu cho render, không cho việc trả lời ``điểm này có trống không''; một đám Gaussian không phải hàm occupancy, và trích ESDF từ nó là một bước thêm không rẻ và không bảo đảm --- với điều hướng đây là điểm chặn. (2) \emph{Bộ nhớ và phần cứng}: hàng triệu Gaussian cộng yêu cầu GPU, ngoài ngân sách của một SoC nhúng. (3) \emph{Tính dự đoán được}: chế độ hỏng của TSDF đã hiểu rõ sau mười lăm năm, của 3DGS-SLAM thì chưa --- cùng lập luận với việc chọn ORB thay vì SuperPoint ở \ptr{B/07}. Đánh giá của tôi tại 9/2026: 3DGS rất mạnh cho tái tạo ngoại tuyến, chưa phải lựa chọn cho robot điều hướng trên phần cứng hạn chế.}
+\tl{Bản đồ dày phải \emph{biến dạng theo}. Với \textbf{TSDF} điều này khó vì dữ liệu đã được \emph{hợp nhất} vào một lưới voxel cố định trong không gian, và không có cách nào ``dịch'' một lưới đã trộn dữ liệu từ nhiều góc nhìn --- cách duy nhất đúng là tích hợp lại từ đầu, tức phải lưu toàn bộ ảnh độ sâu gốc. Các thoả hiệp: chia thành khối gắn với keyframe (chấp nhận đường nối không khớp), hoặc chỉ tích hợp lại vùng ảnh hưởng nhiều nhất. Với \textbf{surfel} thì dễ hơn nhiều vì mỗi surfel gắn với một keyframe nên dịch theo tự nhiên --- đó chính là lý do ElasticFusion chọn surfel. Đây là ví dụ rõ về việc lựa chọn biểu diễn bị chi phối bởi một yêu cầu hệ thống mà tài liệu về biểu diễn không nhắc.}
+\end{traloi}
+
+\begin{dongian}
+Có hai loại bản đồ. Một tấm bản đồ du lịch gấp bỏ túi, ghi vài chục địa điểm dễ nhận. Và một cái sa bàn mô phỏng cả thành phố tới từng bậc thềm.
+
+Bản đồ du lịch đủ để bạn biết mình ở đâu. Sa bàn thì trả lời được những câu khác: cái xe đẩy của tôi có lọt qua chỗ này không, cái kệ kia có đủ chỗ đặt vật này không.
+
+Và đây là chỗ trực giác hay sai: \emph{sa bàn không giúp bạn định vị tốt hơn}. Để biết mình ở đâu, bạn vẫn nhìn nhà thờ và ga tàu --- những thứ dễ nhận ra. Cả một bức tường phẳng trong sa bàn không nói gì thêm về vị trí của bạn, vì mọi chỗ trên bức tường ấy trông như nhau.
+
+Nên câu hỏi đúng không phải ``bản đồ nào tốt hơn'' mà là \emph{``tôi định dùng bản đồ để làm gì''}. Nếu để biết mình ở đâu, tấm gấp bỏ túi là đủ và rẻ hơn hàng trăm lần. Nếu để quyết định đi lối nào, bạn cần thứ khác --- nhưng không phải sa bàn đẹp, mà là một thứ trả lời nhanh câu hỏi ``chỗ này có đi được không''. Hai thứ đó không giống nhau: một cái nhìn giống thế giới, một cái trả lời nhanh câu hỏi bạn cần hỏi.
+
+Còn một chuyện nữa, ít ai nghĩ tới. Khi bạn phát hiện mình vẽ sai và phải kéo bản đồ lại cho đúng, thì với tấm gấp bỏ túi bạn chỉ cần dịch vài chục ký hiệu. Với sa bàn, bạn phải đập đi làm lại cả một khu --- vì các mảnh đã dính chặt vào nhau và không dịch riêng được. Đó là lý do bản đồ chi tiết khó sống chung với một hệ thống hay phải sửa lại chính mình.
+
+\chuadongian{chỗ không rút gọn được là các bề mặt phản chiếu. Một tấm gương hay một cửa kính cho hệ thống một phép đo \emph{trông hoàn toàn hợp lệ} về một vật không tồn tại ở đó. Khác với vùng trống trơn --- nơi hệ thống biết mình không biết --- ở đây nó tự tin và sai. Chưa có lời giải tốt, và đó là lý do robot vẫn đâm vào cửa kính.}
+\motcau{Xây bản đồ dày vì bạn cần trả lời một câu hỏi cụ thể, không vì bạn kỳ vọng nó giúp bạn biết mình đang ở đâu.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{C/16/06}
+
+Mệnh đề chính --- \emph{bản đồ dày không cải thiện độ chính xác tư thế} --- suy từ cấu trúc Jacobian (cửa a) và kiểm được bằng mini project. Nó bị bác bỏ nếu một hệ dày vượt hệ thưa một cách nhất quán trên các chuỗi \emph{có đặc trưng tốt} --- tức ngoài ngoại lệ đã nêu. Tôi cho là không, nhưng cần nói rõ một giới hạn của lập luận: nó giả định front-end thưa đã \emph{tốt}. Với một front-end thưa kém, bổ sung thông tin dày đúng là có ích, và lúc đó kết luận đúng là ``hãy sửa front-end'' chứ không phải ``hãy dùng dày''.
+
+Mệnh đề thứ hai --- \emph{ba vùng thất bại của stereo là giới hạn vật lý} --- đúng theo định nghĩa cho hai vùng đầu (thông tin không tồn tại). Với vùng thứ ba (phản chiếu) thì \emph{không hoàn toàn}: thông tin \emph{có} tồn tại --- một hệ có thể nhận ra rằng đây là gương nếu nó suy luận về tính nhất quán của hình học phản xạ qua nhiều góc nhìn. Nên phát biểu chặt hơn: \emph{với hình học hai khung thuần tuý thì đó là giới hạn; với suy luận cấp cao hơn thì có thể phát hiện}. Đây là một hướng nghiên cứu chưa được khai thác nhiều.
+
+Mệnh đề thứ ba --- đánh giá về 3DGS tại 9/2026 --- là một phán đoán về mức trưởng thành, và nó là phần dễ hết hạn nhất của cả cây. Nó bị bác bỏ bởi thời gian: nếu trong hai năm nữa có một hệ 3DGS chạy điều hướng trên SoC nhúng với ESDF trích xuất được tin cậy, đánh giá này sai. Tôi cho rằng khả năng đó không nhỏ, và đó là lý do khối \emph{Cạm bẫy} ở mục~4 yêu cầu rà lại sau sáu tháng.
+
+\section{Kết nối}
+\ptrtarget{C/16/07}
+
+Nối lên trên. \ptr{A/01-hinh-hoc-da-thi} cho triangulation và hình học stereo. \ptr{A/06-bat-dinh-va-lan-truyen-sai-so} cho quan hệ \(\sigma_z \approx z^2\sigma_d/(bf)\), thứ chi phối chất lượng của \emph{mọi} bản đồ dày và giải thích vì sao bản đồ dày ở xa là bản đồ dày sai. \ptr{B/08-mo-hinh-phan-du} cho phần dư quang trắc và cho lời cảnh báo về prior độ sâu học được, áp dụng nguyên vẹn ở mục~2B.
+
+Nối ngang. \ptr{C/13-quan-ly-ban-do} là chương mà bài toán kích thước được đặt ra; ở đây nó gay gắt hơn hai tới ba bậc độ lớn, và vấn đề biến dạng khi loop closure ở mục~3B là một bài toán mà chương 13 không gặp. \ptr{C/17-hoc-may-trong-slam} bàn kỹ hơn về các mô hình sinh ra độ sâu và về việc hiệu chuẩn bất định của chúng.
+
+Nối xuống dưới. \ptr{D/20-toi-uu-hieu-nang-va-he-thong} là chỗ ngân sách bộ nhớ và tính toán trở thành ràng buộc cứng --- và bản đồ dày là thứ tiêu tốn ngân sách ấy nhiều nhất. \ptr{D/22-huong-nghien-cuu-con-trong} xếp ``biểu diễn neural cho localization thực dụng'' làm một trong tám khoảng trống, với lý do nằm trọn trong mục~4B.
+
+\begin{tukiem}
+\item Vì sao bản đồ dày thường không cho tư thế chính xác hơn? Trả lời bằng ngôn ngữ gradient và ma trận thông tin, rồi nêu ngoại lệ.
+\item Bộ lập kế hoạch cần biểu diễn nào, và vì sao mesh không phải câu trả lời dù nó mô tả thế giới chính xác hơn?
+\item Nêu ba vùng mà stereo thất bại, và nói vùng nào hỏng im lặng --- tức nguy hiểm nhất.
+\item Vì sao TSDF khó biến dạng sau loop closure còn surfel thì dễ? Nêu hai cách thoả hiệp cho TSDF.
+\item Nêu ba lý do một robot sản phẩm có thể vẫn chọn TSDF thay vì 3DGS năm 2026, và nói lý do nào là điểm chặn cứng.
+\item Một bản đồ dày trộn giữa phép đo và độ sâu học được. Vì sao đó là nguy hiểm cho ứng dụng an toàn, và cách xử lý đúng là gì?
+\item Nếu mục tiêu là định vị chính xác hơn, nêu ba chỗ nên đầu tư thay vì xây bản đồ dày.
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,23 @@
+% 00-map.tex — bản đồ Phần A: có gì, mức đầu tư, thứ tự đọc.
+% Ngày tạo: 2026-09-13 | Sửa gần nhất: 2026-09-13 | Ôn gần nhất: chưa
+% Dependency: ../00-map.tex | Mức độ: điều hướng
+\documentclass[../marker.tex]{subfiles}
+\begin{document}
+\begin{table}[H]\centering\small
+\caption{Bản đồ Phần A: các chương, nội dung, và mức đầu tư đề xuất.}
+\begin{tabularx}{\linewidth}{@{}L{0.8cm}L{3.9cm}YL{1.6cm}@{}}
+\toprule
+\textbf{Ch.} & \textbf{Thư mục} & \textbf{Nội dung} & \textbf{Mức}\\
+\midrule
+1 & \code{01-mo-hinh-camera-va-distortion} & Pinhole, ma trận \(K\), toạ độ chuẩn hoá; méo radial/tangential/rational/KB; vì sao méo làm cong cạnh tag; sai số mô hình so với sai số tham số; principal point sai gây thiên lệch xoay & \muc{3}\\
+2 & \code{02-homography-va-hinh-hoc-phang} & \(H = K[r_1\,r_2\,t]\) và phân rã; điều kiện suy biến và số điều kiện theo diện tích tag; cross-ratio; vì sao tâm chiếu \(\neq\) chiếu của tâm & \muc{2}\\
+3 & \code{03-pnp-va-uoc-luong-tu-the} & P3P và bốn nghiệm; EPnP, DLT; IPPE cho target phẳng; tinh chỉnh bằng sai số tái chiếu; PnP hợp nhất trên nhiều tag; PnP có trọng số & \muc{3}\\
+4 & \code{04-pose-ambiguity-target-phang} & Hai nghiệm của target phẳng; khi nào tệ nhất; biểu hiện nhảy/flicker; vì sao không đồng phẳng khử được triệt để & \muc{3}\\
+5 & \code{05-lan-truyen-sai-so-pixel-sang-pose} & Jacobian và \((J^\top\Sigma^{-1}J)^{-1}\); bốn quan hệ tỉ lệ phải thuộc; vì sao xoay từ tag phẳng gần như không quan sát được; cải thiện tuyến tính theo baseline & \muc{3}\\
+6 & \code{06-hieu-ung-vat-ly-va-quang-hoc} & Rolling shutter, motion blur, lấy mẫu và răng cưa, độ sâu trường ảnh và MTF, bias tâm ellipse, đặc trưng quang học của vật liệu & \muc{2}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent Chương 5 là chương có giá trị cao nhất của cả phần và nên đọc kỹ nhất; bốn quan hệ tỉ lệ trong đó đủ ngắn để thuộc lòng và chúng là công cụ chẩn đoán hằng ngày. Chương 1 và 3 là nền bắt buộc. Chương 4 ngắn nhưng đừng bỏ: nó giải thích hiện tượng mà gần như ai làm marker cũng gặp và ít người gọi đúng tên. Chương 2 đọc lướt được nếu đã quen hình học đa khung nhìn, trừ mục cross-ratio. Chương 6 đọc một lượt rồi quay lại khi gặp triệu chứng cụ thể.
+\end{document}

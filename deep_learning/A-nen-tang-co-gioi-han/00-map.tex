@@ -1,0 +1,19 @@
+% 00-map.tex — bản đồ Phần A: có gì, mức đầu tư, thứ tự đọc.
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: ../00-map.tex | Mức độ: điều hướng
+\documentclass[../deep_learning.tex]{subfiles}
+\begin{document}
+\begin{table}[H]\centering\small
+\caption{Bản đồ Phần A: các chương, nội dung, và mức đầu tư đề xuất.}
+\begin{tabularx}{\linewidth}{@{}L{0.8cm}L{4.0cm}YL{2.6cm}@{}}
+\toprule
+\textbf{Ch.} & \textbf{Thư mục} & \textbf{Nội dung} & \textbf{Mức}\\
+\midrule
+1 & \code{01-toan-toi-thieu} & Ngôn ngữ toán tối thiểu: đại số tuyến tính, vi phân và tối ưu, xác suất và lý thuyết thông tin, hình học biến đổi và xử lý tín hiệu & tham khảo, tra khi cần\\
+2 & \code{02-vat-ly-tao-anh} & Ảnh sinh ra thế nào: ánh sáng và nhiễu, ISP và không gian màu, mô hình camera và hình học nhiều view, cảm biến ngoài RGB và nguồn gốc domain gap & \textbf{cốt lõi}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent Chương 1 đọc lướt rồi quay lại từng mục khi phần B và C cần đến; chương 2 đọc kỹ ngay, vì phần lớn khoảng cách giữa huấn luyện và triển khai sinh ra ở đó.
+\end{document}

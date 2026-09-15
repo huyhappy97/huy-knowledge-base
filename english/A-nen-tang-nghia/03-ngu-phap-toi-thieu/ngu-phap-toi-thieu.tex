@@ -1,0 +1,218 @@
+% ============================================================================
+%  A/03-ngu-phap-toi-thieu — file chương
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+%  Dependency: A/01. Mức độ: cốt lõi (nhưng chỉ ở mức tối thiểu, cố ý).
+% ============================================================================
+\documentclass[../../english.tex]{subfiles}
+\begin{document}
+\chapter{Ngữ pháp tối thiểu để đọc đúng (Just Enough Grammar)}
+\ptrtarget{A/03}\ptrtarget{A/03-ngu-phap-toi-thieu}
+\dependency{\ptr{A/01} cho ba tầng nghĩa. Chương này là công cụ: đọc lướt một lượt để biết có gì, rồi quay lại đúng mục khi vướng một câu cụ thể.}
+
+\begin{tomtat}
+Chương này không dạy ngữ pháp để làm bài tập. Nó dạy đúng lượng ngữ pháp cần để \emph{tách một câu học thuật dài thành các phần} và đọc ra thông tin mà cấu trúc đang mang. Bảy kỹ năng: tìm mệnh đề chính, xác định bổ nghĩa dính vào đâu, đọc nghĩa của thì và thể trong văn khoa học, đọc mức cam kết qua động từ tình thái, gỡ danh hoá, xử lý câu bị động, và đọc dấu câu như tín hiệu cấu trúc. Kèm theo là một mục riêng về ba lỗi mà người Việt hay mắc nhất --- mạo từ, số nhiều, và giới từ --- vì chúng vừa là lỗi viết vừa là chỗ đọc sót nghĩa. Nếu chỉ nhớ một điều: câu dài không khó vì từ khó mà vì bạn chưa tách được đâu là xương sống và đâu là phần treo vào xương sống.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mệnh đề (clause)}{một đơn vị có chủ ngữ và động từ hữu hạn. Câu học thuật dài thường gồm một mệnh đề chính cộng nhiều mệnh đề phụ.}
+\kn{động từ hữu hạn (finite verb)}{động từ mang thì --- \emph{shows}, \emph{showed} --- khác với dạng không hữu hạn như \emph{showing}, \emph{to show}, \emph{shown}. Tìm động từ hữu hạn là bước đầu để tìm mệnh đề.}
+\kn{bổ nghĩa (modifier)}{phần thêm thông tin cho một thành phần khác: cụm giới từ, mệnh đề quan hệ, cụm phân từ.}
+\kn{danh hoá (nominalisation)}{biến động từ hoặc tính từ thành danh từ: \emph{analyse} \(\rightarrow\) \emph{analysis}, \emph{accurate} \(\rightarrow\) \emph{accuracy}. Đặc trưng của văn học thuật và là nguồn gây nặng câu.}
+\kn{thể (aspect)}{cách nhìn sự việc theo thời gian: hoàn thành (\emph{have shown}) hay tiếp diễn (\emph{is showing}), khác với \emph{thì} là mốc thời gian.}
+\kn{động từ tình thái (modal)}{\emph{may, might, can, could, should, must, will} --- mang mức chắc chắn hoặc mức bắt buộc, và trong văn khoa học chúng mã hoá mức cam kết (\ptr{B/08}).}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao một câu bốn dòng trong bài báo lại khó, dù bạn biết hết các từ trong đó?}
+\h{Trong văn khoa học, dùng thì hiện tại đơn hay quá khứ đơn không phải chuyện tuỳ ý. Quy tắc thật sự là gì?}
+\h{Danh hoá làm câu trang trọng hơn --- vậy vì sao mọi sách viết tốt đều khuyên hạn chế nó?}
+\h{Tiếng Việt không có mạo từ. Điều đó gây ra hiểu sót gì khi \emph{đọc}, chứ không chỉ lỗi khi viết?}
+\h{Hai câu chỉ khác nhau một dấu phẩy trước \emph{which} có thể nói hai điều khác nhau. Khác thế nào?}
+\end{khoigoi}
+
+Hãy lấy một câu điển hình trong phần thảo luận của một bài báo kỹ thuật:
+
+\begin{quote}
+\emph{Although the loop-closure module, which relies on a bag-of-words index built offline, occasionally produces false positives in scenes with repetitive structure, the geometric verification stage rejects most of them before they can corrupt the pose graph.}
+\end{quote}
+
+Câu này dài 40 từ và không có từ nào đặc biệt khó. Cái khó nằm ở chỗ khác: bạn phải giữ trong đầu ba tầng lồng nhau và biết chúng nối vào đâu. Người đọc thành thạo không đọc tuần tự từ trái sang phải --- họ tìm xương sống trước, rồi mới treo các phần còn lại lên.
+
+Xương sống của câu trên là: \emph{the geometric verification stage rejects most of them}. Mọi thứ còn lại là bổ nghĩa và nhượng bộ. Khi đã thấy điều đó, câu trở nên đơn giản: dù mô-đun đóng vòng thỉnh thoảng sai, khâu kiểm chứng hình học loại được phần lớn các lỗi đó.
+
+Chương này dạy đúng kỹ năng tách như vậy, cộng thêm cách đọc ra thông tin mà các lựa chọn cấu trúc đang mang. Lượng ngữ pháp cần cho việc đó nhỏ hơn nhiều so với một giáo trình ngữ pháp --- và đó là lý do chương này cố ý ngắn.
+
+\section{Kỹ năng 1: tìm mệnh đề chính}
+
+Quy trình ba bước, làm được trong vài giây sau khi quen.
+
+\emph{Bước 1 --- đóng ngoặc mọi cụm giới từ.} Cụm bắt đầu bằng \emph{of, in, on, with, for, by, from, between, under, through}\ldots{} gần như luôn là bổ nghĩa. Tạm bỏ chúng ra.
+
+\emph{Bước 2 --- đóng ngoặc mọi mệnh đề phụ.} Chúng bắt đầu bằng từ nối (\emph{although, because, if, while, when, since, whereas}) hoặc bằng đại từ quan hệ (\emph{which, that, who, where}).
+
+\emph{Bước 3 --- cái còn lại là chủ ngữ và động từ chính.} Nếu còn nhiều hơn một động từ hữu hạn, câu có hai mệnh đề độc lập nối bằng \emph{and}, \emph{but}, hoặc dấu chấm phẩy.
+
+Áp vào câu ví dụ: bỏ \emph{Although\ldots repetitive structure} (mệnh đề nhượng bộ), bỏ \emph{which relies on\ldots offline} (mệnh đề quan hệ), bỏ \emph{before they can corrupt the pose graph} (mệnh đề thời gian). Còn lại đúng xương sống.
+
+\begin{capdoi}[Tách xương sống của một câu dài]
+\truoc{\emph{Although the loop-closure module, which relies on a bag-of-words index built offline, occasionally produces false positives in scenes with repetitive structure, the geometric verification stage rejects most of them before they can corrupt the pose graph.}}
+\sau{Xương sống: \emph{the geometric verification stage rejects most of them}. Nhượng bộ: \emph{although\ldots{} false positives}. Bổ nghĩa cho \emph{module}: \emph{which relies on\ldots{}}. Giới hạn thời gian: \emph{before\ldots{}}}
+\vico{Đọc theo thứ tự này thì bạn nắm được khẳng định chính ngay, rồi mới nạp các điều kiện. Đọc tuần tự thì bạn phải giữ ba tầng trong trí nhớ làm việc cùng lúc --- đó mới là chỗ khó, không phải từ vựng.}
+\end{capdoi}
+
+\section{Kỹ năng 2: bổ nghĩa dính vào đâu}
+
+Tiếng Anh cho phép bổ nghĩa đứng xa thành phần nó bổ nghĩa, và đây là nguồn mơ hồ thường xuyên. Ba trường hợp đáng chú ý.
+
+\emph{Cụm giới từ liên tiếp.} \emph{The effect of noise on the accuracy of the estimator} --- mỗi cụm bổ nghĩa cho danh từ ngay trước nó, tạo thành chuỗi. Khi có quá ba cụm liên tiếp, câu bắt đầu khó và đó cũng là dấu hiệu tác giả nên viết lại (\ptr{C/11}).
+
+\emph{Mệnh đề quan hệ rút gọn.} \emph{The data collected in 2019 show a clear trend} --- \emph{collected} ở đây không phải động từ chính mà là dạng rút gọn của \emph{which were collected}. Người đọc chưa quen dễ hiểu nhầm \emph{collected} là động từ chính và mất phương hướng khi gặp \emph{show}. Mẹo nhận biết: nếu sau danh từ có một phân từ (\emph{-ed} hoặc \emph{-ing}) mà câu vẫn chưa có động từ hữu hạn, đó là mệnh đề rút gọn.
+
+\emph{Danh từ ghép dài.} Văn kỹ thuật tiếng Anh cho phép xâu chuỗi danh từ: \emph{a real-time visual odometry failure detection module}. Quy tắc đọc: danh từ cuối cùng là danh từ chính, mọi thứ trước nó bổ nghĩa, và đọc ngược từ phải sang trái --- \emph{module} \(\rightarrow\) để \emph{detection} \(\rightarrow\) của \emph{failure} \(\rightarrow\) trong \emph{visual odometry} \(\rightarrow\) chạy \emph{real-time}.
+
+\section{Kỹ năng 3: thì và thể mang thông tin gì}
+
+Đây là mục có giá trị trực tiếp nhất cho việc đọc và viết bài báo, vì cách dùng thì trong văn khoa học khá quy ước và mang ý nghĩa rõ ràng.
+
+\emph{Hiện tại đơn} dùng cho ba việc: phát biểu điều được coi là đúng chung (\emph{Gravity affects the accelerometer bias}); mô tả nội dung của chính bài viết hoặc của một hình (\emph{Section 3 describes the method}; \emph{Figure 2 shows the trajectory}); và trình bày kết quả như một sự thật đã xác lập.
+
+\emph{Quá khứ đơn} dùng cho những gì \emph{bạn đã làm} trong nghiên cứu này, gắn với thời điểm cụ thể: \emph{We collected 40 sequences}; \emph{The system failed in three runs}.
+
+\emph{Hiện tại hoàn thành} dùng cho lịch sử nghiên cứu, khi tác giả nói về những gì cộng đồng đã làm mà không nêu thời điểm cụ thể: \emph{Several studies have addressed this problem}. Chuyển sang quá khứ đơn khi nói tới một công trình cụ thể: \emph{Smith et al.\ (2019) addressed this problem by\ldots}
+
+Sự phân công đó có ý nghĩa khi đọc: khi tác giả viết \emph{The method achieves 2 cm accuracy} ở hiện tại đơn, họ đang trình bày như một tính chất của phương pháp; khi viết \emph{The method achieved 2 cm accuracy on our test set}, họ đang thu hẹp về một lần đo cụ thể. Khác biệt về phạm vi này chính là thứ mà \ptr{A/01} gọi là tầng ý định.
+
+\section{Kỹ năng 4: động từ tình thái là thang cam kết}
+
+Trong văn khoa học, các động từ tình thái không diễn tả khả năng theo nghĩa đời thường mà mã hoá mức chắc chắn của tác giả. Thang đại khái từ mạnh xuống nhẹ: \emph{will} và \emph{must} (rất mạnh, hiếm dùng cho kết quả thực nghiệm) $>$ \emph{can} (khả năng đã được chứng minh) $>$ \emph{should} (kỳ vọng dựa trên lý lẽ) $>$ \emph{may} và \emph{might} (khả năng, dè dặt) $>$ \emph{could} (dè dặt nhất, thường trong phần bàn về hạn chế).
+
+Kết hợp với các trạng từ và động từ báo cáo ở \ptr{A/01}, bạn có một hệ thống khá tinh vi để đọc ra chính xác mức tự tin của tác giả --- và để viết đúng mức của mình. Chương \ptr{C/14} khai thác trọn vẹn hệ thống này.
+
+\section{Kỹ năng 5: gỡ danh hoá}
+
+Danh hoá là hiện tượng biến động từ thành danh từ, và nó tràn ngập văn học thuật: \emph{implementation, evaluation, optimisation, verification}. Với người đọc, danh hoá gây khó vì nó \emph{giấu mất ai làm gì}: câu \emph{Verification of the results was performed} không nói ai kiểm chứng.
+
+Kỹ thuật đọc: khi gặp một danh từ trừu tượng kết thúc bằng \emph{-tion, -ment, -ance, -ity}, hãy tự hỏi ``động từ gốc là gì, và ai là người thực hiện''. Việc phục dựng lại chủ thể và hành động thường làm câu sáng ra ngay.
+
+Kỹ thuật viết thì ngược lại và được nói kỹ ở \ptr{C/11}: đưa nhân vật về làm chủ ngữ, đưa hành động về làm động từ.
+
+\begin{capdoi}[Gỡ danh hoá khi đọc và khi viết]
+\truoc{\emph{The implementation of the proposed modification resulted in an improvement in the stability of the estimation.}}
+\sau{\emph{After we modified the estimator, it became more stable.}}
+\vico{Bản đầu có bốn danh từ trừu tượng và một động từ rỗng nghĩa (\emph{resulted in}). Bản sau đưa \emph{we} và \emph{estimator} về làm chủ thể, và biến các danh từ thành động từ, tính từ. Cùng nội dung, ngắn hơn một nửa, và quan trọng hơn: người đọc biết \emph{ai làm gì}.}
+\end{capdoi}
+
+\section{Kỹ năng 6: câu bị động và ba dấu câu quan trọng}
+
+\emph{Bị động} bị mang tiếng oan. Nó có ba công dụng chính đáng trong văn khoa học: khi tác nhân không quan trọng (\emph{The samples were stored at 4\textdegree C}); khi tác nhân đã rõ; và khi bạn muốn giữ thông tin cũ ở đầu câu để mạch văn trôi (\ptr{C/12}). Vấn đề chỉ xuất hiện khi bị động dùng để \emph{trốn tránh trách nhiệm} --- \emph{Mistakes were made} --- hoặc khi nó chồng lên danh hoá làm câu mất hẳn chủ thể.
+
+Khi đọc, hãy tập phản xạ phục dựng tác nhân: câu bị động nào cũng có một câu chủ động tương ứng, và việc hỏi ``ai làm việc này'' thường lộ ra thông tin tác giả không nói rõ.
+
+\emph{Ba dấu câu} mang thông tin cấu trúc, và người học hay bỏ qua.
+
+Dấu chấm phẩy nối hai mệnh đề độc lập có quan hệ chặt; nó báo ``câu sau giải thích hoặc đối lập với câu trước''.
+
+Dấu hai chấm báo ``phần sau là nội dung cụ thể của điều vừa nói'' --- một danh sách, một giải thích, hoặc một ví dụ.
+
+Dấu phẩy trước \emph{which} thay đổi nghĩa. \emph{The sensors that failed were replaced} nghĩa là chỉ những cảm biến hỏng mới được thay --- mệnh đề xác định, thu hẹp phạm vi. \emph{The sensors, which failed, were replaced} nghĩa là tất cả cảm biến đều hỏng và tất cả được thay --- mệnh đề không xác định, chỉ bổ sung thông tin. Đây là câu trả lời cho câu hỏi mở đầu thứ năm, và trong văn kỹ thuật, khác biệt này có thể đổi hẳn nội dung.
+
+\section{Ba lỗi của người Việt và chỗ chúng làm bạn đọc sót}
+
+\emph{Mạo từ.} Tiếng Việt không có mạo từ, nên người Việt vừa hay bỏ sót khi viết vừa hay bỏ qua khi đọc. Nhưng mạo từ mang thông tin thật: \emph{a} giới thiệu cái mới, \emph{the} trỏ về cái đã biết hoặc duy nhất, và \emph{không mạo từ} với danh từ số nhiều hoặc không đếm được nói về khái niệm chung. So sánh: \emph{We propose a method} (một phương pháp, mới, trong nhiều phương pháp khả dĩ) và \emph{We propose the method} (nghe như đã nhắc trước đó). Khi đọc, mạo từ cho bạn biết tác giả coi khái niệm này là mới hay đã xác lập --- một tín hiệu về mạch thông tin mà \ptr{C/12} sẽ khai thác.
+
+\emph{Số nhiều và tính đếm được.} Nhiều danh từ trừu tượng trong tiếng Anh không đếm được: \emph{research, information, evidence, software, equipment}. Viết \emph{researches} hay \emph{informations} là lỗi rõ. Ngược lại, \emph{data} về mặt hình thức là số nhiều của \emph{datum}, và trong văn học thuật vẫn thường dùng với động từ số nhiều (\emph{the data show}), dù cách dùng số ít đang phổ biến dần.
+
+\emph{Giới từ.} Đây là phần khó chuyển từ tiếng Việt nhất vì nó gần như hoàn toàn là quy ước kết hợp: \emph{depend on}, \emph{consist of}, \emph{result in}, \emph{differ from}, \emph{comply with}. Cách học duy nhất hiệu quả là học cả cụm chứ không học từ rời --- chủ đề của \ptr{D/17}.
+
+\begin{cambay}
+Cạm bẫy đọc lớn nhất với người Việt không phải từ khó mà là \emph{bỏ qua các từ nhỏ}: mạo từ, giới từ, động từ tình thái, và các cụm giới hạn phạm vi. Chúng ngắn, quen mắt, và mang phần lớn thông tin về mức cam kết cùng phạm vi áp dụng. Thói quen chữa: khi đọc một câu quan trọng, đọc lại lần hai và chỉ chú ý vào các từ có dưới bốn chữ cái.
+\end{cambay}
+
+\section{Gốc rễ: ngữ pháp mô tả và văn phong học thuật}
+
+Ngữ pháp tiếng Anh được dạy cho người học phần lớn dựa trên truyền thống \emph{mô tả}: thay vì quy định thế nào là đúng, các nhà ngữ pháp quan sát cách người bản ngữ thực sự dùng rồi hệ thống hoá. Công trình tham chiếu lớn của truyền thống này xuất hiện năm 1985 với bộ ngữ pháp toàn diện của Quirk và cộng sự\cite{quirk1985} --- gần hai nghìn trang mô tả tiếng Anh như nó được dùng.
+
+Bước tiếp theo có liên hệ trực tiếp với chương này. Năm 1999, nhóm của Biber công bố một bộ ngữ pháp xây trên kho ngữ liệu, so sánh bốn loại văn bản: hội thoại, tiểu thuyết, báo chí và văn học thuật\cite{biber1999}. Kết quả cho thấy văn học thuật khác các loại kia một cách có hệ thống chứ không ngẫu nhiên: mật độ danh hoá cao hơn hẳn, cụm danh từ dài và phức tạp hơn, câu bị động nhiều hơn, và động từ tình thái được dùng theo cách rất riêng để hiệu chỉnh mức cam kết.
+
+Đó là một phát hiện có giá trị thực hành lớn với người học: những đặc điểm khiến văn học thuật khó đọc \emph{không phải ngẫu nhiên hay do tác giả viết dở} --- chúng là đặc trưng thể loại, có thể liệt kê và học được. Bảy kỹ năng trong chương này chính là danh sách phản ứng với các đặc trưng đó: danh hoá thì gỡ, cụm danh từ dài thì đọc ngược, bị động thì phục dựng tác nhân, tình thái thì đọc như thang cam kết.
+
+Ngược lại, phong trào \emph{viết rõ ràng} từ thập niên 1970 tấn công đúng các đặc điểm này khi chúng bị lạm dụng --- và toàn bộ phần C của quyển sách được xây trên các nguyên tắc đó.
+
+\begin{gocre}
+\gr{Truyền thống ngữ pháp mô tả}{Ngữ pháp quy phạm không giải thích được cách người bản ngữ thật sự nói.}{Mô tả thay vì quy định; bộ ngữ pháp tham chiếu của Quirk và cộng sự (1985) là công trình tiêu biểu.}
+\gr{1999 --- Biber và cộng sự}{Ngữ pháp được mô tả chung, không phân biệt loại văn bản.}{Ngữ pháp dựa trên ngữ liệu so bốn thể loại: văn học thuật có mật độ danh hoá, cụm danh từ phức và tình thái rất khác --- khó đọc là \emph{đặc trưng thể loại}, học được.}
+\gr{Thập niên 1970--nay --- phong trào viết rõ ràng}{Văn bản hành chính và khoa học ngày càng khó hiểu.}{Các nguyên tắc về chủ thể--hành động, hạn chế danh hoá và bị động --- nền của phần C.}
+\gr{Ngữ pháp cho người học}{Người học cần tra nhanh một điểm dùng, không cần hai nghìn trang.}{Các sách tra cứu theo vấn đề\cite{swan2016} và sách bài tập theo mục\cite{murphy2019}: dùng như từ điển ngữ pháp, không đọc tuần tự.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Trình biên dịch}{Phân tích cú pháp: tìm cây cú pháp của một câu}{Kỹ năng 1 và 2 chính là phân tích cú pháp làm bằng tay: tìm nút gốc (mệnh đề chính) rồi gắn các nhánh (bổ nghĩa). Cùng vấn đề mơ hồ: một chuỗi có thể có nhiều cây hợp lệ, và ngữ cảnh quyết định cây nào đúng.}
+\lh{Tiếng Việt}{Cấu trúc chủ đề--thuyết minh, không có mạo từ và biến hình}{Tiếng Việt dựa vào trật tự và từ chức năng; tiếng Anh dựa thêm vào biến hình và mạo từ. Hệ quả: người Việt hay bỏ qua chính những dấu hiệu nhỏ mang thông tin lớn --- mạo từ, số nhiều, thì.}
+\lh{Toán học}{Thứ tự ưu tiên và dấu ngoặc}{Việc ``đóng ngoặc cụm giới từ'' ở mục 1 giống hệt việc đặt ngoặc trong biểu thức toán: làm rõ cấu trúc trước khi tính. Câu danh từ ghép dài đọc ngược từ phải sang trái cũng giống đọc một biểu thức lồng.}
+\lh{Pháp lý}{Câu điều kiện và phạm vi trong hợp đồng}{Văn bản luật cực đoan hoá đúng các đặc điểm ở chương này: mệnh đề điều kiện lồng nhau, danh hoá dày đặc, phạm vi được ghi rõ. Đọc một điều khoản hợp đồng là bài tập tách mệnh đề rất tốt.}
+\lh{Viết mã}{Đặt tên biến và độ sâu lồng nhau}{Câu bốn tầng lồng và hàm lồng bốn tầng gây khó vì cùng một lý do: trí nhớ làm việc của người đọc có hạn. Cách chữa cũng giống nhau --- tách ra, đặt tên cho phần trung gian (\ptr{C/11}).}
+\lh{Ngôn ngữ học ngữ liệu}{So sánh thể loại bằng số liệu}{Cho biết văn học thuật khó theo những cách \emph{cụ thể và đếm được}, nên có thể luyện đúng vào đó thay vì ``đọc nhiều rồi quen''.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Vì độ khó nằm ở cấu trúc chứ không ở từ vựng: câu học thuật thường có một mệnh đề chính cộng nhiều tầng bổ nghĩa, và đọc tuần tự buộc bạn giữ cả ba tầng trong trí nhớ làm việc cùng lúc. Cách chữa là tìm xương sống trước --- đóng ngoặc mọi cụm giới từ và mệnh đề phụ, phần còn lại là chủ ngữ và động từ chính --- rồi mới treo các phần khác vào. Sau vài chục lần, thao tác này thành tự động.}
+\tl{Có quy ước khá rõ. Hiện tại đơn cho điều được coi là đúng chung, cho mô tả nội dung bài viết và hình vẽ, và cho kết quả trình bày như tính chất đã xác lập. Quá khứ đơn cho những gì bạn đã làm trong nghiên cứu này, gắn với thời điểm cụ thể. Hiện tại hoàn thành cho lịch sử nghiên cứu chung, chuyển sang quá khứ đơn khi nói về một công trình cụ thể. Khi đọc, sự khác biệt này cho biết tác giả đang phát biểu ở phạm vi rộng hay hẹp.}
+\tl{Vì nó giấu mất chủ thể và hành động. \emph{Verification of the results was performed} không nói ai kiểm chứng và biến hành động thành một danh từ trừu tượng, nên người đọc phải phục dựng lại. Danh hoá không sai và đôi khi cần thiết --- nó cho phép đóng gói một quá trình thành một khái niệm để bàn tiếp --- nhưng khi chồng nhiều lớp thì câu mất hẳn nhân vật. Nguyên tắc ở \ptr{C/11}: nhân vật làm chủ ngữ, hành động làm động từ.}
+\tl{Mạo từ mang thông tin về \emph{trạng thái thông tin}: \emph{a} giới thiệu cái mới, \emph{the} trỏ về cái đã biết hoặc duy nhất, không mạo từ nói về khái niệm chung. Bỏ qua nó khi đọc là bỏ qua tín hiệu về việc tác giả coi khái niệm này đã được thiết lập hay đang giới thiệu lần đầu --- tín hiệu quan trọng để lần theo mạch thông tin của một đoạn (\ptr{C/12}).}
+\tl{Dấu phẩy phân biệt mệnh đề xác định với không xác định. \emph{The sensors that failed were replaced}: chỉ những cảm biến hỏng được thay --- mệnh đề thu hẹp phạm vi. \emph{The sensors, which failed, were replaced}: tất cả cảm biến đều hỏng và tất cả được thay --- mệnh đề chỉ bổ sung thông tin. Trong văn kỹ thuật, khác biệt này đổi hẳn nội dung, và nó cũng là lý do nên viết \emph{that} không phẩy cho mệnh đề xác định.}
+\end{traloi}
+
+\begin{dongian}
+Câu tiếng Anh dài trong bài báo giống một cái cây có một thân chính và nhiều cành. Người mới đọc thường đi lần từ trái sang phải như đi bộ dọc theo mọi cành, nên tới cuối câu thì quên mất mình xuất phát từ đâu. Người quen đọc thì tìm thân trước.
+
+Cách tìm thân rất cơ học: bỏ tạm mọi cụm bắt đầu bằng \emph{of, in, with, for, by}\ldots{} và mọi mệnh đề bắt đầu bằng \emph{although, because, which, that}\ldots{} Cái còn lại là ``ai làm gì''. Sau đó mới gắn từng cành trở lại và hỏi mỗi cành bổ nghĩa cho cái nào.
+
+Có bốn chỗ nhỏ mà người Việt hay lướt qua nhưng lại chứa nhiều thông tin. Thứ nhất là thì: hiện tại đơn nghĩa là ``điều này đúng nói chung'', quá khứ đơn nghĩa là ``chúng tôi đã làm thế trong thí nghiệm này''. Thứ hai là các từ như \emph{may, can, should}: chúng nói mức chắc chắn của tác giả chứ không phải khả năng theo nghĩa thường ngày. Thứ ba là mạo từ: \emph{a} là ``một cái mới'', \emph{the} là ``cái đã nhắc rồi''. Thứ tư là dấu phẩy trước \emph{which}: có phẩy thì cả nhóm đều thế, không phẩy thì chỉ nhóm nhỏ được nói tới.
+
+Cuối cùng, có một kiểu câu rất phổ biến trong bài báo mà nếu không biết mẹo thì đọc rất mệt: câu toàn danh từ trừu tượng, kiểu ``sự thực hiện của việc cải tiến dẫn tới sự cải thiện của độ ổn định''. Mẹo là tự hỏi ``ai làm gì'' rồi dựng lại câu trong đầu thành ``chúng tôi sửa bộ ước lượng, và nó ổn định hơn''. Việc dựng lại đó vừa giúp hiểu, vừa dạy bạn cách viết cho người khác dễ đọc.
+\motcau{Câu dài không khó vì từ khó, mà vì bạn chưa tách được thân với cành.}
+\chuadongian{Có những câu thật sự mơ hồ về mặt cấu trúc, kể cả với người bản ngữ; lúc đó chỉ ngữ cảnh chuyên môn mới quyết định được cách hiểu đúng.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Ba bước tìm mệnh đề chính}{Đóng ngoặc cụm giới từ; đóng ngoặc mệnh đề phụ (\emph{although, because, which, that}\ldots); phần còn lại là chủ ngữ và động từ chính.}
+\ar[3]{Thì trong văn khoa học}{Hiện tại đơn: sự thật chung, mô tả bài viết và hình. Quá khứ đơn: việc bạn đã làm, gắn thời điểm. Hiện tại hoàn thành: lịch sử nghiên cứu chung.}
+\ar[3]{Động từ tình thái là thang cam kết}{\emph{will/must} > \emph{can} > \emph{should} > \emph{may/might} > \emph{could}; đọc chúng như mức tự tin của tác giả, không phải khả năng đời thường.}
+\ar[3]{Gỡ danh hoá}{Gặp danh từ trừu tượng \emph{-tion, -ment, -ance, -ity}: hỏi động từ gốc là gì và ai thực hiện. Khi viết thì làm ngược lại (\ptr{C/11}).}
+\ar[3]{Dấu phẩy trước \emph{which}}{Không phẩy (\emph{that}): mệnh đề xác định, thu hẹp phạm vi. Có phẩy: không xác định, chỉ bổ sung --- áp cho toàn bộ nhóm.}
+\ar[3]{Bốn từ nhỏ hay bị lướt}{Mạo từ (mới hay đã biết), giới từ (quy ước kết hợp), tình thái (mức cam kết), cụm giới hạn phạm vi.}
+\ar[2]{Mệnh đề quan hệ rút gọn}{\emph{The data collected in 2019 show\ldots} --- \emph{collected} là rút gọn của \emph{which were collected}; dấu hiệu là câu chưa có động từ hữu hạn.}
+\ar[2]{Danh từ ghép dài}{Danh từ cuối là chính, đọc ngược từ phải sang trái: \emph{failure detection module} = mô-đun để phát hiện lỗi.}
+\ar[2]{Ba công dụng chính đáng của bị động}{Tác nhân không quan trọng; tác nhân đã rõ; hoặc để giữ thông tin cũ ở đầu câu cho mạch trôi (\ptr{C/12}).}
+\ar[2]{Danh từ không đếm được hay gặp}{\emph{research, information, evidence, software, equipment} --- không có dạng số nhiều.}
+\ar[2]{Dấu chấm phẩy và hai chấm}{Chấm phẩy: hai mệnh đề độc lập quan hệ chặt. Hai chấm: phần sau là nội dung cụ thể của điều vừa nói.}
+\ar[1]{Vì sao văn học thuật khó}{Đó là đặc trưng thể loại đo được: mật độ danh hoá cao, cụm danh từ phức, nhiều bị động, tình thái dùng để hiệu chỉnh cam kết\cite{biber1999}.}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Tôi có cần học lại ngữ pháp một cách hệ thống không?}{Với mục tiêu đọc và viết chuyên ngành thì không cần học tuần tự một giáo trình. Cách hiệu quả hơn: dùng một sách tra cứu theo vấn đề\cite{swan2016} như từ điển --- khi vướng một điểm cụ thể thì tra đúng mục đó. Nếu bạn thấy mình mắc lặp lại một lỗi (mạo từ, thì, giới từ), hãy làm một chương bài tập tập trung vào đúng lỗi đó\cite{murphy2019} rồi quay lại đọc. Học theo lỗi thật của mình hiệu quả hơn nhiều so với học theo mục lục sách.}
+\qa{Bị động có nên tránh trong bài báo không?}{Không tránh, nhưng dùng có lý do. Ba lý do chính đáng ở mục 6. Vấn đề nảy sinh khi bị động che mất chủ thể ở chỗ chủ thể quan trọng --- ví dụ \emph{It was decided to exclude three sequences} khiến người đọc không biết ai quyết định và vì sao. Trong phần phương pháp, nhiều tạp chí nay khuyến khích chủ động với \emph{we} vì nó rõ ràng hơn. Nguyên tắc: nếu người đọc cần biết ai làm, hãy nói ai làm.}
+\qa{Làm sao biết dùng \emph{the} hay không trong câu của mình?}{Ba câu hỏi theo thứ tự. Người đọc đã biết chính xác vật này chưa --- đã nhắc trước đó, hoặc là duy nhất trong ngữ cảnh? Nếu có thì \emph{the}. Nếu đây là lần đầu giới thiệu và danh từ đếm được số ít thì \emph{a}. Nếu bạn đang nói về khái niệm chung với danh từ số nhiều hoặc không đếm được thì không mạo từ: \emph{Deep networks require large datasets}. Ngoài ra có nhiều cụm cố định phải học nguyên cụm --- \emph{in practice}, \emph{in the literature} --- và đó là chuyện của \ptr{D/17}.}
+\qa{Câu của tôi luôn bị nhận xét là quá dài. Cắt thế nào?}{Ba thao tác theo thứ tự hiệu quả. Một, tìm danh hoá và biến lại thành động từ --- thường cắt được một phần ba độ dài. Hai, tách câu tại chỗ có \emph{and} nối hai ý độc lập. Ba, kiểm xem có cụm giới từ nào lặp thông tin đã rõ từ ngữ cảnh không. Nếu sau ba thao tác câu vẫn dài mà rõ thì độ dài không phải vấn đề --- vấn đề là số \emph{tầng lồng nhau}, không phải số từ.}
+\qa{Tôi hay nhầm \emph{that} và \emph{which}. Có quy tắc đơn giản không?}{Quy tắc dùng được: nếu bỏ mệnh đề đi mà câu mất nghĩa cần thiết --- nó xác định bạn đang nói về cái nào --- thì dùng \emph{that} và không dấu phẩy. Nếu mệnh đề chỉ thêm thông tin phụ, bỏ đi câu vẫn đúng ý, thì dùng \emph{which} và có dấu phẩy hai bên. Trong tiếng Anh Anh, \emph{which} không phẩy cũng được chấp nhận cho mệnh đề xác định, nhưng quy tắc trên an toàn ở mọi biến thể và giúp người đọc không hiểu nhầm phạm vi.}
+\qa{Đọc câu dài trong bài báo vẫn chậm dù tôi biết cách tách. Bình thường không?}{Bình thường trong giai đoạn đầu, vì thao tác tách còn tốn ý thức. Nó sẽ tự động hoá sau vài trăm câu, và cách rút ngắn quá trình là luyện có chủ đích: mỗi ngày chọn ba câu dài trong tài liệu của bạn, viết ra xương sống và các tầng bổ nghĩa. Mười lăm phút mỗi ngày trong hai tuần thường đủ để thấy khác biệt rõ --- đây chính là loại bài tập được đưa vào lộ trình ở \ptr{E/21}.}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Lấy 5 câu dài trong tài liệu của bạn và viết ra xương sống của mỗi câu}{Tài liệu ngành}{Chỉ chủ ngữ và động từ chính; sau đó liệt kê từng bổ nghĩa và nó gắn vào đâu.}
+\bt[1]{Đọc một đoạn và đánh dấu mọi động từ tình thái}{Bài báo bất kỳ}{Với mỗi cái, viết một câu nói tác giả cam kết mạnh tới đâu.}
+\bt[2]{Tìm 5 câu danh hoá nặng và viết lại thành câu có chủ thể--hành động}{Tài liệu ngành}{So độ dài trước và sau; ghi lại tỉ lệ cắt được.}
+\bt[2]{Phân tích cách dùng thì trong phần tóm tắt của ba bài báo}{Bài báo ngành}{Ghi lại: câu nào hiện tại đơn, câu nào quá khứ, và vì sao --- rút ra quy luật của ngành bạn.}
+\bt[2]{Viết lại một đoạn của bạn, sửa mọi lỗi mạo từ và số nhiều}{Bài viết của bạn}{Với mỗi danh từ, tự trả lời ba câu hỏi về \emph{the} ở mục hỏi đáp.}
+\bt[3]{Tìm một câu trong tài liệu mà bổ nghĩa có thể gắn vào hai chỗ khác nhau}{Tài liệu ngành}{Viết ra hai cách hiểu và nói ngữ cảnh chuyên môn giúp bạn chọn cách nào.}
+\bt[3]{Chuyển 5 câu bị động thành chủ động và đánh giá câu nào nên giữ bị động}{Bài viết của bạn}{Dùng ba lý do chính đáng ở mục 6 làm tiêu chí.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Chương này cố ý nhỏ: nó chỉ chứa lượng ngữ pháp thực sự cần cho việc đọc và viết chuyên ngành. Ba thứ đáng mang theo: quy trình ba bước tìm mệnh đề chính, cách đọc thì và tình thái như thông tin về phạm vi và mức cam kết, và phản xạ gỡ danh hoá.
+
+Còn một công cụ nữa cho việc đọc: khi gặp một từ chưa từng thấy, bạn không phải lúc nào cũng dừng lại tra. Rất nhiều từ trong tài liệu kỹ thuật được lắp ghép từ những mảnh có nghĩa cố định, và đọc được các mảnh đó cho phép đoán khá chính xác. Đó là nội dung của \ptr{A/04} --- chương khép lại phần nền tảng.
+\end{document}

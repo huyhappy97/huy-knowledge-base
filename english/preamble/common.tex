@@ -1,0 +1,518 @@
+% ============================================================================
+%  preamble/common.tex — style dùng chung cho toàn cây english.
+%  Biên dịch: XeLaTeX + biber. Mọi macro, hộp, font định nghĩa ở đây.
+%  KHÔNG định nghĩa lại bất cứ thứ gì ở file con.
+%  Ngày tạo: 2026-09-06
+% ============================================================================
+\usepackage[a4paper,top=2.3cm,bottom=2.4cm,left=2.4cm,right=2.4cm,headsep=0.6cm]{geometry}
+
+% ---------- font, ngôn ngữ ----------
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Pagella}
+\setsansfont{Lato}[Scale=MatchLowercase, BoldFont={Lato Semibold}]
+\setmonofont{Noto Sans Mono}[Scale=0.86]
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage[vietnamese]{babel}
+
+% ---------- màu ----------
+\usepackage[table]{xcolor}
+\definecolor{inkblue}{HTML}{12395B}
+\definecolor{steel}{HTML}{2E7290}
+\definecolor{accent}{HTML}{C0651C}
+\definecolor{rulecol}{HTML}{CBD7E1}
+\definecolor{violetdark}{HTML}{5A3E8C}
+\definecolor{violetbg}{HTML}{F4F1FA}
+\definecolor{reddark}{HTML}{A63030}
+\definecolor{redbg}{HTML}{FDF1F0}
+\definecolor{bluebg}{HTML}{EDF4F9}
+\definecolor{codebg}{HTML}{F7F7F4}
+\definecolor{tiercol}{HTML}{6E7C89}
+\definecolor{panelbg}{HTML}{F4F7FA}
+\definecolor{amberbg}{HTML}{FDF5EC}
+\definecolor{tblhead}{HTML}{E7EEF4}
+\definecolor{tblalt}{HTML}{F7FAFC}
+\definecolor{tblrule}{HTML}{8FA6B8}
+\definecolor{greendark}{HTML}{2F6B4F}
+\definecolor{greenbg}{HTML}{EFF6F1}
+
+% ---------- bảng, danh sách, hình ----------
+\usepackage{array,longtable,tabularx,booktabs,multirow,makecell}
+\usepackage{etoolbox}
+\arrayrulecolor{tblrule}
+\BeforeBeginEnvironment{tabularx}{\rowcolors{2}{white}{tblalt}}
+\BeforeBeginEnvironment{tabular}{\rowcolors{2}{white}{tblalt}}
+\setlength{\heavyrulewidth}{1.1pt}
+\setlength{\lightrulewidth}{0.5pt}
+\usepackage{enumitem}
+\setlist{leftmargin=1.5em,itemsep=0.22em,topsep=0.4em,parsep=0pt}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds,decorations.pathreplacing,
+                shapes.geometric,shapes.misc,patterns,matrix,chains,scopes}
+\usepackage{pgfplots}\pgfplotsset{compat=1.18}
+\usepackage[most]{tcolorbox}
+\usepackage{emptypage}
+\usepackage{listings}
+\usepackage{colortbl}
+\usepackage[font=small,labelfont={bf,sf},labelsep=period,skip=6pt]{caption}
+\usepackage{titletoc}
+\usepackage[all]{nowidow}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\renewcommand{\arraystretch}{1.18}
+\setlength{\tabcolsep}{5pt}
+
+\tolerance=3000 \emergencystretch=3.5em \hbadness=7000
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
+
+% ---------- tiêu đề ----------
+\usepackage{titlesec}
+\titleformat{\part}[display]
+  {\normalfont\sffamily\bfseries\color{inkblue}\raggedright}
+  {\hfill\begin{tikzpicture}[remember picture,overlay]
+     \node[anchor=north east,inner sep=0pt] at ($(current page.north east)+(-2.2cm,-4.2cm)$)
+       {\fontsize{140}{140}\selectfont\sffamily\bfseries\color{accent!16}\thepart};
+   \end{tikzpicture}%
+   {\large\sffamily\bfseries\color{accent}PHẦN \thepart}}
+  {0.4em}{\fontsize{30}{34}\selectfont\raggedright}
+  [\vspace{0.7em}{\color{accent}\rule{5cm}{2pt}}]
+\titlespacing*{\part}{0pt}{3.2cm}{2.2em}
+
+\titleformat{\chapter}[display]
+  {\normalfont\sffamily\bfseries\color{inkblue}}
+  {\hfill{\fontsize{46}{46}\selectfont\color{accent!75}\thechapter}}
+  {-0.15em}
+  {\raggedright\fontsize{21}{25}\selectfont}
+  [\vspace{0.45em}{\color{rulecol}\titlerule[1.2pt]}]
+\titlespacing*{\chapter}{0pt}{0.4em}{1.7em}
+
+\titleformat{\section}
+  {\normalfont\sffamily\large\bfseries\color{inkblue}}
+  {\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}\thesection}
+  {0.55em}{}
+  [\vspace{-0.42em}{\color{rulecol}\rule{\linewidth}{0.7pt}}]
+\titlespacing*{\section}{0pt}{1.7em}{0.65em}
+
+\titleformat{\subsection}{\normalfont\sffamily\bfseries\color{steel}}{\thesubsection}{0.5em}{}
+\titlespacing*{\subsection}{0pt}{1.15em}{0.3em}
+\titleformat{\subsubsection}{\normalfont\sffamily\bfseries\itshape\color{steel}}{}{0pt}{}
+\titlespacing*{\subsubsection}{0pt}{0.9em}{0.2em}
+\setcounter{secnumdepth}{1}
+\setcounter{tocdepth}{1}
+\renewcommand{\thepart}{\Alph{part}}
+\renewcommand{\thesection}{\ifnum\value{chapter}>0 \thechapter.\fi\arabic{section}}
+
+\titlecontents{chapter}[2.6em]{\vspace{0.5em}\sffamily\bfseries\color{inkblue}}
+  {\contentslabel[\thecontentslabel]{2.4em}}{\hspace*{-2.4em}}
+  {\hfill\normalfont\color{tiercol}\contentspage}
+\titlecontents{section}[5.0em]{\smallskip\small}
+  {\contentslabel[\thecontentslabel]{2.6em}}{}
+  {\titlerule*[0.6pc]{\color{rulecol}.}\small\color{tiercol}\contentspage}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyhead[L]{\footnotesize\sffamily\color{tiercol}\nouppercase{\leftmark}}
+\fancyhead[R]{\small\sffamily\bfseries\color{white}%
+  \colorbox{inkblue}{\makebox[1.5em][c]{\vphantom{Ag}\thepage}}}
+\fancypagestyle{plain}{\fancyhf{}\renewcommand{\headrulewidth}{0pt}%
+  \fancyfoot[C]{\small\sffamily\bfseries\color{white}%
+    \colorbox{inkblue}{\makebox[1.5em][c]{\vphantom{Ag}\thepage}}}}
+
+\captionsetup{labelfont={bf,sf,color=accent},textfont={small}}
+
+% ---------- bookmark cho các khối cấu trúc ----------
+\newcounter{bmblk}
+\newcommand{\bmblock}[1]{%
+  \stepcounter{bmblk}%
+  \bookmark[level=2, dest=bmblk.\thebmblk]{#1}%
+  \hypertarget{bmblk.\thebmblk}{}}
+
+% ---------- BA loại hộp callout, không thêm loại thứ tư ----------
+\tcbset{hopbase/.style={
+  enhanced, breakable, sharp corners=downhill, arc=3pt,
+  boxrule=0pt, leftrule=3pt, toprule=0pt, bottomrule=0pt, rightrule=0pt,
+  left=1.0em, right=1.0em, top=0.65em, bottom=0.65em,
+  before skip=1.1em, after skip=1.1em,
+  fonttitle=\sffamily\bfseries\small, coltitle=white,
+  attach boxed title to top left={xshift=0.9em, yshift=-\tcboxedtitleheight/2},
+  boxed title style={sharp corners=downhill, arc=2pt, boxrule=0pt, left=0.55em, right=0.55em,
+                     top=0.15em, bottom=0.15em},
+  top=1.15em}}
+\newtcolorbox{trucgiac}{hopbase, colback=violetbg, colframe=violetdark,
+  colbacktitle=violetdark, title={TRỰC GIÁC}, before upper={\bmblock{Trực giác}}}
+\newtcolorbox{cambay}{hopbase, colback=redbg, colframe=reddark,
+  colbacktitle=reddark, title={CẠM BẪY}, before upper={\bmblock{Cạm bẫy}}}
+\newtcolorbox{cannho}{hopbase, colback=bluebg, colframe=steel,
+  colbacktitle=steel, title={CẦN NHỚ}, before upper={\bmblock{Cần nhớ}}}
+
+% ---------- tóm tắt đầu tài liệu ----------
+\newtcolorbox{tomtat}{
+  enhanced, breakable, sharp corners=downhill, arc=3pt,
+  colback=panelbg, colframe=inkblue,
+  boxrule=0pt, leftrule=3pt, toprule=0pt, bottomrule=0pt, rightrule=0pt,
+  left=1.0em, right=1.0em, top=1.15em, bottom=0.7em,
+  before skip=0.9em, after skip=1.0em, fontupper=\small,
+  fonttitle=\sffamily\bfseries\small, coltitle=white, colbacktitle=inkblue,
+  attach boxed title to top left={xshift=0.9em, yshift=-\tcboxedtitleheight/2},
+  boxed title style={sharp corners=downhill, arc=2pt, boxrule=0pt, left=0.55em, right=0.55em,
+                     top=0.15em, bottom=0.15em},
+  title={TÓM TẮT}, before upper={\bmblock{Tóm tắt}}}
+
+% ---------- kiến thức nền cần có trước ----------
+\newtcolorbox{nentang}{
+  enhanced, breakable, sharp corners=downhill, arc=3pt,
+  colback=amberbg, colframe=accent,
+  boxrule=0pt, leftrule=3pt, toprule=0pt, bottomrule=0pt, rightrule=0pt,
+  left=1.0em, right=1.0em, top=1.15em, bottom=0.55em,
+  before skip=0.9em, after skip=1.1em, fontupper=\small,
+  fonttitle=\sffamily\bfseries\small, coltitle=white, colbacktitle=accent,
+  attach boxed title to top left={xshift=0.9em, yshift=-\tcboxedtitleheight/2},
+  boxed title style={sharp corners=downhill, arc=2pt, boxrule=0pt, left=0.55em, right=0.55em,
+                     top=0.15em, bottom=0.15em},
+  title={KIẾN THỨC CẦN CÓ TRƯỚC}, before upper={\bmblock{Kiến thức cần có trước}}}
+\newcommand{\kn}[2]{\par\vspace{0.24em}\hangindent=1.15em\hangafter=1\noindent
+  {\color{accent}\rule[0.22em]{0.42em}{0.42em}}\hspace{0.45em}\textbf{#1} --- #2\par}
+
+% ---------- mạch vấn đề -> giải pháp ----------
+\newcounter{machctr}
+\newlength{\machlabw}\setlength{\machlabw}{6.6em}
+\newlength{\machbase}
+\newenvironment{mach}[1][Mạch vấn đề \(\rightarrow\) giải pháp]
+  {\par\medskip\noindent
+   {\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+    \sffamily\bfseries\color{inkblue}#1}\par\nopagebreak\vspace{0.35em}
+   \setcounter{machctr}{0}%
+   \begin{list}{}%
+     {\setlength{\leftmargin}{1.0em}\setlength{\labelwidth}{0pt}\setlength{\labelsep}{0pt}%
+      \setlength{\itemsep}{0.95em}\setlength{\topsep}{0.2em}\setlength{\parsep}{0pt}%
+      \setlength{\listparindent}{0pt}}%
+   \setlength{\machbase}{\leftskip}}
+  {\end{list}\medskip}
+\newcommand{\machrow}[3]{%
+  \ifnum#3=1\par\vspace{0.14em}\fi
+  \leftskip=\machbase \advance\leftskip by \machlabw
+  \noindent\hspace*{-\machlabw}%
+  \makebox[\machlabw][l]{\footnotesize\sffamily\bfseries\color{#1}#2}\ignorespaces}
+\newcommand{\machnum}{%
+  \tikz[baseline=(n.base)]{\node[circle,fill=inkblue,text=white,inner sep=0pt,minimum size=1.15em,
+    font=\scriptsize\sffamily\bfseries] (n) {\arabic{machctr}};}}
+\newcommand{\vd}[1]{\stepcounter{machctr}%
+  \par\vspace{0.1em}%
+  \leftskip=\machbase \advance\leftskip by \machlabw
+  \noindent\hspace*{-\machlabw}%
+  \makebox[\machlabw][l]{\machnum\hspace{0.4em}\footnotesize\sffamily\bfseries\color{reddark}Vấn đề}%
+  \ignorespaces#1\unskip}
+\newcommand{\gp}{\machrow{steel}{Giải pháp}{1}}
+\newcommand{\gd}{\machrow{tiercol}{Giả định}{1}}
+\newcommand{\gia}{\machrow{reddark}{Giá phải trả}{1}}
+\newcommand{\vdm}{\machrow{reddark}{Vấn đề mới}{1}}
+\newcommand{\hq}{\machrow{tiercol}{Hệ quả}{1}}
+\newcommand{\ra}{\ \(\rightarrow\)\ }
+
+% ---------- macro nội dung ----------
+\newcommand{\term}[1]{\textbf{#1}}
+\newcommand{\eng}[1]{\emph{#1}}
+\newcommand{\vn}[2]{\textbf{#1} (\emph{#2})}
+\newcommand{\en}[1]{\textbf{\emph{#1}}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\Ob}[1]{\ensuremath{O(#1)}}          % độ phức tạp
+\newcommand{\Th}[1]{\ensuremath{\Theta(#1)}}
+\newcommand{\Om}[1]{\ensuremath{\Omega(#1)}}
+\newcommand{\lgn}{\ensuremath{\log n}}
+\newcommand{\T}[1]{{\footnotesize\sffamily\color{tiercol}[T#1]}}
+\newcommand{\muc}[1]{{\color{accent}\ifcase#1\or\(\bullet\)\or\(\bullet\bullet\)\or\(\bullet\bullet\bullet\)\fi}}
+\newcommand{\dependency}[1]{%
+  \par\vspace{0.15em}\noindent
+  \hangindent=1.0em\hangafter=1
+  {\footnotesize\sffamily\bfseries\color{white}\colorbox{tiercol}{\vphantom{Ag}PHỤ THUỘC}}\hspace{0.5em}%
+  {\footnotesize\sffamily\color{tiercol}#1}\par\vspace{0.7em}}
+
+% ---------- câu hỏi mở đầu & lời giải cuối chương ----------
+\newcounter{hoictr}
+\newtcolorbox{khoigoi}[1][CÂU HỎI MỞ ĐẦU]{
+  enhanced, breakable, sharp corners=downhill, arc=3pt,
+  colback=violetbg, colframe=violetdark,
+  boxrule=0pt, leftrule=3pt, toprule=0pt, bottomrule=0pt, rightrule=0pt,
+  left=1.0em, right=1.0em, top=1.15em, bottom=0.6em,
+  before skip=1.0em, after skip=1.1em, fontupper=\small,
+  fonttitle=\sffamily\bfseries\small, coltitle=white, colbacktitle=violetdark,
+  attach boxed title to top left={xshift=0.9em, yshift=-\tcboxedtitleheight/2},
+  boxed title style={sharp corners=downhill, arc=2pt, boxrule=0pt, left=0.55em, right=0.55em,
+                     top=0.15em, bottom=0.15em},
+  title={#1}, before upper={\setcounter{hoictr}{0}\bmblock{#1}}}
+\newcommand{\h}[1]{\par\vspace{0.22em}\stepcounter{hoictr}%
+  \hangindent=1.7em\hangafter=1\noindent
+  {\sffamily\bfseries\color{violetdark}Q\thehoictr.}\hspace{0.5em}#1\par}
+\newtcolorbox{traloi}[1][TRẢ LỜI CÂU HỎI MỞ ĐẦU]{
+  enhanced, breakable, sharp corners=downhill, arc=3pt,
+  colback=violetbg, colframe=violetdark,
+  boxrule=0pt, leftrule=3pt, toprule=0pt, bottomrule=0pt, rightrule=0pt,
+  left=1.0em, right=1.0em, top=1.15em, bottom=0.6em,
+  before skip=1.0em, after skip=1.1em, fontupper=\small,
+  fonttitle=\sffamily\bfseries\small, coltitle=white, colbacktitle=violetdark,
+  attach boxed title to top left={xshift=0.9em, yshift=-\tcboxedtitleheight/2},
+  boxed title style={sharp corners=downhill, arc=2pt, boxrule=0pt, left=0.55em, right=0.55em,
+                     top=0.15em, bottom=0.15em},
+  title={#1}, before upper={\setcounter{hoictr}{0}\bmblock{#1}}}
+\newcommand{\tl}[1]{\par\vspace{0.22em}\stepcounter{hoictr}%
+  \hangindent=1.7em\hangafter=1\noindent
+  {\sffamily\bfseries\color{violetdark}A\thehoictr.}\hspace{0.5em}#1\par}
+
+% ---------- NGÂN HÀNG CÂU HỎI có đáp án (dạng dài, cuối mỗi chương) ----------
+% \begin{hoidap} \qa{câu hỏi}{đáp án} ... \end{hoidap}
+\newcounter{qactr}[chapter]
+\newenvironment{hoidap}[1][Câu hỏi ôn tập có đáp án]
+ {\par\medskip\bmblock{#1}%
+  \noindent{\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+   \sffamily\bfseries\color{inkblue}#1}%
+  {\sffamily\small\color{tiercol}\ \ (che phần đáp án, tự trả lời trước)}\par\vspace{0.4em}
+  \setcounter{qactr}{0}\small}
+ {\par\medskip}
+\newcommand{\qa}[2]{\par\vspace{0.45em}\stepcounter{qactr}%
+  \hangindent=2.0em\hangafter=1\noindent
+  {\sffamily\bfseries\color{inkblue}\theqactr.}\hspace{0.5em}#1\par
+  \vspace{0.12em}\hangindent=2.0em\hangafter=0\noindent
+  \hspace*{2.0em}{\color{steel}\rule{0.5pt}{0.85em}}\hspace{0.5em}#2\par}
+
+% ---------- BÀI TẬP: bảng bài luyện, có nguồn và ý cần nhận ra ----------
+% \begin{baitap} \bt[mức]{tên bài}{nguồn}{điều cần nhận ra} ... \end{baitap}
+\newenvironment{baitap}[1][Bài tập]
+ {\par\medskip\bmblock{#1}%
+  \noindent{\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+   \sffamily\bfseries\color{inkblue}#1}%
+  {\sffamily\small\color{tiercol}\ \ (mức: \(\bullet\) khởi động \ \(\bullet\bullet\) chuẩn \ \(\bullet\bullet\bullet\) khó)}\par
+  \vspace{0.45em}\footnotesize
+  \rowcolors{2}{white}{tblalt}%
+  \longtable{@{}p{1.6em}L{4.3cm}L{2.9cm}L{7.2cm}@{}}
+  \toprule
+  & \textbf{Bài} & \textbf{Nguồn} & \textbf{Điều cần nhận ra}\\
+  \midrule
+  \endfirsthead
+  \toprule
+  & \textbf{Bài} & \textbf{Nguồn} & \textbf{Điều cần nhận ra (tiếp)}\\
+  \midrule
+  \endhead}
+ {\bottomrule\endlongtable\par\medskip}
+\newcommand{\bt}[4][2]{{\color{accent}\scriptsize\ifcase#1\or\(\bullet\)\or\(\bullet\bullet\)\or\(\bullet\bullet\bullet\)\fi} & #2 & {\footnotesize\color{tiercol}#3} & #4\\}
+
+% ---------- KINH NGHIỆM NGƯỜI ĐI TRƯỚC ----------
+% \begin{kinhnghiem} \kng{tên người}{kinh nghiệm}{nguồn} ... \end{kinhnghiem}
+\newenvironment{kinhnghiem}[1][Kinh nghiệm người đi trước]
+ {\par\medskip\bmblock{#1}%
+  \noindent{\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+   \sffamily\bfseries\color{inkblue}#1}\par
+  \vspace{0.45em}\footnotesize
+  \rowcolors{2}{white}{tblalt}%
+  \longtable{@{}L{3.3cm}L{8.2cm}L{4.0cm}@{}}
+  \toprule
+  \textbf{Người / trường phái} & \textbf{Điều họ thực sự làm} & \textbf{Nguồn}\\
+  \midrule
+  \endfirsthead
+  \toprule
+  \textbf{Người / trường phái} & \textbf{Điều họ thực sự làm} & \textbf{Nguồn (tiếp)}\\
+  \midrule
+  \endhead}
+ {\bottomrule\endlongtable\par\medskip}
+\newcommand{\kng}[3]{#1 & #2 & {\footnotesize\color{tiercol}#3}\\}
+
+% ---------- LIÊN HỆ NGANG: đối chiếu với lĩnh vực khác ----------
+% \begin{lienhe} \lh{nơi khác}{ý tưởng tương ứng}{giống ở đâu / khác ở đâu} ... \end{lienhe}
+\newenvironment{lienhe}[1][Liên hệ ngang: ý này còn sống ở đâu nữa]
+ {\par\medskip\bmblock{Liên hệ ngang}%
+  \noindent{\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+   \sffamily\bfseries\color{inkblue}#1}\par
+  \vspace{0.45em}\footnotesize
+  \rowcolors{2}{white}{tblalt}%
+  \longtable{@{}L{3.1cm}L{5.0cm}L{7.3cm}@{}}
+  \toprule
+  \textbf{Lĩnh vực} & \textbf{Ý tưởng tương ứng} & \textbf{Giống ở đâu, khác ở đâu}\\
+  \midrule
+  \endfirsthead
+  \toprule
+  \textbf{Lĩnh vực} & \textbf{Ý tưởng tương ứng} & \textbf{Giống ở đâu, khác ở đâu (tiếp)}\\
+  \midrule
+  \endhead}
+ {\bottomrule\endlongtable\par\medskip}
+\newcommand{\lh}[3]{#1 & #2 & #3\\}
+
+% ---------- GỐC RỄ: mốc lịch sử của ý tưởng ----------
+% \begin{gocre} \gr{năm — ai}{bài toán thực tế lúc đó}{điều thay đổi sau đó} ... \end{gocre}
+\newenvironment{gocre}[1][Gốc rễ: ý tưởng này ra đời từ bài toán nào]
+ {\par\medskip\bmblock{Gốc rễ}%
+  \noindent{\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+   \sffamily\bfseries\color{inkblue}#1}\par
+  \vspace{0.45em}\footnotesize
+  \rowcolors{2}{white}{tblalt}%
+  \longtable{@{}L{3.1cm}L{5.6cm}L{6.7cm}@{}}
+  \toprule
+  \textbf{Mốc} & \textbf{Bài toán thúc ép lúc đó} & \textbf{Điều thay đổi sau đó}\\
+  \midrule
+  \endfirsthead
+  \toprule
+  \textbf{Mốc} & \textbf{Bài toán thúc ép lúc đó} & \textbf{Điều thay đổi sau đó (tiếp)}\\
+  \midrule
+  \endhead}
+ {\bottomrule\endlongtable\par\medskip}
+\newcommand{\gr}[3]{#1 & #2 & #3\\}
+
+% ---------- CẶP ĐÔI: câu trước / câu sau khi sửa ----------
+% \begin{capdoi} \truoc{...} \sau{...} \vico{vì sao} ... \end{capdoi}
+\newenvironment{capdoi}[1][Trước và sau]
+ {\par\medskip\bmblock{#1}%
+  \noindent{\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+   \sffamily\bfseries\color{inkblue}#1}\par\vspace{0.4em}\small}
+ {\par\medskip}
+\newcommand{\cdrow}[3]{\par\vspace{0.16em}\noindent
+  \hangindent=3.3em\hangafter=1
+  \makebox[3.2em][l]{\footnotesize\sffamily\bfseries\color{#1}#2}#3\par}
+\newcommand{\truoc}[1]{\cdrow{reddark}{Trước}{#1}}
+\newcommand{\sau}[1]{\cdrow{greendark}{Sau}{#1}}
+\newcommand{\vico}[1]{\cdrow{tiercol}{Vì sao}{\footnotesize\color{tiercol}#1}\vspace{0.35em}}
+
+% ---------- BẢNG SẮC THÁI TỪ ----------
+% \begin{tuvung} \tv{word}{nghĩa lõi}{sắc thái / văn vực}{ví dụ} ... \end{tuvung}
+\newenvironment{tuvung}[1][Sắc thái của các từ gần nghĩa]
+ {\par\medskip\bmblock{#1}%
+  \noindent{\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+   \sffamily\bfseries\color{inkblue}#1}\par
+  \vspace{0.45em}\footnotesize
+  \rowcolors{2}{white}{tblalt}%
+  \longtable{@{}L{2.5cm}L{3.4cm}L{3.6cm}L{5.4cm}@{}}
+  \toprule
+  \textbf{Từ} & \textbf{Nghĩa lõi} & \textbf{Sắc thái / văn vực} & \textbf{Ví dụ dùng đúng}\\
+  \midrule
+  \endfirsthead
+  \toprule
+  \textbf{Từ} & \textbf{Nghĩa lõi} & \textbf{Sắc thái / văn vực} & \textbf{Ví dụ (tiếp)}\\
+  \midrule
+  \endhead}
+ {\bottomrule\endlongtable\par\medskip}
+\newcommand{\tv}[4]{\textbf{#1} & #2 & #3 & \emph{#4}\\}
+
+% ---------- MẪU CÂU DÙNG LẠI ĐƯỢC ----------
+% \begin{mauau} \mc{chức năng}{mẫu câu}{ghi chú} ... \end{mauau}
+\newenvironment{mauau}[1][Mẫu câu dùng lại được]
+ {\par\medskip\bmblock{#1}%
+  \noindent{\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+   \sffamily\bfseries\color{inkblue}#1}\par
+  \vspace{0.45em}\footnotesize
+  \rowcolors{2}{white}{tblalt}%
+  \longtable{@{}L{3.4cm}L{7.4cm}L{4.0cm}@{}}
+  \toprule
+  \textbf{Chức năng} & \textbf{Mẫu câu} & \textbf{Ghi chú}\\
+  \midrule
+  \endfirsthead
+  \toprule
+  \textbf{Chức năng} & \textbf{Mẫu câu} & \textbf{Ghi chú (tiếp)}\\
+  \midrule
+  \endhead}
+ {\bottomrule\endlongtable\par\medskip}
+\newcommand{\mc}[3]{#1 & \emph{#2} & {\footnotesize\color{tiercol}#3}\\}
+
+% ---------- ACTIVE RECALL cuối mỗi chương ----------
+\newenvironment{onbai}[1][Active recall]
+ {\par\medskip\bmblock{Active recall}%
+  \noindent{\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+   \sffamily\bfseries\color{inkblue}#1}%
+  {\sffamily\small\color{tiercol}\ \ (che cột phải, tự trả lời, rồi mở ra đối chiếu)}\par
+  \vspace{0.5em}\footnotesize
+  \rowcolors{2}{white}{tblalt}%
+  \longtable{@{}p{1.75em}L{4.9cm}!{\color{rulecol}\vrule width 0.8pt}L{8.8cm}@{}}
+  \toprule
+  & \textbf{Thuật ngữ / câu hỏi} & \textbf{Trả lời}\\
+  \midrule
+  \endfirsthead
+  \toprule
+  & \textbf{Thuật ngữ / câu hỏi} & \textbf{Trả lời (tiếp)}\\
+  \midrule
+  \endhead}
+ {\bottomrule\endlongtable\par\vspace{0.25em}
+  \noindent{\footnotesize\sffamily\color{tiercol}%
+  {\color{accent}\(\bullet\bullet\bullet\)} phải thuộc \quad
+  {\color{accent}\(\bullet\bullet\)} nên nắm \quad
+  {\color{accent}\(\bullet\)} biết là có}\par\medskip}
+\newcommand{\ar}[3][2]{{\color{accent}\scriptsize\ifcase#1\or\(\bullet\)\or\(\bullet\bullet\)\or\(\bullet\bullet\bullet\)\fi} & \textbf{#2} & #3\\}
+
+% ---------- nói lại thật đơn giản (kỹ thuật Feynman) ----------
+\newtcolorbox{dongian}[1][NÓI LẠI THẬT ĐƠN GIẢN]{
+  enhanced, breakable, sharp corners=downhill, arc=3pt,
+  colback=greenbg, colframe=greendark,
+  boxrule=0pt, leftrule=3pt, toprule=0pt, bottomrule=0pt, rightrule=0pt,
+  left=1.0em, right=1.0em, top=1.15em, bottom=0.65em,
+  before skip=1.1em, after skip=1.1em, fontupper=\small,
+  fonttitle=\sffamily\bfseries\small, coltitle=white, colbacktitle=greendark,
+  attach boxed title to top left={xshift=0.9em, yshift=-\tcboxedtitleheight/2},
+  boxed title style={sharp corners=downhill, arc=2pt, boxrule=0pt, left=0.55em, right=0.55em,
+                     top=0.15em, bottom=0.15em},
+  title={#1}, before upper={\bmblock{Nói lại thật đơn giản}}}
+\newcommand{\motcau}[1]{\par\vspace{0.4em}\noindent
+  {\sffamily\bfseries\footnotesize\color{greendark}Một câu:}\ \emph{#1}\par}
+\newcommand{\chuadongian}[1]{\par\vspace{0.3em}\noindent
+  {\sffamily\bfseries\footnotesize\color{reddark}Chỗ không rút gọn được:}\ #1\par}
+
+% ---------- đường dẫn chéo bấm được ----------
+\makeatletter
+\newcommand{\ptrtarget}[1]{\label{tp:#1}}
+\newcommand{\ptr}[1]{%
+  \@ifundefined{r@tp:#1}{\code{#1}}{\hyperref[tp:#1]{\code{\color{steel}#1}}}}
+\makeatother
+\newcommand{\lk}[3]{%
+  \par\vspace{0.2em}\noindent\hangindent=1.6em\hangafter=1
+  {\footnotesize\sffamily\bfseries\color{steel}\(\hookrightarrow\)\ #2}%
+  {\footnotesize\sffamily\color{tiercol}\ \ \ptr{#1} --- #3}\par\vspace{0.2em}}
+
+% ---------- code ----------
+\lstset{
+  basicstyle=\ttfamily\footnotesize, breaklines=true, breakatwhitespace=true,
+  backgroundcolor=\color{codebg}, frame=leftline, framerule=1.6pt, rulecolor=\color{rulecol},
+  xleftmargin=0.9em, framexleftmargin=0.9em, aboveskip=1em, belowskip=1em,
+  keywordstyle=\color{inkblue}\bfseries, commentstyle=\color{steel}\itshape,
+  stringstyle=\color{reddark}, showstringspaces=false, columns=fullflexible,
+  extendedchars=true, literate={á}{{\'a}}1 {à}{{\`a}}1 {ả}{{\h a}}1 {ô}{{\^o}}1 {ế}{{\'\^e}}1
+}
+\lstdefinestyle{py}{language=Python}
+\lstdefinestyle{cpp}{language=C++}
+
+% ---------- thư mục và liên kết ----------
+\usepackage[backend=biber,style=ieee,sorting=none,maxbibnames=3,url=false,doi=false,isbn=false]{biblatex}
+\usepackage[unicode,colorlinks=true,linkcolor=steel,citecolor=steel,urlcolor=steel,
+  bookmarks=true,bookmarksnumbered=true,bookmarksopen=true,bookmarksopenlevel=1,
+  bookmarksdepth=4]{hyperref}
+\usepackage{bookmark}
+\setcounter{tocdepth}{1}
+\bookmarksetup{depth=4, numbered=true, open=true, openlevel=1}
+
+\DeclareLanguageMapping{vietnamese}{english}
+\DefineBibliographyStrings{english}{%
+  andothers   = {và cộng sự},
+  andmore     = {và nhiều tác giả khác},
+  in          = {trong},
+  jourvol     = {tập},
+  number      = {số},
+  volume      = {tập},
+  edition     = {ấn bản},
+  page        = {tr\adddot},
+  pages       = {tr\adddot},
+  editor      = {chủ biên},
+  editors     = {chủ biên},
+  techreport  = {báo cáo kỹ thuật},
+  phdthesis   = {luận án tiến sĩ},
+  mathesis    = {luận văn thạc sĩ},
+  urlseen     = {truy cập},
+  version     = {phiên bản},
+}
+\addto\captionsvietnamese{%
+  \renewcommand{\partname}{Phần}\renewcommand{\chaptername}{Chương}%
+  \renewcommand{\contentsname}{MỤC LỤC}\renewcommand{\tablename}{Bảng}\renewcommand{\figurename}{Hình}}
+
+% ---------- câu hỏi tự kiểm ngắn ----------
+\newenvironment{tukiem}{\par\medskip\bmblock{Câu hỏi tự kiểm}%
+  {\raisebox{0.06em}{\color{accent}\rule{2.6pt}{0.82em}}\hspace{0.5em}%
+   \sffamily\bfseries\color{inkblue}Câu hỏi tự kiểm}%
+  {\sffamily\small\color{tiercol}\ \ (trả lời không nhìn bài)}%
+  \begin{enumerate}[label=\arabic*.,leftmargin=1.7em]}{\end{enumerate}}

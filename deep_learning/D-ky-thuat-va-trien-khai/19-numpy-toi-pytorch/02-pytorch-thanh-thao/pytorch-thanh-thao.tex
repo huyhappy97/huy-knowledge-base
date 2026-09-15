@@ -1,0 +1,187 @@
+% ============================================================================
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: D/19/01-tu-viet-bang-numpy, B/11-gioi-han-tinh-toan
+%  Mức độ: cốt lõi (tầng 4 — công cụ, sẽ đổi)
+% ============================================================================
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Giai đoạn 2: PyTorch thành thạo (Becoming Fluent in PyTorch)}
+\ptrtarget{D/19-numpy-toi-pytorch/02}\ptrtarget{D/19-numpy-toi-pytorch/02-pytorch-thanh-thao}\ptrtarget{D/19/02}\ptrtarget{D/19/02-pytorch-thanh-thao}
+\dependency{\ptr{D/19/01-tu-viet-bang-numpy} (bắt buộc --- mọi khái niệm ở đây là tên gọi mới của thứ bạn đã cài bằng tay); \ptr{B/11-gioi-han-tinh-toan} (\en{roofline}, memory-bound so với compute-bound --- không có nó thì mục về tăng tốc chỉ là danh sách mẹo).}
+
+\begin{tomtat}
+Mục này đi theo mạch vấn đề \(\rightarrow\) công cụ: mỗi tính năng của PyTorch được giới thiệu qua đúng cái bug hoặc cái nút thắt đã sinh ra nó, chứ không theo thứ tự tài liệu API. Đọc xong bạn đọc được một \en{profile} và biết nên bật \en{AMP}, sửa \en{DataLoader}, hay gọi \code{torch.compile} --- thay vì bật cả ba rồi không biết cái nào có tác dụng. Nếu chỉ nhớ một điều: mọi công cụ tăng tốc ở đây chỉ giúp khi bạn đang nghẽn ở đúng chỗ nó gỡ, nên thứ tự bắt buộc luôn là \emph{đo trước, sửa sau}.
+\end{tomtat}
+
+\begin{nentang}
+\kn{tensor}{mảng nhiều chiều kèm kiểu dữ liệu (\code{dtype}) và thiết bị (\code{device}, CPU hay GPU). Trong bộ nhớ nó chỉ là một dải liên tục cộng với bộ \en{stride} nói mỗi chiều nhảy bao nhiêu phần tử.}
+\kn{đồ thị tính toán (computation graph)}{bản ghi các phép toán đã thực hiện ở lượt xuôi, để lượt ngược biết đi ngược theo đường nào. PyTorch dựng nó \emph{động}, tức mỗi lần lượt xuôi là một đồ thị mới.}
+\kn{epoch, batch, DataLoader}{một \en{epoch} là một lượt đi hết dữ liệu; \en{batch} là nhóm mẫu xử lý cùng lúc; \code{DataLoader} là bộ máy đọc đĩa, giải mã, augment và gom mẫu thành batch --- thường chạy trên CPU và thường là chỗ nghẽn.}
+\kn{độ chính xác hỗn hợp (mixed precision)}{tính phần lớn phép toán ở 16 bit trong khi giữ trọng số và một số phép cộng dồn ở 32 bit. Mục đích là giảm số byte phải nạp qua bộ nhớ, không phải giảm số phép tính.}
+\kn{memory-bound so với compute-bound}{một kernel memory-bound bị chặn bởi băng thông bộ nhớ (làm ít phép tính trên mỗi byte nạp về), compute-bound thì bị chặn bởi năng lực tính toán. Hầu hết mạng thị giác là memory-bound --- lý do AMP có tác dụng.}
+\kn{profiler}{công cụ đo thời gian thực sự của từng kernel và từng giai đoạn, thay vì đoán. Trong PyTorch là \code{torch.profiler}; ở tầng dưới là Nsight.}
+\kn{checkpoint và state\_dict}{\code{state\_dict} là từ điển chứa toàn bộ trọng số và \en{buffer} của mô hình; lưu nó ra đĩa được gọi là checkpoint. Nó \emph{không} chứa mã nguồn, nên vẫn cần đúng phiên bản code để nạp lại.}
+\kn{tính tất định (determinism)}{tính chất chạy lại cùng đầu vào cho ra cùng đầu ra tới từng bit. Trên GPU nó không mặc định, và ép nó thì phải trả giá bằng tốc độ.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Sau giai đoạn 1 bạn biết cơ chế nhưng chưa có công cụ. PyTorch cung cấp công cụ, nhưng nó cung cấp \emph{rất nhiều} công cụ, và tài liệu chính thức tổ chức theo API chứ không theo vấn đề. Hệ quả là kiểu hiểu biết phổ biến nhất: biết gọi \code{amp.autocast} mà không biết nó giúp gì; bật \code{torch.compile} rồi thấy không nhanh hơn và kết luận rằng ``compile không ăn thua''.
+
+Mục này đảo lại thứ tự trình bày. Mỗi công cụ xuất hiện sau đúng cái vấn đề đã sinh ra nó, vì trong nghề, thứ bạn thực sự cần nhớ không phải tên hàm --- tra được trong ba mươi giây --- mà là \emph{ánh xạ từ triệu chứng sang công cụ}. Cần nói rõ đây là nội dung tầng bốn \T{4}: tên API sẽ đổi, và điều đó bình thường; cái không đổi là danh sách các nút thắt.
+
+\lk{D/19/01}{tiền đề}{autograd, buffer và cặp train/eval chỉ là tên gọi mới của đồ thị tính toán, trạng thái và công tắc chế độ mà bạn đã tự cài bằng tay.}
+
+\textbf{Học xong thì làm được gì?} Bạn cầm một vòng lặp huấn luyện chậm gấp ba lần đáng ra, chạy \en{profiler}, và chỉ đúng một dòng cần sửa --- đây chính là kỹ năng bạn đã có với \code{nsys} và \code{perf} ở phía C++/CUDA, lần này áp cho một \en{runtime} có thêm một tầng trừu tượng ở giữa.
+
+\begin{trucgiac}
+\en{Autograd} là một cuốn băng ghi âm chỉ dùng được một lần. Mỗi phép toán trên \en{tensor} có \code{requires\_grad=True} ghi thêm một mục vào băng; \code{backward()} tua ngược băng, tính gradient, rồi \emph{xoá} băng đi. Từ hình ảnh đó suy ra ba điều mà người ta thường phải học bằng cách vấp: gọi \code{backward()} hai lần thì lỗi vì băng đã bị xoá (trừ khi bạn xin \code{retain\_graph}); giữ một tensor còn dính băng trong một danh sách log nghĩa là giữ luôn toàn bộ đoạn băng phía sau nó, nên bộ nhớ phình dần suốt \en{epoch}; và \code{detach()} chỉ đơn giản là cắt băng ở đúng chỗ đó.
+\end{trucgiac}
+
+\subsection{B. Mạch vấn đề \(\rightarrow\) công cụ}
+
+\begin{mach}[Chín nút thắt, theo thứ tự bạn sẽ gặp]
+\item \vd{bug im lặng về bộ nhớ và tính đúng đắn.} \gp hiểu \en{tensor} ở mức bố cục bộ nhớ: \code{dtype}, \code{device}, \en{stride} (mỗi bước theo một chiều nhảy bao nhiêu phần tử trong bộ nhớ), và khác biệt \en{view} với \en{copy}. \hq \code{.view()} thất bại trên tensor không liền mạch, còn \code{.reshape()} âm thầm sao chép --- một \code{.contiguous()} đặt sai chỗ có thể nhân đôi bộ nhớ mà không báo gì.
+\item \vd{không biết đồ thị được dựng và giải phóng lúc nào.} \gp \en{autograd}: \code{backward}, \code{no\_grad}, \code{detach}, và \code{autograd.Function} tuỳ biến khi bạn có công thức gradient riêng. \vdm bug kinh điển: giữ tensor còn đồ thị trong một list để logging, làm rò bộ nhớ suốt epoch.
+\item \vd{trạng thái mô hình không chỉ là trọng số.} \gp \code{nn.Module}: phân biệt \en{parameter} với \en{buffer}, hiểu \code{state\_dict}, dùng \en{hook}, và cặp \code{train()}/\code{eval()}. \gd bạn nhớ rằng thống kê chạy của BatchNorm là \en{buffer} chứ không phải tham số --- nó được lưu, được chuyển \code{device}, nhưng không được optimizer đụng tới.
+\item \vd{GPU đói dữ liệu.} \gp \code{Dataset}/\code{DataLoader}/\code{sampler}, \code{num\_workers}, \code{pin\_memory}, \en{prefetch}, \code{collate\_fn}; và một tầng \en{augmentation} (\repo{albumentations}, transforms v2, hoặc DALI khi CPU không kịp). \hq đây là nút thắt phổ biến nhất và cũng bị bỏ qua nhiều nhất --- xem \ptr{B/11-gioi-han-tinh-toan}.
+\item \vd{framework giấu quá nhiều.} \gp tự viết vòng lặp huấn luyện ít nhất một lần trước khi dùng Lightning hay HF Trainer. \gia vài giờ. \hq sau đó dùng framework là hợp lý, vì bạn đã biết nó đang làm gì và biết chỗ để chọc vào khi nó làm sai.
+\item \vd{bộ nhớ và tốc độ.} \gp \en{AMP} (tính phần lớn phép toán ở 16 bit, giữ trọng số ở 32 bit) với \code{GradScaler}; \en{DDP} (chia batch cho nhiều GPU, mỗi GPU giữ một bản sao mô hình) qua \code{torchrun}, hoặc FSDP khi một GPU không chứa nổi mô hình \cite{rajbhandari2020zero}; và \code{torch.compile} để hợp nhất kernel và giảm chi phí điều phối.
+\item \vd{đo trước khi tối ưu.} \gp \code{torch.profiler}, Nsight, trace viewer. \gd bạn tin số đo hơn tin trực giác --- nguyên tắc đã có ở \ptr{B/11-gioi-han-tinh-toan}.
+\item \vd{kết quả không lặp lại.} \gp \en{seed}, \code{torch.use\_deterministic\_algorithms}, tắt \code{cudnn.benchmark} --- kèm cái giá về tốc độ. \gia đáng kể, và \emph{vẫn không} đảm bảo tái lập giữa hai máy khác GPU. Toàn bộ chủ đề này thuộc \ptr{D/22-tai-lap-va-mlops}.
+\item \hq biết là đủ: viết kernel riêng bằng CUDA hoặc Triton. Cần khi bạn có một mẫu truy cập bộ nhớ đặc thù mà không kernel nào khớp --- hiếm, và thường có cách rẻ hơn.
+\end{mach}
+
+\subsection{C. Stride, view và copy --- bố cục bộ nhớ là thứ thật}
+Đây là chỗ người từ C++ có lợi thế lớn nhất, vì \en{stride} chính là thứ bạn vẫn dùng khi viết kernel: một tensor là một con trỏ, một \en{shape}, và một bộ \en{stride} nói mỗi bước theo mỗi chiều nhảy bao nhiêu phần tử. Hình~\ref{fig:stride} cho thấy vì sao chuyển vị không tốn gì và vì sao \code{.view()} sau đó lại thất bại.
+
+\begin{figure}[H]\centering
+\resizebox{0.92\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  c/.style={draw=steel, fill=bluebg, minimum size=7mm, inner sep=1pt, font=\footnotesize},
+  m/.style={draw=violetdark, fill=violetbg, minimum size=7mm, inner sep=1pt, font=\footnotesize}]
+\node[font=\footnotesize\bfseries, anchor=west] at (0,2.5) {Bộ nhớ (một dải liên tục)};
+\foreach \i/\v in {0/a,1/b,2/c,3/d,4/e,5/f} \node[m] at (\i*0.75,1.9) {\v};
+\node[font=\scriptsize, anchor=west] at (4.7,1.9) {không đổi trong cả hình};
+
+\node[font=\footnotesize\bfseries, anchor=west] at (0,0.9) {\code{x}, shape $(2,3)$, stride $(3,1)$};
+\foreach \i/\v in {0/a,1/b,2/c} \node[c] at (\i*0.75,0.2) {\v};
+\foreach \i/\v in {0/d,1/e,2/f} \node[c] at (\i*0.75,-0.55) {\v};
+\node[font=\scriptsize, anchor=west, align=left] at (2.6,-0.2) {liền mạch \ra \code{.view(6)} chạy};
+
+\begin{scope}[xshift=8.2cm]
+\node[font=\footnotesize\bfseries, anchor=west] at (0,0.9) {\code{x.t()}, shape $(3,2)$, stride $(1,3)$};
+\foreach \i/\v in {0/a,1/d} \node[c] at (\i*0.75,0.2) {\v};
+\foreach \i/\v in {0/b,1/e} \node[c] at (\i*0.75,-0.55) {\v};
+\foreach \i/\v in {0/c,1/f} \node[c] at (\i*0.75,-1.3) {\v};
+\node[font=\scriptsize, anchor=west, align=left] at (1.9,-0.55) {\emph{không} liền mạch \ra \code{.view(6)} \textbf{lỗi};\\ \code{.reshape(6)} âm thầm \emph{sao chép}};
+\end{scope}
+\end{tikzpicture}}
+\caption{Chuyển vị chỉ đổi \en{stride}, không chạm vào bộ nhớ --- nên nó gần như miễn phí. Nhưng \code{.view()} đòi hỏi các phần tử nằm đúng thứ tự trong bộ nhớ, nên nó thất bại; \code{.reshape()} thì không thất bại mà lặng lẽ cấp phát một bản sao. Chính sự ``lặng lẽ'' đó là nguồn của các lần bùng nổ bộ nhớ không giải thích được.}
+\label{fig:stride}
+\end{figure}
+
+Quy tắc thực hành rút ra: dùng \code{.view()} khi bạn \emph{muốn} chương trình báo lỗi nếu bố cục không như bạn nghĩ, và dùng \code{.reshape()} chỉ khi bạn đã chấp nhận cái giá sao chép. Đây là cùng một triết lý với \code{at()} so với \code{operator[]} trong C++: chọn phiên bản ồn ào ở chỗ bạn chưa chắc.
+
+\subsection{D. Parameter, buffer và cặp train/eval}
+Ở giai đoạn 1 bạn đã phải tự trả lời ``cái gì là tham số, cái gì là trạng thái''. PyTorch đặt tên cho câu trả lời đó:
+
+\begin{itemize}
+\item \textbf{Parameter} --- được optimizer cập nhật, có gradient, nằm trong \code{state\_dict}. Ví dụ: $\gamma$, $\beta$ của BatchNorm.
+\item \textbf{Buffer} --- \emph{không} có gradient và optimizer không đụng tới, nhưng vẫn nằm trong \code{state\_dict} và vẫn theo mô hình khi bạn gọi \code{.to(device)}. Ví dụ: \code{running\_mean}, \code{running\_var} của BatchNorm.
+\item \textbf{Biến tạm} --- không lưu, không chuyển; nếu bạn cần nó tồn tại qua một lần lưu checkpoint thì bạn đã chọn sai loại.
+\end{itemize}
+
+Từ đó suy ra vì sao quên \code{model.eval()} là lỗi kinh điển và im lặng: ở chế độ train, BatchNorm dùng thống kê của \emph{batch hiện tại} thay vì buffer, và dropout bật lại. Kết quả là đầu ra phụ thuộc vào việc bạn tình cờ đưa mẫu nào vào cùng batch --- một mẫu đánh giá có thể ra hai kết quả khác nhau chỉ vì bạn đổi thứ tự dữ liệu. Không có exception nào; chỉ có một con số hơi lệch.
+
+\lk{C/12}{hệ quả của}{BatchNorm được đưa vào để ổn định huấn luyện; chính cơ chế ấy làm mô hình phụ thuộc cả batch, nên nó kéo theo hai chế độ hành vi khác nhau.}
+
+\subsection{E. Tăng tốc: đo trước, và biết mỗi đòn bẩy gỡ nút thắt nào}
+Đây là phần bị lạm dụng nhiều nhất, nên bắt đầu bằng nguyên tắc: \emph{mỗi đòn bẩy chỉ giúp khi bạn đang nghẽn ở đúng chỗ nó gỡ}. Hình~\ref{fig:cay-tang-toc} là cây quyết định rút gọn, và Bảng~\ref{tab:don-bay-tang-toc} là phần chi tiết.
+
+\lk{B/11}{ràng buộc bởi}{cây quyết định tăng tốc chỉ là mô hình roofline diễn đạt bằng tên API: nhánh nào đúng phụ thuộc bạn đang bị chặn bởi băng thông, năng lực tính, hay chi phí điều phối.}
+
+\begin{figure}[H]\centering
+\resizebox{0.96\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  q/.style={draw=inkblue, fill=bluebg, rounded corners=3pt, align=center, inner sep=5pt, text width=3.6cm},
+  a/.style={draw=violetdark, fill=violetbg, rounded corners=3pt, align=center, inner sep=5pt, text width=3.7cm, font=\footnotesize},
+  ar/.style={-{Latex[length=2mm]}, draw=steel, thick, font=\scriptsize}]
+\node[q] (r)  at (0,0)     {Chạy \code{torch.profiler}. GPU rảnh bao nhiêu \%?};
+\node[a] (a1) at (5.8,2.6) {\textbf{Nghẽn dataloader:} thêm worker, \code{pin\_memory}, prefetch, DALI};
+\node[q] (q2) at (5.8,-0.2){GPU bận: nhiều kernel nhỏ hay vài kernel to?};
+\node[a] (a2) at (11.6,1.4){\textbf{Nhiều kernel nhỏ} \ra overhead-bound: \code{torch.compile}, CUDA graphs};
+\node[q] (q3) at (11.6,-1.4){Vài kernel to: tỉ lệ tính trên byte nạp thấp?};
+\node[a] (a3) at (17.0,-0.2){\textbf{Memory-bound:} AMP (bf16), \code{channels\_last}};
+\node[a] (a4) at (17.0,-2.8){\textbf{Compute-bound:} chỉ còn cách đổi kiến trúc hoặc giảm độ phân giải};
+\draw[ar] (r)  -- node[above,sloped]{cao} (a1);
+\draw[ar] (r)  -- node[below,sloped]{thấp} (q2);
+\draw[ar] (q2) -- node[above,sloped]{nhỏ} (a2);
+\draw[ar] (q2) -- node[below,sloped]{to} (q3);
+\draw[ar] (q3) -- node[above,sloped]{có} (a3);
+\draw[ar] (q3) -- node[below,sloped]{không} (a4);
+\end{tikzpicture}}
+\caption{Cây quyết định tăng tốc một vòng lặp huấn luyện. Nhánh đầu tiên --- GPU đang rảnh --- là nhánh đúng trong phần lớn trường hợp thực tế, và cũng là nhánh mà mọi mẹo về \code{torch.compile} đều vô dụng.}
+\label{fig:cay-tang-toc}
+\end{figure}
+
+\begin{table}[H]\centering\footnotesize
+\caption{Năm đòn bẩy tăng tốc, và nút thắt mà mỗi cái gỡ.}
+\label{tab:don-bay-tang-toc}
+\begin{tabularx}{\linewidth}{@{}L{2.4cm}YL{2.6cm}Y@{}}
+\toprule
+\textbf{Đòn bẩy} & \textbf{Cơ chế} & \textbf{Gỡ nút thắt nào} & \textbf{Hỏng / vô dụng khi nào}\\
+\midrule
+Sửa DataLoader & Nhiều \en{worker}, \code{pin\_memory}, prefetch, chuyển augmentation lên GPU & GPU đói dữ liệu & Quá nhiều worker làm cạn RAM và tăng thời gian khởi động; augmentation trên GPU tranh chấp với training\\
+AMP (fp16/bf16) & Nửa số byte phải nạp và ghi & Memory-bound & Compute-bound thuần; fp16 tràn số khi không có \code{GradScaler}\\
+\code{channels\_last} & Đổi bố cục sang NHWC cho \en{Tensor Core} & Conv memory-bound & Mô hình có op không hỗ trợ NHWC \ra thêm phép hoán vị, chậm hơn\\
+\code{torch.compile} & Hợp nhất kernel, giảm chi phí điều phối Python & Overhead-bound & Shape động gây biên dịch lại liên tục; \en{graph break} do code Python động\\
+DDP / FSDP & Chia batch (DDP) hoặc chia trọng số (FSDP) qua nhiều GPU & Không đủ thời gian hoặc bộ nhớ & Băng thông liên kết kém \ra \en{all-reduce} nuốt hết lợi ích; batch hiệu dụng đổi nên phải chỉnh \en{learning rate} \cite{goyal2017accurate}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Ví dụ nhỏ nhất cho AMP.} Một tensor kích hoạt cỡ $64\times256\times56\times56$ có $51{,}4$ triệu phần tử. Ở fp32 nó chiếm $205$ MB; ở bf16 chiếm $103$ MB. Trên một GPU có băng thông $900$ GB/s, chỉ riêng việc đọc nó một lần tốn $228\ \mu$s so với $114\ \mu$s. \emph{Ý nghĩa:} nếu tầng đó chỉ làm vài phép tính trên mỗi byte nạp về, AMP cắt gần một nửa thời gian; nếu nó làm rất nhiều phép tính trên mỗi byte, AMP gần như không đổi gì. Đó chính là trục \en{arithmetic intensity} của \ptr{B/11-gioi-han-tinh-toan}, xuất hiện lại dưới dạng một lựa chọn hai dòng code.
+
+\textbf{fp16 hay bf16?} Hai lựa chọn đối lập rõ ràng nên đáng đặt cạnh nhau: fp16 có 10 bit phần định trị và dải mũ hẹp, nên chính xác hơn ở vùng giá trị bình thường nhưng tràn hoặc triệt tiêu về không khi gradient nhỏ --- vì thế nó \emph{bắt buộc} cần \code{GradScaler} để nhân loss lên trước khi lượt ngược \cite{micikevicius2018mixed}. bf16 có cùng dải mũ với fp32 nhưng chỉ 7 bit định trị: kém chính xác hơn, đổi lại gần như không bao giờ tràn và không cần \code{GradScaler}. Trên phần cứng hỗ trợ bf16, mặc định hợp lý là bf16; fp16 chỉ còn lý do tồn tại trên phần cứng cũ.
+
+\begin{lstlisting}[style=py]
+scaler = torch.amp.GradScaler()          # chi can cho fp16
+model = model.to(memory_format=torch.channels_last)
+for x, y in loader:
+    x = x.cuda(non_blocking=True).to(memory_format=torch.channels_last)
+    opt.zero_grad(set_to_none=True)      # set_to_none re hon zero_
+    with torch.amp.autocast("cuda", dtype=torch.bfloat16):
+        loss = criterion(model(x), y.cuda(non_blocking=True))
+    scaler.scale(loss).backward()
+    scaler.step(opt); scaler.update()
+\end{lstlisting}
+
+\subsection{F. Giới hạn và trường hợp hỏng}
+\begin{itemize}
+\item \textbf{\code{torch.compile} không phải nút bấm thần kỳ.} Nó giúp khi bạn đang overhead-bound; nó không giúp gì cho mô hình nghẽn ở dataloader, và nó có thể \emph{chậm hơn} nếu shape đầu vào thay đổi liên tục khiến nó biên dịch lại. Với dữ liệu ảnh có kích thước thay đổi hoặc số hộp phát hiện thay đổi, đây là tình huống thường gặp chứ không phải ngoại lệ.
+\item \textbf{Profiler cũng nói dối nếu bạn đo sai.} Lệnh CUDA là bất đồng bộ, nên đo bằng đồng hồ Python quanh một lời gọi chỉ đo thời gian \emph{xếp hàng}, không đo thời gian chạy. Phải đồng bộ hoá hoặc dùng CUDA event --- một cái bẫy bạn đã gặp ở phía C++, và nó không biến mất khi lên Python.
+\item \textbf{DDP đổi ngữ nghĩa của batch.} Batch hiệu dụng là batch mỗi GPU nhân số GPU, nên mọi siêu tham số phụ thuộc batch (learning rate, lịch warm-up, thống kê BatchNorm) đều đổi theo. Một so sánh ``1 GPU với 8 GPU'' mà không chỉnh learning rate là một so sánh vô nghĩa.
+\item \textbf{Tất định có giá.} Bật \code{use\_deterministic\_algorithms} buộc PyTorch chọn kernel chậm hơn hoặc báo lỗi ở những op không có bản tất định --- và nó vẫn không đảm bảo hai máy khác GPU cho cùng kết quả.
+\end{itemize}
+
+\begin{cambay}
+Rò bộ nhớ vì logging là bug tốn thời gian nhất trong danh sách này, vì triệu chứng xuất hiện sau vài trăm bước chứ không phải ngay lập tức. Viết \code{losses.append(loss)} thì bạn đang giữ luôn toàn bộ đồ thị tính toán dẫn tới \code{loss}, kể cả mọi activation trung gian; sau một epoch, GPU hết bộ nhớ và \en{stack trace} chỉ vào một dòng hoàn toàn vô can. Cách đúng là \code{losses.append(loss.detach())} hoặc \code{loss.item()}. Cùng một họ lỗi: giữ output của mô hình trong một \en{dict} để debug, hoặc trả tensor còn đồ thị ra khỏi một hàm được gọi trong vòng lặp.
+\end{cambay}
+
+\begin{cannho}
+Ánh xạ triệu chứng \(\rightarrow\) công cụ mới là thứ đáng nhớ, không phải tên API. GPU rảnh thì sửa dataloader; nhiều kernel nhỏ thì \code{torch.compile}; ít tính trên mỗi byte thì AMP và \code{channels\_last}; không đủ bộ nhớ thì FSDP hoặc \en{gradient checkpointing}. Và trước tất cả: chạy profiler, vì tối ưu thứ chưa đo là cách chắc chắn nhất để mất một tuần mà không nhanh hơn. \T{2}
+\end{cannho}
+
+\subsection{G. Kết nối}
+Mục này là bản dịch của \ptr{D/19/01-tu-viet-bang-numpy} sang ngôn ngữ công cụ: \en{autograd} là cuốn băng bạn đã tự cuộn bằng tay, \code{buffer} là ``trạng thái'' bạn đã tự quản lý, \code{eval()} là cái công tắc bạn đã tự viết. Nó là ứng dụng trực tiếp của \ptr{B/11-gioi-han-tinh-toan}: cây quyết định ở Hình~\ref{fig:cay-tang-toc} chỉ là mô hình \en{roofline} được diễn đạt bằng tên API. Nó là tiền đề của \ptr{D/20-toi-uu-va-nen-mo-hinh} (nơi cùng những đòn bẩy này được áp cho \vn{suy luận}{inference} thay vì huấn luyện) và của \ptr{D/22-tai-lap-va-mlops} (nơi mục về \en{seed} và tính tất định được mở rộng thành một chương).
+
+\begin{tukiem}
+\item Khi nào \code{.view()} thất bại mà \code{.reshape()} thì không, và điều đó liên quan gì tới \en{stride}? Vì sao thất bại đôi khi lại là hành vi bạn muốn?
+\item Vì sao \code{torch.compile} không giúp gì cho mô hình bị nghẽn ở dataloader, và làm sao biết mình đang ở tình huống đó trong ba mươi giây?
+\item Thống kê chạy của BatchNorm là \en{parameter} hay \en{buffer}, và câu trả lời đó giải thích thế nào cho việc quên \code{eval()} lại làm kết quả phụ thuộc thứ tự dữ liệu?
+\item Vì sao fp16 cần \code{GradScaler} mà bf16 thì không? Cái giá của bf16 là gì?
+\item Bạn đo một lời gọi mô hình bằng \code{time.time()} và thấy nó tốn $0{,}2$ ms. Vì sao con số đó gần như chắc chắn sai, và phải đo thế nào?
+\item Chuyển từ 1 GPU sang 8 GPU bằng DDP, mọi thứ chạy nhưng độ chính xác tụt --- hai nguyên nhân khả dĩ nhất là gì, biết rằng cả hai đều không phải bug trong DDP?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,23 @@
+\documentclass[../marker.tex]{subfiles}
+\begin{document}
+\part{GIẢI THUẬT VÀ PHƯƠNG PHÁP}
+\begin{tomtat}
+Phần B là phần dài nhất và nó trả lời một câu hỏi duy nhất, hỏi tám lần ở tám chỗ khác nhau: \emph{với nguồn sai số này, ta có những cách nào để giảm nó, và mỗi cách trả giá bằng gì?} Tám chương đi theo đúng thứ tự của chuỗi đo --- phát hiện, tinh chỉnh góc, hình học constellation, xử lý hai nghiệm, tích hợp theo thời gian, hiệu chuẩn, điều khiển, và điều kiện quan sát --- nên đọc tuần tự là cách hợp lý. Nếu chỉ nhớ một điều: \emph{ba chương có đòn bẩy lớn nhất là chương~9 (constellation), chương~12 (calibration) và chương~13 (docking control)}, và cả ba đều không phải chương về thuật toán xử lý ảnh.
+\end{tomtat}
+
+Có một cách đọc Phần~B khiến nó trở nên mạch lạc thay vì trở thành một danh sách kỹ thuật, và nó đáng nói ngay. Mỗi chương ở đây tương ứng với đúng một dòng trong bảng ngân sách sai số ở chương~15. Chương~7 và~8 quyết định \(\sigma\), tức nhiễu định vị góc trên ảnh --- dòng đầu tiên của ngân sách. Chương~9 quyết định hình học của bài toán, tức hệ số nhân biến \(\sigma\) thành sai số pose; đây là dòng có đòn bẩy lớn nhất. Chương~10 quyết định ta có bị một nghiệm sai đánh lừa hay không --- một loại sai số không phải nhiễu mà là lỗi thô, và nó không nằm trong ngân sách mà phá hỏng cả ngân sách. Chương~11 làm giảm \(\sigma\) bằng thời gian thay vì bằng quang học. Chương~12 quyết định các hằng số của mô hình có đúng không --- và một hằng số sai thì mọi thứ phía sau chỉ là chính xác quanh một giá trị sai. Chương~13 quyết định phần sai số nào thật sự đi tới mũi robot, và nó chứa mẹo lớn nhất của cây. Chương~14 nói về điều kiện vật lý làm \(\sigma\) ổn định hay không ổn định.
+
+Trật tự này có một hệ quả đáng chú ý về chiến lược làm việc. Nếu bạn đọc theo thứ tự đòn bẩy giảm dần thay vì theo thứ tự chuỗi đo, thì thứ tự sẽ là 13, 9, 12, rồi mới tới 8, 10, 11, 14, 7. Nói cách khác: \emph{quyết định kiến trúc điều khiển trước, rồi bố trí hình học, rồi hiệu chuẩn, và chỉ sau đó mới tới chuyện chọn detector}. Đây gần như đúng ngược với thứ tự mà phần lớn dự án thực tế đi, và đó là lý do phần lớn dự án thực tế dừng ở một, hai độ.
+
+Một lưu ý về chương~10. Nó ngắn hơn các chương khác và nội dung của nó gần như hoàn toàn là hệ quả của chương~4 và chương~9. Tôi vẫn tách nó ra thành chương riêng vì một lý do thực dụng: xử lý ambiguity là việc phải làm ở tầng code, với những quyết định rất cụ thể --- ngưỡng tỉ số residual bằng bao nhiêu, từ chối cập nhật hay chấp nhận, chọn nghiệm nào khi cả hai đều khả dĩ --- và trộn chúng vào chương lý thuyết sẽ làm cả hai chương khó dùng.
+\subfile{00-map}
+\subfile{07-detection-pipeline/detection-pipeline}
+\subfile{08-corner-refinement/corner-refinement}
+\subfile{09-multi-marker-constellation/multi-marker-constellation}
+\subfile{10-xu-ly-ambiguity/xu-ly-ambiguity}
+\subfile{11-uoc-luong-theo-thoi-gian/uoc-luong-theo-thoi-gian}
+\subfile{12-calibration-cho-docking/calibration-cho-docking}
+\subfile{13-docking-control/docking-control}
+\subfile{14-dieu-kien-quan-sat-va-anh-sang/dieu-kien-quan-sat-va-anh-sang}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

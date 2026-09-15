@@ -1,0 +1,222 @@
+\documentclass[../../../deep_learning.tex]{subfiles}
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: C/14/01, B/09 (focal loss), B/07 (metric). Mức độ: cốt lõi.
+\begin{document}
+\section{Một giai đoạn và cuộc đánh đổi tốc độ (One-Stage Detection and the Speed Trade-off)}
+\ptrtarget{C/14-bai-toan-cv-loi/02}\ptrtarget{C/14-bai-toan-cv-loi/02-detection-mot-giai-doan}\ptrtarget{C/14/02}\ptrtarget{C/14/02-detection-mot-giai-doan}
+\dependency{\ptr{C/14-bai-toan-cv-loi/01-detection-hai-giai-doan} (anchor, NMS, RoI); \ptr{B/09-thiet-ke-ham-mat-mat} (focal loss, mất cân bằng lớp); \ptr{C/13/02-tu-chuoi-toi-attention} (attention, cần cho phần DETR).}
+
+\begin{tomtat}
+Mục này trả lời ba câu hỏi. Vì sao bỏ giai đoạn đề xuất vùng lại làm lộ ra mất cân bằng nền--vật thể? Vì sao vấn đề đó được chữa ở tầng hàm mất mát chứ không ở tầng kiến trúc? Và vì sao chuỗi ATSS \(\rightarrow\) SimOTA \(\rightarrow\) Hungarian matching mới là trục tiến hoá thật của detection hiện đại? Đọc xong, trong bất kỳ bảng so sánh detector nào bạn cũng tách được phần chênh lệch \emph{do kiến trúc} khỏi phần chênh lệch \emph{do gán mẫu và công thức huấn luyện}. Bạn cũng biết tìm thông tin đó ở đâu khi paper không nói. Nếu chỉ nhớ một điều: cách gán mẫu cho \(10^5\) vị trí dự đoán là một phần của \emph{định nghĩa bài toán tối ưu}. Hai detector gán mẫu khác nhau vì thế là hai bài toán khác nhau. So sánh chúng rồi quy kết cho kiến trúc là sai ngay từ tiền đề.
+\end{tomtat}
+
+\begin{nentang}
+\kn{hàm mất mát (loss function)}{một số duy nhất đo mức sai của dự đoán so với nhãn; toàn bộ việc huấn luyện là chỉnh tham số để số đó nhỏ đi. Đổi hàm mất mát là đổi \emph{mục tiêu}, không phải đổi mô hình.}
+\kn{cross-entropy}{hàm mất mát chuẩn cho phân loại: \(-\log p_t\) với \(p_t\) là xác suất mô hình gán cho lớp đúng. Đoán đúng chắc chắn thì mất mát gần 0; đoán sai chắc chắn thì mất mát rất lớn.}
+\kn{mẫu dương / mẫu âm}{với mỗi vị trí dự đoán, ``dương'' nghĩa là vị trí đó được coi là chứa vật thể và phải học nhãn của vật đó; ``âm'' nghĩa là nền. Ai được coi là dương là do bước gán mẫu quyết định.}
+\kn{gán mẫu (label assignment)}{quy tắc quyết định mỗi trong hàng trăm nghìn vị trí dự đoán phải học điều gì. Nó không phải một khối tính toán mà là một phần của \emph{định nghĩa} hàm mất mát --- đây là ý trung tâm của cả mục.}
+\kn{anchor và anchor-free}{có anchor là dự đoán độ lệch so với các khung mẫu định sẵn; anchor-free là dự đoán trực tiếp từ mỗi ô lưới, chẳng hạn bốn khoảng cách tới bốn cạnh của khung.}
+\kn{NMS}{hậu xử lý xoá khung trùng: giữ khung điểm cao nhất rồi xoá mọi khung chồng lấn với nó quá ngưỡng IoU. Vì nó xét quan hệ \emph{giữa} các dự đoán nên không thể huấn luyện cùng phần còn lại.}
+\kn{truy vấn (query) trong DETR}{một vector học được đóng vai ``một chỗ trống để điền một vật thể''. Mô hình có \(N\) truy vấn cố định, mỗi truy vấn tự đi hỏi feature map rồi trả về một khung cộng một nhãn.}
+\kn{epoch}{một lượt đi hết toàn bộ tập huấn luyện. ``Hội tụ sau 500 epoch'' nghĩa là phải quét dữ liệu 500 lần mới đạt kết quả tốt --- rất đắt.}
+\end{nentang}
+
+\subsection{Đặt vấn đề}
+Giai đoạn đề xuất vùng trong Faster R-CNN giải quyết được một vấn đề rất cụ thể: nó \emph{lọc} hàng chục nghìn vị trí ứng viên xuống còn vài trăm, và mọi thứ phía sau chỉ phải làm việc trên một tập nhỏ, đã tương đối cân bằng giữa mẫu dương và mẫu âm. Cái giá là một vòng lặp nữa qua bộ nhớ và một lượng tính toán tỉ lệ với số đề xuất. Với robot phải chạy 30 khung hình mỗi giây trên một máy nhúng, cái giá đó thường không trả nổi. Câu hỏi tự nhiên là: bỏ hẳn giai đoạn đề xuất, cho mạng dự đoán thẳng trên lưới đặc trưng, thì mất gì?
+
+\textbf{Học xong mục này bạn làm được gì mà trước đó không làm được?} Đọc phần thực nghiệm của một paper detection, bạn biết ngay cần kiểm tra ba dòng nào trong code trước khi tin bảng kết quả.
+
+YOLO và SSD trả lời bằng cách làm đúng thế \cite{redmon2016yolo, liu2016ssd}. Kết quả là tốc độ tăng vọt, nhưng một vấn đề mới xuất hiện mà kiến trúc hai giai đoạn chưa từng phải đối mặt, bởi vì bộ lọc đề xuất đã âm thầm che nó đi: \vn{mất cân bằng nền--vật thể}{foreground--background imbalance}. Bài học lớn nhất của mục này nằm ở chỗ vấn đề đó được giải quyết ở tầng \vn{hàm mất mát}{loss function}, không phải ở tầng kiến trúc. Câu chuyện sau đó còn cho thấy một điều nữa: phần lớn khoảng cách giữa các detector hiện đại nằm ở những chi tiết \emph{không được viết trong abstract}.
+
+\subsection{A. Mất cân bằng, và vì sao nó là vấn đề của loss (Class Imbalance)}
+Hãy đếm. Một mạng một giai đoạn với \vn{kim tự tháp đặc trưng}{feature pyramid network, FPN} năm tầng, ảnh \(800\times1333\), chín \en{anchor} mỗi vị trí, sinh ra cỡ \(10^5\) dự đoán mỗi ảnh. Một ảnh COCO trung bình có bảy vật thể; kể cả khi mỗi vật khớp vài anchor thì số mẫu dương vẫn chỉ vài chục. Tỉ lệ âm trên dương do đó vào khoảng \(10^3\) tới \(10^4\).
+
+Con số đó chưa đủ để thấy vấn đề. Cái đáng sợ nằm ở tổng gradient. Giả sử sau vài epoch, mạng đã học được rằng gần như mọi thứ là nền. Mỗi anchor nền khi đó có xác suất đúng \(p_t = 0{,}99\), đóng góp \vn{entropy chéo}{cross-entropy} \(-\log 0{,}99 \approx 0{,}01\). Nghe như không đáng kể --- nhưng \(10^5\) anchor nền cho tổng \(10^5 \times 0{,}01 = 1000\). Trong khi đó ba mươi anchor dương khó, mỗi cái \(p_t = 0{,}5\) và loss \(0{,}69\), chỉ cho tổng \(21\). Tín hiệu học thật bị nhấn chìm dưới tỉ lệ 50:1 bởi những mẫu mà mạng đã làm đúng rồi. Đây là ví dụ nhỏ nhất giải thích vì sao ``hạ learning rate'' hay ``train lâu hơn'' không cứu được: bản thân hàm mất mát đang chỉ sai hướng.
+
+Cách chữa cổ điển là \en{hard negative mining} --- SSD giữ tỉ lệ âm/dương 3:1 bằng cách chỉ lấy các mẫu âm có loss cao nhất. Cách này hoạt động nhưng đưa thêm một heuristic rời rạc, không khả vi vào giữa vòng huấn luyện. \en{Focal loss} thay nó bằng một hệ số điều biến trơn: \(\mathrm{FL}(p_t) = -\alpha_t (1-p_t)^{\gamma}\log p_t\) \cite{lin2017focal}. Với \(\gamma = 2\), mẫu dễ \(p_t = 0{,}99\) bị nhân với \((0{,}01)^2 = 10^{-4}\). Mẫu khó \(p_t = 0{,}5\) chỉ bị nhân \(0{,}25\). Lặp lại phép đếm ở trên: tổng đóng góp của nền tụt từ \(1000\) xuống \(0{,}1\), trong khi mẫu dương khó chỉ giảm bốn lần. Tỉ lệ đảo ngược hoàn toàn.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.72\linewidth,height=5.2cm,xlabel={\(p_t\) --- xác suất mô hình gán cho lớp đúng},
+  ylabel={hệ số \((1-p_t)^\gamma\)}, xmin=0,xmax=1,ymin=0,ymax=1.05,
+  legend pos=north east, legend style={font=\footnotesize,draw=rulecol}, grid=major,
+  grid style={rulecol}, label style={font=\footnotesize}, tick label style={font=\footnotesize}]
+\addplot[thick,color=steel,domain=0:1,samples=80]{1}; \addlegendentry{\(\gamma=0\) (cross-entropy)}
+\addplot[thick,color=violetdark,domain=0:1,samples=80]{1-x}; \addlegendentry{\(\gamma=1\)}
+\addplot[thick,color=reddark,domain=0:1,samples=80]{(1-x)^2}; \addlegendentry{\(\gamma=2\)}
+\addplot[thick,dashed,color=inkblue,domain=0:1,samples=80]{(1-x)^5}; \addlegendentry{\(\gamma=5\)}
+\end{axis}
+\end{tikzpicture}
+\caption{Hệ số điều biến của focal loss. Điều quan trọng không phải mẫu khó được đề cao, mà là mẫu \emph{đã đúng} bị hạ xuống gần như bằng không --- với \(\gamma=2\), một anchor nền chắc chắn đóng góp ít hơn bốn bậc so với cross-entropy. Vì \(\gamma\) chỉ nén chứ không đảo thứ tự, nó không thể sửa được một tập nhãn sai.}
+\label{fig:focal-modulation}
+\end{figure}
+
+Hình~\ref{fig:focal-modulation} cũng cho thấy giới hạn. Hệ số luôn dương và đơn điệu. Nên khi một mẫu bị gán nhãn sai, mô hình dự đoán \emph{đúng theo thực tế nhưng sai theo nhãn}, focal loss coi nó là mẫu khó và \emph{tăng} trọng số cho nó. Trên dữ liệu nhiễu nhãn, đây là chế độ hỏng thật, không phải lý thuyết.
+
+\lk{B/09}{trường hợp riêng của}{focal loss là một ca cụ thể của nguyên tắc tổng quát ``sửa mất cân bằng ở tầng hàm mất mát thay vì ở tầng lấy mẫu dữ liệu''.}
+Kết luận rút ra từ RetinaNet vượt xa bản thân hàm loss. Suốt vài năm, khoảng cách giữa một giai đoạn và hai giai đoạn được giải thích bằng ``kiến trúc hai giai đoạn tinh vi hơn''. Hoá ra phần lớn khoảng cách đó là hệ quả của việc giai đoạn đề xuất đã ngầm cân bằng lại tập mẫu. Sửa ở tầng loss là đủ.
+
+\subsection{B. Bỏ anchor, và câu hỏi thật sự là gán mẫu (Label Assignment)}
+
+\begin{trucgiac}
+Kiến trúc là thí sinh; cách gán mẫu là \emph{đáp án}. Một detector một giai đoạn có \(10^5\) ô trên lưới, và gán mẫu chính là việc điền vào đáp án cho từng ô: ô này phải nói ``có xe ở đây'', ô kia phải nói ``nền''. Đổi cách gán mẫu không phải là đổi thí sinh, mà là đổi đáp án --- tức đổi hẳn bài toán tối ưu. Vì thế so hai detector dùng hai cách gán mẫu khác nhau rồi kết luận về kiến trúc cũng vô nghĩa như so điểm hai thí sinh làm hai đề khác nhau.
+\end{trucgiac}
+
+\begin{mach}[Mạch 2 --- một giai đoạn, từ anchor tới tập hợp]
+\item \vd{anchor là một siêu tham số thủ công mang theo thống kê của tập dữ liệu.} \gp họ \en{anchor-free} dự đoán trực tiếp từ mỗi vị trí trên lưới: FCOS dự đoán bốn khoảng cách từ điểm đó tới bốn cạnh của khung \cite{tian2019fcos}, CenterNet dự đoán một heatmap tâm vật cộng kích thước \cite{zhou2019objects}. \gia không còn tập anchor, nhưng bây giờ phải trả lời một câu hỏi mới và khó hơn: \emph{vị trí nào trên lưới chịu trách nhiệm cho vật nào}. Bài toán không biến mất, nó đổi tên thành gán mẫu.
+\item \vd{gán mẫu theo ngưỡng IoU cố định là một lựa chọn tuỳ tiện.} Ngưỡng \(0{,}5\) khiến vật nhỏ chỉ nhận được một hai mẫu dương trong khi vật lớn nhận hàng chục, tức mô hình được huấn luyện với mức giám sát rất khác nhau tuỳ kích thước. \gp \en{ATSS} --- viết tắt của \emph{adaptive training sample selection} --- chọn ngưỡng thích nghi cho từng vật: lấy \(k\) ứng viên gần tâm nhất ở mỗi tầng, tính trung bình và độ lệch chuẩn IoU của chúng, dùng \(\mu + \sigma\) làm ngưỡng \cite{zhang2020atss}. \hq bài báo cho thấy sau khi thống nhất cách gán mẫu, khác biệt giữa detector có anchor và không anchor gần như biến mất --- một trong những kết quả ablation quan trọng nhất của cả lĩnh vực.
+\item \vd{gán mẫu từng vật độc lập là tối ưu cục bộ.} Khi hai vật chồng lấn, một vị trí lưới có thể tốt cho cả hai, và quyết định tham lam cho từng vật riêng lẻ dẫn tới xung đột. \gp \en{optimal transport assignment} (OTA) và bản rút gọn SimOTA phát biểu việc gán mẫu thành một bài toán vận tải tối ưu: mỗi ground truth là một nguồn cung \(k\) nhãn dương, mỗi vị trí lưới là một điểm cầu, chi phí là tổ hợp loss phân loại và loss hồi quy \cite{ge2021ota}. \gia thêm chi phí tính toán trong lúc huấn luyện, không thêm gì lúc suy luận.
+\item \vd{NMS là heuristic cuối cùng, và nó là heuristic duy nhất thao tác trên quan hệ giữa các dự đoán.} Soft-NMS làm mềm bằng cách giảm điểm thay vì xoá hẳn \cite{bodla2017softnms}, nhưng vẫn là hậu xử lý. \gp DETR đổi phát biểu: dự đoán một tập hợp cố định \(N\) truy vấn, ghép chúng với \vn{chân trị}{ground truth} bằng \vn{ghép cặp Hungary}{Hungarian matching} một--một, và loss chỉ được định nghĩa sau khi ghép \cite{carion2020detr}. Đây là ý tưởng \vn{dự đoán tập hợp}{set prediction} mà Mục~3 sẽ mượn nguyên vẹn sang segmentation. Vì mỗi vật chỉ có đúng một dự đoán được thưởng, mô hình học cách tự triệt tiêu trùng lặp; NMS biến mất khỏi pipeline. \gia hội tụ cực chậm --- bản gốc cần khoảng 500 epoch trong khi Faster R-CNN quen dùng lịch 12--36 epoch --- và kém trên vật nhỏ.
+\item \vd{vì sao DETR chậm hội tụ?} Hai nguyên nhân được các bản sửa chỉ ra: \en{attention} dày đặc trên toàn feature map khởi đầu gần như đồng đều nên mất rất lâu để tập trung, và phép ghép một--một dao động giữa các epoch nên tín hiệu giám sát cho mỗi truy vấn không ổn định. \gp Deformable DETR cho mỗi truy vấn chỉ lấy mẫu một số ít điểm quanh một điểm tham chiếu học được, giảm cả chi phí lẫn thời gian hội tụ xuống cỡ 50 epoch \cite{zhu2021deformabledetr, dai2017deformable}; DINO thêm truy vấn khử nhiễu (cho mạng các khung ground truth đã bị nhiễu và bắt khôi phục) để ổn định hoá tín hiệu \cite{zhang2023dino}. \hq tới 2026, dòng thực dụng như RT-DETR và RF-DETR đã đạt được cả tốc độ lẫn độ chính xác mà không cần NMS.
+\end{mach}
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  gt/.style={draw=inkblue,very thick,rounded corners=1pt},
+  psx/.style={fill=violetdark,draw=none,circle,inner sep=1.5pt},
+  neg/.style={draw=tiercol,circle,inner sep=1.1pt},
+  ttl/.style={font=\sffamily\bfseries\small\color{inkblue},anchor=south}]
+\foreach \dx/\name/\note in {0/{IoU cố định \(0{,}5\)}/{vật nhỏ gần như không có mẫu dương},
+                             6.2/{ATSS --- ngưỡng \(\mu+\sigma\) riêng cho từng vật}/{mỗi vật nhận số mẫu dương tương đương},
+                             12.4/{SimOTA --- vận tải tối ưu toàn ảnh}/{vùng chồng lấn được phân xử, không tranh chấp}}{
+  \begin{scope}[shift={(\dx,0)}]
+    \node[ttl,text width=4.6cm,align=center] at (2.2,4.35) {\name};
+    \draw[color=rulecol] (0,0) grid[step=0.55] (4.4,3.85);
+    \draw[gt] (0.45,1.9) rectangle (2.15,3.5);   % vat lon
+    \draw[gt] (2.9,0.5) rectangle (3.5,1.1);     % vat nho
+  \end{scope}}
+% --- IoU co dinh: nhieu duong cho vat lon, khong co cho vat nho
+\foreach \x/\y in {0.83/2.2, 1.38/2.2, 1.93/2.2, 0.83/2.75, 1.38/2.75, 1.93/2.75, 0.83/3.3, 1.38/3.3, 1.93/3.3}
+  \node[psx] at (\x,\y) {};
+\node[neg] at (3.03,0.77) {}; \node[neg] at (3.3,0.77) {};
+% --- ATSS
+\begin{scope}[shift={(6.2,0)}]
+\foreach \x/\y in {0.83/2.2, 1.38/2.75, 1.93/3.3, 1.38/2.2, 0.83/3.3} \node[psx] at (\x,\y) {};
+\foreach \x/\y in {3.03/0.77, 3.3/0.77, 3.16/1.05} \node[psx] at (\x,\y) {};
+\end{scope}
+% --- SimOTA
+\begin{scope}[shift={(12.4,0)}]
+\foreach \x/\y in {1.1/2.48, 1.38/2.75, 1.65/3.02, 1.38/3.3} \node[psx] at (\x,\y) {};
+\foreach \x/\y in {3.16/0.77, 3.16/1.05} \node[psx] at (\x,\y) {};
+\end{scope}
+\foreach \dx/\note in {0/{vật nhỏ gần như không có mẫu dương},
+                       6.2/{mỗi vật nhận số mẫu dương tương đương},
+                       12.4/{vùng chồng lấn được phân xử bằng chi phí toàn ảnh}}
+  \node[font=\scriptsize\itshape,color=reddark,align=center,text width=4.6cm,anchor=north] at (\dx+2.2,-0.35) {\note};
+\node[font=\scriptsize,color=tiercol,anchor=west] at (17.2,2.0) {\(\bullet\) mẫu dương\quad \(\circ\) mẫu âm};
+\end{tikzpicture}}
+\caption{Cùng một ảnh, cùng một mạng, cùng một tập vị trí dự đoán --- ba quy tắc gán mẫu cho ba tập mẫu dương khác nhau, và do đó ba hàm mất mát khác nhau. Khung đậm là hai vật thật, một lớn một nhỏ. Với ngưỡng IoU cố định, vật lớn nuốt gần hết ngân sách giám sát còn vật nhỏ hầu như không được dạy; ATSS cân lại bằng ngưỡng tính riêng cho từng vật; SimOTA thêm một bước phân xử toàn ảnh nên vị trí tranh chấp không bị gán cho cả hai. Vị trí các chấm ở đây là minh hoạ nguyên lý, không phải kết quả chạy thật.}
+\label{fig:gan-mau-ba-cach}
+\end{figure}
+
+Hình~\ref{fig:gan-mau-ba-cach} cho thấy thứ mà một bảng số không cho thấy: cái thay đổi giữa ba cột không phải mô hình mà là \emph{đề bài} đưa cho mô hình.
+
+\begin{table}[H]\centering\small
+\caption{Bốn cách trả lời câu hỏi ``vị trí nào chịu trách nhiệm cho vật nào''. Đây là thành phần hiếm khi nằm trong abstract nhưng thường giải thích phần lớn chênh lệch giữa hai detector.}
+\label{tab:label-assign}
+\begin{tabularx}{\linewidth}{@{}L{2.05cm}YYL{4.0cm}@{}}
+\toprule
+\textbf{Cách gán} & \textbf{Cơ chế} & \textbf{Giả định} & \textbf{Hỏng khi nào}\\
+\midrule
+IoU cố định & Anchor nào có IoU vượt ngưỡng thì là dương & Ngưỡng tốt cho mọi kích thước và tỉ lệ & Vật nhỏ nhận rất ít mẫu dương; đổi phân bố kích thước là phải chỉnh lại tay\\
+Centerness / FCOS & Điểm trong vùng trung tâm của khung là dương, có trọng số theo độ lệch tâm & Tâm hình học là điểm giàu thông tin nhất & Vật hình khuyên, hình chữ L, hoặc bị che ở giữa --- tâm rơi vào nền\\
+ATSS & Ngưỡng \(\mu+\sigma\) tính riêng cho từng vật từ \(k\) ứng viên gần nhất & Phân bố IoU của ứng viên là đơn đỉnh & Cảnh rất đông: các ứng viên ``gần nhất'' thuộc về vật khác\\
+OTA / SimOTA & Vận tải tối ưu toàn ảnh trên chi phí phân loại + hồi quy & Chi phí ghép phản ánh đúng chất lượng dự đoán & Nhạy với chi phí khởi đầu khi mô hình còn kém; tốn thêm thời gian huấn luyện\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng~\ref{tab:label-assign} nên đọc cùng với một quan sát khó chịu: bốn dòng này thay đổi \emph{hàm mất mát}, không thay đổi mô hình. Hai detector khác nhau ở dòng gán mẫu là hai bài toán tối ưu khác nhau, nên so sánh chúng rồi quy kết chênh lệch cho ``kiến trúc'' là một suy luận sai ngay từ tiền đề. \lk{C/14/03}{cùng nguyên lý với}{Mask2Former mượn nguyên phép ghép cặp một--một này sang miền mask, và nhờ đó hợp nhất được semantic, instance và panoptic.}
+Hungarian matching của DETR, nhìn qua lăng kính này, chỉ là dòng thứ năm --- một cách gán mẫu một--một thay vì một--nhiều --- và chính điều đó, chứ không phải Transformer, mới là thứ khiến NMS trở nên thừa.
+
+\begin{cambay}
+Điểm số mà NMS dùng để xếp hạng là điểm \emph{phân loại}, nhưng thứ ta cần giữ lại là khung \emph{định vị} tốt nhất. Hai đại lượng này tương quan yếu hơn ta tưởng, nên một khung tự tin về nhãn nhưng lệch vị trí vẫn có thể xoá mất một khung đúng hơn. Các bản vá là dự đoán thêm một nhánh ước lượng IoU hoặc centerness rồi nhân vào điểm; nhưng nếu bạn thấy mAP ở ngưỡng IoU chặt (\(\mathrm{AP}_{75}\)) tụt nhiều hơn ở ngưỡng lỏng (\(\mathrm{AP}_{50}\)), hãy nghi ngờ đúng chỗ này trước khi đổi backbone.
+\end{cambay}
+
+
+\begin{figure}[H]\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  q/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,align=center,inner sep=5pt,text width=4.2cm},
+  a/.style={draw=steel,fill=bluebg,rounded corners=2pt,align=center,inner sep=5pt,text width=3.8cm},
+  e/.style={-{Latex[length=2.2mm]},draw=steel},
+  lb/.style={font=\scriptsize\itshape,color=steel}]
+\node[q] (r) at (0,0) {Ngân sách độ trễ có chặt và \emph{ổn định} không?};
+\node[q] (n) at (-4.8,-2.6) {Cảnh có đông vật cùng lớp chồng lấn không?};
+\node[a] (two) at (4.8,-2.6) {Hai giai đoạn\\ (Faster / Mask R-CNN)\\ \footnotesize chính xác nhất, độ trễ dao động theo cảnh};
+\node[a] (detr) at (-8.4,-5.6) {Họ DETR\\ (RT-DETR, RF-DETR)\\ \footnotesize không NMS nên không có ngưỡng để chỉnh sai};
+\node[a] (yolo) at (-2.0,-5.6) {Một giai đoạn + NMS\\ (YOLO, RTMDet)\\ \footnotesize nhanh nhất, nhưng phải chỉnh ngưỡng NMS};
+\draw[e] (r) -- node[lb,above,sloped] {có} (n);
+\draw[e] (r) -- node[lb,above,sloped] {không} (two);
+\draw[e] (n) -- node[lb,above,sloped] {có} (detr);
+\draw[e] (n) -- node[lb,above,sloped] {không} (yolo);
+\end{tikzpicture}}
+\caption{Cây quyết định thực dụng: ràng buộc loại bỏ phương án trước khi độ chính xác kịp lên tiếng. Hai nhánh trái đều là một giai đoạn, nhưng khác nhau ở chỗ NMS còn hay không --- và trong cảnh đông đúc, đó là khác biệt quyết định chứ không phải vài điểm mAP.}
+\label{fig:cay-chon-detector}
+\end{figure}
+
+\begin{figure}[H]\centering
+\resizebox{0.96\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  bx/.style={draw=steel,rounded corners=1pt,thick},
+  gtb/.style={draw=inkblue,very thick,rounded corners=1pt},
+  e/.style={-{Latex[length=2.2mm]},draw=violetdark,thick},
+  ttl/.style={font=\sffamily\bfseries\small\color{inkblue},anchor=south},
+  lb/.style={font=\scriptsize\itshape,color=tiercol,align=center,text width=5.6cm}]
+% --- NMS
+\node[ttl] at (2.6,3.7) {Một--nhiều \(+\) NMS};
+\draw[gtb] (1.5,1.0) rectangle (3.7,2.9);
+\draw[bx] (1.3,0.85) rectangle (3.55,2.75); \node[font=\scriptsize,color=steel] at (0.95,2.75) {0,92};
+\draw[bx] (1.65,1.15) rectangle (3.9,3.05);  \node[font=\scriptsize,color=steel] at (4.25,3.05) {0,88};
+\draw[bx] (1.45,1.3) rectangle (3.6,3.2);    \node[font=\scriptsize,color=steel] at (1.0,3.35) {0,81};
+\node[lb,anchor=north] at (2.6,0.55) {Loss thưởng \emph{mọi} dự đoán đủ tốt, nên mô hình sinh chồng chất; một vòng lặp bên ngoài phải dọn --- và ngưỡng của nó là tham số phải chỉnh tay};
+% --- Hungarian
+\begin{scope}[shift={(9.0,0)}]
+\node[ttl] at (2.6,3.7) {Một--một (ghép cặp Hungary)};
+\draw[gtb] (1.5,1.0) rectangle (3.7,2.9);
+\draw[bx,color=violetdark] (1.55,1.05) rectangle (3.72,2.94);
+\node[font=\scriptsize,color=violetdark,anchor=west] at (3.95,3.45) {\(q_7\) --- được thưởng};
+\node[font=\scriptsize,color=tiercol,anchor=west] at (-0.9,1.9) {\(q_1\ldots q_{99}\):};
+\node[font=\scriptsize,color=tiercol,anchor=west] at (-0.9,1.45) {bị ép thành ``không có vật''};
+\node[lb,anchor=north] at (2.6,0.55) {Chỉ một truy vấn được ghép với vật, phần còn lại bị phạt nếu dự đoán bất cứ gì --- mô hình tự học không sinh trùng lặp, nên không còn gì để dọn};
+\end{scope}
+\draw[e] (5.6,2.0) -- node[font=\scriptsize\itshape,color=violetdark,above,align=center]{đổi phát biểu,\\ không đổi kiến trúc} (8.0,2.0);
+\end{tikzpicture}}
+\caption{Vì sao NMS biến mất khi đổi cách ghép. Bên trái, hàm mất mát chấm điểm từng dự đoán độc lập nên nhiều dự đoán cùng đúng và cùng được thưởng; việc chọn một trong số đó phải làm ở hậu xử lý, bằng một heuristic có ngưỡng. Bên phải, phép ghép một--một biến ``sinh trùng lặp'' thành hành vi \emph{bị phạt} ngay trong hàm mất mát, nên bước dọn không còn lý do tồn tại. Các số tin cậy chỉ để minh hoạ.}
+\label{fig:nms-vs-hungary}
+\end{figure}
+
+Hình~\ref{fig:nms-vs-hungary} cũng giải thích cái giá: vì mỗi vật chỉ có đúng một truy vấn được thưởng, tín hiệu giám sát cho mỗi truy vấn thưa hơn hẳn, và phép ghép còn dao động giữa các epoch --- hai lý do khiến DETR bản gốc hội tụ chậm.
+
+\lk{B/03}{ràng buộc bởi}{cây quyết định này là hiện thân của nguyên tắc đọc hệ thống: ràng buộc cứng loại phương án trước, độ chính xác chỉ lên tiếng sau.}
+Hình~\ref{fig:cay-chon-detector} tóm lại mục này dưới dạng dùng được ngay: câu hỏi đầu tiên không phải ``mô hình nào mAP cao nhất'' mà ``ràng buộc nào của tôi là cứng'' --- đúng cách đọc hệ thống ở \ptr{B/03-giai-phau-he-thong}.
+
+\subsection{C. Giới hạn và trường hợp hỏng}
+Detector một giai đoạn hỏng ở ba chỗ đáng nhớ, mỗi chỗ có một triệu chứng quan sát được:
+
+\begin{itemize}
+\item \textbf{Nhãn nhiễu gặp focal loss.} Focal loss giả định nhãn sạch; trên dữ liệu gán bằng đám đông hoặc bán tự động, nó khuếch đại đúng những mẫu bị gán sai và có thể tệ hơn cross-entropy thường. \emph{Triệu chứng}: loss huấn luyện đứng yên trong khi một nhóm rất nhỏ mẫu chiếm gần hết \en{gradient}.
+\item \textbf{Gán nhãn tinh vi ở giai đoạn đầu.} SimOTA và họ hàng dựa vào chi phí ghép, mà chi phí đó vô nghĩa khi mô hình còn kém, nên chúng phải kèm một giai đoạn khởi động. \emph{Triệu chứng}: phân kỳ hoặc hội tụ về nghiệm suy biến trong vài epoch đầu --- và chi tiết khắc phục nằm trong code chứ không trong bài.
+\item \textbf{Ngân sách truy vấn cố định của DETR.} Ảnh chứa nhiều vật hơn \(N\) thì phần dư bị mất im lặng, không có cảnh báo nào. \emph{Triệu chứng}: recall giảm đều theo mật độ vật thể; không lộ ra trên COCO nhưng lộ ra ngay khi bạn đếm người trong đám đông.
+\end{itemize}
+
+Với người làm hệ thống thời gian thực, còn một giới hạn nữa ít được nói: bỏ NMS không có nghĩa là bỏ hậu xử lý không xác định. Một giai đoạn có thời gian chạy gần như cố định theo nội dung cảnh, đó là ưu điểm lớn nhất của nó so với hai giai đoạn; nhưng nếu bạn thêm lại NMS trên đầu ra (như hầu hết bản triển khai YOLO làm), thời gian NMS lại tỉ lệ với số khung sống sót, và phương sai độ trễ quay về.
+
+\begin{cannho}
+Trước khi tin bất kỳ so sánh detector nào, hãy hỏi hai câu: hai bên dùng cách gán mẫu nào, và hai bên chạy bao nhiêu epoch với augmentation gì. Rất nhiều ``cải tiến kiến trúc'' công bố thực chất là cải tiến gán mẫu, và nó bị chôn trong code. \T{3}
+\end{cannho}
+
+\subsection{D. Kết nối}
+\ptr{C/14-bai-toan-cv-loi/01-detection-hai-giai-doan} là tiền đề trực tiếp: mất cân bằng chỉ lộ ra khi bỏ giai đoạn đề xuất, nên mục này chỉ có nghĩa sau mục kia. \ptr{B/09-thiet-ke-ham-mat-mat} là nơi focal loss được đặt cạnh các cách xử lý mất cân bằng khác, và là nơi trả lời câu hỏi tổng quát ``khi nào nên sửa ở loss thay vì sửa ở dữ liệu''. Ý tưởng dự đoán tập hợp bằng Hungarian matching quay lại nguyên vẹn ở \ptr{C/14-bai-toan-cv-loi/03-segmentation} dưới dạng khung truy vấn của Mask2Former --- đó là trường hợp hiếm hoi một ý tưởng chuyển miền mà không mất gì. \ptr{E/24-thi-nghiem-va-ablation} cung cấp phương pháp để tự kiểm chứng khẳng định trung tâm của mục này.
+
+\begin{tukiem}
+\item Vì sao mất cân bằng foreground--background hầu như không xuất hiện trong Faster R-CNN nhưng lại nghiêm trọng trong SSD, dù cả hai dùng cùng anchor?
+\item Hệ số điều biến với \(\gamma=2\) bằng bao nhiêu tại \(p_t = 0{,}9\) và tại \(p_t = 0{,}3\)? Hai con số đó giải thích thế nào việc focal loss nguy hiểm trên dữ liệu nhiễu nhãn?
+\item ATSS cho thấy điều gì về câu hỏi ``anchor hay anchor-free''? Kết quả đó thay đổi cách bạn đọc một paper detection như thế nào?
+\item DETR bỏ được NMS nhờ Hungarian matching chứ không nhờ Transformer. Hãy giải thích tại sao, và điều gì sẽ xảy ra nếu ta ghép một--nhiều thay vì một--một?
+\item Bạn đo được \(\mathrm{AP}_{50}\) cao nhưng \(\mathrm{AP}_{75}\) thấp --- hai giả thuyết nào giải thích được, và thí nghiệm nào phân biệt chúng?
+\item Trên một robot có ngân sách 20\,ms mỗi khung hình, vì sao phương sai độ trễ có thể quan trọng hơn độ trễ trung bình?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

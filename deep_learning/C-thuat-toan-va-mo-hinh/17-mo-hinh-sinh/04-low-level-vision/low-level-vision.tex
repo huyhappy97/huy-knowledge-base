@@ -1,0 +1,204 @@
+% ---------------------------------------------------------------------------
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: C/17-mo-hinh-sinh/01; A/02-vat-ly-tao-anh; B/07
+%  Mức độ: cốt lõi
+% ---------------------------------------------------------------------------
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Low-level vision và trade-off không thể tránh (Low-Level Vision)}
+\ptrtarget{C/17-mo-hinh-sinh/04}\ptrtarget{C/17-mo-hinh-sinh/04-low-level-vision}\ptrtarget{C/17/04}\ptrtarget{C/17/04-low-level-vision}
+\dependency{\ptr{C/17-mo-hinh-sinh/01-bon-ho-mo-hinh-sinh} (vì sao loss trung bình cho ảnh mờ); \ptr{A/02-vat-ly-tao-anh/01-anh-sang-va-nhieu} (nhiễu cảm biến thật khác nhiễu Gauss thế nào); \ptr{B/07-chia-du-lieu-va-danh-gia} (chọn chỉ số là chọn kết luận).}
+
+\begin{tomtat}
+Khử nhiễu, siêu phân giải, khử nhoè và HDR đều là bài toán \en{ill-posed}: nhiều ảnh đầu ra khác nhau cùng khớp với đầu vào, nên vai trò thật của mô hình là \emph{chọn một} chứ không phải \emph{tìm ra đáp án}. Từ đó suy ra một kết quả có chứng minh: không thể đồng thời tối ưu sai lệch theo pixel và độ chân thực thị giác. Vậy nên mọi tranh cãi ``phương pháp nào tốt hơn'' thật ra là tranh cãi về việc chọn điểm nào trên đường đánh đổi. Đọc xong bạn đọc được một bảng kết quả khôi phục ảnh mà không bị con số dẫn dắt, và biết khi nào một mô hình ``đẹp hơn'' thực chất đang bịa. Nếu chỉ nhớ một điều: tối ưu PSNR cho ảnh mờ nhưng an toàn, còn tối ưu độ chân thực cho ảnh sắc nét nhưng có thể thêm chi tiết không hề có trong đầu vào. Trong ảnh y tế, giám định hay đo đạc, đó là lỗi đúng sai chứ không phải chuyện thẩm mỹ.
+\end{tomtat}
+
+\begin{nentang}
+\kn{low-level vision}{nhóm bài toán biến ảnh thành ảnh mà không cần hiểu nội dung: khử nhiễu, tăng độ phân giải, khử nhoè, ghép dải sáng động. Đối lập với high-level vision (phân loại, phát hiện) vốn biến ảnh thành nhãn.}
+\kn{ill-posed (đặt không chỉnh)}{bài toán mà nghiệm không tồn tại duy nhất hoặc không phụ thuộc liên tục vào dữ liệu; ở đây luôn là trường hợp ``nhiều nghiệm cùng hợp lệ'', vì phép làm hỏng ảnh đã xoá mất thông tin.}
+\kn{toán tử thuận (forward operator)}{mô hình toán của quá trình làm hỏng ảnh --- lấy trung bình rồi lấy mẫu thưa (siêu phân giải), chập với nhân nhoè (khử nhoè), cộng nhiễu (khử nhiễu). Biết nó là biết mình đang phải đảo ngược cái gì.}
+\kn{prior (prior)}{giả định về ``ảnh thật trông thế nào'' dùng để chọn một nghiệm trong vô số nghiệm hợp lệ; ngày nay prior thường nằm ẩn trong trọng số của một mạng đã học.}
+\kn{PSNR}{sai lệch theo pixel quy ra decibel, suy ra trực tiếp từ bình phương trung bình; đo ``gần theo nghĩa số học''.}
+\kn{SSIM}{chỉ số so sánh độ sáng, tương phản và cấu trúc cục bộ giữa hai ảnh; gần thị giác hơn PSNR nhưng vẫn thuộc nhóm đo sai lệch theo cặp.}
+\kn{LPIPS}{khoảng cách giữa hai ảnh đo trong không gian đặc trưng của một mạng đã huấn luyện; bám thị giác người tốt hơn, nhưng cần có ảnh gốc để so cặp.}
+\kn{FID}{khoảng cách giữa \emph{phân phối} ảnh sinh và phân phối ảnh thật. Nó khớp một Gauss trên đặc trưng của một mạng, cần hàng vạn mẫu, và không nói gì về từng ảnh riêng lẻ.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Mọi bài toán trong mục này có cùng một hình dạng: một toán tử thuận đã xoá bớt thông tin, và ta phải đi ngược. Điều quan trọng là thông tin đã mất thì \emph{mất thật} --- không thuật toán nào lấy lại được, chỉ có thể đoán.
+
+\textbf{Ví dụ nhỏ nhất, tính tay được.} Lấy tín hiệu một chiều và giảm độ phân giải hai lần bằng cách lấy trung bình từng cặp: hai giá trị \(a, b\) cho ra một giá trị \(m=(a+b)/2\). Bây giờ đi ngược: biết \(m=0{,}5\), hãy tìm \(a\) và \(b\). Một phương trình, hai ẩn --- nghiệm là cả một đường thẳng \(\{(a,\,1-a)\}\). Cặp \((0{,}5;\,0{,}5)\) hợp lệ, mà \((0;\,1)\) cũng hợp lệ, và \((-3;\,4)\) cũng vậy. Với siêu phân giải \(\times 4\) trên ảnh, mỗi pixel thấp cấp ứng với 16 pixel cao cấp: một ràng buộc, mười sáu ẩn. \emph{Mô hình không giải bài toán này; nó chọn một điểm trên không gian nghiệm, và cái quyết định điểm nào là prior.}
+\lk{C/16/01}{cùng nguyên lý với}{thị giác 3D đối mặt đúng tình thế này: khi ràng buộc hình học không đủ, prior học được chọn nghiệm --- và cũng mất luôn khả năng tự phát hiện sai.}
+
+Hình~\ref{fig:ill-posed-1d} vẽ đúng không gian nghiệm đó.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.62\linewidth,height=5.4cm,
+  xlabel={\(a\)}, ylabel={\(b\)},
+  xlabel style={font=\footnotesize}, ylabel style={font=\footnotesize},
+  tick label style={font=\scriptsize},
+  xmin=-0.6,xmax=1.6,ymin=-0.6,ymax=1.6, axis lines=middle,
+  every axis plot/.append style={thick}]
+\addplot[domain=-0.6:1.6,samples=2,steel,very thick]{1-x};
+\node[font=\scriptsize,steel,anchor=west] at (axis cs:0.95,0.32) {\(a+b=1\)};
+\node[font=\scriptsize,steel,anchor=west,align=left] at (axis cs:0.72,0.03) {\emph{mọi điểm trên đường}\\ \emph{đều là nghiệm hợp lệ}};
+\addplot[only marks,mark=*,mark size=2.4pt,reddark] coordinates {(0.5,0.5)};
+\node[font=\scriptsize,reddark,anchor=south west,align=left] at (axis cs:0.52,0.55) {nghiệm tối ưu MSE\\ \(=\) trung bình \(\Rightarrow\) mờ};
+\addplot[only marks,mark=*,mark size=2.4pt,violetdark] coordinates {(0,1)};
+\addplot[only marks,mark=*,mark size=2.4pt,violetdark] coordinates {(1,0)};
+\node[font=\scriptsize,violetdark,anchor=east,align=right] at (axis cs:-0.06,1.06) {mẫu lấy từ prior:\\ sắc nét, và có thể sai};
+\end{axis}
+\end{tikzpicture}
+\caption{Bài toán ill-posed nhỏ nhất có thể vẽ được. Giảm độ phân giải hai lần bằng phép lấy trung bình biến \((a,b)\) thành một số \(m=0{,}5\); đi ngược thì một phương trình phải xác định hai ẩn, nên nghiệm là cả một đường thẳng. Mô hình không ``giải'' bài toán này --- nó \emph{chọn một điểm} trên đường. Chọn trọng tâm thì được điểm số sai lệch tốt nhất và được ảnh mờ; chọn một điểm lấy từ phân phối ảnh thật thì được ảnh sắc nét và chấp nhận rủi ro chọn nhầm. Siêu phân giải \(\times 4\) trên ảnh chỉ là hình này với một ràng buộc và mười sáu ẩn.}
+\label{fig:ill-posed-1d}
+\end{figure}
+
+Điều đó dẫn thẳng tới câu hỏi trung tâm của cả mục: chọn điểm nào? Nếu chọn trung bình của mọi nghiệm hợp lệ thì được điểm số sai lệch tốt nhất, nhưng trung bình của nhiều ảnh sắc nét lệch nhau là một ảnh mờ --- đúng cơ chế đã gặp ở mục 17.1.
+\lk{C/17/01}{hệ quả của}{ảnh mờ ở đây và ảnh mờ của VAE là cùng một phép tính: nghiệm tối ưu của bình phương trung bình là kỳ vọng có điều kiện.} Nếu chọn một nghiệm cụ thể lấy từ phân phối ảnh thật thì được ảnh sắc nét trông rất thật, nhưng nó có thể khác hẳn ảnh gốc ở chi tiết. Đây không phải một lựa chọn kỹ thuật mà là một đánh đổi có chứng minh.
+
+\textbf{Học mục này thì làm được gì mà trước đó không làm được?} Đọc một bảng so sánh phương pháp khôi phục ảnh và biết ngay vì sao phương pháp có PSNR cao nhất lại trông tệ nhất; chọn chỉ số đánh giá phù hợp với việc mình định làm; và quyết định có được phép dùng ảnh sinh làm dữ liệu huấn luyện hay không, dựa trên lý do chứ không dựa trên cảm giác.
+
+\begin{trucgiac}
+Khôi phục ảnh giống việc đọc một lá thư bị nhoè mực. Chỗ nhoè có thể là chữ ``hoa'' hoặc chữ ``hòa'' --- nét mực không còn phân biệt được nữa. Bạn có hai cách. Cách thứ nhất: viết chồng cả hai khả năng lên nhau thành một vệt mờ; ai đọc cũng thấy chỗ đó không rõ, nên không ai bị lừa. Cách thứ hai: chọn dứt khoát một chữ và viết thật đẹp; lá thư đọc trôi chảy, trông như nguyên bản --- và người đọc không có cách nào biết chữ đó là bạn đoán. Tối ưu PSNR là cách thứ nhất; tối ưu độ chân thực là cách thứ hai. Không có cách thứ ba.
+\end{trucgiac}
+
+\subsection{B. Bốn bài toán, một hình dạng}
+
+\begin{table}[H]\centering\small
+\caption{Bốn bài toán low-level vision, đọc theo cái mà toán tử thuận đã xoá đi. Cột cuối cho biết prior phải bù vào chỗ nào --- và do đó mô hình sẽ bịa ra loại nội dung gì khi nó sai.}
+\label{tab:bon-bai-toan-ll}
+\begin{tabularx}{\linewidth}{@{}L{2.3cm}L{3.2cm}YY@{}}
+\toprule
+\textbf{Bài toán} & \textbf{Toán tử thuận} & \textbf{Cái bị xoá} & \textbf{Prior phải bù gì / hỏng khi}\\
+\midrule
+Khử nhiễu & Cộng nhiễu (thực tế phụ thuộc cường độ sáng, không phải Gauss đều) & Chi tiết biên độ nhỏ, lẫn vào nhiễu & Kết cấu tự nhiên; hỏng khi mô hình nhiễu lúc huấn luyện khác nhiễu thật\\
+Siêu phân giải & Làm mờ rồi lấy mẫu thưa & Toàn bộ tần số cao trên ngưỡng Nyquist & Chi tiết tần số cao; hỏng ở chữ, khuôn mặt, biển số --- những chỗ sai một chút là sai nghĩa\\
+Khử nhoè & Chập với nhân nhoè (do chuyển động hoặc lệch nét) & Các tần số bị nhân nhoè triệt tiêu & Cấu trúc biên; hỏng khi nhân nhoè không đều trên ảnh hoặc không biết trước\\
+HDR & Cắt ngưỡng trên và dưới của dải sáng & Thông tin ở vùng cháy sáng và vùng tối kịt & Nội dung vùng đã cháy; hỏng vì ở đó dữ liệu \emph{bằng không}, không phải ``nhiễu''\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Dòng cuối đáng chú ý vì nó là trường hợp cực đoan giúp nhìn rõ bản chất: ở vùng cháy sáng, cảm biến đã bão hoà nên mọi giá trị thật đều cho ra cùng một con số. Cái mô hình điền vào đó \emph{hoàn toàn} là prior, không có một chút thông tin đo đạc nào. Ba bài toán còn lại chỉ là phiên bản nhẹ hơn của cùng tình huống.
+
+\subsection{C. Đánh đổi perceptual--distortion: một kết quả, không phải một kinh nghiệm}
+Đây là chỗ cần phân biệt rõ địa vị của các phát biểu. Trong mục 17.1, ``thế lưỡng nan ba chiều'' là một cách gọi tên quan sát thực nghiệm. Ở đây thì khác. Trước hết phải hình thức hoá hai đại lượng: \emph{sai lệch} là kỳ vọng của một khoảng cách tính theo từng ảnh, còn \emph{độ chân thực} là khoảng cách giữa phân phối ảnh khôi phục và phân phối ảnh thật. Với hai định nghĩa đó, người ta \emph{chứng minh được} rằng hàm biểu diễn giới hạn giữa chúng là không tăng \cite{blau2018perception}. Nói bằng lời: muốn giảm sai lệch xuống dưới một mức nào đó thì buộc phải chấp nhận độ chân thực kém đi. Hình~\ref{fig:pd-tradeoff} vẽ tình thế đó.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.78\linewidth,height=5.6cm,
+  xlabel={Sai lệch theo từng ảnh (MSE, thấp \(=\) tốt) \(\longrightarrow\)},
+  ylabel={Sai lệch phân phối\\ (thấp \(=\) trông thật)},
+  ylabel style={align=center,font=\footnotesize},
+  xlabel style={font=\footnotesize},
+  xtick=\empty,ytick=\empty,
+  xmin=0.8,xmax=10.5,ymin=1.2,ymax=11,
+  axis lines=left, tick style={draw=none},
+  every axis plot/.append style={thick}]
+\addplot[domain=1:10,samples=80,steel,very thick]{2+8/x};
+\node[font=\scriptsize,steel,anchor=west] at (axis cs:5.6,5.2) {đường giới hạn: không thể xuống dưới};
+\addplot[only marks,mark=*,mark size=2pt,reddark] coordinates {(1.25,8.4)};
+\node[font=\scriptsize,reddark,anchor=west,align=left] at (axis cs:1.5,9.5)
+  {tối ưu PSNR / L2:\\ mờ nhưng ``an toàn''};
+\addplot[only marks,mark=*,mark size=2pt,violetdark] coordinates {(6.0,3.33)};
+\node[font=\scriptsize,violetdark,anchor=west,align=left] at (axis cs:6.2,2.6)
+  {GAN / diffusion:\\ sắc nét, có thể bịa};
+\node[font=\scriptsize\itshape,tiercol,anchor=west] at (axis cs:2.4,2.4) {vùng không đạt được};
+\end{axis}
+\end{tikzpicture}
+\caption{Đánh đổi perceptual--distortion. Mọi phương pháp khôi phục ảnh đều nằm \emph{trên} đường cong này; tiến bộ thuật toán đẩy đường cong xuống, còn việc chọn hàm mất mát chỉ là chọn \emph{trượt dọc theo} nó. Hệ quả trực tiếp: không xếp hạng được các phương pháp bằng một con số duy nhất, và hai phương pháp ở hai đầu đường cong không so sánh được với nhau nếu chưa nói rõ mục đích sử dụng.}
+\label{fig:pd-tradeoff}
+\end{figure}
+
+Hệ quả thực hành nghiêm túc hơn vẻ ngoài của nó. Một mô hình siêu phân giải kiểu GAN hay diffusion \cite{ledig2017srgan} có thể dựng ra một khuôn mặt sắc nét, hợp lý và \emph{sai người}, hoặc một biển số đọc được và sai số. Trong ảnh giải trí, đó là tính năng. Trong ảnh y tế, giám định pháp y, đo đạc từ ảnh vệ tinh hay kiểm tra khuyết tật công nghiệp, đó là lỗi đúng sai. Nó còn nguy hiểm gấp bội vì đầu ra trông \emph{đáng tin hơn} đầu vào.
+
+\subsection{D. Đánh giá: mỗi chỉ số nhạy với một thứ, và mù với thứ khác}
+
+\begin{table}[H]\centering\small
+\caption{Bốn chỉ số hay dùng. Không chỉ số nào đủ một mình; chọn chỉ số là chọn trước loại lỗi mà bạn sẽ không nhìn thấy.}
+\label{tab:chi-so-ll}
+\begin{tabularx}{\linewidth}{@{}L{1.7cm}YYY@{}}
+\toprule
+\textbf{Chỉ số} & \textbf{Đo gì} & \textbf{Nhạy với} & \textbf{Mù với}\\
+\midrule
+PSNR & Bình phương trung bình theo pixel & Lệch sáng, lệch màu toàn cục, sai lệch biên độ lớn & Cấu trúc; nó \emph{thưởng} cho ảnh mờ, và phạt nặng một phép dịch một pixel\\
+SSIM & Tương quan cục bộ về sáng, tương phản, cấu trúc \cite{wang2004ssim} & Mất cấu trúc cục bộ, nhoè & Sai lệch ngữ nghĩa; vẫn thuộc nhóm đo sai lệch nên vẫn nghiêng về ảnh mờ\\
+LPIPS & Khoảng cách trong không gian đặc trưng học được \cite{zhang2018lpips} & Khác biệt mà mắt người thấy: kết cấu, nét & Cần ảnh gốc; kế thừa thiên lệch của mạng nền\\
+FID & Khoảng cách giữa hai \emph{phân phối} đặc trưng \cite{heusel2017fid} & Lệch thống kê tổng thể, thu hẹp phân phối & Từng ảnh riêng lẻ; lỗi ngữ nghĩa (sáu ngón tay) gần như không bị phạt\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Hình~\ref{fig:tang-chi-so} xếp bốn chỉ số theo tầng mà chúng quan sát, kèm chỗ mù của từng cái.
+
+\begin{figure}[H]\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  lvl/.style={draw=steel,fill=bluebg,rounded corners=2pt,minimum width=3.1cm,minimum height=0.85cm,inner sep=2pt,align=center,font=\scriptsize},
+  m/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=3pt,font=\scriptsize\bfseries},
+  ar/.style={-{Stealth[length=4pt]},steel}]
+\node[lvl] (l1) at (0,0)    {từng \textbf{pixel}};
+\node[lvl] (l2) at (0,-1.2) {\textbf{cấu trúc} cục bộ};
+\node[lvl] (l3) at (0,-2.4) {\textbf{đặc trưng} tri giác};
+\node[lvl] (l4) at (0,-3.6) {\textbf{phân phối} của cả tập};
+\node[m] (m1) at (3.6,0)    {PSNR};
+\node[m] (m2) at (3.6,-1.2) {SSIM};
+\node[m] (m3) at (3.6,-2.4) {LPIPS};
+\node[m] (m4) at (3.6,-3.6) {FID};
+\foreach \a/\b in {l1/m1,l2/m2,l3/m3,l4/m4} \draw[ar] (\a) -- (\b);
+\node[font=\scriptsize,reddark,anchor=west,align=left,text width=8.2cm] at (4.9,0)    {mù với cấu trúc; \textbf{thưởng cho ảnh mờ}, phạt nặng một phép dịch một pixel};
+\node[font=\scriptsize,reddark,anchor=west,align=left,text width=8.2cm] at (4.9,-1.2) {vẫn thuộc nhóm đo sai lệch, nên vẫn nghiêng về phía mờ};
+\node[font=\scriptsize,reddark,anchor=west,align=left,text width=8.2cm] at (4.9,-2.4) {cần có ảnh gốc để so cặp; kế thừa thiên lệch của mạng nền};
+\node[font=\scriptsize,reddark,anchor=west,align=left,text width=8.2cm] at (4.9,-3.6) {mù với từng ảnh: sáu ngón tay gần như không bị phạt; cần hàng vạn mẫu};
+\draw[decorate,decoration={brace,amplitude=4pt},accent] (-1.75,0.5) -- (-1.75,-4.1)
+  node[midway,left=5pt,font=\scriptsize,align=center,text=inkblue,rotate=90,yshift=0.9cm]
+  {tầng quan sát ngày càng thô};
+\end{tikzpicture}}
+\caption{Bốn chỉ số, bốn \emph{tầng quan sát} khác nhau --- và đó là lý do không chỉ số nào thay thế được chỉ số khác. Đi từ trên xuống, thước đo ngày càng ít quan tâm tới từng pixel và ngày càng quan tâm tới thống kê tổng thể; cột phải là cái mà mỗi tầng \emph{không nhìn thấy}. Chọn chỉ số vì thế là chọn trước loại lỗi mà bạn sẽ để lọt, nên báo cáo tối thiểu phải có một chỉ số ở nhóm trên và một ở nhóm dưới.}
+\label{fig:tang-chi-so}
+\end{figure}
+
+Hai điểm thực hành ít được nói. Thứ nhất, FID cần cỡ hàng vạn mẫu mới ổn định. Giá trị của nó còn phụ thuộc mạnh vào chi tiết tiền xử lý: thư viện dùng để đổi kích thước ảnh, và chất lượng nén JPEG. Hệ quả là hai con số FID từ hai bài báo thường không so sánh trực tiếp được. Đó là lý do tồn tại các bản cài đặt chuẩn hoá như \repo{GaParmar/clean-fid}. Thứ hai, và quan trọng hơn: FID nhạy với việc \emph{phân phối bị thu hẹp} --- đúng thứ mà mắt người không phát hiện được khi nhìn từng ảnh. Đó là lý do nó vẫn là chỉ số chính dù mọi người đều biết nó có nhiều khuyết điểm.
+
+\subsection{E. Nhiễu thật không phải nhiễu Gauss}
+Một chế độ hỏng rất phổ biến, và hoàn toàn tránh được nếu biết trước. Gần như mọi mô hình khử nhiễu trong tài liệu được huấn luyện bằng cách cộng nhiễu Gauss trắng vào ảnh sạch, vì làm vậy thì có dữ liệu vô hạn miễn phí. Nhưng nhiễu của cảm biến thật là hỗn hợp của nhiễu Poisson phụ thuộc cường độ sáng và nhiễu đọc. Bộ xử lý ảnh trong máy còn biến đổi nó một cách phi tuyến qua khử khảm, cân bằng trắng, gamma và nén. Sau chuỗi đó, nhiễu trở nên có tương quan không gian và phụ thuộc màu \cite{brooks2019unprocessing}. Mô hình huấn luyện trên nhiễu Gauss đạt điểm rất cao trên bộ kiểm thử tổng hợp và tụt hẳn trên ảnh chụp thật \cite{abdelhamed2018sidd}.
+
+Đây là một ca sách giáo khoa của lệch phân phối (\ptr{B/08-dich-chuyen-phan-phoi}), và cách chữa cũng là cách chữa chuẩn: hoặc thu dữ liệu ghép cặp thật, hoặc mô phỏng đúng chuỗi vật lý bằng cách ``gỡ ngược'' quá trình xử lý ảnh về miền raw, thêm nhiễu đúng mô hình ở đó, rồi chạy xuôi trở lại. Chi tiết vật lý nằm ở \ptr{A/02-vat-ly-tao-anh}.
+\lk{A/02}{ràng buộc bởi}{mô hình nhiễu dùng lúc huấn luyện phải khớp chuỗi vật lý thật của cảm biến, nếu không thì mọi con số đo được đều vô nghĩa.}
+\lk{B/08}{trường hợp riêng của}{nhiễu Gauss tổng hợp đối lại nhiễu cảm biến thật là một ca sách giáo khoa của lệch phân phối.}
+
+\subsection{F. Dùng ảnh sinh làm dữ liệu huấn luyện}
+Đây là vấn đề mới của thời đại này, và câu trả lời không phải ``có'' hay ``không'' mà là một điều kiện.
+
+\begin{itemize}
+\item \textbf{Có ích khi} bạn dùng mô hình sinh để bù vào các vùng \emph{hiếm} mà bạn biết trước là hiếm: tư thế lạ, thời tiết hiếm, khuyết tật ít gặp. Điều kiện đi kèm là bạn giữ được một tập kiểm thử \emph{thật} hoàn toàn tách biệt để đo. Ở đây ảnh sinh đóng vai một dạng tăng cường dữ liệu có kiểm soát, và tín hiệu đánh giá vẫn đến từ thế giới thật.
+\item \textbf{Tự đầu độc khi} vòng lặp được lặp lại: mô hình sinh dữ liệu, dữ liệu huấn luyện mô hình sau, mô hình sau lại sinh dữ liệu. Cơ chế thu hẹp rất cụ thể. Mọi thao tác làm ảnh ``đẹp hơn'' --- dẫn hướng mạnh, cắt ngưỡng, chọn lọc thủ công --- đều cắt bớt đuôi của phân phối. Mỗi vòng lặp vì thế co phương sai lại một chút, và các mode hiếm biến mất hẳn. Hiện tượng này đã được chứng minh bằng thực nghiệm trong nhiều công trình gần đây; mức độ nghiêm trọng phụ thuộc rất mạnh vào một điều kiện: mỗi vòng có giữ lại dữ liệu thật hay không. Điểm này đáng nói rõ, vì các phát biểu kiểu ``mô hình sẽ tự sụp đổ'' thường bỏ qua nó.
+\end{itemize}
+
+\subsection{G. Giới hạn và trường hợp hỏng}
+Giới hạn lớn nhất của cả mảng này là ta không có cách đánh giá tốt. Đường cong ở Hình~\ref{fig:pd-tradeoff} nói rằng một con số không đủ về mặt nguyên tắc, chứ không phải vì ta chưa nghĩ ra chỉ số hay hơn. Hệ quả là mọi bảng xếp hạng khôi phục ảnh đều mang một giả định ngầm về mục đích sử dụng, và giả định đó hầu như không bao giờ được viết ra.
+
+Ba chế độ hỏng còn lại đáng nhớ: mô hình khử nhiễu huấn luyện ở một mức nhiễu cố định hỏng ở mức khác; mô hình siêu phân giải huấn luyện với một toán tử làm mờ cố định (thường là bicubic) hỏng ngay khi ảnh thật bị làm hỏng theo cách khác; và mọi mô hình trong nhóm này đều hỏng \emph{im lặng} --- đầu ra luôn là một ảnh trông hợp lý, không bao giờ là một thông báo ``tôi không biết''.
+
+\begin{cambay}
+Cạm bẫy phổ biến nhất là dùng PSNR để chọn mô hình rồi ngạc nhiên vì mô hình được chọn trông tệ. Đây không phải trục trặc mà là hành vi đúng của chỉ số: PSNR suy ra từ bình phương trung bình, và nghiệm tối ưu của bình phương trung bình là trung bình của mọi ảnh hợp lệ, tức là ảnh mờ. \emph{Chọn chỉ số là chọn trước kết luận.} Cách làm tối thiểu chấp nhận được có hai phần. Thứ nhất, báo cáo một chỉ số sai lệch và một chỉ số chân thực, tức là một ở mỗi đầu đường cong. Thứ hai, với ứng dụng có rủi ro, thêm một phép kiểm tra rằng mô hình \emph{không} thêm nội dung. Phép thử rẻ nhất: cho đầu ra chạy lại qua toán tử thuận rồi so với đầu vào. Chỗ nào lệch là chỗ mô hình đã bịa.
+\end{cambay}
+
+\begin{cannho}
+Mọi bài toán low-level vision đều ill-posed, nên mô hình không ``khôi phục'' mà \emph{chọn một nghiệm}, và prior là thứ quyết định chọn cái nào. Từ đó suy ra đánh đổi perceptual--distortion, vốn là một kết quả có chứng minh chứ không phải kinh nghiệm: sắc nét hơn đồng nghĩa với bịa nhiều hơn. Câu hỏi đúng khi chọn mô hình không phải ``cái nào tốt hơn'' mà ``sai kiểu nào thì tôi chịu được''. \T{1}
+\end{cannho}
+
+\subsection{H. Kết nối}
+Cơ chế ``loss trung bình cho ảnh mờ'' ở đây là đúng cơ chế của VAE trong \ptr{C/17-mo-hinh-sinh/01-bon-ho-mo-hinh-sinh}; các mô hình khôi phục hiện đại nhất chính là mô hình diffusion có điều kiện của \ptr{C/17-mo-hinh-sinh/03-diffusion}, nên hệ số dẫn hướng ở đó cũng chính là núm vặn trượt dọc đường cong ở đây. Vai trò của prior trong bài toán ill-posed là bản sao chính xác của vai trò prior trong \ptr{C/16-thi-giac-3d/01-bon-the-he-3d}: cả hai lĩnh vực đều đổi ràng buộc cứng lấy tri thức học được, và đều mất khả năng tự phát hiện sai. Mô hình nhiễu thật nằm ở \ptr{A/02-vat-ly-tao-anh/01-anh-sang-va-nhieu}; việc chọn chỉ số và giao thức đo nằm ở \ptr{B/07-chia-du-lieu-va-danh-gia}; hậu quả vận hành của ``hỏng im lặng'' nằm ở \ptr{E/25-do-tin-cay-va-van-hanh}.
+
+\begin{tukiem}
+\item Vì sao một mô hình tối ưu MSE cho ảnh mờ, và vì sao đó là \emph{nghiệm đúng} chứ không phải mô hình kém?
+\item Đánh đổi perceptual--distortion khác về địa vị thế nào so với ``thế lưỡng nan ba chiều'' ở mục 17.1, và vì sao sự khác biệt đó quan trọng khi đọc paper?
+\item FID nhạy với thứ gì mà mắt người không để ý, và mù với thứ gì mà mắt người nhận ra ngay?
+\item Một mô hình khử nhiễu đạt kết quả xuất sắc trên bộ kiểm thử tổng hợp và kém hẳn trên ảnh điện thoại; cơ chế nào giải thích điều đó và bạn sửa bằng cách nào?
+\item Trong trường hợp nào thì việc dùng ảnh sinh làm dữ liệu huấn luyện là an toàn, và điều kiện nào bị vi phạm thì nó trở thành tự đầu độc?
+\item Nếu phải giao một mô hình siêu phân giải cho một hệ thống đọc biển số, bạn chọn điểm nào trên đường cong ở Hình~\ref{fig:pd-tradeoff}, và bạn thêm phép kiểm tra nào để bảo vệ mình?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

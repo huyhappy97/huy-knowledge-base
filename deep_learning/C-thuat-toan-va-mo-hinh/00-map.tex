@@ -1,0 +1,24 @@
+% 00-map.tex — bản đồ Phần C: có gì, mức đầu tư, thứ tự đọc.
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Dependency: ../00-map.tex | Mức độ: điều hướng
+\documentclass[../deep_learning.tex]{subfiles}
+\begin{document}
+\begin{table}[H]\centering\small
+\caption{Bản đồ Phần C: các chương, nội dung, và mức đầu tư đề xuất.}
+\begin{tabularx}{\linewidth}{@{}L{0.8cm}L{4.0cm}YL{2.6cm}@{}}
+\toprule
+\textbf{Ch.} & \textbf{Thư mục} & \textbf{Nội dung} & \textbf{Mức}\\
+\midrule
+12 & \code{12-co-che-huan-luyen} & Bốn mục: cơ học của gradient; làm cho training chạy được; tối ưu hoá; tổng quát hoá và chẩn đoán & \textbf{cốt lõi}\\
+13 & \code{13-kien-truc-backbone} & Ba mạch: dòng CNN; từ chuỗi tới attention; ViT và bài học inductive bias & \textbf{cốt lõi}\\
+14 & \code{14-bai-toan-cv-loi} & Bốn mục: detection hai giai đoạn, một giai đoạn, segmentation, các bài toán lân cận & \textbf{cốt lõi}\\
+15 & \code{15-thi-giac-khong-thoi-gian} & Ba mục: đầu ra độ dài thay đổi; biểu diễn video; flow, tracking và ràng buộc streaming & cốt lõi\\
+16 & \code{16-thi-giac-3d} & Ba mục: bốn thế hệ 3D; biểu diễn và depth và SLAM; NeRF, 3DGS, hợp nhất cảm biến & cốt lõi\\
+17 & \code{17-mo-hinh-sinh} & Bốn mục: bốn họ sinh; tối ưu trên pixel; diffusion; low-level vision & tham khảo có chọn lọc\\
+18 & \code{18-pretraining-va-foundation} & Hai mục: nguồn giám sát ngày càng rẻ; kinh tế học của pretraining & \textbf{cốt lõi}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent Chương 12 trước hết và đọc kỹ nhất. Chương 13 là nền cho 14 tới 16. Chương 17 đọc theo nhu cầu. Chương 18 nên đọc sớm hơn vị trí của nó nếu bạn đang phải chọn giữa train từ đầu và dùng mô hình có sẵn.
+\end{document}

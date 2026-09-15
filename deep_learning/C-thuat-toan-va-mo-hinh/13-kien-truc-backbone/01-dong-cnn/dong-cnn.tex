@@ -1,0 +1,254 @@
+% ---------------------------------------------------------------------------
+% Chương 13, mục 1 — Dòng CNN
+% Tạo: 2026-09-03  |  Sửa gần nhất: 2026-09-03  |  Ôn gần nhất: —
+% Phụ thuộc: C/12 (toàn chương), B/10-thiet-ke-kien-truc
+% Mức độ: cốt lõi
+% ---------------------------------------------------------------------------
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Dòng CNN: gỡ từng nút thắt (The CNN Lineage)}
+\ptrtarget{C/13-kien-truc-backbone/01}\ptrtarget{C/13-kien-truc-backbone/01-dong-cnn}\ptrtarget{C/13/01}\ptrtarget{C/13/01-dong-cnn}
+\dependency{\ptr{C/12-co-che-huan-luyen} (đặc biệt mục 2 --- kết nối tắt là thành viên thứ tư của họ ``giữ tích Jacobian gần \(1\)''); \ptr{B/11-gioi-han-tinh-toan} (FLOPs, cường độ số học, chế độ nghẽn bộ nhớ).}
+
+\begin{tomtat}
+Mục này đọc mười lăm năm lịch sử \en{CNN} như một chuỗi gỡ nút thắt: mỗi kiến trúc ra đời để phá đúng một rào cản của kiến trúc trước, và tạo ra rào cản mới cho kiến trúc sau. Đọc xong bạn nhìn một \en{backbone} lạ và gọi tên được nó đang tối ưu cho ràng buộc nào: tham số, độ sâu, FLOPs, hay độ trễ thật. Nhờ đó bạn chọn backbone theo ràng buộc của mình, thay vì theo bảng xếp hạng. Nếu chỉ nhớ một điều: bài học lớn nhất của cả dòng nằm ở mắt xích cuối, ConvNeXt. Rất nhiều ``cải tiến kiến trúc'' trong lịch sử hoá ra là cải tiến \emph{công thức huấn luyện}. Nên mọi so sánh kiến trúc không kiểm soát recipe đều đáng ngờ.
+\end{tomtat}
+
+\begin{nentang}
+\kn{convolution}{phép nhân một cửa sổ trọng số nhỏ, gọi là kernel hay filter, trượt khắp ảnh; vì cùng bộ trọng số dùng cho mọi vị trí nên số tham số không phụ thuộc kích thước ảnh.}
+\kn{kênh (channel)}{chiều thứ ba của một bản đồ đặc trưng --- ảnh RGB có \(3\) kênh đầu vào, còn một tầng giữa mạng có thể có \(256\) kênh, mỗi kênh là một loại đặc trưng mà mạng học được.}
+\kn{stride}{bước nhảy của cửa sổ khi trượt; stride \(2\) làm bản đồ đặc trưng nhỏ đi một nửa mỗi chiều, nên nó là cách chính để giảm độ phân giải và tăng tầm nhìn.}
+\kn{trường tiếp nhận (receptive field)}{vùng pixel đầu vào ảnh hưởng tới một giá trị đầu ra; nó lớn dần theo chiều sâu, và cả mục này xoay quanh việc mở rộng nó cho rẻ.}
+\kn{pooling}{phép gộp một vùng nhỏ thành một giá trị (lấy lớn nhất hoặc lấy trung bình), dùng để giảm độ phân giải mà không tốn tham số.}
+\kn{FLOPs}{số phép nhân-cộng mà mô hình thực hiện; đây là chỉ số đại diện phổ biến cho chi phí, nhưng \emph{không} tỉ lệ với độ trễ thật.}
+\kn{cường độ số học (arithmetic intensity)}{số phép tính thực hiện trên mỗi byte dữ liệu đọc từ bộ nhớ; thấp thì kernel bị nghẽn ở băng thông chứ không ở khả năng tính toán, và giảm FLOPs lúc đó gần như vô ích.}
+\kn{recipe (công thức huấn luyện)}{toàn bộ các lựa chọn không thuộc kiến trúc --- optimizer, lịch học, số epoch, augmentation --- và bài học cuối mục là chúng giải thích phần lớn chênh lệch giữa các kiến trúc.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Toàn bộ chương 13 là một cuộc tranh luận kéo dài về một câu hỏi: \emph{nên cài sẵn bao nhiêu giả định vào mô hình?} \en{Convolution} là một câu trả lời rất mạnh cho câu hỏi đó, và nó cài sẵn đúng ba giả định. Thứ nhất là \vn{tính cục bộ}{locality} --- một pixel chỉ liên quan trực tiếp tới các pixel lân cận, nên trọng số bằng \(0\) ở ngoài cửa sổ \(k\times k\). Thứ hai là \vn{chia sẻ trọng số}{weight sharing}, tương đương với \vn{đẳng biến tịnh tiến}{translation equivariance} --- một mẫu hình có ý nghĩa như nhau dù nó nằm ở đâu trong ảnh. Thứ ba là \vn{phân cấp}{hierarchy} --- đặc trưng phức tạp được ghép từ đặc trưng đơn giản, nên tăng dần độ trừu tượng và giảm dần độ phân giải.
+
+Ba giả định này đến từ vật lý của việc tạo ảnh chứ không từ toán học, và chúng đúng đủ tốt để một mạng conv cần ít dữ liệu hơn hẳn một mạng dày đặc cùng sức chứa. Nhưng chúng cũng khoá lại một không gian thiết kế, và lịch sử CNN chính là lịch sử của việc lần lượt phát hiện ra rào cản nào trong không gian đó đang chặn, rồi gỡ nó. Giá trị cụ thể của mục này: cầm một backbone lạ lên, bạn trả lời được ba câu mà không cần chạy thử. Nó đang tiết kiệm cái gì? Nó trả giá ở đâu? Và ràng buộc nào khiến người ta chọn nó?
+
+\begin{trucgiac}
+Đừng đọc dòng CNN như một cuộc thi xem ai chính xác hơn. Hãy đọc nó như lịch sử tối ưu một đường ống sản xuất, nơi mỗi thế hệ tìm ra \emph{nút cổ chai hiện thời} rồi mở rộng đúng chỗ đó. Mở đúng nút cổ chai thì thông lượng tăng vọt, và nút cổ chai lập tức chuyển sang chỗ khác. Đó là lý do mỗi bước tiến trong bảng dưới đây lại sinh ra một vấn đề mới ở trục khác. Người đọc lịch sử theo cách này đoán được bước tiếp theo; người đọc theo cách ``ai chính xác hơn'' chỉ nhớ được tên.
+\end{trucgiac}
+
+\subsection{B. Dòng thời gian: ba thời kỳ, ba nút thắt khác nhau}
+Nhìn từ xa, mười lăm năm này chia làm ba thời kỳ rõ rệt, và \emph{nút thắt của mỗi thời kỳ nằm ở một trục khác nhau}. Thời kỳ đầu vướng ở tính khả thi. Thời kỳ giữa vướng ở khả năng tối ưu hoá. Thời kỳ sau vướng ở phần cứng và ở công thức huấn luyện.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  nd/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,font=\small,align=center,text width=1.85cm},
+  hl/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=4pt,font=\small\bfseries,align=center,text width=1.85cm},
+  rl/.style={font=\small\bfseries,color=inkblue,anchor=west},
+  sb/.style={font=\scriptsize\itshape,color=reddark,anchor=west}]
+\draw[rulecol,thick] (0,2.35) -- (19.2,2.35);
+\draw[rulecol,thick] (0,0.55) -- (19.2,0.55);
+\draw[rulecol,thick] (0,-1.25) -- (19.2,-1.25);
+\node[rl] at (0,3.15) {Thời kỳ 1 --- làm cho mạng sâu khả thi};
+\node[sb] at (8.2,3.15) {nút thắt: tính toán và tối ưu hoá cơ bản};
+\node[rl] at (0,1.35) {Thời kỳ 2 --- đi sâu hơn và rẻ hơn};
+\node[sb] at (8.2,1.35) {nút thắt: độ sâu không huấn luyện được, và số phép nhân};
+\node[rl] at (0,-0.45) {Thời kỳ 3 --- hợp với phần cứng, và recipe};
+\node[sb] at (8.2,-0.45) {nút thắt: độ trễ thật, và công thức huấn luyện};
+\node[nd] at (1.3,2.35)  {AlexNet\\2012};
+\node[nd] at (4.3,2.35)  {ZFNet\\2013};
+\node[nd] at (7.3,2.35)  {VGG\\2014};
+\node[nd] at (4.3,0.55)  {Inception\\2014};
+\node[hl] at (7.3,0.55)  {ResNet\\2015};
+\node[nd] at (11.5,0.55) {DenseNet\\2017};
+\node[nd] at (11.5,-1.25){MobileNet\\2017};
+\node[nd] at (13.9,-1.25){SENet\\2018};
+\node[nd] at (16.0,-1.25){EfficientNet\\2019};
+\node[hl] at (18.4,-1.25){ConvNeXt\\2022};
+\end{tikzpicture}}
+\caption{Dòng CNN đặt trên trục thời gian và tách theo nút thắt được gỡ. Hai mắt xích được tô đậm vì chúng thay đổi cách ngành suy nghĩ chứ không chỉ thay đổi con số: ResNet cho thấy rào cản của mạng sâu là \emph{tối ưu hoá} chứ không phải sức chứa, còn ConvNeXt cho thấy phần lớn khoảng cách giữa các kiến trúc là khoảng cách công thức huấn luyện.}
+\label{fig:timeline-cnn}
+\end{figure}
+
+Bảng~\ref{tab:dong-cnn} đọc cùng Hình~\ref{fig:timeline-cnn} theo chiều dọc; cột cuối là cột đáng nhớ, vì nó cho thấy không bước nào miễn phí.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Dòng CNN đọc theo mạch gỡ nút thắt. Cột cuối cho thấy mỗi bước tiến đẩy độ khó sang một trục khác chứ không xoá nó.}
+\label{tab:dong-cnn}
+\begin{tabularx}{\linewidth}{@{}L{1.95cm}YY@{}}
+\toprule
+\textbf{Bước} & \textbf{Gỡ nút thắt gì} & \textbf{Cái giá / vấn đề mới}\\
+\midrule
+LeNet & Chứng minh conv \(+\) pooling \(+\) huấn luyện gradient học được đặc trưng thị giác \cite{lecun1998gradient} & Chỉ chạy ở quy mô chữ số; chưa có dữ liệu và phần cứng để mở rộng\\
+AlexNet & Chứng minh mạng sâu \(+\) GPU \(+\) ReLU \(+\) dropout là khả thi ở quy mô ImageNet \cite{krizhevsky2012alexnet} & Kiến trúc làm bằng tay, filter lớn \(11\times11\), rất nhiều tham số ở tầng FC\\
+ZFNet & Trực quan hoá để thấy mạng học gì, từ đó chỉnh filter và stride & Đóng góp là phương pháp quan sát, không phải kiến trúc mới\\
+VGG & Xếp chồng \(3\times3\): cùng trường tiếp nhận, ít tham số hơn, nhiều phi tuyến hơn \cite{simonyan2015vgg} & Tầng FC chiếm phần lớn tham số; tổng FLOPs rất cao\\
+Inception & Nhiều tỉ lệ song song; \(1\times1\) làm nút thắt giảm chiều trước phép tính nặng \cite{szegedy2015going,szegedy2016rethinking} & Kiến trúc phức tạp, nhiều siêu tham số nhánh, khó chỉnh và khó mở rộng\\
+ResNet & Vấn đề \emph{tối ưu hoá} của mạng sâu, bằng đường cộng đồng nhất \cite{he2016resnet} & Vẫn nhiều FLOPs; nhánh tắt buộc giữ thêm kích hoạt nên tốn bộ nhớ hơn\\
+DenseNet & Tái dùng đặc trưng tối đa, ít tham số hơn ở cùng độ chính xác \cite{huang2017densenet} & Phép nối làm bộ nhớ và băng thông phình ra nếu cài đặt ngây thơ\\
+MobileNet & Chi phí tính toán trên thiết bị yếu, bằng depthwise separable \cite{howard2017mobilenets} & Giảm FLOPs nhiều hơn giảm độ trễ thật, vì cường độ số học tụt\\
+SENet & Mạng không tự điều chỉnh được tầm quan trọng giữa các kênh \cite{hu2018senet} & Thêm một điểm đồng bộ toàn cục; lợi ích nhỏ dần khi backbone đã mạnh\\
+EfficientNet & Việc mở rộng mô hình bị làm tuỳ tiện theo một chiều \cite{tan2019efficientnet} & Tối ưu cho FLOPs, không tối ưu cho một phần cứng cụ thể\\
+ConvNeXt & Nghi vấn ``ViT thắng nhờ kiến trúc'', bằng cách hiện đại hoá recipe của CNN \cite{liu2022convnext} & Cho thấy phần lớn chênh lệch trước đó là do công thức huấn luyện, làm mọi so sánh kiến trúc cũ trở nên đáng ngờ\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{C. Ba phép tính tay giải thích ba bước quan trọng nhất}
+Ba bước có ảnh hưởng lớn nhất trong bảng đều rút gọn được thành một phép tính ngắn. Tự làm ba phép tính này một lần thì bạn nhớ chúng mãi.
+
+\textbf{VGG --- vì sao xếp chồng \(3\times3\).} Hai tầng \(3\times3\) nối tiếp có cùng trường tiếp nhận với một tầng \(5\times5\); ba tầng thì bằng \(7\times7\). Nhưng chi phí tham số khác hẳn. Với \(C\) kênh vào và ra, một tầng \(5\times5\) tốn \(25C^2\) tham số, còn hai tầng \(3\times3\) chỉ tốn \(2\cdot 9C^2 = 18C^2\) --- ít hơn \(28\) phần trăm. So \(7\times7\) với ba tầng \(3\times3\) thì là \(49C^2\) đối với \(27C^2\), ít hơn \(45\) phần trăm. Và ta còn được thêm hai lần phi tuyến. Nói gọn: cùng tầm nhìn, ít tham số hơn, nhiều khả năng biểu diễn hơn --- một trong những phép đổi hiếm hoi tốt ở cả ba mặt.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[scale=0.44,
+  cl/.style={draw=rulecol,fill=white},
+  hi/.style={draw=violetdark,fill=violetbg,thick},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  cp/.style={font=\scriptsize,color=steel,align=center}]
+\foreach \x in {0,...,4}\foreach \y in {0,...,4}{\node[cl,minimum size=0.62cm] at (\x,\y) {};}
+\foreach \x in {1,2,3}\foreach \y in {1,2,3}{\node[hi,minimum size=0.62cm] at (\x,\y) {};}
+\node[cp] at (2,-1.2) {đầu vào \(5\times5\)};
+\draw[ar] (5.2,2) -- (7.0,2);
+\node[cp] at (6.1,2.75) {conv \(3\times3\)};
+\foreach \x in {8,...,10}\foreach \y in {1,...,3}{\node[cl,minimum size=0.62cm] at (\x,\y) {};}
+\node[hi,minimum size=0.62cm] at (9,2) {};
+\node[cp] at (9,-1.2) {trung gian \(3\times3\)};
+\draw[ar] (11.2,2) -- (13.0,2);
+\node[cp] at (12.1,2.75) {conv \(3\times3\)};
+\node[hi,minimum size=0.62cm] at (14,2) {};
+\node[cp] at (14,-1.2) {đầu ra: nhìn thấy\\cả vùng \(5\times5\)};
+\end{tikzpicture}
+\caption{Hai tầng \(3\times3\) nối tiếp cho một ô đầu ra nhìn thấy đúng vùng \(5\times5\) của đầu vào. Cùng trường tiếp nhận với một tầng \(5\times5\), nhưng chỉ tốn \(18C^2\) tham số thay vì \(25C^2\). Và có thêm một lần phi tuyến ở giữa.}
+\label{fig:rf-3x3}
+\end{figure}
+
+Hình~\ref{fig:rf-3x3} là toàn bộ lập luận của VGG dưới dạng hình. Điều nó \emph{không} nói ra là nút thắt kế tiếp: tầng kết nối đầy đủ đầu tiên của VGG-16 có \(7\cdot 7\cdot 512\cdot 4096 \approx 103\) triệu tham số, tức khoảng ba phần tư toàn bộ mô hình nằm trong một tầng duy nhất không phải conv. Đó là lý do các thế hệ sau thay tầng FC bằng \en{global average pooling}.
+
+\textbf{Inception --- vì sao \(1\times1\) là nút thắt hiệu quả.} Giả sử cần một conv \(3\times3\) từ \(256\) kênh sang \(256\) kênh. Chi phí trực tiếp là \(256\cdot 256\cdot 9 = 589\,824\) phép nhân-cộng cho mỗi vị trí không gian. Bây giờ chèn hai tầng \(1\times1\): giảm \(256 \rightarrow 64\), làm \(3\times3\) trong không gian \(64\) kênh, rồi mở lại \(64 \rightarrow 256\). Tổng chi phí là \(256\cdot 64 + 64\cdot 64\cdot 9 + 64\cdot 256 = 16\,384 + 36\,864 + 16\,384 = 69\,632\), tức rẻ hơn \(8{,}5\) lần. Ý nghĩa của phép tính: phần đắt nhất của conv là tương tác giữa \emph{mọi} kênh vào với \emph{mọi} kênh ra, nhân với \(k^2\); nếu ta làm phép tính không gian ở một không gian kênh hẹp thì cái \(k^2\) chỉ nhân với một số nhỏ. Đây cũng chính là khối \eng{bottleneck} của ResNet, và là ý tưởng nền của phần lớn kiến trúc hiệu quả về sau.
+
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  tn/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,font=\small,align=center,minimum height=1.5cm,text width=1.5cm},
+  op/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=4pt,font=\small,align=center,text width=1.9cm},
+  ar/.style={-{Latex[length=2mm]},draw=steel,thick},
+  ct/.style={font=\scriptsize,color=reddark,align=center},
+  hd/.style={font=\small\bfseries,color=inkblue,anchor=west}]
+% --- conv thuong ---
+\node[hd] at (-0.3,2.55) {conv \(3\times3\) thường: mọi kênh vào nói chuyện với mọi kênh ra, ở mọi vị trí};
+\node[tn] (i1) at (0.7,1.2) {\(H\!\times\!W\)\\\(256\) kênh};
+\node[op] (k1) at (3.6,1.2) {conv \(3\times3\)\\\(256 \to 256\)};
+\node[tn] (o1) at (6.5,1.2) {\(H\!\times\!W\)\\\(256\) kênh};
+\draw[ar] (i1) -- (k1); \draw[ar] (k1) -- (o1);
+\node[ct] at (3.6,0.15) {\(256 \times 256 \times 9 = 589\,824\) phép nhân mỗi vị trí};
+% --- depthwise separable ---
+\node[hd] at (-0.3,-1.05) {depthwise separable: tách phần \emph{không gian} khỏi phần \emph{kênh}};
+\node[tn] (i2) at (0.7,-2.4) {\(H\!\times\!W\)\\\(256\) kênh};
+\node[op] (k2a) at (3.6,-2.4) {depthwise \(3\times3\)\\mỗi kênh riêng};
+\node[tn] (m2) at (6.5,-2.4) {\(H\!\times\!W\)\\\(256\) kênh};
+\node[op] (k2b) at (9.4,-2.4) {pointwise \(1\times1\)\\\(256 \to 256\)};
+\node[tn] (o2) at (12.3,-2.4) {\(H\!\times\!W\)\\\(256\) kênh};
+\draw[ar] (i2) -- (k2a); \draw[ar] (k2a) -- (m2); \draw[ar] (m2) -- (k2b); \draw[ar] (k2b) -- (o2);
+\node[ct] at (3.6,-3.45) {\(256 \times 9 = 2\,304\)};
+\node[ct] at (9.4,-3.45) {\(256 \times 256 = 65\,536\)};
+\node[ct,anchor=west] at (0.2,-4.15) {Tổng \(= 67\,840\), tức \(\frac{1}{C_{\text{out}}} + \frac{1}{k^2} = \frac{1}{256} + \frac{1}{9} \approx 0{,}115\) lần chi phí gốc --- rẻ hơn khoảng \(8{,}7\) lần.};
+\node[ct,anchor=west,color=violetdark] at (0.2,-4.75) {Nhưng bước depthwise đọc mỗi phần tử để làm vỏn vẹn \(9\) phép nhân, nên cường độ số học của nó tụt xuống mức nghẽn băng thông.};
+\end{tikzpicture}}
+\caption{Vì sao depthwise separable rẻ, và vì sao ``rẻ'' theo FLOPs không có nghĩa là ``nhanh''. Conv thường trả tiền cho tích của ba thứ cùng lúc: kênh vào, kênh ra, và diện tích cửa sổ. Phép tách chia nó thành hai bước, mỗi bước chỉ trả cho \emph{hai} trong ba thứ đó --- đây là toàn bộ nguồn gốc của tỉ số \(1/C_{\text{out}} + 1/k^2\). Cái giá nằm ở dòng cuối: bước depthwise có rất ít phép tính trên mỗi byte đọc vào, nên nó rơi vào phía nghẽn bộ nhớ và thời gian thực tế không giảm theo tỉ lệ FLOPs.}
+\label{fig:depthwise-sep}
+\end{figure}
+
+Hình~\ref{fig:depthwise-sep} bày ra cả hai vế của phép đổi trên cùng một sơ đồ, và đó là lý do nó đáng vẽ: con số \(8{,}7\) và lời cảnh báo về độ trễ luôn phải đọc cùng nhau.
+
+\textbf{MobileNet --- và vì sao FLOPs không phải độ trễ.} Depthwise separable tách một conv thành hai: một conv \(k\times k\) chạy độc lập trên từng kênh, rồi một conv \(1\times1\) trộn kênh. Tỉ số chi phí so với conv thường là \(\frac{1}{C_{\text{out}}} + \frac{1}{k^2}\); với \(k=3\) và \(C_{\text{out}}=256\) thì bằng \(0{,}0039 + 0{,}111 \approx 0{,}115\), tức rẻ hơn khoảng \(8{,}7\) lần. Nhưng độ trễ thực đo được hầu như không bao giờ giảm \(8{,}7\) lần, và lý do là thứ bạn đã gặp khi tối ưu CUDA: phần depthwise đọc mỗi phần tử đầu vào để làm vỏn vẹn \(k^2 = 9\) phép nhân, nên \vn{cường độ số học}{arithmetic intensity} của nó cực thấp và nó rơi vào chế độ nghẽn băng thông bộ nhớ. Giảm FLOPs của một kernel vốn đã nghẽn ở bộ nhớ thì gần như không giảm thời gian. Đây là ví dụ rõ nhất trong cả cây về việc một chỉ số đại diện --- FLOPs --- đo sai thứ mà ta quan tâm.
+\lk{B/11}{ràng buộc bởi}{mô hình roofline nói chính xác khi nào giảm FLOPs không giảm thời gian: khi kernel đã nằm ở phía nghẽn băng thông}
+
+\subsection{D. ResNet: nút thắt là tối ưu hoá, không phải sức chứa}
+Đóng góp của ResNet hay bị kể sai thành ``mạng sâu hơn thì mạnh hơn''. Bằng chứng gốc nói điều khác và mạnh hơn nhiều: một mạng phẳng \(56\) tầng có \emph{sai số huấn luyện} cao hơn một mạng phẳng \(20\) tầng \cite{he2016resnet}. Sai số huấn luyện, không phải sai số kiểm thử. Nên đây không phải overfitting, và cũng không phải thiếu sức chứa. Mạng sâu hơn về nguyên tắc biểu diễn được mọi thứ mạng nông biểu diễn được: chỉ cần các tầng thừa làm ánh xạ đồng nhất. Vấn đề là gradient descent không tìm ra nghiệm đó.
+
+Kết nối tắt \(y = x + F(x)\) làm hai việc cùng lúc, và cả hai đều đã xuất hiện ở chương 12. Về mặt biểu diễn, ánh xạ đồng nhất trở thành phương án \emph{mặc định} --- chỉ cần \(F \approx 0\), điều mà khởi tạo nhỏ cho sẵn. Về mặt gradient, Jacobian của khối là \(I + \partial F/\partial x\), nên tích các Jacobian qua nhiều khối luôn còn một thành phần bằng \(1\) không thể triệt tiêu; đây chính xác là thành viên thứ tư của họ kỹ thuật ``giữ \(\rho\) gần \(1\)'' mà mục \ptr{C/12/02} đã mở ngoặc để dành. 
+\begin{figure}[H]\centering
+\resizebox{0.95\linewidth}{!}{%
+\begin{tikzpicture}[
+  bx/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,font=\small,minimum width=1.3cm,align=center},
+  ar/.style={-{Latex[length=2mm]},draw=steel,thick},
+  bw/.style={-{Latex[length=2mm]},draw=reddark,thick,dashed},
+  lb/.style={font=\scriptsize,align=center},
+  hd/.style={font=\small\bfseries,color=inkblue,anchor=west}]
+% --- mang phang ---
+\node[hd] at (-0.3,2.4) {Khối phẳng};
+\node[bx] (px) at (0.7,1.3) {\(x\)};
+\node[bx] (pf1) at (2.7,1.3) {conv, BN};
+\node[bx] (pf2) at (5.0,1.3) {conv, BN};
+\node[bx] (py) at (7.2,1.3) {\(y\)};
+\draw[ar] (px) -- (pf1); \draw[ar] (pf1) -- (pf2); \draw[ar] (pf2) -- (py);
+\draw[bw] (py) to[out=-150,in=-30] node[lb,color=reddark,below]{\(\dfrac{\partial y}{\partial x} = J_2 J_1\) --- mọi thừa số đều có thể nhỏ hơn \(1\)} (px);
+% --- khoi residual ---
+\node[hd] at (-0.3,-1.55) {Khối residual};
+\node[bx] (rx) at (0.7,-2.65) {\(x\)};
+\node[bx] (rf1) at (2.7,-2.65) {conv, BN};
+\node[bx] (rf2) at (5.0,-2.65) {conv, BN};
+\node[circle,draw=reddark,fill=redbg,inner sep=2pt,font=\small] (rp) at (7.0,-2.65) {\(+\)};
+\node[bx] (ry) at (8.9,-2.65) {\(y\)};
+\draw[ar] (rx) -- (rf1); \draw[ar] (rf1) -- (rf2); \draw[ar] (rf2) -- (rp); \draw[ar] (rp) -- (ry);
+\draw[ar,reddark,thick] (rx) to[out=55,in=125] node[lb,color=reddark,above]{đường tắt: \(x\) đi thẳng, không qua phép toán nào} (rp);
+\draw[bw] (ry) to[out=-150,in=-30] node[lb,color=reddark,below]{\(\dfrac{\partial y}{\partial x} = I + \dfrac{\partial F}{\partial x}\) --- số hạng \(I\) không bao giờ triệt tiêu} (rx);
+\node[lb,color=tiercol,anchor=west,text width=4.6cm] at (10.0,-2.65) {Hệ quả kép: ánh xạ đồng nhất trở thành phương án \emph{mặc định} (chỉ cần \(F\approx 0\)), và gradient luôn có một đường về không bị nhân dồn.};
+\end{tikzpicture}}
+\caption{Kết nối tắt sửa vấn đề gì, nhìn từ phía lượt ngược. Ở khối phẳng, đạo hàm của đầu ra theo đầu vào là một tích thuần tuý, nên nếu mỗi thừa số hơi nhỏ hơn \(1\) thì sau vài chục khối nó tắt --- đúng cơ chế ở \ptr{C/12/02}. Ở khối residual, đường cộng thêm một số hạng \(I\) vào Jacobian, và số hạng đó không phụ thuộc trọng số nên không thể bị nhân cho tiêu biến. Đây là lý do bằng chứng gốc của ResNet là sai số \emph{huấn luyện} chứ không phải sai số kiểm thử: thứ được sửa là khả năng tối ưu hoá, không phải sức chứa.}
+\label{fig:khoi-residual}
+\end{figure}
+
+Hình~\ref{fig:khoi-residual} cũng cho thấy cái giá đã nhắc ở bảng: mũi tên đường tắt buộc tensor \(x\) phải sống tới tận điểm cộng, nên bộ nhớ kích hoạt của một mạng residual cao hơn một mạng phẳng cùng độ sâu.
+
+Cái giá thì cụ thể: nhánh tắt buộc giữ tensor \(x\) sống tới tận chỗ cộng, nên bộ nhớ kích hoạt tăng so với một mạng phẳng cùng độ sâu.
+\lk{C/12/02}{cùng nguyên lý với}{kết nối tắt, hàm kích hoạt, khởi tạo và chuẩn hoá đều nhắm vào một đại lượng: hệ số nhân của tích các Jacobian}
+
+\subsection{E. Các biến thể convolution và mục đích riêng}
+Đây là một bộ sưu tập chứ không phải một chuỗi, nên đọc theo kiểu tra cứu. Điểm chung: mỗi biến thể \emph{nới lỏng hoặc siết chặt} đúng một trong ba giả định gốc ở mục A.
+
+\begin{itemize}
+\item \textbf{Depthwise separable} --- tách tương tác không gian khỏi tương tác kênh.
+  \begin{itemize}
+  \item \textbf{Được:} chi phí giảm khoảng \(k^2\) lần, như phép tính ở mục C.
+  \item \textbf{Mất:} cường độ số học tụt nên độ trễ thật giảm ít hơn nhiều; và giả định ``không gian và kênh tách rời được'' không phải lúc nào cũng đúng.
+  \end{itemize}
+\item \textbf{Group convolution} --- chia kênh thành \(g\) nhóm, mỗi nhóm chỉ nói chuyện trong nội bộ. Ra đời từ ràng buộc bộ nhớ của AlexNet trên hai GPU, sau đó thành công cụ giảm tham số. \emph{Mất:} thông tin không đi qua ranh giới nhóm, nên cần một phép trộn kênh (ví dụ shuffle hoặc \(1\times1\)) để bù.
+\item \textbf{Dilated convolution} \cite{yu2016dilated} --- giãn khoảng cách giữa các điểm lấy mẫu trong cửa sổ, nên trường tiếp nhận tăng theo cấp số nhân mà không cần giảm độ phân giải. Sinh ra cho segmentation, nơi giảm độ phân giải là mất mát trực tiếp. \emph{Mất:} hiện tượng lưới --- các ô lấy mẫu không phủ kín nên xuất hiện hoa văn răng lược nếu xếp chồng nhiều tầng cùng hệ số giãn.
+\item \textbf{Deformable convolution} \cite{dai2017deformable} --- học luôn cả \emph{vị trí} lấy mẫu thay vì cố định trên lưới, tức nới lỏng giả định cục bộ theo một cách có điều khiển. \emph{Mất:} truy cập bộ nhớ không đều nên rất khó tối ưu trên GPU, và là một trong những lý do phổ biến khiến một mô hình không xuất được sang runtime suy luận.
+\item \textbf{Transposed convolution} --- tăng độ phân giải ở nhánh giải mã. \emph{Mất:} hiện tượng bàn cờ khi kích thước kernel không chia hết cho stride; nhiều cài đặt hiện đại thay nó bằng \emph{upsample rồi conv thường} để tránh hẳn.
+\end{itemize}
+
+\subsection{F. ConvNeXt và bài học đắt nhất của cả mục}
+Khi ViT vượt CNN trên ImageNet, cách đọc tự nhiên là ``\en{attention} tốt hơn convolution''. ConvNeXt kiểm chứng cách đọc đó bằng một thí nghiệm có kỷ luật. Nhóm tác giả giữ nguyên convolution, rồi lần lượt áp từng thành phần của recipe hiện đại và đo sau mỗi bước \cite{liu2022convnext}. Danh sách gồm lịch học dài hơn, AdamW, augmentation mạnh, stochastic depth, LayerNorm thay BatchNorm, kernel lớn hơn, và tỉ lệ tầng theo kiểu transformer. Kết quả là một CNN thuần bắt kịp ViT cùng hạng.
+
+Kết luận đúng không phải ``CNN thắng'' mà là: \emph{phần lớn khoảng cách được gán cho kiến trúc thực ra thuộc về công thức huấn luyện}. Điều này thay đổi cách bạn đọc mọi paper kiến trúc về sau. Câu hỏi đầu tiên khi thấy một bảng so sánh không còn là ``kiến trúc nào cao hơn''. Nó thành ``hai dòng này có cùng recipe không, và nếu không thì ai được tune kỹ hơn''. Đây cũng là lý do chương \ptr{E/24-thi-nghiem-va-ablation} tồn tại.
+\lk{E/24}{hệ quả của}{một bảng so sánh chỉ có nghĩa khi hai dòng được huấn luyện bằng cùng công thức và được tune ngang nhau}
+
+\subsection{G. Giới hạn và trường hợp hỏng}
+Ba giới hạn đáng mang theo. Thứ nhất, \emph{FLOPs không phải độ trễ, và số tham số cũng không}. Ba đại lượng này tương quan yếu với nhau và với thời gian chạy thật; MobileNet và DenseNet là hai ví dụ ngược chiều nhau về đúng điểm này. Bất kỳ lựa chọn backbone nào cũng phải đo trên đúng phần cứng và đúng chế độ batch mà bạn sẽ triển khai.
+
+Thứ hai, \emph{độ chính xác ImageNet là một chỉ số đại diện, không phải mục tiêu}. Tương quan giữa nó và chất lượng ở tác vụ khác là có thật, nhưng không chặt. Tương quan đó yếu đi rõ rệt với các tác vụ dự đoán dày như segmentation. Ở đó, độ phân giải và đặc trưng đa tỉ lệ quan trọng hơn khả năng phân loại toàn ảnh.
+
+Thứ ba, các con số trong mục này thuộc hai loại khác nhau. Các phép tính tham số và FLOPs ở mục C là số học thuần tuý nên chính xác. Ngược lại, các phát biểu kiểu ``rẻ hơn \(8{,}7\) lần nhưng độ trễ giảm ít hơn nhiều'' là mô tả định tính của một hiện tượng đã được quan sát rộng rãi; mức giảm cụ thể phụ thuộc GPU, thư viện và kích thước tensor tới mức tôi không nêu một con số nào ở đây.
+
+\begin{cambay}
+Cạm bẫy phổ biến nhất khi chọn backbone là so sánh hai mô hình được huấn luyện bằng hai recipe khác nhau rồi kết luận về kiến trúc. Một ResNet-50 theo recipe 2015 và một ResNet-50 theo recipe 2022 chênh nhau vài điểm phần trăm trên ImageNet. Khoảng cách đó lớn hơn khoảng cách giữa nhiều cặp kiến trúc mà người ta viết hẳn một paper để so. Trước khi tin bất kỳ bảng nào, hãy kiểm tra ba thứ: số epoch, bộ augmentation, và optimizer cùng lịch học.
+\end{cambay}
+
+\begin{cannho}
+Mỗi bước trong dòng CNN gỡ đúng một nút thắt và đẩy độ khó sang một trục khác: tham số \ra khả năng tối ưu hoá \ra chi phí tính toán \ra độ trễ trên phần cứng thật \ra công thức huấn luyện. Khi cầm một backbone mới, hỏi nó đang đứng ở nút nào trong chuỗi đó --- câu trả lời cho bạn biết nó sẽ hỏng ở đâu. \T{2}
+\end{cannho}
+
+\subsection{H. Kết nối}
+Mục này giả định toàn bộ \ptr{C/12-co-che-huan-luyen}, và trả lại cho chương đó thành viên thứ tư của họ ``giữ tích Jacobian gần \(1\)''. Nó đi thẳng vào \ptr{C/13/02-tu-chuoi-toi-attention}, nơi câu hỏi ``bao nhiêu giả định là đủ'' được đặt cho dữ liệu có thứ tự. Rồi vào \ptr{C/13/03-vit-va-inductive-bias}, nơi ba giả định ở mục A bị gỡ bỏ có chủ đích để xem chuyện gì xảy ra. Phần FLOPs và cường độ số học nối trực tiếp sang \ptr{B/11-gioi-han-tinh-toan} và \ptr{D/20-toi-uu-va-nen-mo-hinh}; còn bài học ConvNeXt là tiền đề của \ptr{E/24-thi-nghiem-va-ablation}. Nếu bạn quan tâm việc lắp backbone vào một hệ thống thật, \ptr{C/14-bai-toan-cv-loi} là chương nói về phần neck và head gắn lên nó.
+
+\begin{tukiem}
+\item Ba giả định mà convolution cài sẵn là gì, và mỗi biến thể ở mục E nới lỏng giả định nào?
+\item Vì sao xếp chồng hai tầng \(3\times3\) tốt hơn một tầng \(5\times5\) ở cả ba mặt, và trong tình huống nào nó \emph{không} tốt hơn?
+\item Bằng chứng gốc của ResNet là sai số \emph{huấn luyện} chứ không phải kiểm thử. Vì sao chi tiết đó thay đổi hoàn toàn kết luận rút ra?
+\item MobileNet giảm FLOPs khoảng \(8{,}7\) lần nhưng độ trễ giảm ít hơn nhiều --- giải thích bằng cường độ số học thì thế nào, và phép đo nào xác nhận chẩn đoán đó?
+\item Nếu ConvNeXt đúng khi nói recipe quan trọng hơn kiến trúc, điều đó thay đổi thứ tự bạn đọc một paper kiến trúc thế nào?
+\item Deformable convolution mạnh hơn conv thường ở đâu, và vì sao nó thường bị loại khi triển khai lên thiết bị nhúng?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

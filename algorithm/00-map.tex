@@ -1,0 +1,91 @@
+% ============================================================================
+%  00-map.tex — bản đồ toàn cây algorithm
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+%  Dependency: không. Mức độ: cốt lõi (đọc đầu tiên).
+% ============================================================================
+\documentclass[algorithm.tex]{subfiles}
+\begin{document}
+\chapter*{Bản đồ cây --- quyển sách này là gì và đọc thế nào}
+\addcontentsline{toc}{chapter}{Bản đồ cây}
+\markboth{Bản đồ cây}{}
+
+\begin{tomtat}
+Đây là bản đồ của một quyển sách gồm 28 chương về thuật toán, được viết để \emph{ôn lại} chứ không phải để học lần đầu. Nó chia làm năm phần: tư duy giải bài và nền tảng (A), cấu trúc dữ liệu (B), chiến lược thiết kế (C), giới hạn lý thuyết và các miền chuyên (D), và hành nghề --- viết code, gỡ lỗi, phỏng vấn, luyện tập (E). Điểm khác biệt so với một giáo trình thuật toán thông thường: mỗi chương không chỉ nói thuật toán làm gì, mà nói \emph{làm sao nghĩ ra được nó}, và cuối mỗi chương có ngân hàng câu hỏi kèm đáp án cộng danh sách bài tập kèm gợi ý. Nếu chỉ nhớ một điều: đọc chương 1 và chương 2 trước, vì hai chương đó quyết định bạn dùng 26 chương còn lại như thế nào.
+\end{tomtat}
+
+\section*{A. Quyển sách này giải quyết vấn đề gì}
+
+Người học thuật toán lâu năm hay rơi vào một trong hai trạng thái khó chịu. Trạng thái thứ nhất: biết rất nhiều thuật toán, đọc tên nào cũng thấy quen, nhưng khi gặp một bài mới thì đứng im, vì không có cách nào để đi từ \emph{đề bài} tới \emph{cái tên thuật toán} cần dùng. Trạng thái thứ hai: giải được nhiều bài nhờ luyện tập, nhưng không giải thích được vì sao lời giải đúng, nên khi bài đổi một chi tiết nhỏ thì lời giải sụp mà không biết sụp ở đâu.
+
+Cả hai trạng thái đều có chung một nguyên nhân: kiến thức được lưu dưới dạng \emph{danh mục} chứ không phải dưới dạng \emph{quan hệ}. Danh mục trả lời câu hỏi ``có những gì''; nó không trả lời được ``khi nào dùng cái nào'' và ``vì sao cái đó lại đúng''. Quyển sách này cố ý được tổ chức theo quan hệ: mỗi kỹ thuật xuất hiện kèm câu hỏi mà nó trả lời, giả định mà nó cần, giá phải trả, và dấu hiệu trên đề bài để nhận ra nó.
+
+Có một điểm nữa ít giáo trình nói thẳng. Luyện thuật toán không chỉ là học thuật toán --- nó là một dạng luyện tư duy giải quyết vấn đề, và tư duy đó có tài liệu riêng, có người nghiên cứu nghiêm túc, có phương pháp luyện đã được kiểm chứng. Pólya viết \emph{How to Solve It} cho toán học nhưng bốn bước của ông áp thẳng vào lập trình thi đấu; Schoenfeld chỉ ra rằng người giải giỏi khác người giải kém chủ yếu ở khả năng \emph{tự giám sát} chứ không ở lượng kiến thức; Ericsson chỉ ra rằng số giờ luyện tập chỉ có giá trị khi luyện đúng kiểu. Vì vậy Phần A và Phần E của quyển sách này nói về cách nghĩ và cách luyện, chứ không nói về thuật toán nào cả --- và đó là hai phần nên đọc kỹ nhất.
+
+\section*{B. Năm phần và vì sao chia như vậy}
+
+Cách chia phổ biến của giáo trình thuật toán là chia theo \emph{đối tượng}: sắp xếp, cây, đồ thị, chuỗi, hình học. Cách chia đó tiện tra cứu nhưng dở khi cần vận dụng, vì đề bài thật không bao giờ nói cho bạn biết nó thuộc chương nào. Cây này chia theo \emph{vai trò trong quá trình giải}:
+
+\begin{itemize}
+\item \textbf{Phần A --- Tư duy và nền tảng (chương 1--5).} Trả lời câu hỏi ``đứng trước một bài lạ thì làm gì'' và ``bằng thước đo nào mà tôi biết lời giải này đủ nhanh và đúng''. Gồm nghệ thuật giải bài, kinh nghiệm của những người giỏi nhất, mô hình chi phí và độ phức tạp, chứng minh tính đúng, và bộ toán tối thiểu.
+\item \textbf{Phần B --- Cấu trúc dữ liệu (chương 6--12).} Trả lời câu hỏi ``dữ liệu nên nằm ở dạng nào để thao tác tôi cần trở nên rẻ''. Mỗi chương là một nhóm cấu trúc chia theo \emph{thao tác được làm rẻ đi}, không theo hình dạng.
+\item \textbf{Phần C --- Chiến lược thiết kế (chương 13--20).} Trả lời câu hỏi ``dùng khuôn tư duy nào để sinh ra lời giải''. Vét cạn, chia để trị, tham lam, quy hoạch động, đồ thị, luồng, tìm kiếm trên đáp án, ngẫu nhiên hoá. Đây là phần dày nhất và cũng là phần sinh ra nhiều lời giải nhất trên thực tế.
+\item \textbf{Phần D --- Giới hạn và miền chuyên (chương 21--24).} Trả lời câu hỏi ``khi nào thì nên ngừng tìm lời giải nhanh''. Số học và đại số tính toán, hình học tính toán, độ khó và quy dẫn, cận dưới cùng các mô hình tính toán khác.
+\item \textbf{Phần E --- Hành nghề (chương 25--28).} Trả lời câu hỏi ``từ ý tưởng đúng tới code chạy đúng, và làm sao luyện để giỏi lên''. Cài đặt và gỡ lỗi, thuật toán trong hệ thống thật, chiến thuật phỏng vấn và thi đấu, lộ trình luyện tập kèm ngân hàng bài tập lớn.
+\end{itemize}
+
+\section*{C. Phụ thuộc và thứ tự đọc}
+
+Hình~\ref{fig:map-root} vẽ quan hệ phụ thuộc thật giữa năm phần. Mũi tên đặc là phụ thuộc bắt buộc; mũi tên nét đứt là ``đọc trước thì dễ hơn nhưng không bắt buộc''.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.75cm and 1.25cm,
+  p/.style={draw=steel,fill=bluebg,rounded corners=2.5pt,inner sep=6pt,align=center,
+            font=\small,text width=3.15cm},
+  hi/.style={draw=accent,fill=amberbg,rounded corners=2.5pt,inner sep=6pt,align=center,
+            font=\small,text width=3.15cm},
+  ar/.style={-{Latex[length=2.4mm]},draw=steel,thick},
+  ard/.style={-{Latex[length=2.4mm]},draw=tiercol,thick,dashed},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center}]
+\node[hi] (a) {\textbf{A.} Tư duy\\và nền tảng\\{\scriptsize ch.\ 1--5}};
+\node[p,right=of a] (b) {\textbf{B.} Cấu trúc\\dữ liệu\\{\scriptsize ch.\ 6--12}};
+\node[p,right=of b] (c) {\textbf{C.} Chiến lược\\thiết kế\\{\scriptsize ch.\ 13--20}};
+\node[p,below=1.35cm of b] (d) {\textbf{D.} Giới hạn và\\miền chuyên\\{\scriptsize ch.\ 21--24}};
+\node[hi,below=1.35cm of c] (e) {\textbf{E.} Hành nghề\\và luyện tập\\{\scriptsize ch.\ 25--28}};
+\draw[ar] (a) -- node[lb,above=0pt,text width=2.2cm] {thước đo\\chi phí} (b);
+\draw[ar] (b) -- node[lb,above=0pt,text width=2.2cm] {kho thao tác\\rẻ} (c);
+\draw[ar] (c) -- (e);
+\draw[ar] (a.south) |- node[lb,below left=2pt and 0.1cm,text width=2.4cm] {quy dẫn cần\\ngôn ngữ độ phức tạp} (d.west);
+\draw[ard] (c.south) -- node[lb,right=1pt,text width=2.0cm] {biết đâu là\\tường} (d.east);
+\draw[ard] (d) -- (e);
+\draw[ard] (a.north) to[out=35,in=145] node[lb,above=0pt] {chương 1--2 chi phối cả quyển} (c.north);
+\end{tikzpicture}
+\caption{Quan hệ phụ thuộc giữa năm phần. Hai phần tô hổ phách (A và E) là phần nói về \emph{cách nghĩ và cách luyện}; ba phần còn lại là nội dung kỹ thuật. Người đã có nền có thể vào thẳng C, nhưng nên đọc chương 1--2 trước vì chúng quyết định cách dùng phần còn lại.}
+\label{fig:map-root}
+\end{figure}
+
+Có ba lối đọc hợp lý, tuỳ mục tiêu.
+
+\emph{Ôn tập toàn diện (khuyến nghị):} đọc tuần tự A \(\rightarrow\) B \(\rightarrow\) C, rồi D, rồi E; nhưng mỗi khi học xong một chương của C thì quay ngay sang mục bài tập tương ứng ở chương 28 và giải ít nhất năm bài. Kiến thức thuật toán không dính nếu không có bài tập đi kèm trong vòng vài ngày.
+
+\emph{Chuẩn bị phỏng vấn (6--10 tuần):} chương 1, 2, 3, rồi B toàn bộ, rồi C các chương 13--17, rồi chương 25 và 27. Bỏ qua D trừ mục nhận diện bài NP-khó ở chương 23 --- nhận ra ``bài này không có lời giải đa thức đã biết'' là một tình huống phỏng vấn thật.
+
+\emph{Thi đấu lập trình:} A đầy đủ, B đầy đủ, C đầy đủ, D chương 21--22, E chương 25 và 27--28. Chương 23--24 đọc lướt.
+
+\section*{D. Cốt lõi và tham khảo}
+
+Không phải chương nào cũng đáng đầu tư như nhau. Theo nguyên tắc 80/20, phần lõi tạo ra phần lớn năng lực giải bài gồm: chương 1 (bốn bước và bộ heuristic), chương 3 (mô hình chi phí), chương 4 (bất biến --- công cụ chứng minh dùng nhiều nhất), chương 6--7 và 9--10 (mảng, hai con trỏ, heap, cây chỉ số, DSU), chương 14--17 (tham lam, quy hoạch động, đồ thị --- chiếm tỉ lệ áp đảo trong mọi kỳ thi và phỏng vấn), chương 19 (tìm kiếm trên đáp án, kỹ thuật có tỉ lệ ``bài khó hoá dễ'' cao nhất), và chương 25 (cài đặt, gỡ lỗi, stress test).
+
+Phần tham khảo --- biết là có, tra khi cần --- gồm: cây cân bằng ở mức cài đặt chi tiết (chương 9), suffix automaton (chương 12), luồng chi phí nhỏ nhất (chương 18), hình học với số thực (chương 22), và toàn bộ chương 24.
+
+\section*{E. Quy ước dùng trong cả quyển}
+
+Mỗi chương mở đầu bằng khối \textbf{Tóm tắt}, khối \textbf{Kiến thức cần có trước} và bốn tới năm \textbf{câu hỏi mở đầu}; những câu hỏi đó được trả lời tường minh ở cuối chương trong khối \textbf{Trả lời câu hỏi mở đầu}. Sau đó là khối \textbf{Nói lại thật đơn giản} --- toàn chương kể lại bằng ngôn ngữ thường, theo kỹ thuật Feynman.
+
+Cuối mỗi chương có ba khối luyện: bảng \textbf{Active recall} (che cột phải, tự trả lời), \textbf{Câu hỏi ôn tập có đáp án} (câu hỏi dài hơn, đáp án viết đủ để tự chấm), và bảng \textbf{Bài tập} với cột ``điều cần nhận ra'' đóng vai trò gợi ý --- che cột đó lại nếu muốn tự nghĩ. Mức độ đánh bằng chấm: \(\bullet\) khởi động, \(\bullet\bullet\) chuẩn, \(\bullet\bullet\bullet\) khó.
+
+Ba loại hộp màu được dùng tiết chế: \textbf{Trực giác} (mô hình tư duy trước khi hình thức hoá), \textbf{Cạm bẫy} (lỗi thường gặp), \textbf{Cần nhớ} (điều duy nhất phải mang theo nếu quên hết phần còn lại).
+
+Nhiều chương kết thúc bằng khối \textbf{Đọc thêm}: mỗi dòng ghi tên công trình và tác giả, \emph{nơi công bố và năm}, một câu vì sao nên đọc và nên đọc phần nào, cùng mức ưu tiên --- \emph{nền tảng} nếu muốn hiểu chương tới gốc, \emph{tra khi cần} nếu chỉ cần biết là có. Khối này chỉ liệt kê nguồn đã qua phản biện; nơi nào dẫn một bản tiền ấn thì có ghi rõ, và bạn nên đọc dòng đó như tin tức chứ không như kiến thức đã ổn định.
+
+Về thuật ngữ: mỗi thuật ngữ chuyên môn xuất hiện lần đầu ở dạng \emph{tiếng Việt (English)}, sau đó dùng nhất quán một dạng. Tên thuật toán và tên cấu trúc dữ liệu giữ nguyên tiếng Anh, vì đó là dạng bạn sẽ gặp khi tra cứu và khi đọc code.
+\end{document}

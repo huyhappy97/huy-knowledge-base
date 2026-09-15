@@ -1,0 +1,72 @@
+% ============================================================================
+%  HIỂU SÂU TIẾNG ANH — master gộp toàn cây thành một PDF liền mạch.
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+%  Dependency: không (gốc cây). Mức độ: cốt lõi.
+%  Build: ./build.sh            (chỉ master)
+%         ./build.sh all        (thêm PDF riêng cho từng phần/chương)
+% ============================================================================
+\documentclass[11pt,a4paper,oneside]{report}
+\usepackage{subfiles}
+\input{\subfix{preamble/common}}
+\addbibresource{\subfix{refs.bib}}
+\hypersetup{pdftitle={Hiểu sâu tiếng Anh — đọc kỹ và viết rõ},
+            pdfsubject={Ngữ nghĩa, ngữ dụng, đọc học thuật và viết chính xác cho người dùng tiếng Anh chuyên ngành}}
+\begin{document}
+
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture, overlay]
+  \fill[inkblue] (current page.north west) rectangle ++(1.5cm,-\paperheight);
+  \fill[accent]  ($(current page.north west)+(1.5cm,0)$) rectangle ++(0.22cm,-\paperheight);
+  \node[anchor=north east, inner sep=0pt]
+    at ($(current page.north east)+(-1.6cm,-2.3cm)$)
+    {\fontsize{190}{190}\selectfont\sffamily\bfseries\color{inkblue!7}EN};
+\end{tikzpicture}
+
+\vspace*{4.2cm}
+\begin{flushleft}
+{\sffamily\bfseries\color{accent}\large ĐỌC KỸ, VIẾT RÕ, HIỂU ĐÚNG Ý NGƯỜI NÓI\par}
+\vspace{0.5cm}
+{\sffamily\bfseries\color{inkblue}\fontsize{40}{45}\selectfont
+HIỂU SÂU\\[0.12em] TIẾNG ANH\par}
+\vspace{0.9cm}
+{\color{accent}\rule{7cm}{2.4pt}}\par
+\vspace{0.9cm}
+{\large\color{inkblue!85}
+Trình bày theo mạch\\[0.25em]
+\textbf{từ} \(\rightarrow\) \textbf{ngữ cảnh} \(\rightarrow\) \textbf{ý định người viết} \(\rightarrow\) \textbf{cách bạn viết lại}\par}
+\end{flushleft}
+
+\vfill
+\begin{flushleft}
+{\itshape\color{tiercol}``Không có hai từ nào thật sự đồng nghĩa;\\
+chỗ chúng khác nhau chính là chỗ người viết đang nói điều gì đó.''\par}
+{\footnotesize\sffamily\color{tiercol}luận điểm xuyên suốt, xem Chương 1 và Chương 16\par}
+\vspace{1.1cm}
+{\footnotesize\sffamily\color{inkblue}\textbf{Năm phần}\quad
+A · Nền tảng nghĩa \quad B · Đọc sâu \quad C · Viết rõ\\[0.25em]
+\phantom{\textbf{Năm phần}}\quad D · Sắc thái và ngữ dụng \quad E · Luyện hằng ngày\par}
+\vspace{0.5em}
+{\footnotesize\sffamily\color{tiercol}Bản gộp toàn cây --- \today\par}
+\end{flushleft}
+\end{titlepage}
+
+\pagenumbering{roman}
+\subfile{00-map}
+\cleardoublepage
+\tableofcontents
+\cleardoublepage
+\pagenumbering{arabic}
+
+\subfile{A-nen-tang-nghia/nen-tang-nghia}
+\subfile{B-doc-sau/doc-sau}
+\subfile{C-viet-ro/viet-ro}
+\subfile{D-sac-thai/sac-thai}
+\subfile{E-luyen-hang-ngay/luyen-hang-ngay}
+
+\subfile{97-doc-them}
+\subfile{98-thuat-ngu}
+\subfile{99-ket-luan}
+
+\printbibliography[title={Nguồn}]
+\end{document}

@@ -1,0 +1,49 @@
+% 99-chua-biet.tex — sổ những điều chưa biết, bản LaTeX để gộp vào PDF master.
+% Nội dung nguồn: 99-chua-biet.md (sửa ở đó trước, rồi đồng bộ sang đây).
+% Ngày tạo: 2026-09-13 | Sửa gần nhất: 2026-09-14
+\documentclass[marker.tex]{subfiles}
+\begin{document}
+\chapter*{Sổ những điều chưa biết}
+\addcontentsline{toc}{chapter}{Sổ những điều chưa biết}
+\markboth{SỔ NHỮNG ĐIỀU CHƯA BIẾT}{}
+
+\begin{tomtat}
+Đây là danh sách công việc học tập của cây, mô phỏng quyển \emph{``Notebook of things I don't know about''} mà Feynman mở khi làm nghiên cứu sinh ở Princeton. Mỗi mục là một \textbf{câu hỏi cụ thể} mà tôi biết là mình chưa trả lời được, chứ không phải một chủ đề chung chung. Nếu chỉ nhớ một điều: sổ này chỉ có giá trị khi được \emph{thu ngắn dần} --- mục nào giải quyết xong thì chuyển thành một đoạn trong bài chính và ghi ngày.
+\end{tomtat}
+
+Bản đầy đủ và được cập nhật thường xuyên nằm ở tệp \code{99-chua-biet.md} tại gốc cây; bản dưới đây là ảnh chụp tại ngày lập, giữ trong PDF để người đọc bản in cũng thấy được cây này còn nợ những gì. Khi hai bản lệch nhau thì bản \code{.md} là bản đúng.
+
+Cây này có một điểm khác với các cây khác trong kho, và nó đáng nói ngay: \emph{một phần nợ kiểm chứng đã được trả}. Script Monte Carlo ở \ptr{C/16} đã được chạy ngày 2026-09-14, và hai trong bốn quan hệ tỉ lệ của \ptr{A/05} cùng toàn bộ luận điểm về ambiguity của \ptr{A/04} đã qua cửa kiểm chứng (b). Nhưng việc chạy ấy cũng \emph{sinh ra} ba câu hỏi mới, và chúng đứng đầu danh sách dưới đây --- đó là cách một sổ như thế này nên hoạt động.
+
+\section*{Nợ kiểm chứng --- ưu tiên cao nhất}
+
+\textbf{Một, phá tính đồng phẳng có thật sự khử ambiguity không?} \ptr{C/16} mục~3C đo được rằng kê nghiêng \(20^\circ\) chỉ cải thiện độ tản mát góc \emph{1,24 lần}, trong khi \ptr{B/09} mục~4 ngụ ý đòn bẩy lớn hơn nhiều. Ba giả thuyết chưa phân biệt được: cấu hình đã đủ tốt sẵn nên lợi ích nhỏ lại; lợi ích thật nằm ở việc \emph{loại lỗi thô} chứ không giảm nhiễu, tức tôi đã đo nhầm đại lượng; hoặc độ nghiêng chưa đủ. Cách giải quyết là mini project của \ptr{C/16}: đo \emph{tỉ lệ chọn nhầm nghiệm} thay vì độ tản mát. Đây là mục quan trọng nhất của sổ vì nó ảnh hưởng tới một khuyến nghị thiết kế cơ khí đã được đưa ra.
+
+\textbf{Hai, vì sao tag nhô ra theo chiều sâu mạnh hơn nêm nghiêng hai lần?} \ptr{C/16} mục~3E đo được phương án D cho pitch \(0{,}064^\circ\) so với \(0{,}124^\circ\) của phương án C. Hai giả thuyết: hiệu ứng thật của độ lệch khỏi mặt phẳng lớn hơn (60\,mm so với 26\,mm --- tỉ số đúng bằng hai, một trùng khớp đáng chú ý), hoặc chỉ là hệ quả của việc có thêm bốn góc nữa. Phép thử: so với một phương án năm tag nhưng tất cả đồng phẳng.
+
+\textbf{Ba, quan hệ \(\delta\theta \propto 1/B\) có tuyến tính chính xác không?} \ptr{C/16} mục~3D: từ \(B = 0{,}1\) tới \(0{,}8\) m --- tám lần --- yaw chỉ cải thiện 3,4 lần. Giải thích hiện tại (khi yaw tốt lên thì trục khác thành ràng buộc) hợp lý nhưng chưa kiểm.
+
+\textbf{Bốn, toàn cây chưa có một phép đo phần cứng nào.} Mọi con số đã kiểm đến từ mô phỏng, và \ptr{C/16} mục~6 nói rõ mô phỏng không kiểm được hai thứ: các nguồn bị bỏ sót, và tính đúng của mô hình nhiễu. Đây là chỗ nợ lớn nhất của toàn bộ cây.
+
+\textbf{Năm, \code{refs.bib} chưa được đối chiếu với nguồn gốc.} Soạn từ trí nhớ; theo \code{learning-rules.md} mục~5 thì như vậy là chưa qua cửa kiểm chứng nào. Ưu tiên các công trình mà cây dựa vào nhiều nhất: IPPE, phân tích hai nghiệm của target phẳng, AprilTag~2, bias tâm ellipse, hand-eye, và định lý Brockett.
+
+\section*{Câu hỏi về nguyên lý và toán học}
+
+Điểm chính sai \(\Delta\) pixel gây thiên lệch pose bao nhiêu? \ptr{A/01} mục~5 dẫn ra rằng nó dịch mọi tia nhìn đi \(\Delta/f\) radian --- với \(\Delta = 10\) px và \(f = 600\) px thì gần một độ --- nhưng tôi chưa đo xem bao nhiêu phần bị hấp thụ vào các tham số pose khác. Đây là dòng lớn nhất của bảng ngân sách ví dụ ở \ptr{C/15}, nên nó đáng kiểm sớm. Motion blur gây thiên lệch hay chỉ tăng phương sai? \ptr{A/06} mục~3 lập luận rằng profile độ sáng mất đối xứng nên phép khớp cạnh lệch; nếu hoá ra blur chỉ gây nhiễu thì lập luận cho stop-and-go mất một chân, tuy rolling shutter vẫn còn. Méo làm cong cạnh khuếch đại sai số góc bao nhiêu --- \ptr{A/01} mục~4 dẫn ra cơ chế ba tầng và có ví dụ số cho độ lớn méo, nhưng phần khuếch đại tại giao điểm chưa được đo.
+
+Hai câu hỏi về các con số khuyến nghị chưa kiểm ở \ptr{B/09}: ngưỡng độ lệch khỏi mặt phẳng (khuyến nghị 20\% kích thước tag) và tỉ lệ baseline đứng trên ngang (khuyến nghị không dưới một phần ba). Cả hai gắn với mục~1 của sổ này, và \ptr{C/16} mục~3D đã cho thấy pitch và yaw thật sự tách biệt nên câu hỏi thứ hai giờ đo được.
+
+\section*{Câu hỏi về phương pháp và triển khai}
+
+Ngưỡng \(\rho\) nên đặt ở đâu? \ptr{B/10} mục~3B nói rõ không có hằng số phổ quát và phải dẫn ra bằng Monte Carlo. \ptr{C/16} mục~3B cho dữ liệu đầu tiên --- \(\rho\) biến thiên từ 1,33 tới 66,6 theo góc nghiêng --- nhưng chưa có đường cong \emph{tỉ lệ chọn sai theo \(\rho\)}, và đường cong ấy mới là thứ cho ngưỡng. IMU loại được nghiệm sai trong trường hợp nào --- \ptr{B/10} mục~5 dẫn ra rằng nó phụ thuộc hướng của trục lật so với trọng lực, chưa kiểm. Saddle point có thật sự chính xác hơn giao hai đường không, và bao nhiêu --- \ptr{B/08} mục~3 lập luận bằng số hướng ràng buộc và được ủng hộ gián tiếp bởi thực hành của cộng đồng hiệu chuẩn, nhưng chưa có so sánh định lượng; đây là mệnh đề nền của đề xuất target lai.
+
+Ba câu hỏi cần phần cứng: teach-by-showing mất hiệu lực ở khoảng cách nào (\ptr{B/13} mục~3C), chiếu sáng chủ động cải thiện tính ổn định của \(\sigma\) bao nhiêu (\ptr{B/14} mục~4, hiện chỉ phát biểu định tính), và thứ tự hiệu chuẩn sai gây sai số bao nhiêu (\ptr{B/12} mục~2 --- câu này thực ra kiểm được bằng mô phỏng và nên làm sớm).
+
+\section*{Câu hỏi nối sang nhánh khác}
+
+Chương \ptr{B/11} của cây này chồng lấn đáng kể với Phần~B của cây \code{../IMU\_Fusion/}. Câu hỏi cụ thể: nguyên tắc ``giữ phép đo ở dạng nguyên thuỷ nhất mà mô hình nhiễu còn đúng'' ở \ptr{B/11} mục~4 có tương đương với nguyên tắc tiền tích phân ở cây kia không, hay chúng là hai ý khác nhau? Nếu tương đương thì nên trỏ sang thay vì viết lại. Và một quan sát đáng theo đuổi: bài toán chọn nghiệm ở \ptr{B/10} có cấu trúc giống bài toán chọn nghiệm trong khởi tạo thị giác--quán tính --- cả hai đều là chọn giữa các nghiệm rời rạc dựa trên một chỉ báo liên tục --- nên có thể học được gì đó từ bên kia.
+
+\section*{Việc đã làm xong}
+
+\textbf{2026-09-14 --- chạy script Monte Carlo.} Cửa kiểm chứng (b) cho hai quan hệ tịnh tiến của \ptr{A/05} và cho toàn bộ luận điểm ambiguity của \ptr{A/04} đã qua; kết quả ở \ptr{C/16} mục~3. Đáng ghi lại: trong quá trình chạy tôi phát hiện \emph{hai lỗi của chính script} --- một lỗi quy ước hệ quy chiếu, và một lỗi báo cáo góc bằng con số vô hướng --- và cả hai đã được viết vào \ptr{C/16} mục~2 vì chúng là cạm bẫy chung của mọi mô phỏng loại này, không phải chuyện riêng của tôi.
+\end{document}

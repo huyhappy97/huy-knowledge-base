@@ -1,0 +1,40 @@
+% ---------------------------------------------------------------------------
+%  Bản đồ chương 16 — Thị giác 3D và hình học
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ chương 16 --- Thị giác 3D và hình học}
+
+\begin{tomtat}
+Chương 16 gồm ba mục, chia theo ba tầng câu hỏi chứ không theo thứ tự lịch sử: khung bốn thế hệ, các quyết định con, rồi hai chủ đề mới nhất. Bản đồ này nói mục nào là cốt lõi, mục nào có thể tra khi cần, và đọc theo trình tự nào tuỳ theo nền sẵn có của bạn. Nếu chỉ nhớ một điều: mục 16.1 là khung để đọc hai mục còn lại --- bỏ qua nó thì phần sau biến thành một danh sách phương pháp rời rạc.
+\end{tomtat}
+
+\begin{nentang}
+\kn{SfM / MVS}{hai bước của pipeline hình học cổ điển: suy pose camera và cấu trúc thưa từ ảnh (SfM), rồi dựng bề mặt dày đặc khi đã biết pose (MVS).}
+\kn{neural rendering}{học một biểu diễn cảnh bằng cách bắt nó dựng ra ảnh giống các ảnh đã chụp, thay vì đo hình học trực tiếp.}
+\kn{feed-forward geometry}{mô hình suy pose và hình học trong \emph{một} lần chạy mạng, không cần vòng tối ưu và không cần pose cho trước.}
+\kn{point cloud / voxel / mesh}{ba cách lưu hình dạng 3D: tập điểm rời rạc, lưới ô đều, và bề mặt tam giác.}
+\end{nentang}
+
+\subsection*{Ba mục và vai trò của từng mục}
+\begin{itemize}
+\item \textbf{16.1 --- Bốn thế hệ, cùng một bài toán} \emph{(cốt lõi).} Khung của cả chương: hình học cổ điển, lai học--hình học, neural rendering, feed-forward geometry. Trục đánh đổi ``giả định mạnh + ít dữ liệu \(\leftrightarrow\) giả định yếu + nhiều dữ liệu''. Đọc mục này trước mọi thứ khác.
+\item \textbf{16.2 --- Chọn biểu diễn 3D, độ sâu và SLAM} \emph{(cốt lõi phần biểu diễn và độ sâu; phần SLAM là tham khảo với người đã làm SLAM).} Vốn từ: voxel, point cloud, mesh, trường ẩn, Gaussian; bốn nguồn độ sâu và cái gì cố định tỉ lệ; PointNet và bất biến hoán vị.
+\item \textbf{16.3 --- NeRF, 3DGS và hợp nhất cảm biến} \emph{(cốt lõi).} Cơ chế dựng ảnh thể tích, vì sao phải dùng mật độ liên tục, 3DGS đổi gì lấy gì, ba giả định nền dễ vỡ; early đối lại late fusion và ngân sách sai số hiệu chỉnh.
+\end{itemize}
+
+\subsection*{Trình tự đọc}
+\begin{enumerate}
+\item Nếu bạn \textbf{chưa có nền hình học nhiều view}: đọc mục \emph{camera và hình học nhiều view} ở
+  \ptr{A/02-vat-ly-tao-anh} trước, rồi 16.1 \ra 16.2 \ra 16.3 theo đúng thứ tự.
+\item Nếu bạn \textbf{đã làm SLAM hoặc SfM}: đọc 16.1 để lấy khung (nhanh, phần lớn là sắp xếp lại thứ đã biết), lướt mục 16.2 phần D về SLAM, đọc kỹ 16.2 phần C và E (độ sâu học được, point cloud) và toàn bộ 16.3 --- đó là phần có mật độ thông tin mới cao nhất với bạn.
+\item Khối \emph{Thực hành} nằm ở file chương, sau ba mục.
+\end{enumerate}
+
+\subsection*{Chương này phụ thuộc gì và được dùng lại ở đâu}
+\begin{itemize}
+\item \textbf{Phụ thuộc lên trên:} \ptr{A/02-vat-ly-tao-anh} (mô hình chiếu, hiệu chỉnh, phơi sáng); \ptr{B/04-nen-tang-hoc-tu-du-lieu} (đánh đổi giả định \(\leftrightarrow\) dữ liệu, tính xác định được); \ptr{B/07-chia-du-lieu-va-danh-gia} (ATE/RPE, giao thức); \ptr{C/13-kien-truc-backbone} (transformer).
+\item \textbf{Được dùng lại ở dưới:} \ptr{C/17-mo-hinh-sinh/02-toi-uu-tren-pixel} dùng lại nguyên ý tưởng tối ưu trên chính đối tượng cần tạo ra; \ptr{C/17-mo-hinh-sinh/04-low-level-vision} dùng lại khái niệm bài toán ill-posed và vai trò của prior; \ptr{E/25-do-tin-cay-va-van-hanh} dùng lại yêu cầu ``cơ chế phát hiện sai từ bên ngoài''.
+\end{itemize}
+\end{document}

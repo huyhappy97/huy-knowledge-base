@@ -1,0 +1,322 @@
+% ---------------------------------------------------------------------------
+% Chương 11 — Ước lượng và làm mượt pose theo thời gian
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-13  |  Ôn gần nhất: —
+% Phụ thuộc: A/05 (nhiễu vs hệ thống), B/08 (hiệp phương sai góc), B/10 (phải chọn
+%            nghiệm tin cậy TRƯỚC khi làm mượt)
+% Mức độ: QUAN TRỌNG — trở nên quan trọng HƠN sau khi B/13 triệt tiêu nguồn hệ thống,
+%         vì khi đó nguồn ngẫu nhiên là phần còn lại duy nhất.
+% Kiểm chứng công thức lõi:
+%   (1) Trung bình quaternion thô là sai; phải dùng trung bình Karcher trên SO(3)
+%       — cửa (c) moakher2002means (nguồn chuẩn), hartley2013rotation;
+%         cửa (a) q và -q biểu diễn cùng xoay nên tổng phụ thuộc lựa chọn dấu.
+%   (2) EKF với đo là REPROJECTION của góc, không phải pose
+%       — cửa (a) lập luận ở mục 4: nhiễu Gauss trên pixel, không Gauss trên pose;
+%         cửa (c) nguyên tắc chung trong barfoot2017 (giữ đúng mô hình nhiễu).
+%   (3) Hiệp phương sai từ Hessian PnP dùng làm trọng số khi fuse
+%       — kế thừa A/03 và A/05; cửa (a) và (c) đã qua ở đó.
+%   (4) Trung bình N khung giảm sigma theo 1/sqrt(N) — kế thừa B/08 mục 5.
+% Ghi chú trung thực: không có số đo thực nghiệm. Nhận định về chi phí tính toán
+%   của các phương pháp là định tính.
+% ---------------------------------------------------------------------------
+\documentclass[../../marker.tex]{subfiles}
+\begin{document}
+\chapter{Ước lượng pose theo thời gian (Temporal Pose Estimation)}
+\ptrtarget{B/11}\ptrtarget{B/11-uoc-luong-theo-thoi-gian}
+\dependency{\ptr{A/05-lan-truyen-sai-so-pixel-sang-pose} (mục~8, phân loại nhiễu và hệ thống --- chương này chỉ xử lý được loại thứ nhất); \ptr{B/08-corner-refinement} (hiệp phương sai của từng góc --- đầu vào cho mọi phép hợp nhất có trọng số); \ptr{B/10-xu-ly-ambiguity} (điều kiện tiên quyết: phải chọn nghiệm tin cậy \emph{trước} khi làm mượt, nếu không bạn đang làm mượt giữa hai nghiệm khác nhau).}
+
+\begin{tomtat}
+Chương này bàn cách dùng \emph{thời gian} để giảm sai số, và nó có một điều kiện tiên quyết nghiêm ngặt phải nói ngay: mọi kỹ thuật ở đây chỉ hợp lệ sau khi bài toán hai nghiệm đã được xử lý --- làm mượt giữa hai nghiệm khác nhau cho ra một pose không phải nghiệm nào cả (\ptr{A/04} mục~2). Với điều kiện ấy được thoả, có bốn công cụ theo thứ tự phức tạp tăng dần: trung bình khi đứng yên, trung bình đúng cách trên đa tạp, lọc đệ quy với phép đo là \emph{toạ độ góc} chứ không phải pose, và hợp nhất trên đồ thị nhân tử. Hai điểm kỹ thuật quan trọng nhất: \emph{trung bình quaternion thô là sai} vì \(q\) và \(-q\) biểu diễn cùng một xoay; và \emph{phép đo phải là reprojection, không phải pose}, vì nhiễu là Gauss trên pixel chứ không Gauss trên \(SE(3)\). Nếu chỉ nhớ một điều: \emph{chương này chỉ chạm tới nguồn ngẫu nhiên} --- nên nó trở nên quan trọng \emph{hơn} sau khi \ptr{B/13} đã triệt tiêu các nguồn hệ thống, chứ không phải thay thế cho việc đó.
+\end{tomtat}
+
+\begin{nentang}
+\kn{đa tạp (manifold)}{không gian cong mà cục bộ trông như không gian Euclid. \(SO(3)\) và \(SE(3)\) là đa tạp: không có phép cộng, nên ``trung bình'' phải được định nghĩa lại.}
+\kn{trung bình Karcher}{điểm cực tiểu hoá tổng bình phương \emph{khoảng cách trên đa tạp} tới các điểm cần trung bình. Với \(SO(3)\) nó được tính bằng một vòng lặp: đưa mọi điểm về không gian tiếp tuyến tại ước lượng hiện tại, trung bình ở đó, cập nhật, lặp \cite{moakher2002means}.}
+\kn{không gian tiếp tuyến}{xấp xỉ tuyến tính của đa tạp tại một điểm. Với \(SO(3)\) tại một xoay \(R\), nó là không gian ba chiều của các véctơ xoay nhỏ, và ánh xạ mũ đưa nó trở lại đa tạp.}
+\kn{lọc đệ quy}{cập nhật ước lượng theo từng phép đo mới thay vì giải lại toàn bộ. Kalman mở rộng (EKF) là dạng phổ biến nhất.}
+\kn{fixed-lag smoothing}{giữ một cửa sổ vài giây gần nhất và tối ưu lại toàn bộ cửa sổ mỗi khi có phép đo mới. Chính xác hơn lọc đệ quy vì nó tuyến tính hoá lại, tốn hơn vì nó giải một bài toán lớn hơn.}
+\kn{đổi mới (innovation)}{hiệu giữa phép đo thực tế và phép đo dự đoán từ trạng thái hiện tại. Độ lớn chuẩn hoá của nó là công cụ loại ngoại lai có cơ sở thống kê.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Bạn có bốn pose từ bốn khung liên tiếp và muốn lấy trung bình. Nếu bạn cộng bốn quaternion rồi chuẩn hoá, kết quả có thể sai hoàn toàn --- không phải sai một chút. Cơ chế gì, và vì sao nó chỉ xuất hiện đôi khi?}
+\h{Một EKF chuẩn cho docking nhận đầu vào là pose từ PnP. Có một cách thiết kế tốt hơn, và nó đổi \emph{đầu vào} chứ không đổi bộ lọc. Cách ấy là gì, và nó sửa vấn đề gì?}
+\h{Robot đang dừng và bạn lấy trung bình 100 khung. Nêu chính xác dòng nào trong bảng ngân sách của \ptr{C/15} được cải thiện, và dòng nào hoàn toàn không đổi.}
+\h{Chương \ptr{B/13} lập luận rằng teach-by-showing triệt tiêu sai số hệ thống. Vì sao điều đó làm chương này \emph{quan trọng hơn} chứ không phải ít quan trọng đi?}
+\h{Bạn muốn làm mượt pose để nó bớt nhảy. Nêu điều kiện tiên quyết mà nếu không thoả thì việc làm mượt biến một vấn đề nhìn thấy được thành một vấn đề ẩn.}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{B/11/01}
+
+Mọi chương trước đều xử lý \emph{một} khung hình: một ảnh vào, một pose ra. Chương này hỏi: nhiều khung hình cho ta thêm gì?
+
+Câu trả lời ngắn gọn là \(1/\sqrt{N}\) --- đã nêu ở \ptr{B/08} mục~5. Nhưng câu trả lời ngắn gọn ấy giấu ba câu hỏi con mà chương này phải trả lời.
+
+\emph{Câu hỏi thứ nhất: trung bình cái gì?} Trung bình pose thì pose sống trên đa tạp và phép cộng không tồn tại. Trung bình toạ độ góc thì đơn giản hơn nhưng chỉ dùng được khi camera đứng yên. Hai lựa chọn ấy không tương đương, và mục~3 bàn.
+
+\emph{Câu hỏi thứ hai: trung bình thế nào khi camera đang chuyển động?} Lúc ấy pose thật đang đổi, nên trung bình thô là sai. Cần một mô hình chuyển động, và ta bước vào địa hạt của lọc và làm mượt --- mục~4 và~5.
+
+\emph{Câu hỏi thứ ba, và nó là câu hỏi quan trọng nhất: trung bình giúp được gì và không giúp được gì?} Đây là chỗ \ptr{A/05} mục~8 quay lại: trung bình giảm nguồn \emph{ngẫu nhiên} theo \(1/\sqrt{N}\) và hoàn toàn không chạm tới nguồn \emph{hệ thống}. Nếu ngân sách của bạn bị chi phối bởi sai số constellation hoặc bởi méo còn sót, thì cả chương này gần như vô ích.
+
+Sự thật cuối cùng ấy dẫn tới một quan hệ đáng chú ý với \ptr{B/13}, và nó trả lời Q4. Teach-by-showing triệt tiêu các nguồn hệ thống. Sau khi nó đã làm việc ấy, phần còn lại của ngân sách \emph{chỉ gồm nguồn ngẫu nhiên} --- tức chính xác thứ mà chương này xử lý. Nói cách khác: hai chương không cạnh tranh mà nối tiếp, và chương này trở nên quan trọng \emph{hơn} sau khi chương kia đã làm việc của nó.
+
+Có một điều kiện tiên quyết phải nói ngay, và nó là câu trả lời cho Q5. Mọi kỹ thuật trong chương giả định rằng các pose được đưa vào \emph{cùng thuộc về một nghiệm}. Nếu bài toán hai nghiệm chưa được xử lý (\ptr{B/10}), thì bạn đang trung bình giữa hai giá trị cách nhau \(2\alpha\), và kết quả rơi vào giữa --- một pose không phải nghiệm nào cả, và theo \ptr{A/04} mục~2 thì nó luôn rơi đúng vào tư thế fronto-parallel. Tệ hơn, việc làm mượt \emph{xoá mất triệu chứng nhảy}, nên bạn mất dấu hiệu duy nhất cho biết mình có vấn đề. Đây là ví dụ điển hình của việc một kỹ thuật hợp lệ áp dụng sai thứ tự biến một vấn đề nhìn thấy được thành một vấn đề ẩn.
+
+\begin{trucgiac}
+Hình dung việc đo chiều cao một cái cây bằng cách nhìn từ xa, mỗi lần nhìn cho một con số hơi khác.
+
+Nếu cây đứng yên và bạn đứng yên, trung bình nhiều lần nhìn là câu trả lời đúng --- và càng nhiều lần càng tốt, theo căn bậc hai.
+
+Nếu cây đang mọc, trung bình các lần nhìn cho bạn chiều cao \emph{trung bình trong khoảng thời gian đo}, không phải chiều cao hiện tại. Muốn biết hiện tại thì phải có một mô hình về việc nó mọc nhanh thế nào, và dùng mô hình ấy để quy các phép đo cũ về thời điểm hiện tại. Đó là lọc.
+
+Bây giờ đến chỗ tinh tế, và nó là chỗ mà pose khác chiều cao. Chiều cao là một con số --- cộng hai chiều cao rồi chia đôi thì ra một chiều cao hợp lệ. Nhưng hướng thì không: cộng hai hướng ``quay 170 độ'' và ``quay \(-170\) độ'' rồi chia đôi thì ra ``quay 0 độ'', trong khi hai hướng ấy thật ra chỉ cách nhau 20 độ và trung bình đúng phải là 180 độ. Phép cộng thông thường không hiểu rằng hướng quay vòng lại.
+
+Đó là lý do phải có một cách trung bình riêng cho hướng, và cách ấy là: chuyển mọi hướng về ``lệch bao nhiêu so với một hướng tham chiếu'' --- lúc này chúng là những số nhỏ và cộng được --- rồi trung bình, rồi cộng ngược trở lại. Lặp vài lần cho tới khi ổn định.
+
+Và một chuyện cuối, về việc \emph{đo cái gì}. Nếu bạn đo chiều cao cây bằng cách đo góc nhìn rồi tính ra chiều cao, thì sai số của bạn thật ra nằm ở phép đo \emph{góc}, không phải ở chiều cao. Trung bình các chiều cao đã tính không giống với trung bình các góc rồi mới tính --- và cách thứ hai đúng hơn, vì nó xử lý sai số ở đúng chỗ sai số sinh ra.
+\end{trucgiac}
+
+\section{Trường hợp đơn giản nhất: camera đứng yên}
+\ptrtarget{B/11/02}
+
+Trường hợp này đáng có mục riêng vì với chiến lược stop-and-go của \ptr{B/13} mục~4, nó là trường hợp \emph{quan trọng nhất} chứ không phải trường hợp tầm thường.
+
+Khi camera và tag đều đứng yên, pose thật là hằng số và bài toán trở thành ước lượng một hằng số từ nhiều phép đo nhiễu. Có hai cách, và chúng không tương đương.
+
+\emph{Cách một, trung bình toạ độ góc rồi chạy PnP một lần.} Lấy trung bình \(u_i\) qua \(N\) khung cho từng góc, rồi đưa các toạ độ trung bình ấy vào PnP.
+
+\emph{Cách hai, chạy PnP mỗi khung rồi trung bình \(N\) pose.} Đòi trung bình trên đa tạp (mục~3).
+
+Cách một tốt hơn, và lý do đáng hiểu: nó xử lý sai số ở \emph{đúng chỗ sai số sinh ra}. Nhiễu là Gauss trên toạ độ pixel; trung bình \(N\) mẫu Gauss cho một mẫu Gauss với phương sai chia \(N\), và PnP chạy trên dữ liệu ít nhiễu hơn là một bài toán tốt hơn. Cách hai chạy PnP trên dữ liệu nhiều nhiễu rồi trung bình các kết quả --- và vì PnP là phi tuyến, trung bình của các nghiệm không bằng nghiệm của bài toán trung bình.
+
+Cách một cũng đơn giản hơn về cài đặt: không cần đa tạp, không cần Karcher, chỉ là phép cộng số thực. Và nó cho một lợi ích phụ: độ lệch chuẩn của \(N\) mẫu cho từng góc là một ước lượng \emph{thực nghiệm} của \(\sigma\), đúng thứ mà \ptr{B/08} mini project cần và đúng thứ mà \ptr{A/03} mục~6 cần làm trọng số.
+
+Một chi tiết cài đặt: phải khớp đúng góc nào với góc nào giữa các khung. Với marker có ID và có hướng xác định thì việc này hiển nhiên; đừng giả định thứ tự trả về của detector là ổn định.
+
+\begin{cannho}
+Với stop-and-go, cách đúng là: \emph{trung bình toạ độ góc, rồi chạy PnP một lần}.
+
+Không phải: chạy PnP mỗi khung rồi trung bình pose.
+
+Ba lý do: nó xử lý nhiễu ở đúng chỗ nhiễu sinh ra; nó tránh hoàn toàn bài toán trung bình trên đa tạp; và nó cho \(\sigma\) thực nghiệm miễn phí như sản phẩm phụ.
+
+Đây là một trong những chỗ mà cách đơn giản hơn cũng là cách đúng hơn, và nó đáng kiểm lại trong pipeline của bạn --- nhiều cài đặt làm ngược vì thứ tự ``phát hiện, tính pose, xử lý pose'' nghe tự nhiên hơn.
+\end{cannho}
+
+\section{Trung bình trên đa tạp: vì sao quaternion thô là sai}
+\ptrtarget{B/11/03}
+
+Mục này trả lời Q1, và nó cần thiết khi bạn \emph{buộc} phải trung bình pose --- chẳng hạn khi hợp nhất pose từ nhiều nguồn có bản chất khác nhau.
+
+\subsection{A. Cơ chế của lỗi}
+
+Một phép xoay biểu diễn bởi quaternion đơn vị \(q\), và \(q\) cùng \(-q\) biểu diễn \emph{cùng một} phép xoay. Nếu bạn cộng bốn quaternion rồi chuẩn hoá, kết quả phụ thuộc vào dấu bạn tình cờ gán cho từng cái.
+
+Ví dụ cụ thể: hai xoay gần giống nhau, một biểu diễn bởi \(q_1\) và một bởi \(q_2 \approx q_1\). Trung bình của \(q_1\) và \(q_2\) cho \(\approx q_1\) --- đúng. Nhưng nếu thư viện của bạn trả về \(-q_2\) thay vì \(q_2\) (và nó có quyền, vì hai cái tương đương), thì \(q_1 + (-q_2) \approx 0\), và chuẩn hoá một véctơ gần không cho ra một hướng \emph{hoàn toàn ngẫu nhiên}.
+
+Đây là câu trả lời cho phần thứ hai của Q1: lỗi chỉ xuất hiện \emph{đôi khi}, vì nó phụ thuộc vào việc thư viện tình cờ trả về dấu nào. Một hệ thống có thể chạy đúng hàng tháng rồi đột nhiên cho ra một pose vô nghĩa --- và loại lỗi không tái lập được ấy là loại tốn thời gian gỡ nhất.
+
+Biện pháp vá nhanh: trước khi cộng, đảo dấu mọi quaternion sao cho chúng cùng nằm trong một nửa cầu (chẳng hạn ép \(q^\top q_{\text{ref}} > 0\)). Nó chữa được triệu chứng và nó đáng làm ngay. Nhưng nó không phải trung bình đúng, vì trung bình số học của quaternion vẫn không phải trung bình trên \(SO(3)\).
+
+\subsection{B. Trung bình Karcher}
+
+Cách đúng: trung bình Karcher, tức điểm cực tiểu hoá tổng bình phương khoảng cách \emph{trên đa tạp} \cite{moakher2002means}. Thuật toán là một vòng lặp ngắn:
+
+\begin{enumerate}
+\item Khởi tạo \(\bar{R}\) bằng một trong các \(R_i\).
+\item Với mỗi \(i\), tính \(\boldsymbol{\omega}_i = \log(\bar{R}^\top R_i)\) --- đưa \(R_i\) về không gian tiếp tuyến tại \(\bar{R}\).
+\item Tính \(\bar{\boldsymbol{\omega}} = \frac{1}{N}\sum_i \boldsymbol{\omega}_i\) --- ở đây cộng được vì đã là véctơ.
+\item Cập nhật \(\bar{R} \leftarrow \bar{R}\exp(\bar{\boldsymbol{\omega}})\).
+\item Lặp từ bước 2 cho tới khi \(\|\bar{\boldsymbol{\omega}}\|\) đủ nhỏ.
+\end{enumerate}
+
+Vòng lặp hội tụ trong vài bước với các xoay gần nhau --- đúng trường hợp của ta. Tài liệu tham chiếu đầy đủ hơn về chủ đề này là \cite{hartley2013rotation}.
+
+Cần nói rõ điều kiện: trung bình Karcher xác định duy nhất khi các xoay nằm trong một lân cận đủ nhỏ. Với các pose từ các khung liên tiếp thì điều kiện thoả thoải mái. Với hai nghiệm của bài toán ambiguity cách nhau \(2\alpha\) --- có thể hàng chục độ --- thì nó vẫn tính ra một kết quả, và kết quả ấy vẫn vô nghĩa. Trung bình đúng cách trên đa tạp \emph{không} sửa được việc bạn đang trung bình những thứ không nên trung bình.
+
+Với phần tịnh tiến thì không có vấn đề gì: nó sống trong \(\mathbb{R}^3\) và trung bình số học là đúng. Nhưng nếu muốn trọng số hoá thì phải dùng hiệp phương sai, và hiệp phương sai của tịnh tiến \emph{tương quan} với hiệp phương sai của xoay --- nên tách chúng ra để xử lý riêng là một xấp xỉ. Cách đúng hoàn toàn là xử lý cả sáu chiều cùng lúc trên \(SE(3)\), và đó là điều mà các thư viện như \repo{Sophus} hay \repo{manif} cung cấp.
+
+\section{Lọc: phép đo phải là reprojection}
+\ptrtarget{B/11/04}
+
+Khi camera chuyển động, cần một mô hình chuyển động và một bộ lọc. Mục này trả lời Q2, và nó là điểm kỹ thuật quan trọng nhất của chương.
+
+\subsection{A. Thiết kế thông thường và chỗ nó sai}
+
+Thiết kế thông thường: chạy PnP mỗi khung để được pose, rồi đưa pose ấy vào EKF như một phép đo, với một hiệp phương sai \(6\times6\) nào đó.
+
+Vấn đề: \emph{nhiễu không phải Gauss trên \(SE(3)\)}. Nhiễu là Gauss trên toạ độ pixel, và phép biến đổi từ pixel sang pose là phi tuyến. Kết quả là phân bố của pose ước lượng không phải Gauss, đặc biệt là ở các hướng yếu (chiều sâu, và góc nghiêng khi gần fronto-parallel). Ép nó thành Gauss bằng cách gán một hiệp phương sai \(6\times6\) là một xấp xỉ, và nó tệ nhất đúng ở những hướng mà ta quan tâm nhất.
+
+Có một vấn đề thứ hai, tinh tế hơn: nếu PnP hội tụ về nghiệm sai ở một khung nào đó, thì phép đo đưa vào bộ lọc là một ngoại lai rất lớn, và một EKF không có cơ chế bảo vệ sẽ bị kéo đi đáng kể.
+
+\subsection{B. Thiết kế đúng}
+
+Giữ nguyên bộ lọc, đổi \emph{phép đo}: dùng \emph{toạ độ góc trên ảnh} làm phép đo thay vì pose.
+
+Cụ thể: trạng thái của bộ lọc là pose (và có thể cả vận tốc). Hàm đo lấy trạng thái, chiếu các điểm 3D của constellation ra ảnh, và trả về toạ độ dự đoán. Đổi mới là hiệu giữa toạ độ đo được và toạ độ dự đoán --- một đại lượng trong không gian pixel, nơi nhiễu \emph{thật sự} là Gauss.
+
+Ba lợi ích, và chúng đáng kể.
+
+\emph{Một, mô hình nhiễu đúng.} Hiệp phương sai của phép đo là \(\Sigma_i\) của từng góc (\ptr{B/08} mục~7), một đại lượng có ý nghĩa vật lý rõ ràng và đo được, thay vì một ma trận \(6\times6\) phải đoán.
+
+\emph{Hai, loại ngoại lai ở đúng mức.} Cổng chi-square trên đổi mới của \emph{từng góc} loại được một góc xấu mà vẫn giữ ba góc còn lại của cùng tag --- điều mà cổng ở mức pose không làm được.
+
+\emph{Ba, bài toán ambiguity được xử lý tự nhiên.} Vì bộ lọc có một dự đoán từ trạng thái trước, nó tự nhiên chọn nghiệm gần dự đoán --- tức nó thực hiện bậc 3 của \ptr{B/10} mà không cần logic riêng. Nhưng cảnh báo về khoá cứng ở \ptr{B/10} mục~4 vẫn áp dụng nguyên vẹn, và phải có cơ chế phát hiện.
+
+Cái giá: hàm đo phức tạp hơn và Jacobian của nó là Jacobian của PnP (\ptr{A/03} mục~4C) --- nhưng bạn đã phải tính nó rồi, nên chi phí thêm gần như bằng không.
+
+Nguyên tắc chung đằng sau chuyện này áp dụng rộng hơn bài toán marker: \emph{giữ phép đo ở dạng nguyên thuỷ nhất mà mô hình nhiễu còn đúng}, thay vì xử lý trước rồi đưa kết quả đã xử lý vào bộ ước lượng. Đây là một nguyên tắc quen thuộc trong ước lượng trạng thái robot \cite{barfoot2017}.
+
+\section{Fixed-lag smoothing và đồ thị nhân tử}
+\ptrtarget{B/11/05}
+
+Bậc cao nhất, và nó đáng nêu ngắn gọn.
+
+Lọc đệ quy tuyến tính hoá một lần tại mỗi bước và không quay lại. Nếu tuyến tính hoá ở một điểm tồi --- chẳng hạn ngay sau khi hệ thống mất tag rồi thấy lại --- sai số ấy không được sửa.
+
+\emph{Fixed-lag smoothing} giữ một cửa sổ vài giây gần nhất và tối ưu lại toàn bộ cửa sổ mỗi khi có phép đo mới. Nó tuyến tính hoá lại ở mọi bước lặp, nên nó chính xác hơn, và nó xử lý được các phép đo đến không theo thứ tự thời gian. Với bài toán docking --- nơi đoạn quan trọng chỉ vài giây cuối --- cửa sổ cố định là một lựa chọn rất tự nhiên: \emph{giữ toàn bộ giai đoạn tiếp cận cuối trong cửa sổ}.
+
+Về mặt cài đặt, cách hiện đại là biểu diễn bài toán dưới dạng \emph{đồ thị nhân tử} \cite{dellaert2017factor} và dùng một thư viện như \repo{GTSAM} hoặc \repo{Ceres}. Các nhân tử: reprojection cho mỗi góc mỗi khung, chuyển động (từ odometry bánh xe hoặc mô hình vận tốc), và có thể cả IMU. Ưu điểm so với EKF: nó là cùng một khung với bài toán hiệu chuẩn constellation ở \ptr{B/09} mục~5, nên bạn dùng lại được công cụ; và nó cho phép đưa các ràng buộc thêm vào một cách tự nhiên --- chẳng hạn ràng buộc sàn phẳng đã nêu ở \ptr{B/10} mục~5.
+
+Khi nào đáng dùng: khi bạn đã fuse nhiều nguồn (marker, odometry, IMU), hoặc khi bạn cần xử lý các phép đo trễ. Với một hệ chỉ có marker và dùng stop-and-go, một EKF đơn giản --- hoặc thậm chí chỉ mục~2 --- là đủ, và sự phức tạp thêm không trả lại gì.
+
+\section{Điều chương này không làm được}
+\ptrtarget{B/11/06}
+
+Mục ngắn nhưng quan trọng nhất về mặt định vị chương trong cây. Nó trả lời Q3 và Q4.
+
+\emph{Chương này chỉ chạm tới nguồn ngẫu nhiên.} Theo phân loại của \ptr{A/05} mục~8: nhiễu định vị góc, nhiễu ảnh, và các dao động ngẫu nhiên khác. Chúng giảm theo \(1/\sqrt{N}\).
+
+\emph{Chương này không chạm tới nguồn hệ thống:} méo còn sót, sai số intrinsic, sai số constellation, sai số hand-eye, bias tâm ellipse, rolling shutter và blur nếu còn chuyển động. Lấy trung bình một triệu khung thì chúng vẫn nguyên vẹn.
+
+Đây là câu trả lời cho Q3, và nó đáng phát biểu dưới dạng một lời khuyên thực hành: \emph{trước khi đầu tư vào bộ lọc phức tạp, hãy vẽ đồ thị \(\sigma_N\) theo \(N\)} (\ptr{B/08} mục~5A). Nếu nó bão hoà sớm thì bạn đang bị giới hạn bởi thiên lệch, và một EKF tinh vi hơn không giúp gì --- việc cần làm là đi tìm nguồn thiên lệch.
+
+Và đây là câu trả lời cho Q4, và nó là quan hệ đáng chú ý nhất của chương. \ptr{B/13} mục~3 triệt tiêu các nguồn hệ thống bằng teach-by-showing. Sau khi nó làm việc ấy, phần còn lại của ngân sách \emph{chỉ gồm nguồn ngẫu nhiên}. Nói cách khác: teach-by-showing làm cho chương này trở thành chương quyết định phần dư, chứ không phải làm nó thừa. Hai chương là một cặp: một cái xoá các dòng hệ thống, một cái chia các dòng ngẫu nhiên cho \(\sqrt{N}\).
+
+\begin{cannho}
+Thứ tự đúng của ba việc, và đảo thứ tự thì hỏng:
+
+\emph{Một}, chọn nghiệm tin cậy (\ptr{B/10}). Làm mượt trước khi làm việc này thì bạn đang trung bình giữa hai nghiệm và kết quả luôn rơi vào fronto-parallel.
+
+\emph{Hai}, xử lý các nguồn hệ thống (\ptr{B/09} mục~5, \ptr{B/12}, hoặc \ptr{B/13} mục~3). Làm mượt không chạm tới chúng, nên làm mượt trước thì bạn chỉ đang làm cho một con số sai trở nên ổn định.
+
+\emph{Ba}, rồi mới làm mượt --- và lúc này nó thật sự hiệu quả, vì phần còn lại đúng là nguồn ngẫu nhiên.
+
+Sai lầm phổ biến nhất là làm bước ba trước, vì nó dễ nhất và vì đầu ra trông đẹp ngay lập tức. Nhưng ``trông đẹp'' ở đây nghĩa là đã xoá mất các triệu chứng chẩn đoán.
+\end{cannho}
+
+\section{Giới hạn và chế độ hỏng}
+\ptrtarget{B/11/07}
+
+\textbf{Làm mượt xoá triệu chứng.} Đã bàn ở mục~1 và~6. Đây là chế độ hỏng nghiêm trọng nhất của chương vì nó không gây ra lỗi mới mà \emph{giấu} lỗi cũ.
+
+\textbf{Trung bình Karcher không sửa được việc trung bình sai thứ.} Nó tính đúng trung bình của tập bạn đưa vào; nếu tập ấy gồm hai nghiệm khác nhau thì kết quả vẫn vô nghĩa.
+
+\textbf{\(1/\sqrt{N}\) có điều kiện.} Nhiễu phải độc lập giữa các khung. \ptr{B/08} mục~5A liệt kê ba cách vi phạm và cách phát hiện.
+
+\textbf{Lọc giả định mô hình chuyển động đúng.} Nếu robot tăng tốc đột ngột và mô hình giả định vận tốc không đổi, bộ lọc sẽ trễ. Với docking tốc độ thấp thì ít quan trọng, nhưng nó là lý do nữa để thích stop-and-go.
+
+\textbf{Mọi thứ giả định đồng bộ thời gian đúng.} Nếu nhãn thời gian của ảnh lệch so với nhãn thời gian của odometry, bộ lọc hợp nhất hai nguồn ở sai thời điểm và kết quả có thiên lệch phụ thuộc vận tốc --- một triệu chứng giống hệt rolling shutter (\ptr{A/06} mục~2), và phân biệt hai nguyên nhân đòi phép thử riêng.
+
+\section{Thực hành}
+\ptrtarget{B/11/08}
+
+Bốn việc.
+
+\emph{Một, với stop-and-go, dùng cách của mục~2}: trung bình toạ độ góc rồi chạy PnP một lần. Đơn giản hơn và đúng hơn.
+
+\emph{Hai, nếu phải trung bình pose, đảo dấu quaternion về cùng nửa cầu ngay lập tức} như một biện pháp vá, rồi cài trung bình Karcher khi có thời gian.
+
+\emph{Ba, nếu dùng bộ lọc, đổi phép đo sang toạ độ góc} thay vì pose. Chi phí thêm gần bằng không vì Jacobian đã có.
+
+\emph{Bốn, vẽ đồ thị \(\sigma_N\) theo \(N\) trước khi đầu tư} vào bất kỳ bộ lọc phức tạp nào.
+
+\begin{onbai}
+\ar[3]{Điều kiện tiên quyết của cả chương}{Nghiệm phải được chọn tin cậy \emph{trước} (\ptr{B/10}). Làm mượt giữa hai nghiệm cho pose rơi vào fronto-parallel (\ptr{A/04} mục 2) \emph{và} xoá mất triệu chứng nhảy --- biến vấn đề nhìn thấy được thành vấn đề ẩn.}
+\ar[3]{Với camera đứng yên: cách đúng}{Trung bình \emph{toạ độ góc} rồi chạy PnP \emph{một lần}. Không phải: PnP mỗi khung rồi trung bình pose. Ba lý do: xử lý nhiễu ở đúng chỗ nó sinh ra; tránh bài toán đa tạp; và cho \(\sigma\) thực nghiệm miễn phí.}
+\ar[3]{Vì sao trung bình quaternion thô sai}{\(q\) và \(-q\) biểu diễn cùng một xoay, nên tổng phụ thuộc dấu thư viện tình cờ trả về. Hai xoay gần nhau với dấu ngược cho tổng gần không, và chuẩn hoá véctơ gần không ra hướng \emph{ngẫu nhiên}.}
+\ar[3]{Vì sao lỗi ấy chỉ xuất hiện đôi khi}{Vì nó phụ thuộc dấu mà thư viện tình cờ trả về. Hệ có thể chạy đúng hàng tháng rồi đột nhiên cho một pose vô nghĩa --- loại lỗi không tái lập được, tốn thời gian gỡ nhất.}
+\ar[2]{Vá nhanh và cách đúng}{Vá: đảo dấu mọi quaternion về cùng nửa cầu (\(q^\top q_{\text{ref}} > 0\)). Đúng: trung bình Karcher --- lặp \(\log\), trung bình trong không gian tiếp tuyến, \(\exp\), cập nhật \cite{moakher2002means}.}
+\ar[3]{Điểm kỹ thuật quan trọng nhất của chương}{Trong bộ lọc, phép đo phải là \emph{toạ độ góc} chứ không phải pose. Vì nhiễu là Gauss trên \emph{pixel}, không Gauss trên \(SE(3)\); ép nó thành Gauss trên pose là xấp xỉ tệ nhất đúng ở các hướng yếu.}
+\ar[3]{Ba lợi ích của phép đo là reprojection}{Mô hình nhiễu đúng (\(\Sigma_i\) đo được thay vì ma trận \(6\times6\) phải đoán); loại ngoại lai ở mức \emph{từng góc} thay vì cả pose; và chọn nghiệm ambiguity tự nhiên qua dự đoán.}
+\ar[2]{Fixed-lag smoothing}{Giữ cửa sổ vài giây và tối ưu lại toàn bộ mỗi bước --- tuyến tính hoá lại nên chính xác hơn lọc đệ quy, và xử lý được phép đo đến trễ. Với docking, chọn cửa sổ \emph{chứa toàn bộ pha tiếp cận cuối}.}
+\ar[2]{Khi nào dùng đồ thị nhân tử}{Khi fuse nhiều nguồn (marker + odom + IMU) hoặc cần xử lý đo trễ. Ưu điểm phụ: cùng khung với hiệu chuẩn constellation ở \ptr{B/09} mục 5 \cite{dellaert2017factor}. Với hệ chỉ marker + stop-and-go thì EKF đơn giản là đủ.}
+\ar[3]{Chương này KHÔNG làm được gì}{Không chạm tới nguồn \emph{hệ thống}: méo còn sót, intrinsic, constellation, hand-eye, bias ellipse, rolling shutter/blur khi còn chuyển động. Trung bình một triệu khung thì chúng vẫn nguyên vẹn.}
+\ar[3]{Quan hệ với \ptr{B/13}}{Không cạnh tranh mà \emph{nối tiếp}. Teach-by-showing xoá các dòng hệ thống; chương này chia các dòng ngẫu nhiên cho \(\sqrt{N}\). Nên chương này quan trọng \emph{hơn} sau khi chương kia đã làm việc của nó.}
+\ar[3]{Thứ tự ba việc, đảo thì hỏng}{Chọn nghiệm \(\rightarrow\) xử lý nguồn hệ thống \(\rightarrow\) rồi mới làm mượt. Sai lầm phổ biến là làm bước ba trước vì nó dễ nhất và đầu ra trông đẹp ngay --- nhưng ``đẹp'' ở đây nghĩa là đã xoá triệu chứng chẩn đoán.}
+\ar[2]{Chế độ hỏng do lệch đồng bộ thời gian}{Nhãn thời gian ảnh lệch so với odometry \(\Rightarrow\) hợp nhất ở sai thời điểm \(\Rightarrow\) thiên lệch phụ thuộc vận tốc --- triệu chứng \emph{giống hệt} rolling shutter (\ptr{A/06} mục 2). Cần phép thử riêng để phân biệt.}
+\ar[1]{Nguyên tắc chung}{Giữ phép đo ở dạng \emph{nguyên thuỷ nhất} mà mô hình nhiễu còn đúng, thay vì xử lý trước rồi đưa kết quả đã xử lý vào bộ ước lượng \cite{barfoot2017}.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{\repo{Sophus}, \repo{manif} \cite{sola2018microlie}}{Cài \(SO(3)\), \(SE(3)\), \(\log\)/\(\exp\), và trung bình trên đa tạp}{Đừng tự cài Karcher --- dùng thư viện}
+\ud{\repo{GTSAM} \cite{dellaert2017factor}}{Đồ thị nhân tử với fixed-lag smoother sẵn có}{Cùng công cụ với \ptr{B/09} mục 5 --- dùng lại được}
+\ud{\repo{Ceres} \cite{agarwal2012ceres}}{Tối ưu cửa sổ trượt với tham số hoá trên đa tạp}{Lựa chọn khi đã dùng Ceres cho BA constellation}
+\ud{Rotation averaging \cite{hartley2013rotation}}{Tài liệu tham chiếu đầy đủ cho mục 3}{Đọc §3 nếu cần trung bình có trọng số hoặc bền với ngoại lai}
+\ud{\repo{tagslam} \cite{pfrommer2019tagslam}}{Fuse marker với odometry trong factor graph}{Ví dụ kiến trúc cho mục 5; mức tin C}
+\end{ungdung}
+
+\begin{duan}{So bốn cách hợp nhất theo thời gian trên cùng dữ liệu}{2 ngày}
+\dmt biết chính xác mỗi mức phức tạp thêm vào trả lại bao nhiêu, để không đầu tư vào một EKF khi một phép trung bình đã đủ.
+\ddl một chuỗi ảnh thật của quỹ đạo tiếp cận, ghi lại kèm odometry bánh xe và --- nếu có --- một chuẩn tham chiếu ở điểm cuối.
+\dbc cài bốn đường: (A) PnP một khung, không hợp nhất; (B) trung bình toạ độ góc qua \(N\) khung rồi PnP (chỉ ở các đoạn dừng); (C) EKF với phép đo là \emph{pose}; (D) EKF với phép đo là \emph{toạ độ góc}; chạy cả bốn trên cùng chuỗi; so độ tản mát của pose ở điểm cuối qua nhiều lần chạy, và so sai lệch so với chuẩn tham chiếu nếu có; đồng thời ghi lại chi phí tính toán của từng đường.
+\dxk bạn có một bảng bốn hàng với ba cột: độ tản mát, sai lệch so với chuẩn, chi phí. Dự đoán của chương: B thắng A rõ rệt về tản mát; D thắng C ở các đoạn mà ambiguity nặng hoặc có góc bị che; và \emph{sai lệch so với chuẩn} của cả bốn gần như nhau --- vì đó là thành phần hệ thống mà không đường nào chạm tới. Kiểm tra chéo bắt buộc: nếu cột sai lệch của bốn đường \emph{khác nhau} đáng kể thì có gì đó không đúng --- hoặc bạn đang so ở các thời điểm khác nhau, hoặc một trong các đường đang chọn nghiệm ambiguity khác.
+\dnv \ptr{C/15} nhận kết quả cột ba để biết nên đầu tư ở đâu; \ptr{B/13} mục 4 nhận \(N\) tối ưu cho stop-and-go.
+\end{duan}
+
+\begin{traloi}
+\tl{Cơ chế: \(q\) và \(-q\) biểu diễn \emph{cùng một} phép xoay, nên tổng của một tập quaternion phụ thuộc vào dấu mà bạn tình cờ gán cho từng cái. Nếu hai xoay gần giống nhau nhưng thư viện trả về \(q_1\) và \(-q_2\) với \(q_2 \approx q_1\), thì tổng \(q_1 + (-q_2) \approx 0\), và chuẩn hoá một véctơ gần không cho ra một hướng hoàn toàn ngẫu nhiên --- sai hẳn, không phải sai một chút. Nó chỉ xuất hiện đôi khi vì nó phụ thuộc vào dấu mà thư viện tình cờ trả về, thứ có thể đổi theo đường đi của thuật toán hoặc theo dữ liệu. Hệ quả thực tế: một hệ thống có thể chạy đúng hàng tháng rồi đột nhiên cho một pose vô nghĩa, và loại lỗi không tái lập được ấy là loại tốn thời gian gỡ nhất. Vá nhanh: ép mọi quaternion về cùng nửa cầu trước khi cộng. Cách đúng: trung bình Karcher trên \(SO(3)\) \cite{moakher2002means}.}
+\tl{Đổi phép đo từ \emph{pose} sang \emph{toạ độ góc trên ảnh}: hàm đo của bộ lọc lấy trạng thái pose, chiếu các điểm 3D của constellation ra ảnh, và đổi mới là hiệu giữa toạ độ đo được và toạ độ dự đoán. Nó sửa vấn đề mô hình nhiễu: nhiễu là Gauss trên \emph{pixel}, không Gauss trên \(SE(3)\), và phép biến đổi giữa hai không gian là phi tuyến --- nên ép phân bố pose thành Gauss bằng một ma trận \(6\times6\) là một xấp xỉ, và nó tệ nhất đúng ở các hướng yếu (chiều sâu, góc nghiêng gần fronto-parallel), tức đúng những hướng ta quan tâm nhất. Ba lợi ích kèm theo: hiệp phương sai đầu vào là \(\Sigma_i\) của từng góc --- đại lượng đo được thay vì phải đoán; cổng chi-square loại được \emph{một góc} xấu mà giữ ba góc còn lại; và bộ lọc tự nhiên chọn nghiệm ambiguity gần dự đoán. Chi phí thêm gần bằng không vì Jacobian đã phải tính cho PnP.}
+\tl{Cải thiện: mọi dòng thuộc loại \emph{ngẫu nhiên} --- chủ yếu là dòng ``nhiễu định vị góc'', giảm theo \(1/\sqrt{100} = 10\) lần. Hoàn toàn không đổi: mọi dòng thuộc loại \emph{hệ thống} --- méo còn sót, sai số intrinsic, sai số constellation so với mô hình, sai số hand-eye, bias tâm ellipse nếu dùng marker tròn. Chúng nguyên vẹn sau một trăm khung cũng như sau một triệu khung. Hệ quả thực hành trực tiếp: trước khi đầu tư vào bộ lọc phức tạp hơn, hãy vẽ đồ thị \(\sigma_N\) theo \(N\) trên trục log--log (\ptr{B/08} mục 5A); nếu nó bão hoà sớm thì bạn đang bị giới hạn bởi thiên lệch và một EKF tinh vi hơn không giúp gì --- việc cần làm là đi tìm nguồn thiên lệch.}
+\tl{Vì hai chương xử lý hai loại nguồn khác nhau và chúng nối tiếp chứ không cạnh tranh. Teach-by-showing triệt tiêu các nguồn \emph{hệ thống} --- intrinsic sai, constellation lệch, hand-eye sai --- bằng cách làm chúng xuất hiện ở cả pose hiện tại lẫn pose mục tiêu và trừ đi nhau. Sau khi nó làm việc ấy, phần còn lại của ngân sách \emph{chỉ gồm nguồn ngẫu nhiên}, tức chính xác thứ mà chương này chia cho \(\sqrt{N}\). Nói cách khác, trước khi có teach-by-showing thì chương này chỉ cải thiện một phần nhỏ của ngân sách và bị các dòng hệ thống át đi; sau khi có nó thì chương này quyết định toàn bộ phần dư. Đây là một ví dụ của việc thứ tự làm quyết định giá trị của từng bước: cùng một kỹ thuật, giá trị khác nhau tuỳ vào việc gì đã được làm trước.}
+\tl{Điều kiện tiên quyết: bài toán hai nghiệm phải được xử lý trước (\ptr{B/10}). Nếu không, bạn đang làm mượt giữa hai giá trị cách nhau \(2\alpha\), và theo \ptr{A/04} mục 2 thì trung bình của chúng luôn rơi đúng vào tư thế fronto-parallel --- một pose không phải nghiệm nào cả và sai một cách có hệ thống. Nhưng tác hại lớn hơn nằm ở chỗ khác: việc làm mượt \emph{xoá mất triệu chứng nhảy}, tức xoá mất dấu hiệu duy nhất cho biết bạn đang có vấn đề. Trước khi làm mượt, bạn có một hệ thống nhảy loạn --- khó chịu nhưng trung thực, và nó đang báo cho bạn biết điều gì đó sai. Sau khi làm mượt, bạn có một hệ thống êm ái và sai có hệ thống, không có tín hiệu nào. Đây là ví dụ điển hình của việc một kỹ thuật hợp lệ áp dụng sai thứ tự biến một vấn đề nhìn thấy được thành một vấn đề ẩn.}
+\end{traloi}
+
+\begin{dongian}
+Chụp một tấm ảnh thì có nhiễu; chụp nhiều tấm rồi lấy trung bình thì bớt nhiễu. Đó là toàn bộ ý tưởng của chương này, và phần còn lại là chi tiết về việc làm sao trung bình cho đúng.
+
+Chi tiết thứ nhất: khi robot đứng yên, đừng tính vị trí từng tấm rồi trung bình các vị trí. Hãy trung bình \emph{toạ độ mấy cái góc} trước, rồi mới tính vị trí một lần. Nghe như chuyện thứ tự vụn vặt nhưng nó quan trọng, vì nhiễu nằm ở mấy cái góc chứ không nằm ở vị trí --- xử lý nhiễu ở đúng chỗ nó sinh ra thì tốt hơn.
+
+Chi tiết thứ hai: hướng quay thì không cộng được như số thường. Lấy trung bình của ``quay 170 độ'' và ``quay âm 170 độ'' theo kiểu cộng chia đôi thì ra 0 độ, trong khi câu trả lời đúng phải là 180. Với cách máy tính lưu hướng quay thì chuyện này còn tệ hơn: có hai cách viết cho cùng một hướng, và nếu chẳng may lấy mỗi cái một kiểu rồi cộng lại thì ra một kết quả hoàn toàn vô nghĩa. Đáng sợ ở chỗ nó chỉ xảy ra thỉnh thoảng, nên hệ thống chạy đúng hàng tháng rồi bỗng dưng loạn một lần.
+
+Chi tiết thứ ba, và là chi tiết đáng nhớ nhất: khi robot đang chạy và cần một bộ lọc, đừng đưa \emph{vị trí đã tính} vào bộ lọc. Hãy đưa \emph{toạ độ mấy cái góc trên ảnh} vào. Lý do vẫn là lý do cũ: cái bị nhiễu là mấy cái góc, còn vị trí chỉ là thứ suy ra từ chúng. Bộ lọc làm việc với thứ bị nhiễu thật thì nó hiểu đúng mình đang đối phó với cái gì.
+
+Và bây giờ là điều quan trọng nhất, thứ mà cả chương này chỉ là một nửa của nó. Chụp nhiều tấm chữa được cái \emph{run tay} nhưng không chữa được cái \emph{lệch ngắm}. Nếu tấm marker của bạn lệch một milimét so với bản vẽ, thì một triệu tấm ảnh vẫn lệch đúng một milimét ấy.
+
+Cho nên chương này chỉ có giá trị sau khi đã dọn xong mấy cái lệch ngắm --- đo lại tấm marker, hiệu chuẩn tử tế, hoặc dùng mẹo chụp ảnh mẫu ở chương sau. Làm ngược thứ tự thì bạn chỉ đang làm cho một con số sai trở nên ổn định hơn, và cái ổn định ấy lại che mất dấu hiệu duy nhất cho biết có gì đó không đúng.
+
+\chuadongian{ranh giới giữa ``run tay'' và ``lệch ngắm'' không nhìn ra được từ một lần đo, nhưng có một biểu đồ rẻ tiền cho biết: vẽ xem sai số giảm thế nào khi tăng số tấm chụp. Giảm đều thì là run tay, cứ chụp thêm. Giảm rồi dừng ở một mức nào đó thì là lệch ngắm, và chụp thêm vô ích.}
+\motcau{Trung bình đúng chỗ, đúng cách, và đúng thứ tự --- và nhớ rằng nó chỉ chữa được một nửa vấn đề.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{B/11/09}
+
+Mệnh đề chính --- \emph{trung bình toạ độ góc rồi PnP một lần tốt hơn PnP mỗi khung rồi trung bình pose} --- bị bác bỏ nếu mô phỏng cho thấy hai cách cho cùng độ tản mát. Tôi dẫn nó bằng lập luận về chỗ nhiễu sinh ra và tính phi tuyến của PnP (cửa a); nó chưa qua cửa (b). Chênh lệch có thể nhỏ khi nhiễu nhỏ --- vì khi ấy PnP gần tuyến tính --- nên đây là mệnh đề mà tôi dự đoán sẽ đúng về chiều nhưng khiêm tốn về độ lớn.
+
+Mệnh đề thứ hai --- \emph{phép đo là reprojection tốt hơn phép đo là pose} --- bị bác bỏ nếu đường C và đường D trong mini project cho kết quả tương đương ở mọi đoạn. Tôi dự đoán chênh lệch tập trung ở các đoạn có góc bị che hoặc ambiguity nặng, và nếu chuỗi dữ liệu của bạn không có đoạn nào như thế thì hai đường sẽ giống nhau --- điều đó không bác bỏ mệnh đề, nó chỉ nói dữ liệu chưa đủ khắc nghiệt.
+
+Mệnh đề thứ ba --- \emph{làm mượt không chạm tới nguồn hệ thống} --- là một mệnh đề định nghĩa hơn là một mệnh đề thực nghiệm: nếu một nguồn giảm khi lấy trung bình thì theo định nghĩa nó là ngẫu nhiên. Điều đáng kiểm là phân loại cụ thể: nguồn nào trên hệ của bạn thật sự là hệ thống. Cột ``sai lệch so với chuẩn'' trong mini project là phép kiểm ấy.
+
+\section{Kết nối}
+\ptrtarget{B/11/10}
+
+Chương này là chương kết nối nhiều nhất trong Phần~B và nó nằm ở giữa một chuỗi phụ thuộc nghiêm ngặt.
+
+Nối lên trên. \ptr{A/05-lan-truyen-sai-so-pixel-sang-pose} mục~8 cấp phân loại quyết định phạm vi của cả chương. \ptr{A/03-pnp-va-uoc-luong-tu-the} mục~4C cấp Jacobian mà mục~4B ở đây dùng làm hàm đo. \ptr{A/04-pose-ambiguity-target-phang} mục~2 cấp cảnh báo về trung bình giữa hai nghiệm.
+
+Nối ngang, theo thứ tự phụ thuộc. \ptr{B/10-xu-ly-ambiguity} là điều kiện tiên quyết cứng: phải chạy trước. \ptr{B/08-corner-refinement} cấp \(\Sigma_i\) cho mục~4B, và mục~5A ở đó cấp đồ thị chẩn đoán mà mục~6 ở đây khuyến nghị. \ptr{B/09-multi-marker-constellation} mục~5 và \ptr{B/12-calibration-cho-docking} là nơi các nguồn hệ thống được xử lý --- tức nơi phải làm xong trước khi chương này có giá trị đầy đủ. \ptr{B/13-docking-control} mục~3 là lựa chọn thay thế cho việc ấy, và mục~4 ở đó tạo điều kiện cho mục~2 ở đây.
+
+Nối xuống. \ptr{C/15-ngan-sach-sai-so} nhận từ mục~6 một yêu cầu về cách trình bày bảng ngân sách: phải ghi rõ dòng nào chia được cho \(\sqrt{N}\) và dòng nào không, vì hai loại ấy phản ứng khác nhau với chiến lược thời gian. \ptr{C/16-danh-gia-va-nghiem-thu} nhận mini project của chương này, và nó cũng nhận một cảnh báo phương pháp luận: khi đo độ tản mát của một hệ có làm mượt, con số thu được \emph{không} phải độ chính xác --- làm mượt giảm tản mát mà không giảm thiên lệch, nên nó làm con số trông đẹp hơn thực tế.
+
+\begin{tukiem}
+\item Vì sao làm mượt trước khi chọn nghiệm biến một vấn đề nhìn thấy được thành một vấn đề ẩn?
+\item Với camera đứng yên, nêu hai cách trung bình và ba lý do cách thứ nhất tốt hơn.
+\item Mô tả cơ chế làm trung bình quaternion thô cho kết quả ngẫu nhiên, và giải thích vì sao lỗi ấy khó tái lập.
+\item Trong một bộ lọc, phép đo nên là gì và vì sao? Nêu ba lợi ích cụ thể của lựa chọn đúng.
+\item Bạn lấy trung bình 100 khung. Phân loại các dòng ngân sách thành hai nhóm theo việc chúng có được cải thiện không, và nêu một dòng ở mỗi nhóm.
+\item Vì sao \ptr{B/13} làm chương này quan trọng hơn chứ không phải ít quan trọng đi?
+\item Một hệ có lệch đồng bộ thời gian cho triệu chứng giống hệt một hiệu ứng khác trong cây. Hiệu ứng nào, và vì sao cần một phép thử riêng để phân biệt?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

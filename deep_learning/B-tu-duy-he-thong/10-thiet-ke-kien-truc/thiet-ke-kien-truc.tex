@@ -1,0 +1,321 @@
+% ---------------------------------------------------------------------------
+% Chương 10 — Nguyên lý thiết kế kiến trúc
+% Tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+% Mức độ: cốt lõi (T2)
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Nguyên lý thiết kế kiến trúc (Architecture Design Principles)}
+\ptrtarget{B/10}\ptrtarget{B/10-thiet-ke-kien-truc}
+\dependency{\ptr{B/04-nen-tang-hoc-tu-du-lieu} (\en{inductive bias} và trục ``giả định mạnh \(+\) ít dữ liệu \(\leftrightarrow\) giả định yếu \(+\) nhiều dữ liệu'' --- chương này chính là trục đó áp cho kiến trúc); \ptr{B/09-thiet-ke-ham-mat-mat} (chỗ cài giả định thứ hai); \ptr{A/01-toan-toi-thieu/04-hinh-hoc-va-tin-hieu} (convolution, lấy mẫu).}
+
+\begin{tomtat}
+Chương này giải thích vì sao không thể dùng một MLP khổng lồ cho mọi thứ, và vì sao mỗi kiến trúc thực chất là một tập giả định về cấu trúc dữ liệu được đông cứng thành mã nguồn. Nó xây năm câu hỏi để mổ xẻ một kiến trúc lạ, kèm phép tính tay ra con số cho từng câu: giả định nào được cài vào, mô hình nhìn được bao xa, thông tin định tuyến cố định hay theo nội dung, gradient chảy thế nào, và bốn thước đo chi phí rơi vào đâu. Đọc xong, bạn dự đoán được một lớp lỗi trước khi huấn luyện, tức trường tiếp nhận không phủ hết vật thể. Bạn giải thích được vì sao thêm độ sâu và thêm độ rộng có giá hoàn toàn khác nhau. Và bạn nhận ra khi nào một bảng so sánh kiến trúc thực ra đang so sánh công thức huấn luyện. Nếu chỉ nhớ một điều: kiến trúc không làm mô hình ``thông minh hơn'', nó quyết định \emph{ai chạm được tới ai, sau bao nhiêu bước, và với chi phí nào}.
+\end{tomtat}
+
+\begin{nentang}
+\kn{tensor và feature map}{tensor là mảng số nhiều chiều --- ảnh đầu vào là tensor \(C\times H\times W\) (kênh, cao, rộng). Feature map là tensor ở giữa mạng: mỗi ``kênh'' của nó là một bản đồ cho biết một loại đặc trưng xuất hiện mạnh ở vị trí nào.}
+\kn{tầng nối đầy đủ và convolution}{tầng nối đầy đủ (\emph{fully connected}) nhân toàn bộ đầu vào với một ma trận --- mọi đầu ra nhìn thấy mọi đầu vào. Convolution trượt một cửa sổ nhỏ (kernel) khắp ảnh và dùng \emph{cùng} bộ trọng số ở mọi vị trí, nên mỗi đầu ra chỉ nhìn thấy một vùng nhỏ.}
+\kn{kernel, stride, padding}{kernel là kích thước cửa sổ trượt (thường \(3\times3\)); stride là bước nhảy giữa hai vị trí liên tiếp (stride 2 làm ảnh nhỏ đi một nửa); padding là số pixel đệm thêm ở viền để kiểm soát kích thước đầu ra.}
+\kn{hàm kích hoạt (activation function)}{hàm áp lên từng phần tử giữa hai tầng tuyến tính, ví dụ ReLU \(\max(0,x)\). Không có nó thì xếp chồng bao nhiêu tầng tuyến tính cũng chỉ tương đương một tầng tuyến tính --- đó là lý do nó bắt buộc phải có.}
+\kn{lan truyền ngược và luồng gradient}{để cập nhật trọng số ở tầng đầu, đạo hàm phải nhân dồn ngược qua tất cả các tầng phía sau. Chuỗi phép nhân dài đó có thể tiêu biến hoặc bùng nổ, và đó là lý do ``đường về của gradient'' là một tiêu chí thiết kế thật sự chứ không phải ẩn dụ.}
+\kn{tham số so với FLOPs}{tham số là số trọng số phải lưu; FLOPs là số phép nhân--cộng phải làm cho một lần chạy. Hai đại lượng độc lập với nhau: convolution có ít tham số nhưng nhiều FLOPs vì cùng bộ trọng số được dùng lại ở mọi vị trí.}
+\kn{inductive bias}{tập giả định mà bạn cài sẵn vào hệ thống về hình dạng của lời giải, trước khi nhìn dữ liệu. Nó đến từ bốn chỗ: kiến trúc, hàm mất mát, augmentation, và thuật toán tối ưu. Bạn không thể ``không có giả định'' --- chỉ có thể chọn giả định nào.}
+\kn{batch}{số mẫu được xử lý cùng lúc trong một bước cập nhật. Nó ảnh hưởng tới bộ nhớ, tới độ ổn định của gradient, và --- như phần cuối chương cho thấy --- tới cả độ trễ đo được.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Một MLP đủ rộng xấp xỉ được mọi hàm liên tục --- vậy vì sao không một hệ thống thị giác nghiêm túc nào dùng MLP cho ảnh?}
+\h{Trước ResNet, mạng 56 tầng có sai số \emph{huấn luyện} cao hơn mạng 20 tầng. Vì sao đó chắc chắn không phải \en{overfitting}, và cái gì thực sự hỏng?}
+\h{Nếu \en{attention} mạnh hơn convolution ở mọi mặt lý thuyết, vì sao thế hệ ViT tiếp theo lại phải cắt nó về thành cục bộ trong từng cửa sổ?}
+\h{Hai mạng cùng số tham số, một sâu gấp đôi và một rộng gấp đôi --- vì sao cái rẻ hơn về tham số lại là cái đắt hơn về thời gian chạy?}
+\h{Bạn đọc một bảng nói kiến trúc mới hơn kiến trúc cũ 3 điểm mAP. Vì sao con số đó có thể không nói gì về kiến trúc cả?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+
+Một mạng nơ-ron đủ rộng xấp xỉ được mọi hàm liên tục; định lý xấp xỉ phổ quát nói vậy từ những năm 1980. Nếu thế thì vì sao không dùng một \en{MLP} khổng lồ cho mọi thứ và để dữ liệu lo phần còn lại? Câu trả lời không nằm ở khả năng biểu diễn mà nằm ở \emph{chi phí học}: định lý nói hàm đúng \emph{tồn tại} trong không gian giả thuyết, nó không nói bạn tìm được hàm đó với lượng dữ liệu và lượng tính toán bạn có. Kiến trúc là công cụ thu hẹp không gian giả thuyết lại quanh những hàm khả dĩ, và mọi lần thu hẹp đều là một phát biểu về cấu trúc của dữ liệu.
+
+Ba ví dụ để thấy phát biểu đó cụ thể tới mức nào:
+
+\begin{itemize}
+\item \textbf{\en{Convolution}} phát biểu rằng đặc trưng hữu ích thì \emph{cục bộ}, và một đặc trưng có nghĩa ở góc trên trái thì cũng có nghĩa y như vậy ở góc dưới phải.
+\item \textbf{\en{Pooling}} phát biểu rằng vị trí chính xác ít quan trọng hơn sự hiện diện.
+\item \textbf{\en{Attention}} phát biểu rằng quan hệ giữa hai vị trí nên do \emph{nội dung} quyết định chứ không do khoảng cách.
+\end{itemize}
+
+Nếu phát biểu khớp với dữ liệu, bạn được tổng quát hoá tốt với ít mẫu; nếu không khớp, bạn đã cài sẵn một sai lệch mà không lượng dữ liệu nào gỡ được. Đây chính xác là trục ở chương 4: giả định mạnh đổi lấy ít dữ liệu. Toàn bộ lịch sử kiến trúc thị giác đọc được như một chuỗi các lần \emph{nới lỏng} giả định, mỗi lần dữ liệu và tính toán rẻ đi một bậc.
+\lk{B/04}{tiền đề}{trục đánh đổi giả định--dữ liệu là thứ giải thích vì sao ViT cần tiền huấn luyện quy mô lớn còn CNN thì không.}
+
+Giá trị của chương: sau khi đọc, bạn không cần nhớ tên kiến trúc nào cũng đọc được một bài báo kiến trúc lạ, vì bạn có năm câu hỏi cố định và ba phép tính tay để tự trả lời chúng.
+
+\begin{trucgiac}
+Hãy nghĩ về kiến trúc như hệ thống ống dẫn chứ không như một cái hộp đen: nó quyết định \emph{thông tin nào có thể chạm tới thông tin nào, sau bao nhiêu bước}. Một MLP là bể chứa --- mọi thứ chạm được mọi thứ ngay lập tức, nên nó không có cấu trúc để dựa vào và phải trả bằng tham số. Convolution là mạng ống ngắn nối các điểm lân cận, nên hai pixel ở hai góc ảnh chỉ ``nói chuyện'' được sau nhiều tầng. Nếu số tầng không đủ, chúng \emph{không bao giờ} nói chuyện được, dù bạn huấn luyện bao lâu. \vn{Kết nối tắt}{residual connection} là đường ống phụ chạy song song, đặt ở đó không phải để mang thêm thông tin xuôi mà để \en{gradient} có lối về ngắn. Đọc kiến trúc theo hình dạng đường ống thì receptive field, attention và skip connection thôi là ba khái niệm rời rạc và trở thành ba câu trả lời cho cùng một câu hỏi: ai chạm được tới ai.
+\end{trucgiac}
+
+\section{Từ template matching tới convolution (From Template Matching to Convolution)}
+
+\subsection{A. Điểm xuất phát nhìn được bằng mắt}
+
+Điểm xuất phát đáng ngạc nhiên là bộ phân loại tuyến tính \(f = Wx + b\). Cách đọc bổ ích không phải đại số mà là hình học: mỗi hàng của \(W\) là một \vn{mẫu chuẩn}{template} có cùng số chiều với ảnh, và điểm số của một lớp là tích vô hướng giữa ảnh và mẫu chuẩn đó. Ý nghĩa bằng lời: \emph{mô hình chấm điểm bằng cách hỏi ảnh này giống bản mẫu của lớp đến đâu}. Vẽ các hàng của \(W\) ra thành ảnh sau khi huấn luyện trên CIFAR-10 là bài tập rất đáng làm. Bạn sẽ thấy mẫu ``ngựa'' có hai đầu. Lý do là mỗi lớp chỉ có \emph{một} mẫu chuẩn, nên nó buộc phải trung bình mọi tư thế lại. Giới hạn của mô hình lộ ra từ hình ảnh đó, trước cả khi bạn đọc con số accuracy.
+
+\subsection{B. Ba lần thu hẹp không gian giả thuyết}
+
+\begin{mach}[Mạch 1 --- vì sao convolution ra đời, và nó lấy đi cái gì]
+\item \vd{một mẫu chuẩn cho mỗi lớp là quá ít, và biên quyết định chỉ là siêu phẳng.} \gp xếp chồng nhiều tầng tuyến tính xen phi tuyến, tức MLP. \gd hàm cần học liên tục và mạng đủ rộng. \gia số tham số nổ tung --- ảnh \(224\times224\times3 = 150\,528\) chiều nối đầy đủ vào 1000 nơ-ron là \(\approx 150\) triệu tham số cho \emph{một} tầng. \vdm tệ hơn cả chi phí, mô hình không hề biết hai pixel cạnh nhau thì liên quan, nên phải học lại sự thật đó từ dữ liệu, và học lại nó riêng cho từng vị trí.
+\item \vd{quá nhiều tham số và không có chút tri thức nào về ảnh.} \gp \vn{chia sẻ trọng số}{weight sharing} cộng tính cục bộ, tức convolution \cite{lecun1998gradient}. \hq ta được \vn{đẳng biến tịnh tiến}{translation equivariance} gần như miễn phí, và số tham số giảm hàng nghìn lần: một tầng conv \(3\times3\) từ 3 kênh sang 64 kênh chỉ có \(3\cdot3\cdot3\cdot64 = 1728\) trọng số, \emph{bất kể ảnh to bao nhiêu}. \gia bất biến với xoay và với tỉ lệ thì \emph{không} được cài vào, nên mạng vẫn phải học chúng từ dữ liệu hoặc từ \en{augmentation} --- tức chỗ cài giả định thứ ba của chương 4; và quan hệ giữa hai vùng xa nhau trở nên đắt đỏ.
+\item \vdm nếu thông tin chỉ lan ra từng chút qua mỗi tầng thì \emph{mô hình nhìn được bao xa?} \gp tính receptive field bằng tay \emph{trước} khi huấn luyện, thay vì phát hiện vấn đề sau ba ngày.
+\end{mach}
+
+\subsection{C. Receptive field: con số tính được trước khi train}
+
+Kích thước đầu ra của một tầng conv là \((W - F + 2P)/S + 1\), và \vn{trường tiếp nhận}{receptive field} tích luỹ theo hai công thức truy hồi rất đơn giản:
+\[
+j_l = j_{l-1}\cdot s_l, \qquad r_l = r_{l-1} + (k_l - 1)\, j_{l-1}, \qquad j_0 = 1,\ r_0 = 1 .
+\]
+Diễn giải bằng lời: \emph{mỗi tầng mở rộng tầm nhìn thêm đúng \((k-1)\) lần bước nhảy hiện tại, và mỗi lần lấy mẫu xuống thì bước nhảy nhân lên}. Hệ quả là stride mở rộng tầm nhìn theo cấp số nhân, còn độ sâu chỉ mở rộng theo cấp số cộng. Hình~\ref{fig:rf} minh hoạ trường hợp nhỏ nhất tính được trong đầu.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[font=\footnotesize, x=0.86cm, y=1.35cm,
+  c/.style={draw=steel, fill=white, minimum size=0.62cm, inner sep=0pt},
+  hot/.style={draw=violetdark, fill=violetbg, minimum size=0.62cm, inner sep=0pt},
+  lk/.style={draw=rulecol, thin}]
+\foreach \x in {0,...,6} \node[hot] (i\x) at (\x,0) {};
+\foreach \x in {1,...,5} \node[c] (a\x) at (\x,1) {};
+\foreach \x in {2,...,4} \node[c] (b\x) at (\x,2) {};
+\node[c] (t3) at (3,3) {};
+\foreach \x in {1,...,5} \foreach \d in {-1,0,1} \draw[lk] (a\x) -- (i\the\numexpr\x+\d\relax);
+\foreach \x in {2,...,4} \foreach \d in {-1,0,1} \draw[lk] (b\x) -- (a\the\numexpr\x+\d\relax);
+\foreach \d in {-1,0,1} \draw[lk] (t3) -- (b\the\numexpr3+\d\relax);
+\node[anchor=west, color=steel] at (6.6,0) {đầu vào, \(r_0 = 1\)};
+\node[anchor=west, color=steel] at (6.6,1) {conv \(3\times3\): \(r_1 = 3\)};
+\node[anchor=west, color=steel] at (6.6,2) {conv \(3\times3\): \(r_2 = 5\)};
+\node[anchor=west, color=steel] at (6.6,3) {conv \(3\times3\): \(r_3 = 7\)};
+\end{tikzpicture}
+\caption{Ba tầng \(3\times3\) stride 1 (vẽ theo một chiều cho gọn): một nơ-ron ở tầng trên cùng nhìn thấy đúng 7 pixel đầu vào, tô đậm. Cùng tầm nhìn với một tầng \(7\times7\) nhưng chỉ tốn \(3\cdot 9C^2 = 27C^2\) tham số thay vì \(49C^2\), và có ba phi tuyến thay vì một --- đây chính là lập luận của VGG.}
+\label{fig:rf}
+\end{figure}
+
+Vì sao con số này quan trọng đến thế? Vì \emph{receptive field nhỏ hơn vật thể là nguyên nhân của một lớp lỗi rất khó chẩn đoán}. Mô hình sẽ sai có hệ thống trên vật lớn, và trên những gì cần ngữ cảnh rộng: phân biệt một con thuyền với một cái xe đòi hỏi nhìn thấy nước hay đường. Triệu chứng thì trông giống hệt ``thiếu dữ liệu'' hoặc ``mô hình nhỏ quá'', và cả hai chẩn đoán đó đều dẫn tới hành động sai.
+\lk{B/08}{đối lập với}{cùng triệu chứng ``sai có hệ thống trên một nhóm'', nhưng ở đó nguyên nhân là dịch chuyển phân phối chứ không phải giới hạn kiến trúc; phép đo phân biệt hai thứ là khác nhau.} Điều dễ chịu là receptive field tính được trong hai phút bằng giấy bút.
+
+Nhưng ở đây phải phức tạp hoá một chút, vì cắt gọn sẽ thành sai. Với ResNet-18 ở tầng conv cuối, con số \emph{lý thuyết} rơi vào cỡ vài trăm pixel, lớn hơn ảnh \(224\times224\), nên thoạt nhìn có vẻ không có vấn đề gì. Hiệu chỉnh quan trọng là \vn{trường tiếp nhận hiệu dụng}{effective receptive field} nhỏ hơn nhiều: đóng góp của các pixel giảm dần theo dạng gần Gaussian tính từ tâm, và bán kính hiệu dụng chỉ tăng cỡ căn bậc hai của số tầng. Đây là kết quả đã được công bố (dòng công trình về effective receptive field), và hệ quả thực dụng là hãy coi con số lý thuyết như một chặn trên rất lỏng chứ đừng coi là mô tả hành vi thật.
+
+\section{Bốn cách nhìn xa hơn, bốn cái giá (Widening the Receptive Field)}
+
+Khi receptive field không đủ, có bốn đòn bẩy và không cái nào miễn phí.
+
+\begin{table}[H]\centering\small
+\caption{Bốn cách mở rộng receptive field: cơ chế, cái được, và chế độ hỏng riêng của từng cách.}
+\label{tab:mo-rong-rf}
+\begin{tabularx}{\linewidth}{@{}L{2.4cm}L{3.6cm}YL{3.4cm}@{}}
+\toprule
+\textbf{Cách} & \textbf{Cơ chế} & \textbf{Được} & \textbf{Hỏng khi nào}\\
+\midrule
+Tăng độ sâu & Cộng dồn \((k-1)j\) qua nhiều tầng & Cả tầm nhìn lẫn độ trừu tượng & Khó tối ưu nếu không có residual; độ trễ tăng \emph{tuần tự}, không song song hoá được\\
+Lấy mẫu xuống & Nhân bước nhảy \(j\) lên & Rẻ nhất, mở rộng theo cấp số nhân & Mất chi tiết không gian vĩnh viễn; vật nhỏ biến mất trước khi tới tầng sâu\\
+\en{Dilated conv} \cite{yu2016dilated} & Giãn kernel mà giữ nguyên độ phân giải & Vừa xa vừa chi tiết --- đúng thứ phân vùng cần & \en{Gridding artifact}: điểm lấy mẫu không phủ liên tục nên có tần số bị bỏ sót\\
+Attention toàn cục \cite{vaswani2017attention} & Mọi vị trí chạm mọi vị trí trong một bước & Quan hệ xa tuỳ ý, do nội dung quyết định & Chi phí bậc hai theo số \en{token}; bỏ bớt inductive bias nên đói dữ liệu\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Cột chi phí của attention đáng làm thành con số vì nó giải thích gần hết thiết kế của các ViT hiện đại. Ở \(224\times224\) với patch \(16\times16\) ta có \(14\times14 = 196\) token và ma trận tương tự \(196^2 \approx 3{,}8\cdot10^{4}\) phần tử --- hoàn toàn chấp nhận được. Nhưng phân vùng cần đặc trưng ở \(56\times56\), tức \(3136\) token, và \(3136^2 \approx 9{,}8\cdot10^{6}\): gấp 256 lần. Đó là lý do \emph{vật lý}, không phải thẩm mỹ, khiến Swin chia attention thành cửa sổ cục bộ rồi dịch cửa sổ giữa các tầng \cite{liu2021swin}. Nói cách khác, Swin \emph{cài lại} tính cục bộ mà ViT vừa gỡ bỏ, sau khi cả ngành đã học được rằng gỡ hết thì quá đắt. \lk{B/11}{ràng buộc bởi}{con số \(256\times\) này vẫn chưa phải toàn bộ câu chuyện: thời gian chạy phụ thuộc lưu lượng bộ nhớ chứ không chỉ số phép tính.}
+
+\section{Residual và luồng gradient (Residual Connections and Gradient Flow)}
+
+\subsection{A. Nghịch lý mà residual thực sự giải quyết}
+
+Đây là điểm hay bị hiểu sai nhất trong toàn chương. Trước ResNet, người ta quan sát một nghịch lý: mạng 56 tầng có sai số \emph{huấn luyện} cao hơn mạng 20 tầng \cite{he2016resnet}. Đây không thể là \en{overfitting} --- overfitting làm sai số test cao chứ không làm sai số train cao. Mạng sâu hơn về nguyên tắc biểu diễn được mọi thứ mạng nông biểu diễn được (chỉ cần các tầng thừa học hàm đồng nhất), nên vấn đề nằm ở chỗ SGD \emph{không tìm được} nghiệm đó. Kết nối tắt \(y = x + F(x)\) sửa đúng chỗ đó: hàm đồng nhất trở thành mặc định (chỉ cần \(F \to 0\)), và gradient có một đường về thẳng không bị nhân qua chuỗi Jacobian. Nói gọn thì \emph{residual giải quyết bài toán tối ưu trước, còn độ sâu chỉ là hệ quả của việc bài toán tối ưu đã dễ đi.}
+
+\subsection{B. Chuẩn hoá đặt ở đâu, và nó giả định gì}
+
+Hệ quả kéo dài tới hôm nay: mọi kiến trúc sâu đều có dạng ``một luồng chính cộng dồn, các khối chỉ ghi thêm một lượng nhỏ vào luồng đó''. Chỗ đặt \en{normalization} là chi tiết đi kèm và có hệ quả rất thực. Đặt sau phép cộng (\en{post-norm}) thì luồng chính bị chuẩn hoá lại ở mỗi tầng, đường về của gradient không còn sạch, và \en{transformer} sâu cần khởi động học suất rất cẩn thận mới không phân kỳ; đặt trước khối (\en{pre-norm}) thì luồng chính không bị đụng vào, huấn luyện ổn định hơn nhiều nhưng thường mất một chút chất lượng cuối. Bản thân họ chuẩn hoá cũng là những giả định khác nhau.
+
+\begin{table}[H]\centering\small
+\caption{Ba họ chuẩn hoá: mỗi họ là một giả định khác nhau về chỗ nào thống kê đáng tin.}
+\label{tab:norm}
+\begin{tabularx}{\linewidth}{@{}L{2.4cm}L{3.9cm}YL{3.5cm}@{}}
+\toprule
+\textbf{Họ} & \textbf{Chuẩn hoá theo chiều nào} & \textbf{Giả định} & \textbf{Hỏng khi nào}\\
+\midrule
+BatchNorm \cite{ioffe2015batchnorm} & Trên cả batch, từng kênh & Batch đủ lớn và đồng nhất; thống kê lúc suy luận giống lúc huấn luyện & Batch bằng 2 (cấu hình huấn luyện detection); dữ liệu suy luận lệch phân bố; suy luận trực tuyến từng mẫu\\
+LayerNorm \cite{ba2016layernorm} & Trong từng mẫu, trên toàn bộ đặc trưng & Các kênh trong một mẫu có thang so sánh được & Ảnh có kênh với ý nghĩa vật lý rất khác nhau\\
+GroupNorm \cite{wu2018groupnorm} & Trong từng mẫu, theo nhóm kênh & Có cấu trúc nhóm tự nhiên giữa các kênh & Số nhóm chọn tuỳ tiện; mất một phần lợi ích chính quy hoá của BN\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Ở đây cần trung thực về mức độ chắc chắn: lý do \emph{vì sao} chuẩn hoá giúp vẫn còn tranh luận. Lời giải thích ``giảm internal covariate shift'' của bài gốc đã bị phản bác bằng thực nghiệm \cite{santurkar2018how}, và cách hiểu được ủng hộ hơn hiện nay là nó làm mặt loss trơn hơn. Điều \emph{đã được đo} là hành vi ở cột cuối bảng; điều còn là giả thuyết là cơ chế.
+
+\section{Định tuyến cố định hay theo nội dung (Fixed vs Content-Based Routing)}
+
+Convolution trộn thông tin theo một mẫu hình \emph{cố định}: cùng một kernel áp lên mọi vị trí, bất kể nội dung. Đây vừa là sức mạnh (ít tham số, tổng quát hoá tốt) vừa là giới hạn cứng. Ba thế hệ giải pháp nới lỏng dần sự cố định đó, và xếp chúng lên một quang phổ như Hình~\ref{fig:quang-pho-gia-dinh} là cách gọn nhất để nhớ cả họ.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\small]
+\draw[-{Latex[length=3mm]},thick,draw=steel] (-0.6,0) -- (17.4,0);
+\node[anchor=north west,font=\scriptsize\itshape,color=steel] at (-0.6,-0.2) {giả định mạnh, ít dữ liệu là đủ};
+\node[anchor=north east,font=\scriptsize\itshape,color=steel] at (17.4,-0.2) {giả định yếu, cần rất nhiều dữ liệu};
+\foreach \x/\n/\d in {%
+  1.0/{Conv \(3\times3\)}/{cục bộ \(+\) chia sẻ trọng số},
+  5.4/{Dilated, SE-gating}/{cục bộ nhưng giãn, hoặc chỉnh kênh theo ngữ cảnh},
+  10.2/{Deformable, local attn}/{vị trí lấy mẫu do nội dung quyết định},
+  15.0/{ViT}/{không cài giả định hình học nào}}
+{\node[draw=violetdark, fill=violetbg, rounded corners=2pt, inner sep=5pt,
+       text width=3.3cm, align=center, anchor=south] (n) at (\x,0.55) {\textbf{\n}\\[2pt] \scriptsize \d};
+ \draw[draw=violetdark] (\x,0.55) -- (\x,0.08);}
+\end{tikzpicture}}
+\caption{Quang phổ giả định của kiến trúc thị giác: đi từ trái sang phải, mỗi bậc gỡ bớt một ràng buộc hình học và đổi lấy nhu cầu dữ liệu cao hơn. Đây chính là trục của chương 4, lần này áp cho kiến trúc thay vì cho toàn hệ thống.}
+\label{fig:quang-pho-gia-dinh}
+\end{figure}
+
+Ba bậc giữa và bậc cuối, đọc theo cái được và cái mất:
+
+\begin{itemize}
+\item \textbf{\en{Channel gating}} kiểu Squeeze-and-Excitation chỉ học một trọng số cho mỗi kênh dựa trên ngữ cảnh toàn cục \cite{hu2018senet}. Rất rẻ, và nó chứng minh rằng chỉ một chút định tuyến động đã đủ tạo khác biệt.
+\item \textbf{\en{Deformable convolution}} để mạng học luôn \emph{vị trí lấy mẫu} thay vì cố định lưới \cite{dai2017deformable}. Mạnh khi vật thể biến dạng nhiều; khó tối ưu hơn và khó tăng tốc trên phần cứng vì truy cập bộ nhớ không đều.
+\item \textbf{Self-attention} tính lại toàn bộ mẫu hình trộn cho từng đầu vào một. Cái mất không chỉ là FLOPs mà còn là \emph{lượng dữ liệu tối thiểu}: ViT huấn luyện từ đầu trên ImageNet-1k thua CNN, và chỉ vượt lên khi có tiền huấn luyện quy mô lớn hoặc khi được thêm lại một ít inductive bias qua chưng cất và augmentation mạnh \cite{dosovitskiy2021vit, touvron2021deit}.
+\end{itemize}
+
+Có một hướng ngược lại đáng nhắc: thay vì nới lỏng giả định, \emph{cài thêm toán học vào kiến trúc} --- tầng tối ưu khả vi, vòng lặp tối ưu được trải phẳng, ràng buộc hình học cứng đặt thẳng vào đồ thị tính toán. Tất cả đều nói ``đừng học lại thứ tôi đã biết''. Chúng mạnh khi dữ liệu ít và mô hình toán đúng; chúng cứng nhắc và sai một cách khó gỡ khi giả định toán không khớp. Người làm hình học sẽ thấy trục này quen thuộc: đây đúng là cuộc tranh luận giữa pipeline SLAM cổ điển và các mô hình \vn{tiến thẳng}{feed-forward}, và chương 16 sẽ mở nó ra đầy đủ.
+\lk{C/16}{đối lập với}{hình học cổ điển cài toán vào hệ thống, mô hình tiến thẳng để mạng học lại toán đó --- cùng một bài toán, hai vị trí đặt giả định.}
+
+\section{Bốn thước đo chi phí (Four Cost Metrics)}
+
+\subsection{A. Ba trục phân tích được bằng giấy bút}
+
+Có bốn thước đo và chúng \emph{không} tỉ lệ với nhau: số tham số, FLOPs, bộ nhớ, và độ trễ thực đo. Trước khi chạy bất cứ thứ gì, ba trục kiến trúc cơ bản đã phân tích được.
+
+\begin{table}[H]\centering\small
+\caption{Nhân đôi theo ba trục: chi phí không đi cùng nhau, nên ``cùng ngân sách FLOPs'' không có nghĩa là ``cùng giá''.}
+\label{tab:ba-truc}
+\begin{tabularx}{\linewidth}{@{}L{2.1cm}L{1.6cm}L{1.5cm}L{2.3cm}Y@{}}
+\toprule
+\textbf{Nhân đôi} & \textbf{Tham số} & \textbf{FLOPs} & \textbf{Bộ nhớ kích hoạt} & \textbf{Độ trễ (batch 1)}\\
+\midrule
+Độ sâu & \(\times 2\) & \(\times 2\) & \(\times 2\) & \(\times 2\) và \emph{tuần tự} --- không giấu được bằng song song hoá\\
+Độ rộng & \(\times 4\) & \(\times 4\) & \(\times 2\) & \(< \times 4\): kernel to hơn dùng GPU hiệu quả hơn\\
+Độ phân giải & \(\times 1\) & \(\times 4\) & \(\times 4\) & \(\approx \times 4\); là trục dễ tràn bộ nhớ nhất\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng~\ref{tab:ba-truc} giải thích vài điều thoạt nhìn nghịch lý. Tăng độ rộng làm tham số tăng \emph{bậc hai} --- vì một tầng conv có \(k^2 C_{\text{in}} C_{\text{out}}\) trọng số và cả hai chỉ số cùng nhân đôi --- trong khi tăng độ sâu chỉ tăng tuyến tính; xét theo tham số thì sâu rẻ hơn rộng. Nhưng xét theo độ trễ ở batch 1 thì ngược lại: các tầng phải chạy nối tiếp, còn độ rộng thì trải ra được trên hàng nghìn lõi. Đây là lý do các mạng thiết kế cho thiết bị biên thường nông và rộng hơn ta tưởng. Và vì ba trục không tương đương, dồn hết ngân sách vào một trục là lựa chọn tồi. Mở rộng cả ba cùng lúc theo một tỉ lệ cố định --- \en{compound scaling} --- cho kết quả tốt hơn \cite{tan2019efficientnet}.
+
+Điểm nối trực tiếp sang chương 11 nằm ở cột cuối: \emph{FLOPs thấp không có nghĩa là nhanh}. MobileNet dùng convolution tách theo chiều sâu để giảm FLOPs hơn một bậc so với ResNet-50 \cite{howard2017mobilenets}. Nhưng ở batch 1 trên GPU nó thường không nhanh hơn tương ứng, đôi khi còn chậm hơn. Lý do là mỗi FLOP của nó vẫn phải kéo theo gần như cùng lượng dữ liệu như trước, nên phép tính chuyển từ chế độ nghẽn tính toán sang chế độ nghẽn băng thông. Chương 11 biến câu đó thành hai con số byte cụ thể.
+\lk{D/20}{hệ quả của}{mọi kỹ thuật nén mô hình ở đó đều nhắm vào một trong bốn thước đo này, và chọn nhầm thước đo là lý do phổ biến nhất khiến nén xong không nhanh hơn.}
+
+\subsection{B. Các mô típ lặp lại: cách đọc nhanh nhất một kiến trúc lạ}
+
+\begin{itemize}
+\item \textbf{Tách ba tầng chức năng} --- \en{backbone} trích đặc trưng đa tỉ lệ, \en{neck} trộn các tỉ lệ (ví dụ FPN \cite{lin2017fpn}), \en{head} biến đặc trưng thành đầu ra của bài toán. Nhận ra ba tầng này là bước đầu tiên khi mở một repo lạ, vì nó cho biết chỗ nào thay được.
+\item \textbf{Encoder--decoder với skip connection} \cite{ronneberger2015unet} --- dùng khi đầu ra cần độ phân giải cao: nhánh xuống lấy ngữ nghĩa, skip mang chi tiết không gian đã bị mất khi lấy mẫu xuống.
+\item \textbf{Bottleneck} --- giảm số kênh ở giữa để cắt chi phí bậc hai của tầng \(3\times3\), rồi phục hồi.
+\item \textbf{Đa tỉ lệ và coarse-to-fine} --- xử lý thô trước rồi tinh dần, để chi phí tập trung vào chỗ cần.
+\end{itemize}
+
+Chín mươi phần trăm kiến trúc thị giác là các mô típ này lắp lại theo thứ tự khác nhau, và khi bạn thấy chúng thì phần còn lại của bài báo đọc rất nhanh.
+
+\section{Thực hành}
+
+\begin{description}
+\item[Repo và tài nguyên.] \repo{huggingface/pytorch-image-models} (timm) là nơi đối chiếu hàng trăm backbone trên cùng một khung; \repo{TylerYep/torchinfo} để in bảng hình dạng và tham số từng tầng; \repo{facebookresearch/fvcore} để đếm FLOPs; \repo{lutzroeder/netron} để nhìn đồ thị tính toán thật thay vì tin hình vẽ trong paper; \repo{Fangyh09/pytorch-receptive-field} để đối chiếu với phép tính tay của bạn. Danh sách này chốt tại tháng 9/2026 và tên các mô hình dẫn đầu sẽ cũ trong 6--12 tháng, còn các repo hạ tầng kể trên bền hơn nhiều.
+\item[Câu hỏi kiểm tra hiểu.] Tính tay receptive field của ResNet-18 ở tầng cuối --- nó có phủ hết ảnh \(224\times224\) không, và nếu có thì vì sao mô hình vẫn hỏng trên vật rất lớn? Vì sao tăng độ sâu rẻ hơn tăng độ rộng xét theo tham số nhưng đắt hơn xét theo độ trễ ở batch 1? Với batch 32 ảnh \(512\times512\), tầng nào chiếm nhiều bộ nhớ kích hoạt nhất, và vì sao câu trả lời không phải là tầng có nhiều tham số nhất?
+\item[Mini project.] Chọn ba backbone trong timm có cùng mức accuracy ImageNet nhưng khác họ (một CNN cổ điển, một mạng \en{depthwise}, một ViT nhỏ). Tính tay tham số và FLOPs, \emph{viết ra dự đoán thứ tự độ trễ trước khi đo}, rồi đo thật trên GPU và trên CPU. Mọi chỗ dự đoán sai là một bài học của chương 11; ghi lại cụ thể sai bao nhiêu lần và vì sao.
+\end{description}
+
+\section{Giới hạn và trường hợp hỏng}
+
+Khung ``kiến trúc là tập giả định'' rất mạnh nhưng có ba chỗ nó nói dối.
+
+\begin{itemize}
+\item \textbf{Nó giả vờ rằng ta biết mình đang cài giả định gì.} Trong thực tế nhiều lựa chọn kiến trúc là kết quả của tìm kiếm thực nghiệm rồi được kể lại như một lập luận có nguyên lý. Bằng chứng rõ nhất là ConvNeXt \cite{liu2022convnext}: khi lấy một ResNet và áp lần lượt các chi tiết huấn luyện lẫn thiết kế của ViT, phần lớn khoảng cách vốn được quy cho ``attention'' biến mất.
+\item \textbf{Mọi phép đếm ở đây là chặn, không phải hành vi thật.} Receptive field hiệu dụng nhỏ hơn lý thuyết rất nhiều, và FLOPs không dự đoán được độ trễ. Ai tối ưu theo con số lý thuyết mà không đo sẽ tối ưu nhầm hướng --- chương 11 tồn tại đúng vì lý do này.
+\item \textbf{``Giả định mạnh thì cần ít dữ liệu'' chỉ đúng khi giả định khớp.} Ảnh y sinh, ảnh vệ tinh và camera gắn trên người đều có xoay tự do. Với chúng, đẳng biến tịnh tiến của conv không giúp gì cả, nên mạng phải tiêu sức chứa để học lại phép xoay --- thứ mà một biểu diễn phù hợp hơn cho không mất gì. Cùng logic, nếu ảnh đã được cắt căn giữa và luôn cùng tỉ lệ thì phần lớn lợi thế của conv so với MLP biến mất.
+\end{itemize}
+
+\begin{cambay}
+Đừng so sánh hai kiến trúc khi công thức huấn luyện của chúng khác nhau --- và chúng gần như luôn khác nhau. Số epoch, augmentation, optimizer, độ phân giải, EMA của trọng số, độ dài warm-up: mỗi thứ có thể tạo chênh lệch lớn hơn chênh lệch giữa hai backbone. Khi đọc một bảng kết quả, câu hỏi đầu tiên không phải ``kiến trúc nào cao hơn'' mà là ``hai dòng này có được huấn luyện như nhau không''; câu trả lời nằm ở phụ lục, không nằm ở phần method.
+\end{cambay}
+
+\begin{cannho}
+Kiến trúc không làm mô hình ``thông minh hơn'', nó quyết định \emph{ai chạm được tới ai, sau bao nhiêu bước, và với chi phí nào}. Ba câu hỏi tương ứng --- receptive field, cách định tuyến, bốn thước đo chi phí --- đủ để đọc gần như mọi kiến trúc thị giác, kể cả kiến trúc chưa ra đời. \T{2}
+\end{cannho}
+
+\begin{onbai}
+\ar[3]{Inductive bias}{Tập giả định về lời giải được cài sẵn trước khi nhìn dữ liệu. Nó đến từ bốn chỗ: kiến trúc, hàm mất mát, augmentation, và thuật toán tối ưu. Bạn không thể ``không có giả định'', chỉ có thể chọn giả định nào.}
+\ar[2]{Template matching}{Cách đọc bộ phân loại tuyến tính: mỗi hàng của ma trận trọng số là một ảnh mẫu, và điểm số là tích vô hướng với ảnh đầu vào. Vẽ các hàng đó ra sẽ thấy mẫu ``ngựa'' có hai đầu, vì một lớp chỉ có một mẫu chuẩn.}
+\ar[3]{Vì sao không dùng một MLP khổng lồ cho ảnh?}{Định lý xấp xỉ phổ quát chỉ nói hàm đúng \emph{tồn tại}, không nói bạn tìm được nó. Một tầng nối đầy đủ từ ảnh \(224\times224\times3\) sang 1000 nơ-ron đã là 150 triệu tham số, và mô hình vẫn không biết hai pixel cạnh nhau thì liên quan.}
+\ar[3]{Đẳng biến tịnh tiến}{Dời vật trong ảnh thì bản đồ đặc trưng dời theo đúng chừng ấy. Convolution có tính chất này gần như miễn phí nhờ chia sẻ trọng số, nhưng \emph{không} có tính chất tương ứng cho xoay hay đổi tỉ lệ.}
+\ar[3]{Trường tiếp nhận}{Vùng ảnh đầu vào ảnh hưởng tới một vị trí đầu ra. Tính bằng hai công thức truy hồi: bước nhảy nhân với stride, bán kính cộng thêm \((k-1)\) lần bước nhảy hiện tại. Nhỏ hơn vật thể là một lớp lỗi tính được trước khi huấn luyện.}
+\ar[2]{Trường tiếp nhận hiệu dụng}{Vùng thực sự đóng góp, nhỏ hơn con số lý thuyết rất nhiều vì đóng góp giảm dần theo dạng gần Gaussian từ tâm, và chỉ tăng cỡ căn bậc hai của số tầng. Con số lý thuyết chỉ là chặn trên rất lỏng.}
+\ar[2]{Dilated convolution}{Giãn khoảng cách giữa các điểm lấy mẫu của kernel để mở rộng tầm nhìn mà không giảm độ phân giải. Đúng thứ phân vùng cần, nhưng các điểm lấy mẫu không phủ liên tục nên sinh gridding artifact.}
+\ar[2]{Vì sao attention đắt ở bài toán dày đặc?}{Chi phí bậc hai theo số token. Ở \(224\times224\) với patch \(16\times16\) chỉ có 196 token, nhưng đặc trưng \(56\times56\) cần 3136 token, đắt hơn 256 lần. Đó là lý do vật lý khiến Swin cắt attention về từng cửa sổ.}
+\ar[3]{Kết nối tắt}{Cộng thẳng đầu vào vào đầu ra của một khối, khiến hàm đồng nhất thành mặc định và mở một đường về sạch cho gradient. Nó giải quyết bài toán \emph{tối ưu} trước; độ sâu chỉ là hệ quả.}
+\ar[3]{Vì sao mạng sâu hơn lại có sai số huấn luyện cao hơn?}{Quan sát này có thật trước ResNet: mạng 56 tầng thua mạng 20 tầng ngay trên tập huấn luyện. Vì SGD không tìm được nghiệm, chứ không phải vì mạng không biểu diễn nổi. Đây chắc chắn không phải overfitting: overfitting làm sai số \emph{kiểm thử} cao, không làm sai số huấn luyện cao.}
+\ar[2]{Ba họ chuẩn hoá}{BatchNorm chuẩn hoá theo chiều batch nên giả định batch đủ lớn và đồng nhất. LayerNorm và GroupNorm chuẩn hoá trong từng mẫu nên bỏ được giả định đó. Vì sao chuẩn hoá giúp thì tới nay vẫn còn tranh luận.}
+\ar[1]{Squeeze-and-Excitation}{Học một trọng số cho mỗi kênh dựa trên ngữ cảnh toàn ảnh, rồi nhân lại vào kênh đó. Rất rẻ, và nó cho thấy chỉ một chút định tuyến theo nội dung đã đủ tạo khác biệt.}
+\ar[1]{Deformable convolution}{Để mạng học luôn \emph{vị trí lấy mẫu} thay vì cố định trên lưới. Mạnh khi vật thể biến dạng nhiều, nhưng truy cập bộ nhớ không đều nên khó tăng tốc trên phần cứng.}
+\ar[3]{Thước đo chi phí}{Có bốn cái: số tham số, FLOPs, bộ nhớ, và độ trễ thực đo. Chúng không tỉ lệ với nhau, nên ``cùng ngân sách FLOPs'' không có nghĩa là ``cùng giá''.}
+\ar[2]{Vì sao nên mở rộng cả ba trục cùng lúc?}{Vì ba trục có giá khác nhau: độ rộng làm tham số tăng bậc hai, độ sâu tăng tuyến tính nhưng cộng thẳng vào độ trễ tuần tự, độ phân giải nhân bộ nhớ lên bốn khi tăng gấp đôi. Dồn hết vào một trục thì chạm trần của trục đó trước.}
+\ar[2]{Backbone--neck--head}{Ba tầng chức năng của gần như mọi hệ thống thị giác: trích đặc trưng đa tỉ lệ, trộn các tỉ lệ, rồi biến đặc trưng thành đầu ra của bài toán. Nhận ra ba tầng này là bước đầu tiên khi mở một repo lạ.}
+\ar[2]{Mô hình sai có hệ thống trên vật rất lớn --- nguyên nhân?}{Hai khả năng: trường tiếp nhận hiệu dụng không phủ hết vật, hoặc tập huấn luyện thiếu vật cỡ đó. Phân biệt bằng cách cắt vật lớn thành mảnh nhỏ rồi đo lại: nếu điểm số hồi phục thì lỗi nằm ở tầm nhìn, không ở dữ liệu.}
+\ar[2]{Huấn luyện detection với batch 2, kết quả tụt bất thường --- nguyên nhân?}{Nhiều khả năng là BatchNorm: thống kê tính trên hai mẫu thì quá nhiễu, và thống kê chạy dùng lúc suy luận lệch hẳn. Đổi sang GroupNorm hoặc đóng băng BatchNorm rồi đo lại.}
+\ar[1]{Bảng nói kiến trúc mới hơn 3 điểm mAP --- kiểm tra gì trước?}{Kiểm tra phụ lục xem hai dòng có cùng công thức huấn luyện không: số epoch, augmentation, optimizer, độ phân giải, độ dài warm-up. ConvNeXt cho thấy phần lớn khoảng cách CNN--ViT biến mất khi giữ công thức cố định.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{\repo{timm}}{Nó tồn tại chính vì bài học ``phải giữ công thức huấn luyện cố định mới so được kiến trúc''}{Hạ tầng bền; là nơi duy nhất so backbone công bằng}
+\ud{ConvNeXt}{Bằng chứng thực nghiệm trực tiếp rằng phần lớn khoảng cách CNN--ViT đến từ công thức huấn luyện chứ không từ attention}{Kết quả này thay đổi cách đọc mọi bảng so sánh kiến trúc}
+\ud{Dòng Swin và các ViT phân cấp}{Cài lại tính cục bộ và cấu trúc đa tỉ lệ vào ViT, đúng vì lý do bậc hai theo số token đã tính trong chương}{Là kiến trúc mặc định cho bài toán dày đặc tính tới 9/2026}
+\ud{Segment Anything (SAM)}{Phân bổ chi phí cực lệch: bộ mã hoá ảnh rất nặng chạy một lần, còn phần giải mã mặt nạ rất nhẹ chạy nhiều lần}{Minh hoạ sạch nhất cho việc tách backbone--head theo ràng buộc độ trễ}
+\ud{Họ EfficientNet và các biến thể sau nó}{Mở rộng hợp nhất theo cả ba trục thay vì dồn ngân sách vào một trục}{Ý tưởng còn sống dù tên mô hình đã cũ}
+\end{ungdung}
+
+\begin{duan}{Đo trường tiếp nhận thực nghiệm của backbone frontend}{vài giờ tới một ngày}
+\dmt kiểm chứng bằng số cái chặn trên lỏng đã nêu trong chương: đặt con số trường tiếp nhận lý thuyết tính bằng giấy bút cạnh con số đo được bằng cách che ảnh, và xem chúng lệch nhau bao nhiêu lần.
+\ddl vài trăm ảnh xám \(752\times480\) từ một chuỗi EuRoC, cùng đúng backbone bạn định dùng cho frontend.
+\dbc (1) tính tay trường tiếp nhận lý thuyết ở ba tầng có độ sâu khác nhau bằng hai công thức truy hồi trong chương; (2) chọn một vị trí đầu ra cố định; (3) trượt một ô che \(16\times16\) khắp ảnh và mỗi lần ghi lại mức thay đổi của vectơ đặc trưng tại vị trí đó; (4) vẽ bản đồ nhạy cảm và lấy bán kính chứa \(90\%\) tổng thay đổi; (5) lặp cho cả ba tầng.
+\dxk bạn có một bảng ba dòng --- tầng, trường tiếp nhận lý thuyết, bán kính \(90\%\) đo được --- cùng tỉ số giữa hai cột, và trả lời được bằng số rằng backbone này có nhìn đủ xa cho vật thể lớn nhất xuất hiện trong chuỗi của bạn hay không.
+\dnv \ptr{B/11} vì bản đồ nhạy cảm tốn hàng nghìn lượt xuôi và là bài tập tốt để đo thông lượng; \ptr{C/13} nếu bạn muốn lặp lại phép đo trên một ViT để so hai họ trên cùng thước đo; \ptr{E/25} vì đây chính là một dạng bản đồ nổi bật.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì định lý chỉ nói hàm đúng \emph{tồn tại} trong không gian giả thuyết, không nói bạn tìm được nó với lượng dữ liệu và tính toán bạn có. Một tầng nối đầy đủ từ ảnh \(224\times224\times3\) sang 1000 nơ-ron đã là 150 triệu tham số, và mô hình vẫn không biết hai pixel cạnh nhau thì liên quan.}
+\tl{Vì overfitting làm sai số \emph{test} cao chứ không làm sai số \emph{train} cao. Mạng sâu về nguyên tắc biểu diễn được mọi thứ mạng nông biểu diễn được, nên cái hỏng là bài toán tối ưu: SGD không tìm được nghiệm đó. Kết nối tắt biến hàm đồng nhất thành mặc định và mở một đường về sạch cho gradient.}
+\tl{Vì chi phí bậc hai theo số token. Ở \(224\times224\) với patch \(16\times16\) chỉ có 196 token, nhưng bài toán dày đặc cần đặc trưng ở \(56\times56\), tức 3136 token và đắt hơn 256 lần. Swin cài lại tính cục bộ mà ViT vừa gỡ bỏ, sau khi đã biết rằng gỡ hết thì quá đắt.}
+\tl{Vì tham số của một tầng conv là \(k^2 C_{\text{in}} C_{\text{out}}\), nên nhân đôi độ rộng nhân tham số lên bốn còn nhân đôi độ sâu chỉ nhân lên hai. Nhưng các tầng phải chạy nối tiếp, còn các kênh trải ra được trên hàng nghìn lõi --- nên ở batch 1, độ sâu là thứ không giấu được.}
+\tl{Vì hai dòng trong bảng gần như luôn khác nhau ở số epoch, augmentation, optimizer, độ phân giải và độ dài warm-up --- những thứ có thể tạo chênh lệch lớn hơn chênh lệch kiến trúc. ConvNeXt là bằng chứng: giữ công thức cố định thì phần lớn khoảng cách biến mất.}
+\end{traloi}
+
+\begin{dongian}
+Có hai cách xây nhà. Cách thứ nhất là đổ bê tông tự do: tạo được bất kỳ hình dạng nào, nhưng tốn rất nhiều vật liệu và thời gian. Cách thứ hai là lắp bằng một bộ gạch có sẵn, mỗi viên chỉ khớp với viên bên cạnh theo vài kiểu nhất định. Bộ gạch giới hạn hình dạng, nhưng bạn xây nhanh hơn với ít vật liệu hơn hẳn.
+
+Mạng nơ-ron cũng vậy. Nối mọi điểm ảnh với mọi thứ là bê tông tự do: chỉ một tầng đã tốn hàng trăm triệu con số cần chỉnh. Hoặc bạn cài sẵn một hiểu biết rất tầm thường --- hai điểm ảnh cạnh nhau thì liên quan tới nhau, và một hoa văn có nghĩa ở góc này thì cũng có nghĩa y hệt ở góc kia. Cài xong, số thứ phải học giảm hàng nghìn lần.
+
+Cái giá là gì? Vì mỗi viên gạch chỉ nhìn thấy vùng nhỏ quanh nó, muốn hai đầu bức ảnh ``nói chuyện'' được với nhau thì phải xếp rất nhiều lớp gạch chồng lên. Xếp không đủ lớp thì hai đầu đó không bao giờ gặp nhau, dù bạn dạy máy bao lâu --- và đây là con số tính được bằng giấy bút trước khi bắt đầu. Còn nếu ảnh của bạn bị xoay lung tung thì bộ gạch không giúp gì, bạn tốn công hơn cả khi dùng bê tông.
+
+\chuadongian{vì sao việc chuẩn hoá các con số giữa các lớp lại làm việc học dễ đi thì tới nay vẫn chưa có lời giải thích vừa gọn vừa đúng; cách giải thích trong bài báo gốc đã bị chính thực nghiệm bác bỏ.}
+\motcau{Kiến trúc là bộ gạch bạn chọn: chọn khớp với dữ liệu thì xây nhanh với rất ít vật liệu, chọn lệch thì tốn hơn cả xây tự do.}
+\end{dongian}
+
+\section{Kết nối}
+
+Chương này là \emph{trục của chương 4 áp cho kiến trúc}: quang phổ ở Hình~\ref{fig:quang-pho-gia-dinh} chính là trục ``giả định mạnh \(+\) ít dữ liệu \(\leftrightarrow\) giả định yếu \(+\) nhiều dữ liệu''. Nó \emph{đối tác} với chương 9: kiến trúc cài giả định về dạng của hàm, loss cài giả định về mục tiêu. Nó là \emph{tiền đề trực tiếp} của chương 11, vì cột ``độ trễ'' trong mọi bảng ở đây chỉ có nghĩa khi bạn hiểu vì sao FLOPs không dự đoán được thời gian.
+
+Sang Phần C, \ptr{C/13-kien-truc-backbone} đọc lịch sử CNN, attention và ViT như một chuỗi các lần gỡ nút thắt --- đó là bản kể chi tiết của quang phổ trong chương này. \ptr{C/14-bai-toan-cv-loi} cho thấy tách backbone/neck/head hoạt động ra sao trên bài toán thật và vì sao đa tỉ lệ là bắt buộc chứ không phải trang trí. \ptr{C/16-thi-giac-3d} mở ra cuộc tranh luận ``nhúng toán vào kiến trúc hay để mạng học''. Và \ptr{D/20-toi-uu-va-nen-mo-hinh} nhặt lại chỗ này khi bàn về việc thay đổi kiến trúc \emph{sau} huấn luyện.
+
+\begin{tukiem}
+\item Vì sao định lý xấp xỉ phổ quát \emph{không} phải lý do để dùng MLP cho ảnh --- giới hạn thật nằm ở khả năng biểu diễn hay ở chi phí học?
+\item Residual connection giải quyết vấn đề gì \emph{trước tiên}, và bằng chứng thực nghiệm nào cho thấy đó không phải vấn đề overfitting?
+\item Một mô hình phân vùng hỏng có hệ thống trên vật rất lớn: hai chẩn đoán nào giải thích được triệu chứng đó, và phép đo nào phân biệt chúng?
+\item Vì sao Swin phải chia attention thành cửa sổ, và phép tính nào về số token cho thấy đó là bắt buộc chứ không phải một lựa chọn thẩm mỹ?
+\item Nếu dữ liệu của bạn có xoay tự do, đẳng biến tịnh tiến của convolution còn giá trị gì, và bạn sẽ cài giả định thiếu vào chỗ nào trong bốn chỗ của chương 4?
+\item Hai mạng cùng số tham số, một sâu gấp đôi và một rộng gấp đôi: chênh lệch độ trễ ở batch 1 khác chênh lệch ở batch 64 ra sao, và vì sao?
+\item BatchNorm hỏng ở ba tình huống nào, và mỗi tình huống vi phạm giả định nào của nó?
+\end{tukiem}
+
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

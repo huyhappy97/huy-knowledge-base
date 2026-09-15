@@ -1,0 +1,25 @@
+\documentclass[../deep_learning.tex]{subfiles}
+\begin{document}
+\part{HỌC SÂU CHO VISUAL SLAM}
+\begin{tomtat}
+Phần F đặt toàn bộ năm phần trước vào một câu hỏi duy nhất: có nên thay một khối trong hệ SLAM cổ điển bằng một mạng, và nếu có thì khối nào. Tám chương đi từ khung quyết định, qua frontend học được, đóng vòng, độ sâu và dòng quang, backend khả vi, bản đồ neural, ngữ nghĩa, tới IMU và triển khai. Mỗi phương pháp được hỏi đúng bốn câu: nó chữa thất bại cụ thể nào, cơ chế nào làm được, có đáng cái giá không, và nếu không dùng thì học được gì từ thiết kế của nó. Nếu chỉ nhớ một điều: phần lớn công trình trong phần này chưa đủ chín để thay thế một hệ cổ điển đã tinh chỉnh kỹ, nhưng vài ý tưởng trong đó chữa đúng những chỗ mà hình học thuần tuý không chữa nổi.
+\end{tomtat}
+
+Năm phần trước dạy học sâu như một môn học. Phần này dùng nó như một hộp công cụ, cho một hệ thống cụ thể đã tồn tại và đang đau ở những chỗ cụ thể.
+
+Cách đặt vấn đề vì thế đảo ngược so với phần lớn tài liệu về chủ đề này. Tài liệu thường bắt đầu từ phương pháp rồi đi tìm chỗ dùng. Ở đây ta bắt đầu từ bốn thất bại có thật của một hệ stereo-inertial đã tinh chỉnh kỹ --- \textbf{chuyển động nhanh}, \textbf{ảnh mờ do chuyển động}, \textbf{đóng vòng không nổ}, và \textbf{đặt trọng số cho IMU} --- rồi hỏi ngược lại xem có công trình nào thật sự chạm tới chúng.
+
+Câu trả lời trung thực là: có, nhưng ít hơn nhiều so với ấn tượng mà số lượng paper tạo ra. Rất nhiều kết quả ấn tượng trong phần này đến từ chuỗi ngắn, cảnh trong nhà, và máy để bàn có GPU rời. Một hệ chạy trên Jetson Orin, ngoài trời, thời gian thực, với ngân sách vài chục mili-giây mỗi khung, sống trong một thế giới khác. Chương~27 dựng khung để phân biệt hai thế giới đó trước khi đọc bất cứ chương nào sau.
+
+Một lưu ý về giọng của phần này. Nó phê phán nhiều hơn năm phần trước, và điều đó là cố ý. Với một người chưa có hệ thống, học sâu là con đường nhanh nhất để có một hệ chạy được. Với một người đã có một hệ chạy tốt, phần lớn phương pháp trong đây là một cuộc đánh đổi đắt: đổi tính chẩn đoán được, tính lặp lại và ngân sách tính toán lấy một cải thiện chỉ hiện ra trên một số cảnh. Biết trước điều đó không làm ta bỏ lỡ cơ hội; nó làm ta tiêu đúng ba tháng vào đúng một ý tưởng thay vì rải mỏng vào tám ý tưởng.
+\subfile{00-map}
+\subfile{27-dat-hoc-sau-vao-dau/dat-hoc-sau-vao-dau}
+\subfile{28-dac-trung-va-ghep-cap/dac-trung-va-ghep-cap}
+\subfile{29-dinh-vi-lai-va-dong-vong/dinh-vi-lai-va-dong-vong}
+\subfile{30-do-sau-dong-quang-va-mo-hinh-nen/do-sau-dong-quang-va-mo-hinh-nen}
+\subfile{31-backend-kha-vi-va-dau-cuoi/backend-kha-vi-va-dau-cuoi}
+\subfile{32-ban-do-neural/ban-do-neural}
+\subfile{33-ngu-nghia-va-do-thi-canh/ngu-nghia-va-do-thi-canh}
+\subfile{34-imu-bat-dinh-va-trien-khai/imu-bat-dinh-va-trien-khai}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

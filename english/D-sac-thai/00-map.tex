@@ -1,0 +1,54 @@
+% ============================================================================
+%  D/00-map.tex — bản đồ phần D
+%  Ngày tạo: 2026-09-07 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../english.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ phần D --- Sắc thái}
+
+\begin{tomtat}
+Ba chương, ba lớp sắc thái, và chúng độc lập hơn các phần khác --- đọc theo thứ tự nào cũng được. Nhưng nếu chọn một chương để đọc kỹ, hãy chọn chương 17: kết hợp từ là thứ cho hiệu quả rõ nhất trên cả đọc lẫn viết, và cũng là thứ bị bỏ sót nhiều nhất trong cách học truyền thống.
+\end{tomtat}
+
+\subsection*{A. Bảng tra ngược: bạn đang gặp gì \(\rightarrow\) đọc chương nào}
+\begin{center}\footnotesize
+\begin{tabularx}{\linewidth}{@{}L{5.6cm}L{2.0cm}Y@{}}
+\toprule
+\textbf{Tình huống} & \textbf{Chương} & \textbf{Công cụ chính}\\
+\midrule
+Từ điển cho ba từ, không biết chọn cái nào & 16 & Văn vực, bốn chiều sắc thái, tra dữ liệu thật\\
+Câu đúng ngữ pháp mà người bản ngữ nói ``lạ'' & 17 & Kết hợp từ, mẫu câu, học theo cụm\\
+Hiểu từng chữ mà không nắm được cách nghĩ của ngành & 18 & Ẩn dụ nền, khung tư duy, ẩn dụ chết\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection*{B. Vì sao chia như vậy}
+Ba chương này ứng với ba mức mà nghĩa được quyết định ngoài phạm vi định nghĩa từ điển. Ở mức \emph{từ}, nghĩa được quyết bởi các từ khác mà người nói đã \emph{không} chọn --- đó là văn vực và sắc thái. Ở mức \emph{tổ hợp}, nghĩa và tính tự nhiên được quyết bởi thói quen kết hợp của cộng đồng, không bởi logic. Ở mức \emph{hệ khái niệm}, cách một ngành ẩn dụ hoá đối tượng của nó quyết định câu hỏi nào được coi là hợp lý.
+
+Cách chia này khác với cách chia thông thường của sách từ vựng --- theo chủ đề (kinh tế, môi trường, giáo dục) --- và khác có chủ ý. Chia theo chủ đề cho bạn danh sách từ; chia theo \emph{cơ chế} cho bạn cách tự xử lý mọi từ mới bạn gặp về sau.
+
+\subsection*{C. Phụ thuộc và thứ tự đọc}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.58cm and 1.0cm,
+  m/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=2.9cm},
+  o/.style={draw=accent,fill=amberbg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=2.9cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  ard/.style={-{Latex[length=2.2mm]},draw=tiercol,thick,dashed},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.4cm}]
+\node[m] (a2) {\ptr{A/01}--\ptr{A/02}\\ nghĩa nằm ở cách dùng};
+\node[m,right=of a2] (c16) {\textbf{16.} Gần nghĩa và văn vực};
+\node[o,right=of c16] (c17) {\textbf{17.} Kết hợp từ};
+\node[m,below=1.0cm of c17] (c18) {\textbf{18.} Ẩn dụ và khung tư duy};
+\draw[ar] (a2) -- (c16);
+\draw[ar] (c16) -- node[lb,above=0pt] {từ \(\rightarrow\) tổ hợp} (c17);
+\draw[ard] (c17) -- node[lb,right=0pt] {tổ hợp \(\rightarrow\) hệ khái niệm} (c18);
+\draw[ard] (a2.south) .. controls +(0,-1.1) and +(-1.0,0) .. (c18.west);
+\end{tikzpicture}
+\caption{Ba mức mà nghĩa được quyết định ngoài định nghĩa từ điển: từ, tổ hợp, và hệ khái niệm. Chương 17 tô hổ phách vì nó cho hiệu quả rõ nhất trên cả đọc lẫn viết.}
+\label{fig:map-D-en}
+\end{figure}
+
+\subsection*{D. Cốt lõi hay tham khảo}
+\textbf{Cốt lõi:} bốn chiều sắc thái và cách tra bằng dữ liệu thật ở chương 16; toàn bộ chương 17; và mục về ẩn dụ trong chính ngành bạn ở chương 18. \textbf{Tham khảo:} phần phân loại chi tiết các kiểu kết hợp từ ở chương 17 và phần lý thuyết về ẩn dụ ý niệm ở chương 18 --- đọc để biết cơ chế, rồi quay lại khi cần.
+\end{document}

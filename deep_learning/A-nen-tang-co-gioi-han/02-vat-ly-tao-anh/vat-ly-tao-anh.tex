@@ -1,0 +1,145 @@
+% ============================================================================
+%  A/02-vat-ly-tao-anh — file chương
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: A/01/04. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Vật lý tạo ảnh và mô hình camera (Image Formation Physics and Camera Models)}
+\ptrtarget{A/02}\ptrtarget{A/02-vat-ly-tao-anh}
+\dependency{\ptr{A/01-toan-toi-thieu/04-hinh-hoc-va-tin-hieu}. Cần ba thứ từ đó: toạ độ đồng nhất, \(SE(3)\), và quy tắc lấy mẫu. Đây là chương duy nhất của Phần A có phụ thuộc bắt buộc.}
+
+\begin{tomtat}
+Chương này mở hộp đen giữa thế giới thật và tensor đầu vào: photon và nhiễu, chuỗi xử lý trong máy ảnh, mô hình camera cùng hình học nhiều view, và các cảm biến ngoài RGB. Đọc xong bạn thiết kế được augmentation có cơ sở vật lý thay vì theo cảm tính. Bạn cập nhật đúng ma trận nội tại sau mọi phép biến đổi ảnh. Và khi hiệu năng tụt lúc triển khai, bạn đi ngược đường đi của tín hiệu để tìm nguyên nhân, thay vì thử đổi mô hình. Nếu chỉ nhớ một điều: \emph{phần lớn khoảng cách giữa kết quả thí nghiệm và kết quả triển khai được quyết định trước khi mô hình nhìn thấy dữ liệu}. Đây là phần bị bỏ sót nhiều nhất, và là thứ phân biệt người làm thị giác máy tính với người dùng CNN.
+\end{tomtat}
+
+\begin{nentang}
+\kn{ảnh số}{một mảng số hai chiều (ảnh xám) hoặc ba chiều (ảnh màu, chiều thứ ba là kênh). Giá trị mỗi ô gọi là pixel, và trong ảnh 8 bit thông thường nó nằm trong khoảng 0--255.}
+\kn{photon và phép đếm}{ánh sáng tới cảm biến dưới dạng các hạt rời rạc; giá trị pixel về bản chất là một phép \emph{đếm} số hạt bắt được, nên nó mang sẵn một mức dao động thống kê không loại bỏ được.}
+\kn{ISP (image signal processor)}{chuỗi xử lý bên trong máy ảnh biến số đo thô của cảm biến thành ảnh xem được: nội suy màu, cân bằng trắng, nén dải sáng, khử nhiễu, nén file. Nó được thiết kế cho mắt người chứ không cho mô hình.}
+\kn{RAW so với sRGB}{RAW là số đo gần như thô, tuyến tính theo lượng ánh sáng; sRGB là ảnh đã qua ISP, phi tuyến và phụ thuộc nội dung. Mọi tính toán mang ý nghĩa vật lý chỉ đúng ở miền tuyến tính.}
+\kn{ma trận nội tại \(K\)}{ma trận \(3\times3\) chứa tiêu cự tính bằng pixel và toạ độ tâm ảnh; nó biến một tia trong hệ toạ độ camera thành toạ độ pixel. Nó thuộc về camera, còn tư thế thì thuộc về lần chụp.}
+\kn{tăng cường dữ liệu (data augmentation)}{sinh thêm mẫu huấn luyện bằng cách biến đổi mẫu có sẵn --- lật, xoay, đổi màu, thêm nhiễu --- để dạy mô hình rằng những biến đổi đó không làm đổi nhãn.}
+\kn{domain gap (dịch chuyển miền)}{hiện tượng phân phối dữ liệu lúc triển khai khác phân phối lúc huấn luyện, khiến mô hình tụt hiệu năng dù bản thân mô hình không đổi.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao nhân đôi giá trị pixel trên ảnh sRGB \emph{không} tương đương phơi sáng gấp đôi --- và sai lệch đó lớn cỡ nào?}
+\h{Cùng một cảm biến và cùng một cảnh: vì sao tăng ISO làm ảnh sáng lên mà không làm nó đáng tin hơn chút nào?}
+\h{Bạn resize ảnh còn một nửa trước khi đưa vào mạng, không có exception nào được báo và loss vẫn giảm --- vậy cái gì vừa hỏng?}
+\h{Một mô hình đạt \(95\%\) khi thử nghiệm và \(80\%\) khi triển khai, dù vẫn là ảnh của cùng loại vật thể: phần lớn mười lăm điểm ấy mất ở đâu trên đường đi của tín hiệu?}
+\end{khoigoi}
+
+Đây là phần bị bỏ sót nhiều nhất trong mọi lộ trình học thị giác, và là thứ phân biệt người làm computer vision với người dùng CNN. Lý do bỏ sót thì dễ hiểu: các tập dữ liệu chuẩn phát hành dưới dạng JPEG đã xử lý xong, nên toàn bộ chuỗi vật lý phía trước trở nên vô hình. Nhưng nó không biến mất. Nó trở thành một tập giả định ngầm mà bạn thừa hưởng, không biết mình đang giữ. Và nó xuất hoá đơn đúng lúc bạn mang mô hình ra khỏi phòng thí nghiệm.
+
+Bốn mục của chương xếp theo \emph{đường đi của tín hiệu}, từ photon tới quyết định, và mỗi mục trả lời một câu hỏi mà mục trước để lại:
+
+\begin{itemize}
+\item \textbf{Mục 1 --- ánh sáng và nhiễu:} tín hiệu bắt đầu từ đâu và nó mang sẵn bao nhiêu bất định. Trả lời ``vì sao ảnh thiếu sáng làm mô hình sập, ngoài chuyện tối hơn''.
+\item \textbf{Mục 2 --- ISP và không gian màu:} tín hiệu ấy bị biến đổi thế nào trước khi thành ảnh. Trả lời ``vì sao augmentation trên sRGB không tương đương thao tác vật lý thật''.
+\item \textbf{Mục 3 --- camera và hình học nhiều view:} ánh xạ giữa pixel và thế giới ba chiều. Trả lời ``thông tin nào bị xoá lúc chụp và mua lại bằng cách nào''.
+\item \textbf{Mục 4 --- cảm biến khác và domain gap:} cùng khung phân tích áp cho depth, thermal, event, LiDAR, radar, rồi tổng kết thành luận điểm chung của cả chương.
+\end{itemize}
+
+Thứ tự này nên giữ. Mục 2 dùng mô hình nhiễu của mục 1, còn mục 4 tổng quát hoá cả ba mục trước. Riêng mục 3, với người đã làm SLAM, phần lớn là ôn tập. Ở đó chỉ có hai chỗ đáng đọc kỹ: quy tắc cập nhật \(K\) sau resize và crop, và đoạn nói mô hình học được che giấu các cấu hình suy biến.
+
+\subfile{00-map}
+\subfile{01-anh-sang-va-nhieu/anh-sang-va-nhieu}
+\subfile{02-isp-va-khong-gian-mau/isp-va-khong-gian-mau}
+\subfile{03-camera-va-hinh-hoc-nhieu-view/camera-va-hinh-hoc-nhieu-view}
+\subfile{04-cam-bien-khac-va-domain-gap/cam-bien-khac-va-domain-gap}
+
+\section{Thực hành}
+Chương này khác các chương khác ở chỗ phần lớn nội dung chỉ thật sự vào đầu khi bạn cầm một cái camera thật. Hai bài dưới đây được thiết kế để mỗi bài cho ra một \emph{con số} mà bạn tự đo được, chứ không phải một cảm giác.
+
+\begin{description}
+\item[Repo và SOTA.] \repo{opencv} cho hiệu chuẩn và undistort; \repo{kornia} cho các phép thị giác khả vi (hữu ích khi cần đưa một phép biến đổi hình học vào trong đồ thị tính toán); \repo{rawpy} cùng LibRaw để đọc ảnh RAW; \repo{colour-science} cho chuyển đổi không gian màu đúng chuẩn; \repo{COLMAP} \cite{schoenberger2016colmap} làm bản dựng lại 3D tham chiếu. Về việc gỡ ảnh sRGB ngược về RAW để mô phỏng nhiễu thật, xem dòng \emph{Unprocessing Images for Learned Raw Denoising} \cite{brooks2019unprocessing} và các bản cài đặt lại; về dữ liệu nhiễu thật có cặp ảnh sạch, xem SIDD \cite{abdelhamed2018sidd}. Sách nền: Szeliski \cite{szeliski2022} bản hai miễn phí, và \cite{hartley2004} cho phần hình học nhiều view. \emph{Cảnh báo bán rã:} danh sách này chốt tại tháng 9/2026 và tên các mô hình dẫn đầu bảng sẽ cũ trong 6--12 tháng, trong khi các repo hạ tầng như OpenCV và COLMAP thì bền hơn nhiều.
+\item[Câu hỏi kiểm tra hiểu.] Ba câu, mỗi câu chạm một mục:
+  \begin{itemize}
+  \item Vì sao augmentation ``tăng độ sáng'' trên ảnh sRGB không tương đương tăng phơi sáng thật --- sai ở hệ số bao nhiêu, và sai thế nào về hành vi của nhiễu?
+  \item Nếu train trên JPEG chất lượng 90 và triển khai trên luồng RAW, hỏng ở đâu trước và vì sao?
+  \item Nhiễu shot phụ thuộc tín hiệu --- điều đó phá vỡ giả định nào của mô hình nhiễu Gauss, và hệ quả với việc chọn hàm mất mát cho bài khử nhiễu là gì?
+  \end{itemize}
+\end{description}
+
+
+\begin{onbai}
+\ar[3]{Shot noise}{Dao động không tránh được của một phép đếm photon: phương sai bằng chính kỳ vọng. Hệ quả là tỉ số tín hiệu trên nhiễu chỉ tăng theo \(\sqrt{N}\), nên vùng tối luôn là chỗ mô hình sai trước.}
+\ar[3]{Mô hình nhiễu affine}{\(\operatorname{Var}(I)=aI+b\): phần tỉ lệ với cường độ là nhiễu photon, phần hằng số là nhiễu mạch đọc. Fit được từ vài chục ảnh cảnh tĩnh, nhưng chỉ đúng ở miền tuyến tính.}
+\ar[2]{Dải động}{Tỉ số giữa mức bão hoà của giếng điện tích và sàn nhiễu đọc. Vượt trần thì cháy sáng và mất hẳn thông tin; dưới sàn thì chìm tối nhưng còn cứu được phần nào.}
+\ar[2]{Vì sao tăng ISO không thêm thông tin?}{Vì nó khuếch đại tín hiệu \emph{đã đo} chứ không thu thêm photon, nên nhân cả tín hiệu lẫn nhiễu. Chỉ ở mức rất tối, nơi nhiễu mạch đọc chi phối, nó mới cải thiện được phần nào.}
+\ar[3]{ISP}{Chuỗi xử lý trong máy ảnh biến số đo thô của cảm biến thành ảnh xem được: khử khảm, cân bằng trắng, gamma, ánh xạ tone, nén. Nó phi tuyến, phụ thuộc nội dung, và không khôi phục ngược chính xác được.}
+\ar[3]{Gamma}{Phép nén dải sáng bằng hàm mũ khoảng \(1/2{,}2\), để mã số phân bố đều theo cảm nhận của mắt. Đây là chỗ ảnh mất tính tuyến tính, nên mọi tính toán vật lý phải dừng lại trước bước này.}
+\ar[2]{Khử khảm}{Bước nội suy hai kênh màu còn thiếu tại mỗi pixel, vì cảm biến chỉ đo được một màu mỗi ô. Nó làm nhiễu có tương quan cả về không gian lẫn giữa các kênh, phá giả định nhiễu độc lập từng pixel.}
+\ar[3]{Vì sao augmentation độ sáng phải làm ở miền tuyến tính?}{Vì gamma bẻ cong thang sáng: gấp đôi phơi sáng chỉ làm giá trị sRGB tăng khoảng \(1{,}37\) lần. Nhân thẳng giá trị pixel còn sai cả về nhiễu, vì SNR không đổi trong khi lẽ ra phải tăng \(\sqrt{2}\).}
+\ar[2]{Train trên JPEG, chạy trên luồng ít nén --- hỏng ở đâu trước?}{Ở các bài toán mức thấp như phân đoạn biên hay đếm vật nhỏ, vì mô hình đã quen với vùng phẳng bị lượng tử hoá làm sạch. Phòng vệ rẻ nhất là đưa mức nén thành một tham số augmentation.}
+\ar[3]{Mô hình pinhole}{Toạ độ pixel chỉ phụ thuộc tỉ số giữa toạ độ ngang và độ sâu. Vì thế camera đo tia chứ không đo điểm: độ sâu và thang đo tuyệt đối bị xoá ngay lúc chụp.}
+\ar[3]{Ma trận nội tại}{Ma trận \(K\) cỡ \(3\times3\), chứa tiêu cự tính bằng pixel và toạ độ tâm ảnh; nó biến một tia thành toạ độ pixel. Nó gắn với hệ toạ độ ảnh, nên resize nhân mọi phần tử với hệ số, còn crop chỉ dịch tâm ảnh.}
+\ar[2]{Ràng buộc epipolar}{Một pixel ở ảnh này ứng với cả một đường thẳng ở ảnh kia. Giá trị thực dụng: bài tìm điểm tương ứng co từ tìm kiếm hai chiều xuống một chiều.}
+\ar[2]{Homography}{Ánh xạ \(3\times3\) giữa hai ảnh của cùng một mặt phẳng. Nó chỉ đúng khi cảnh phẳng hoặc camera xoay tại chỗ; áp cho cảnh có độ sâu thật thì cho ra một phép biến đổi sai ở mọi nơi.}
+\ar[2]{Quỹ đạo bị co lại một hệ số không đổi --- nguyên nhân?}{Gần như luôn là quên cập nhật \(K\) sau khi resize hoặc crop ảnh. Phân biệt với lỗi thuật toán: chiếu vài điểm 3D đã biết xuống ảnh đã biến đổi và nhìn xem chúng có rơi đúng chỗ không.}
+\ar[2]{Vì sao một hệ stereo có tầm dùng được rất rõ?}{Vì sai số độ sâu bằng \(Z^2/(fB)\) trên mỗi pixel sai lệch thị sai, tức tăng theo bình phương khoảng cách. Với \(f=500\) và \(B=0{,}1\) m, một pixel là \(0{,}5\) m ở 5 m nhưng \(8\) m ở 20 m.}
+\ar[2]{Event camera}{Cảm biến mà mỗi pixel báo độc lập mỗi khi độ sáng log đổi quá một ngưỡng. Mạnh ở dải động và độ trễ micro giây, nhưng không cho cường độ tuyệt đối và gần như câm trước cảnh tĩnh.}
+\ar[2]{Pixel độ sâu bị thiếu tập trung ở kính và mép vật --- hệ quả?}{Dữ liệu thiếu không ngẫu nhiên mà tương quan với chính thứ cần dự đoán. Cho mạng thêm kênh mặt nạ thiếu là rò rỉ nhãn: nó học ``chỗ nào thiếu thì đó là kính''.}
+\ar[3]{Domain gap}{Khoảng cách giữa phân phối dữ liệu lúc huấn luyện và lúc triển khai. Phần lớn nó sinh ra ở khâu tạo ảnh --- cảnh, quang học, cảm biến, ISP --- tức trước khi kiến trúc kịp có ý kiến.}
+\ar[2]{Vì sao đổi backbone hiếm khi chữa được domain gap?}{Vì kiến trúc là khối cuối cùng của chuỗi, còn nguyên nhân nằm ở bốn khối trước nó. Các thí nghiệm đổi kiến trúc vẫn cho khác biệt nhỏ ngẫu nhiên, đủ để bạn tưởng mình đang tiến bộ.}
+\ar[1]{Vì sao thêm LiDAR chưa chắc làm hệ bền hơn?}{Vì chế độ hỏng có thể tương quan: sương mù dày làm hỏng cả camera lẫn LiDAR. Hợp nhất cảm biến chỉ mua được sự độc lập khi hai cảm biến hỏng vì hai lý do khác nhau.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{OpenCV, COLMAP}{Mô hình pinhole, hiệu chuẩn bàn cờ và hình học nhiều view gần như nguyên vẹn như trình bày ở mục 3}{Hạ tầng; bền hơn nhiều so với tên mô hình dẫn đầu bảng}
+\ud{Dòng khử nhiễu RAW kiểu \emph{Unprocessing}}{Gỡ ISP về miền tuyến tính rồi mô phỏng nhiễu shot và read, đúng mạch của mục 1 và 2}{Kỹ thuật chuẩn để sinh dữ liệu huấn luyện khử nhiễu}
+\ud{Pipeline HDR trên điện thoại}{Ghép nhiều mức phơi sáng để vượt dải động cảm biến --- kèm cái giá là bóng ma chuyển động}{Sản phẩm thật, nhiều hãng; chi tiết cài đặt thì không công bố}
+\ud{MiDaS và họ độ sâu đơn ảnh}{Dự đoán độ sâu tương đối chứ không tuyệt đối, vì phép chiếu đã xoá thang đo}{Thường được dùng làm prior cho các pipeline dựng cảnh}
+\ud{Benchmark robustness kiểu ImageNet-C}{Mô phỏng thô các biến dạng sinh ra ở khâu tạo ảnh, để đo domain gap}{Chỉ là xấp xỉ của hiệu ứng thật; đọc điểm số thận trọng}
+\end{ungdung}
+
+
+\begin{duan}{Từ mô hình nhiễu của một camera thật tới ngưỡng gãy tracking}{một tới hai ngày}
+\dmt nối thẳng vật lý cảm biến với hiệu năng SLAM: đo mô hình nhiễu của một camera thật, áp chính mô hình đó lên một chuỗi EuRoC, rồi tìm mức nhiễu mà tracking bắt đầu gãy --- thay vì chỉ nói ``ảnh tối thì khó hơn''.
+\ddl (i) khoảng ba mươi ảnh chụp cùng một cảnh tĩnh trên chân máy ở ISO 100, 800 và 6400, chụp RAW nếu máy cho phép; (ii) hai chuỗi EuRoC có chân trị ở hai mức khó, ví dụ một chuỗi dễ và một chuỗi có đoạn ảnh mờ.
+\dbc (1) Chọn vài chục vùng phẳng ở các mức sáng khác nhau, đo phương sai theo cường độ và fit \(\operatorname{Var}=aI+b\) cho từng mức ISO; bạn sẽ thấy cả \(a\) lẫn \(b\) tăng theo ISO, và thấy đường fit trên ảnh JPEG không thẳng như trên RAW. (2) Hiệu chuẩn camera bằng bàn cờ, báo cáo sai số tái chiếu, rồi thử bỏ bớt tư thế bàn cờ để thấy hiệu chuẩn cần \emph{đa dạng tư thế} chứ không cần nhiều ảnh. (3) Áp mô hình nhiễu đã fit lên ảnh EuRoC ở bốn mức tương đương ISO. Làm ở miền tuyến tính: gỡ gamma xấp xỉ trước, áp lại sau. Ghi rõ trong báo cáo rằng đây là \emph{xấp xỉ}, vì ảnh EuRoC đã qua xử lý nên không phải RAW thật. (4) Chạy hệ SLAM ba lần cho mỗi mức, ghi số đặc trưng bám được trên mỗi ảnh và ATE bằng \repo{evo}. (5) Vẽ cả hai đại lượng theo mức nhiễu.
+\dxk bạn có một hình duy nhất, trục hoành là mức nhiễu (hoặc ISO tương đương), hai trục tung là số đặc trưng bám được và ATE; trên đó bạn chỉ ra mức nhiễu mà số đặc trưng tụt xuống dưới ngưỡng buộc hệ khởi tạo lại, và ATE nhảy bậc ngay tại đó. Vẽ kèm độ lệch chuẩn của ba lần chạy, để chứng minh bậc nhảy lớn hơn nhiễu của chính harness.
+\dnv \ptr{A/02/01} cho mô hình nhiễu affine và quan hệ \(\mathrm{SNR}=\sqrt{N}\); \ptr{A/02/02} cho lý do bắt buộc phải làm ở miền tuyến tính; \ptr{A/01/03} để trả lời ba lần chạy đã đủ chưa. Đường số điều kiện theo thời gian từ mini project chương 1 dùng được ngay làm biến giải thích cho các đoạn gãy.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì gamma. Ánh sáng thật \(L\to 2L\) chỉ làm giá trị sRGB tăng \(2^{1/2{,}2}\approx 1{,}37\) lần chứ không phải hai lần. Nặng hơn là hành vi nhiễu: phơi sáng thật gấp đôi làm SNR tăng \(\sqrt{2}\), còn nhân giá trị pixel thì SNR không đổi.}
+\tl{Vì ISO khuếch đại tín hiệu \emph{đã đo} chứ không thu thêm photon, nên nó nhân cả tín hiệu lẫn nhiễu với cùng một hệ số. Chỉ ở vùng cực tối, nơi read noise chi phối, nó mới cải thiện được phần nào.}
+\tl{Ma trận nội tại. Tiêu cự và tâm ảnh đều tính bằng pixel nên phải nhân theo hệ số resize; quên thì mọi phép chiếu lệch một hệ số không đổi, và triệu chứng chỉ hiện ra ở cuối chuỗi dưới dạng ``quỹ đạo co lại'' hay ``độ sâu sai một hệ số''.}
+\tl{Phần lớn mất ở khâu tạo ảnh --- cảnh, quang học và chính sách phơi sáng, cảm biến, ISP và nén --- tức là ở bốn trạm nằm trước mô hình. Bằng chứng ủng hộ chiều hướng này khá vững, dù không có một tỉ lệ phổ quát cho mọi bài toán.}
+\end{traloi}
+
+
+\begin{dongian}
+Hãy nghĩ tới cái nhiệt kế điện tử treo trong phòng bạn. Bạn muốn biết phòng nóng bao nhiêu, nhưng thứ đọc được là con số trên màn hình --- và giữa hai thứ đó có cả một chuỗi: cảm biến nằm ở chỗ nào, vỏ máy tự nóng lên bao nhiêu, rồi một chương trình nhỏ làm mượt số đo và làm tròn trước khi hiện lên.
+
+Máy ảnh y hệt vậy, chỉ dài hơn. Nó đếm hạt sáng rơi vào từng ô nhỏ; chỗ tối đếm được ít nên con số nhảy nhót, còn chỗ quá sáng thì tràn và mọi khác biệt bên trong bị xoá sạch, không cách nào lấy lại. Rồi máy tự kéo sáng cho dễ nhìn, bôi mờ những chi tiết nó đoán là không ai để ý, và nén lại cho nhẹ. Cái đến tay bạn không phải một phép đo, mà là một bản đã được biên tập.
+
+Mẹo của chương: muốn làm bất cứ phép tính nào mang ý nghĩa vật lý --- giả lập trời tối hơn, thêm hạt nhiễu --- thì phải gỡ ngược bản biên tập về gần số đo gốc, làm ở đó, rồi dựng lại.
+
+Cái giá: gỡ ngược chỉ là gần đúng, phần đã bị xoá thì mất hẳn, và mỗi hãng máy biên tập một kiểu.
+
+\chuadongian{câu ``phần lớn khoảng cách giữa phòng thí nghiệm và thực tế sinh ra ở khâu chụp ảnh'' nghe gọn nhưng không quy được thành một tỉ lệ chung: nó đổi theo từng bài toán, và ai đưa ra một con số phần trăm cho mọi trường hợp là đang nói quá.}
+\motcau{Ảnh không phải một phép đo mà là một bản đã biên tập, nên phần lớn khoảng cách giữa thí nghiệm và thực tế đã được quyết định xong trước khi mô hình kịp nhìn thấy gì.}
+\end{dongian}
+
+\section{Kết nối}
+Chương này khép lại Phần A và mở ra ba hướng. Hướng gần nhất là Phần B. Ở đó, các ràng buộc vật lý vừa nêu được nhìn lại như \emph{ràng buộc thiết kế}: dải động của cảm biến, độ trễ do thời gian phơi sáng, và khác biệt giữa các hãng camera. Chúng đứng cạnh ràng buộc về nhãn và về tính toán. Và chính chúng loại bỏ phần lớn phương án, trước khi độ chính xác kịp lên tiếng. Hướng thứ hai là \code{C}, nơi hình học nhiều view của mục 3 trở thành bước khởi tạo bắt buộc cho gần như mọi phương pháp dựng cảnh học được. Hướng thứ ba là \code{E}: luận điểm domain gap ở mục 4 biến thành một kỷ luật đo đạc cụ thể --- tách kết quả theo nhóm điều kiện thay vì báo một con số trung bình.
+
+\subsection*{Tổng kết chương}
+Chương này đã đi hết đường đi của tín hiệu và, ở mỗi trạm, chỉ ra một giả định bị phá vỡ. Ở cảm biến, phép đếm photon làm nhiễu phụ thuộc tín hiệu. Tỉ số tín hiệu trên nhiễu vì thế chỉ tăng theo căn của lượng ánh sáng. Mọi kỹ thuật ``làm sáng ảnh'' chỉ khuếch đại, không thêm thông tin. Ở ISP, mỗi tầng phá một giả định khác nhau. Gamma phá tính tuyến tính. Khử khảm phá tính độc lập của nhiễu giữa các pixel. Ánh xạ tone cục bộ phá giả định độ sáng không đổi, còn nén JPEG xoá tần số cao. Vì vậy mọi phép mô phỏng vật lý phải làm ở miền tuyến tính, rồi mới dựng ảnh lại. Ở camera, phép chiếu xoá độ sâu, và \(K\) gắn với hệ toạ độ pixel. Mỗi phép biến đổi ảnh vì thế đòi một phép cập nhật \(K\) tương ứng. Quên thì không có lỗi nào được báo. Ở các cảm biến khác, mỗi loại mang một tập giả định riêng và một kiểu mù riêng, nên hợp nhất cảm biến là bài toán quyết định tin ai chứ không phải phép cộng.
+
+Điểm gộp của cả bốn mục là luận điểm về domain gap: khoảng cách giữa phòng thí nghiệm và thực tế được ấn định phần lớn ở những trạm nói trên, tức là \emph{trước} khi kiến trúc kịp có ý kiến. Luận điểm này có bằng chứng ủng hộ vững về chiều hướng, dù không có con số phổ quát; và hệ quả thực hành của nó rất cụ thể --- khi hiệu năng tụt lúc triển khai, hãy đi ngược đường đi của tín hiệu trước khi chạm vào mô hình.
+
+Còn bỏ ngỏ ba nhánh, và bỏ ngỏ có chủ ý. Thứ nhất là quang học ở mức thiết kế ống kính. Thứ hai là xử lý ảnh cổ điển ở mức thuật toán chi tiết. Thứ ba là toàn bộ phần thuật toán 3D hiện đại --- dựng lại cảnh, biểu diễn ngầm, hợp nhất đa cảm biến --- vốn thuộc \code{C}. Nhánh nên đọc tiếp là Phần B, nơi các ràng buộc vật lý ở đây được nhìn lại như một dạng ràng buộc thiết kế, cạnh các ràng buộc về dữ liệu, tính toán và độ trễ.
+\begin{tukiem}
+\item Mục 1 nói kéo dài phơi sáng là cách duy nhất thật sự thêm thông tin, còn mục 3 cần đặc trưng sắc nét để tam giác hoá. Với một robot đang di chuyển, hai đòi hỏi đó xung đột ở đâu, và bạn phân xử bằng đại lượng nào?
+\item Bạn muốn sinh dữ liệu ``chạy đêm'' từ một tập ảnh sRGB chụp ban ngày. Chuỗi thao tác đúng đi qua những trạm nào của mục 1 và mục 2, và trạm nào trong chuỗi đó không đảo ngược được, khiến phép mô phỏng chỉ còn là xấp xỉ?
+\item Hãy kể ba lỗi im lặng --- mỗi mục 2, 3 và 4 một lỗi --- tức lỗi không sinh exception và không làm loss huấn luyện xấu đi. Với mỗi lỗi, phép kiểm nào bắt được nó trước khi triển khai?
+\item Vùng cháy sáng ở mục 1 và pixel thiếu dữ liệu của camera độ sâu ở mục 4 đều là mất dữ liệu \emph{không} ngẫu nhiên. Điểm chung về mặt thống kê là gì, và vì sao cùng một cách xử lý lại không dùng được cho cả hai?
+\item Random resize crop gần như vô hại với bài phân loại nhưng làm hỏng nhãn của một mạng dự đoán độ sâu metric. Cơ chế nào gây ra chuyện đó, và sửa thế nào mà vẫn giữ được phép augmentation?
+\item Luận điểm gộp của chương là phần lớn domain gap sinh ra trước khi mô hình nhìn thấy dữ liệu. Bạn thiết kế thí nghiệm nào có thể \emph{bác bỏ} luận điểm đó, và kết quả nào sẽ đủ để bác bỏ?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

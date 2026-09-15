@@ -1,0 +1,61 @@
+% 99-chua-biet.tex — sổ những điều chưa biết, bản LaTeX để gộp vào PDF master.
+% Nội dung nguồn: 99-chua-biet.md (sửa ở đó trước, rồi đồng bộ sang đây).
+% Ngày tạo: 2026-09-13 | Sửa gần nhất: 2026-09-13
+\documentclass[vslam.tex]{subfiles}
+\begin{document}
+\chapter*{Sổ những điều chưa biết}
+\addcontentsline{toc}{chapter}{Sổ những điều chưa biết}
+\markboth{SỔ NHỮNG ĐIỀU CHƯA BIẾT}{}
+
+\begin{tomtat}
+Đây là danh sách công việc học tập của cây, mô phỏng quyển \emph{``Notebook of things I don't know about''} mà Feynman mở khi làm nghiên cứu sinh ở Princeton. Mỗi mục là một \textbf{câu hỏi cụ thể} mà tôi biết là mình chưa trả lời được, chứ không phải một chủ đề chung chung. Nếu chỉ nhớ một điều: sổ này chỉ có giá trị khi được \emph{thu ngắn dần} --- mục nào giải quyết xong thì chuyển thành một đoạn trong bài chính và ghi ngày.
+\end{tomtat}
+
+Bản đầy đủ và được cập nhật thường xuyên nằm ở tệp \code{99-chua-biet.md} tại gốc cây; bản dưới đây là ảnh chụp tại ngày lập, giữ trong PDF để người đọc bản in cũng thấy cây này còn nợ những gì. Khi hai bản lệch nhau thì bản \code{.md} là bản đúng.
+
+Điều đáng nói ngay: mục quan trọng nhất không phải một câu hỏi tri thức mà là một khoản \textbf{nợ kiểm chứng}, và nó đứng trên mọi câu hỏi về nội dung.
+
+\section*{Nợ kiểm chứng}
+
+Toàn bộ \code{refs.bib} được soạn từ trí nhớ về công trình gốc và \emph{chưa} được đối chiếu với trang nhà xuất bản hay arXiv. Theo \code{learning-rules.md} mục~5, như vậy là chưa qua cửa kiểm chứng nào, và một nguồn bịa nằm im trong cây nhiều năm rồi lộ ra đúng lúc cần dựa vào nó là kịch bản tệ nhất.
+
+Ưu tiên đối chiếu theo mức cây dựa vào chúng: \code{hartley2004}, \code{triggs2000ba} và \code{barfoot2017} là nền của cả Phần~A; \code{civera2008inversedepth} chống đỡ lập luận nghịch đảo độ sâu dùng lại ở ba chương; \code{sattler2019understanding} và \code{pittaluga2019revealing} là hai khẳng định mạnh về mặt kết luận nên phải kiểm kỹ nhất. Mỗi entry sau khi đối chiếu cần được dán lại mức tin A/B/C \emph{sau khi} đã đọc được ít nhất abstract gốc; mức tin hiện tại là phán đoán chưa đối chiếu.
+
+Hai khoản nợ khác cùng loại. \emph{Chưa có bài nền tảng nào được đọc tới lượt ba} theo phương pháp Keshav --- ít nhất \code{triggs2000ba} và một trong hai sách nền phải qua lượt ba trước khi coi Phần~A là hoàn chỉnh. Và \emph{chưa có thư mục \code{code/} nào}: mọi công thức được đánh dấu ``cửa (b)'' trong header các chương đều là tính tay, chưa có script chạy được; ưu tiên là Jacobian ở \ptr{A/03}, phần bù Schur ở \ptr{A/04}, và quan hệ \(\sigma_z\) ở \ptr{A/06}.
+
+\section*{Câu hỏi về nguyên lý và toán học}
+
+Công thức Rodrigues có kỳ dị \(0/0\) khi góc tiến về không, và mọi thư viện chuyển sang khai triển Taylor dưới một ngưỡng --- nhưng ngưỡng ấy đặt ở đâu thì đúng, và sai số số học ở lân cận ngưỡng lớn cỡ nào? Mini project ở \ptr{A/03} đo được con số này. Liên quan: nhiễu loạn trái và phải cho cùng cực tiểu với bài toán trơn và bước nhỏ, nhưng với LM damping mạnh trên bài toán không lồi, hai quy ước có thể đi hai đường và rơi vào hai cực tiểu địa phương khác nhau; tôi chưa kiểm và chưa tìm được nguồn khẳng định. Còn một khoản nợ suy dẫn: \ptr{A/03} khẳng định mọi tham số hoá ba số của \(SO(3)\) đều có kỳ dị, đối chiếu được với hai nguồn nhưng tôi \emph{không tự chứng minh được} phần topology.
+
+Hai câu hỏi về tính tách được. Lệch điểm chính \(\Delta c_x\) tương đương xấp xỉ một yaw \(\Delta c_x/f\) theo \ptr{A/02}; nhưng tôi ngờ chúng tách được \emph{một phần} khi chuyển động đủ đa dạng, vì lệch điểm chính gắn với vị trí trong ảnh còn yaw thì không --- làm rõ điều này cần một phân tích observability cụ thể. Và ngưỡng parallax ở \ptr{B/10} được dẫn từ hình học tam giác nhỏ, bỏ qua ảnh hưởng của \emph{số lượng} quan sát và bỏ qua phân bố lệch ở \ptr{A/06}; một công thức đúng hơn nên tính từ ma trận thông tin đầy đủ.
+
+\section*{Câu hỏi về observability và bất định}
+
+Câu hỏi cụ thể nhất và dễ kiểm nhất: thành phần của \(\mathbf{p}_{\text{cam}}^{\text{imu}}\) song song với trục quay có quan sát được \emph{yếu} không? \ptr{C/14} nêu rằng ngoài số hạng \(\boldsymbol{\omega}\times\mathbf{p}\) còn có \(\dot{\boldsymbol{\omega}}\times\mathbf{p}\), và số hạng sau đưa vào một cơ chế quan sát khác nếu tốc độ góc \emph{thay đổi}. Phát biểu chặt hơn phải là: với \(\boldsymbol{\omega}\) hằng quanh một trục thì không quan sát được; với \(\boldsymbol{\omega}\) biến thiên thì có thể quan sát được yếu. Mini project ở \ptr{C/14} đo được điều này chỉ bằng cách thêm một quỹ đạo.
+
+Câu hỏi lớn hơn và quan trọng hơn: \emph{SLAM hiện đại quá tự tin tới mức nào?} Bệnh được thiết lập cho EKF-SLAM; với các hệ tối ưu hoá hiện đại tôi \emph{suy ra} từ bốn cơ chế ở \ptr{A/06} rằng nó vẫn còn, nhưng không có số liệu về mức độ. Một khảo sát ANEES trên nhiều hệ và nhiều bộ dữ liệu là thí nghiệm đáng làm mà tôi không biết ai đã làm --- và nó cũng chính là phép kiểm cho hướng số hai ở \ptr{D/22}. Hai câu hỏi định lượng cùng nhóm: bao nhiêu phần trăm cạnh sai thì GNC sụp (\ptr{B/11} đo được), và marginalization trong cửa sổ trượt tối ưu hoá gây bất nhất tới mức nào so với trong bộ lọc.
+
+\section*{Câu hỏi về phương pháp và triển khai}
+
+Mệnh đề rủi ro cao nhất trong cả cây nằm ở \ptr{D/20}: vòng lặp \emph{nhiệt \(\rightarrow\) trôi ống kính \(\rightarrow\) trôi hiệu chuẩn}. Tôi suy ra nó từ \ptr{A/02} và \ptr{C/14}, \emph{không có số liệu đo và không dẫn được nguồn nào đã đo nó một cách hệ thống}. Phép kiểm rẻ và nên làm sớm: ghi nhiệt độ vỏ máy cùng tham số hiệu chuẩn trực tuyến trên một thiết bị thật trong vài giờ, xem chúng có tương quan không. Nếu không, phải rút mệnh đề.
+
+Ba mệnh đề khác cùng loại, đều dễ kiểm và đều chưa kiểm. \emph{Direct suy giảm nặng hơn indirect với vật động} (\ptr{D/19}) --- chạy cả hai họ trên cùng chuỗi với vật động chiếm các tỉ lệ diện tích khác nhau. \emph{Số inlier không tương quan với sai số tư thế} (\ptr{A/01}, \ptr{B/10}) --- đo tương quan trên một tập đủ lớn gồm cả cấu hình suy biến, so với parallax trung vị. \emph{Dạng căn bậc hai đáng dùng} (\ptr{B/09}) --- lợi ích có thể không đo được khi số điều kiện nhỏ, và ngưỡng chưa biết. Cuối cùng, một con số mà tôi không biết ai đã công bố cho môi trường thật: \emph{tốc độ lão hoá của bản đồ}, tức tỉ lệ landmark từ phiên đầu còn sống sau nhiều phiên (\ptr{C/13} đo được).
+
+\section*{Câu hỏi về học máy}
+
+Mục có rủi ro sai cao nhất trong \ptr{C/17}: khẳng định rằng \emph{bất định học được là chỗ trống}. Nó dựa trên ấn tượng từ việc đọc rải rác, không phải một khảo sát --- và tôi đã ghi rõ điều đó trong chương. Làm khảo sát cho nó là việc cần làm \emph{trước} khi dùng \ptr{D/22} hướng hai và hướng năm để chọn đề tài. Hai câu hỏi phụ: mức độ nghiêm trọng của việc mạng nơ-ron không được hiệu chuẩn xác suất, trong ngữ cảnh SLAM cụ thể (tôi không dẫn được nguồn cho điều này); và kết luận về APR ở \ptr{B/12} có còn đúng với các kiến trúc sau 2019 không.
+
+\section*{Câu hỏi nối sang nhánh khác}
+
+Cây \code{../IMU\_Fusion/} có một dự án thực nghiệm thật ở \code{../imu\_initialization/} trên một chuỗi EuRoC. Những con số đó nói gì về \ptr{B/10}, và có chỗ nào hai cây phát biểu khác nhau không? Có dữ liệu thật trong tay mà chưa đối chiếu với bài tổng quan là một dạng tự lừa mình rẻ tiền và dễ tránh --- nên đây là việc nên làm sớm.
+
+Cây \code{../marker/} làm ngân sách sai số pixel sang tư thế ở mức milimet. Các quan hệ ở \ptr{A/06} có nhất quán với ngân sách ở đó không? Nếu hai cây cho hai con số khác nhau cho cùng một đại lượng thì ít nhất một cây sai. Và một việc chưa làm: \ptr{B/11} nói công nghiệp giải bài toán môi trường lặp lại bằng cách dán marker, còn \code{../marker/} cho cái giá của giải pháp ấy; ghép hai phía thành một phân tích đánh đổi đầy đủ.
+
+\section*{Khoản nợ ở mức cây}
+
+Ba điều. Thứ nhất, \ptr{D/22} chưa đạt chuẩn \code{research-rules.md} và nói rõ điều đó; trước khi dùng nó để chọn đề tài thật, hướng đã chọn phải được nâng lên thành một dự án \code{survey/} đúng chuẩn.
+
+Thứ hai, cả cây \emph{chưa có con số thực nghiệm nào do tôi đo}. Điều này là có chủ ý và được ghi ở \ptr{00-map}, nhưng nó nghĩa là mọi khẳng định định lượng đều thuộc một trong ba loại: dẫn nguồn, tính tay từ ví dụ tự đặt, hoặc đánh dấu \emph{``tôi suy ra, chưa đối chiếu nguồn''}. Danh sách các mệnh đề loại thứ ba nằm rải trong mục ``Điều gì chứng minh cách hiểu này sai'' của từng chương; gom chúng thành một danh sách duy nhất là việc nên làm.
+
+Thứ ba, phần hết hạn nhanh gồm \ptr{C/16} mục~4, toàn bộ \ptr{C/17} và toàn bộ \ptr{E/23}. Cả ba chốt tại tháng 9/2026. \textbf{Rà lại tháng 3/2027.}
+\end{document}

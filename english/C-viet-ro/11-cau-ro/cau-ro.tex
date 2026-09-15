@@ -1,0 +1,238 @@
+% ============================================================================
+%  C/11-cau-ro — file chương
+%  Ngày tạo: 2026-09-07 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+%  Dependency: A/03, B/06. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../english.tex]{subfiles}
+\begin{document}
+\chapter{Câu rõ: ai làm gì (Clear Sentences)}
+\ptrtarget{C/11}\ptrtarget{C/11-cau-ro}
+\dependency{\ptr{A/03} cho bộ khung ngữ pháp tối thiểu; \ptr{B/06} vì bạn đọc lập luận của người khác rõ hơn thì viết lập luận của mình cũng rõ hơn.}
+
+\begin{tomtat}
+Chương này chỉ có một nguyên tắc, nhưng nó giải thích phần lớn các câu khó đọc: người đọc hiểu nhanh nhất khi \emph{chủ thể của hành động} là chủ ngữ ngữ pháp và \emph{hành động} là động từ. Mọi tật viết nặng --- danh từ hoá, bị động không cần thiết, chuỗi giới từ, chủ ngữ dài lê thê --- đều là các cách khác nhau để vi phạm nguyên tắc đó. Nội dung gồm: chẩn đoán câu bằng câu hỏi ``ai làm gì''; năm phép sửa cụ thể; khi nào bị động là \emph{đúng} chứ không sai; và vì sao độ dài câu không phải thủ phạm như người ta tưởng. Nếu chỉ nhớ một điều: đừng hỏi ``câu này có sai ngữ pháp không'', hãy hỏi ``ai đang làm gì trong câu này, và hai thứ đó có ở đúng vị trí không''.
+\end{tomtat}
+
+\begin{nentang}
+\kn{chủ thể}{người hoặc vật thực hiện hành động trong ý nghĩa của câu --- không nhất thiết là chủ ngữ ngữ pháp.}
+\kn{hành động}{việc đang diễn ra --- không nhất thiết được diễn đạt bằng động từ.}
+\kn{danh từ hoá}{biến động từ hoặc tính từ thành danh từ: \emph{decide} \(\rightarrow\) \emph{decision}, \emph{fail} \(\rightarrow\) \emph{failure}, \emph{accurate} \(\rightarrow\) \emph{accuracy}.}
+\kn{động từ rỗng}{động từ không mang hành động thật, chỉ đỡ cho một danh từ hoá: \emph{make}, \emph{perform}, \emph{conduct}, \emph{carry out}, \emph{provide}.}
+\kn{chủ ngữ nặng}{chủ ngữ dài nhiều từ khiến người đọc phải giữ trong đầu quá lâu trước khi gặp động từ.}
+\kn{giọng bị động}{cấu trúc đưa đối tượng lên vị trí chủ ngữ: \emph{the data were collected}. Không sai; chỉ sai khi dùng nhầm chỗ.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao câu \emph{The implementation of the optimisation resulted in an improvement in accuracy} khó đọc, dù không sai ngữ pháp một chữ nào?}
+\h{Có phải câu dài là câu khó đọc? Nếu không thì cái gì mới thật sự làm câu khó?}
+\h{Bị động có phải luôn nên tránh trong viết khoa học không?}
+\h{Làm sao phát hiện danh từ hoá trong bài của chính mình một cách máy móc, không cần cảm giác ngôn ngữ?}
+\h{Vì sao người viết không phải bản ngữ lại đặc biệt hay viết nặng, dù ngữ pháp của họ có thể rất chắc?}
+\end{khoigoi}
+
+Hãy bắt đầu bằng câu ở câu hỏi mở đầu thứ nhất. \emph{The implementation of the optimisation resulted in an improvement in accuracy.} Mười ba từ, ngữ pháp hoàn hảo, và bạn hiểu được --- nhưng phải mất một nhịp. Bây giờ hãy so với: \emph{Optimising the loop improved accuracy by 3\%.} Sáu từ, và bạn hiểu ngay.
+
+Khác biệt không nằm ở độ dài, cũng không nằm ở độ khó của từ --- \emph{implementation} và \emph{optimisation} là những từ mà bất kỳ ai đọc tài liệu kỹ thuật đều biết. Khác biệt nằm ở chỗ: trong câu thứ nhất, hành động thật (\emph{implement}, \emph{optimise}, \emph{improve}) đều bị nhốt trong danh từ, còn động từ duy nhất --- \emph{resulted in} --- không mang hành động nào cả. Người đọc phải tự dịch ngược ba lần trước khi hiểu ai làm gì.
+
+Đây là nguyên tắc trung tâm trong truyền thống của Williams\cite{williams2016}, và nó đủ mạnh để đáng nhắc lại: \textbf{đặt chủ thể vào chủ ngữ, đặt hành động vào động từ}.
+
+\section{Chẩn đoán: hỏi ``ai làm gì''}
+
+Quy trình chẩn đoán gồm ba bước, và làm được một cách máy móc.
+
+\emph{Bước một: tìm hành động thật trong câu.} Không nhìn động từ mà nhìn \emph{ý}. Trong câu ví dụ, các hành động là cài đặt, tối ưu, cải thiện --- cả ba nằm trong danh từ.
+
+\emph{Bước hai: tìm chủ thể của mỗi hành động.} Ai cài đặt? Chúng tôi. Cái gì cải thiện? Việc tối ưu.
+
+\emph{Bước ba: viết lại sao cho chủ thể là chủ ngữ và hành động là động từ.} \emph{We implemented the optimisation, which improved accuracy by 3\%.} Hoặc gọn hơn: \emph{Optimising the loop improved accuracy by 3\%.}
+
+\begin{capdoi}[Chẩn đoán và sửa]
+\truoc{The implementation of the optimisation resulted in an improvement in accuracy.}
+\sau{Optimising the loop improved accuracy by 3\%.}
+\vico{Ba hành động bị nhốt trong danh từ; động từ \emph{resulted in} rỗng. Sửa: một hành động chính lên làm động từ.}
+\truoc{An evaluation of the performance of the system was carried out.}
+\sau{We evaluated the system.}
+\vico{\emph{Carry out} là động từ rỗng đỡ cho danh từ hoá \emph{evaluation}; bị động lại giấu mất chủ thể.}
+\truoc{There is a dependence of the accuracy on the calibration quality.}
+\sau{Accuracy depends on calibration quality.}
+\vico{\emph{There is} + danh từ hoá là một khuôn nặng rất phổ biến; động từ thật đang nằm trong \emph{dependence}.}
+\truoc{The failure of the tracker occurred due to the presence of motion blur.}
+\sau{The tracker failed because the image was blurred.}
+\vico{Hai danh từ hoá (\emph{failure}, \emph{presence}) và một từ nối cồng kềnh (\emph{due to}) thay cho \emph{because}.}
+\end{capdoi}
+
+\section{Năm phép sửa}
+
+Năm phép dưới đây phủ gần hết các câu nặng trong văn kỹ thuật.
+
+\emph{Phép một --- gỡ danh từ hoá.} Tìm các danh từ kết thúc bằng \emph{-tion}, \emph{-ment}, \emph{-ance}, \emph{-ence}, \emph{-ity}, \emph{-ness}, \emph{-al} và hỏi: đây có phải một hành động đội lốt danh từ không? Nếu có, trả nó về động từ. Đây cũng là câu trả lời cho câu hỏi mở đầu thứ tư: bạn không cần cảm giác ngôn ngữ, chỉ cần tìm các hậu tố đó (\ptr{A/04} đã cho danh sách).
+
+\emph{Phép hai --- bỏ động từ rỗng.} \emph{Make an assumption} \(\rightarrow\) \emph{assume}. \emph{Perform a comparison} \(\rightarrow\) \emph{compare}. \emph{Provide an explanation} \(\rightarrow\) \emph{explain}. \emph{Conduct an analysis} \(\rightarrow\) \emph{analyse}.
+
+\emph{Phép ba --- rút ngắn chủ ngữ.} Nếu chủ ngữ dài quá bảy tám từ, người đọc phải giữ nó trong bộ nhớ làm việc trước khi biết câu nói gì. Cách sửa thường là tách thành hai câu, hoặc chuyển phần dài xuống sau động từ.
+
+\emph{Phép bốn --- đưa động từ lên sớm.} Liên quan tới phép ba nhưng khác: đôi khi chủ ngữ ngắn mà giữa chủ ngữ và động từ lại chen một mệnh đề dài. Người đọc chờ động từ; đừng bắt họ chờ lâu.
+
+\emph{Phép năm --- thay từ nối cồng kềnh bằng từ nối ngắn.} \emph{Due to the fact that} \(\rightarrow\) \emph{because}. \emph{In order to} \(\rightarrow\) \emph{to}. \emph{With respect to} \(\rightarrow\) \emph{about} hoặc \emph{for}. \emph{In the event that} \(\rightarrow\) \emph{if}.
+
+\begin{mauau}[Động từ rỗng và bản gọn]
+\mc{make an assumption}{assume}{Một động từ thay hai từ}
+\mc{perform a comparison of}{compare}{Kèm bỏ luôn giới từ}
+\mc{conduct an analysis of}{analyse}{}
+\mc{provide an explanation for}{explain}{}
+\mc{give consideration to}{consider}{}
+\mc{result in an improvement in}{improve}{Cả cụm chỉ để nói một động từ}
+\mc{is dependent upon}{depends on}{Tính từ hoá thay vì động từ}
+\mc{due to the fact that}{because}{Bốn từ thừa}
+\end{mauau}
+
+\begin{cambay}
+Đừng biến quy tắc này thành một cuộc săn lùng mọi từ đuôi \emph{-tion}. Nhiều danh từ hoá là \emph{đúng} và cần thiết: khi khái niệm đó chính là chủ đề bạn đang bàn (\emph{optimisation is NP-hard}), khi nó là thuật ngữ đã ổn định trong ngành (\ptr{B/10}), hoặc khi nó nối câu này với câu trước bằng cách gói lại ý vừa nói --- vai trò mà \ptr{C/12} sẽ nói kỹ. Quy tắc là: danh từ hoá xấu khi nó \emph{giấu hành động chính của câu}, không xấu khi nó \emph{là} chủ đề.
+\end{cambay}
+
+\section{Độ dài không phải thủ phạm}
+
+Câu hỏi mở đầu thứ hai chạm vào một lời khuyên phổ biến mà sai: ``viết câu ngắn''. Lời khuyên đó có tác dụng phụ tốt --- câu ngắn thì khó nhồi ba danh từ hoá --- nhưng nó chẩn đoán sai nguyên nhân.
+
+Một câu ba mươi từ có thể rất dễ đọc nếu nó là một chuỗi \emph{chủ thể--hành động} nối tiếp nhau. Một câu mười hai từ có thể rất khó nếu nó nhốt ba hành động vào danh từ. Cái làm câu khó là số lượng \emph{việc chưa hoàn tất} mà người đọc phải giữ trong đầu: một chủ ngữ đang chờ động từ, một danh từ hoá đang chờ được dịch ngược, một đại từ đang chờ biết trỏ vào đâu.
+
+Vì vậy lời khuyên chính xác hơn là: \emph{đừng bắt người đọc giữ nhiều thứ dở dang cùng lúc}. Câu ngắn chỉ là một cách thô để đạt điều đó.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[
+  bar/.style={draw=steel,fill=bluebg,minimum height=0.52cm,inner sep=3pt,font=\footnotesize,align=center},
+  barbad/.style={bar,draw=reddark,fill=redbg},
+  lbl/.style={font=\scriptsize\itshape,color=tiercol,align=left}]
+\node[barbad,text width=10.2cm] (a) {\textbf{Nặng:} \emph{The\ implementation\ of\ the\ optimisation}\ \ \(\Big|\)\ \ resulted in\ \ \(\Big|\)\ \ \emph{an improvement in accuracy}};
+\node[lbl,below=0.10cm of a.south west,anchor=north west,text width=10.2cm] (al) {chủ ngữ nặng (5 từ, 2 danh từ hoá) \(\rightarrow\) động từ rỗng \(\rightarrow\) danh từ hoá thứ ba. Người đọc giữ 3 việc dở dang.};
+\node[bar,text width=10.2cm,below=0.75cm of a] (b) {\textbf{Rõ:} \emph{Optimising the loop}\ \ \(\Big|\)\ \ \textbf{improved}\ \ \(\Big|\)\ \ \emph{accuracy by 3\%}};
+\node[lbl,below=0.10cm of b.south west,anchor=north west,text width=10.2cm] {chủ thể (3 từ) \(\rightarrow\) hành động thật \(\rightarrow\) kết quả cụ thể. 0 việc dở dang.};
+\end{tikzpicture}
+\caption{Cùng một ý, hai cách sắp. Cái làm câu trên khó không phải độ dài mà là số việc người đọc phải giữ dở dang trước khi gặp hành động thật.}
+\label{fig:cau-ro-tai}
+\end{figure}
+
+\section{Khi nào bị động là đúng}
+
+Câu hỏi mở đầu thứ ba đụng vào một lời khuyên khác bị hiểu quá đà. Bị động không sai; nó là một công cụ để \emph{chọn cái gì đứng đầu câu}. Bốn trường hợp bị động là lựa chọn đúng:
+
+\emph{Khi chủ thể không quan trọng hoặc không biết.} \emph{The samples were stored at 4\textdegree C.} Ai bỏ vào tủ lạnh không phải điều người đọc cần.
+
+\emph{Khi chủ thể quá hiển nhiên.} Trong phần phương pháp, \emph{we} lặp lại ba chục lần thành nhiễu.
+
+\emph{Khi bạn cần đối tượng đứng đầu câu để nối với câu trước.} Đây là lý do quan trọng nhất và là cầu sang \ptr{C/12}: đầu câu là chỗ dành cho thông tin \emph{đã biết}. Nếu câu trước vừa nói về \emph{the residual}, thì \emph{the residual was then minimised} nối mạch tốt hơn \emph{we then minimised the residual}.
+
+\emph{Khi bạn cố ý không nêu tác nhân.} Có lúc chính đáng, có lúc là né tránh --- \ptr{B/08} đã nói về mặt tối này khi đọc; khi viết, hãy tự hỏi mình đang làm cái nào.
+
+\begin{cannho}
+Bị động không phải kẻ thù. Kẻ thù là bị động \emph{cộng} danh từ hoá \emph{cộng} động từ rỗng --- ba thứ này thường đi cùng nhau và cùng nhau xoá sạch dấu vết của ai làm gì: \emph{An evaluation of the performance was carried out}. Sửa một thứ thôi cũng đã đỡ; sửa cả ba thì câu trở lại bình thường: \emph{We evaluated the system}.
+\end{cannho}
+
+\section{Vì sao người không bản ngữ hay viết nặng}
+
+Câu hỏi mở đầu thứ năm đáng trả lời riêng vì hiểu nguyên nhân thì sửa dễ hơn nhiều. Có ba nguyên nhân, và không cái nào là ``tiếng Anh kém''.
+
+\emph{Nguyên nhân một --- bắt chước bề mặt.} Bạn học viết bằng cách đọc bài báo đã xuất bản, và nhiều bài trong số đó viết nặng. Bạn kết luận rằng nặng \emph{là} phong cách khoa học. Thực ra nó là tật lan truyền: mỗi thế hệ bắt chước thế hệ trước.
+
+\emph{Nguyên nhân hai --- an toàn.} Danh từ hoá và bị động cho phép bạn không phải quyết định ai làm gì. Khi chưa chắc chắn về tiếng Anh, người viết chọn cấu trúc mơ hồ vì nó khó sai --- nhưng cái giá là người đọc phải làm việc thay bạn.
+
+\emph{Nguyên nhân ba --- dịch từ tiếng mẹ đẻ.} Nhiều ngôn ngữ, kể cả tiếng Việt trong văn phong hành chính và học thuật, có xu hướng danh từ hoá mạnh --- và bản thân văn học thuật tiếng Anh cũng vậy, như các so sánh thể loại dựa trên ngữ liệu cho thấy\cite{biber1999}: ``việc triển khai giải pháp đã dẫn đến sự cải thiện về độ chính xác''. Nếu bạn nghĩ bằng tiếng Việt hành chính rồi dịch, bạn sẽ ra đúng câu nặng ở đầu chương.
+
+Nguyên nhân ba gợi một bài tập hiệu quả bất ngờ: viết ý bằng tiếng Việt \emph{nói} --- như đang giải thích cho đồng nghiệp qua điện thoại --- rồi mới dịch. Tiếng Việt nói tự nhiên dùng động từ; câu tiếng Anh dịch ra sẽ nhẹ hơn nhiều.
+
+\section{Gốc rễ: vì sao văn khoa học lại nặng}
+
+Văn khoa học tiếng Anh không phải lúc nào cũng nặng như bây giờ. Các bài báo khoa học thế kỷ 17 và 18 được viết ở ngôi thứ nhất, kể lại thí nghiệm như một câu chuyện: tôi lấy cái này, tôi làm thế kia, tôi thấy thế này. Chúng dễ đọc một cách đáng ngạc nhiên với người hiện đại.
+
+Sự chuyển dịch sang văn phi cá nhân, nhiều danh từ hoá và nhiều bị động diễn ra dần trong thế kỷ 19 và 20, và có mấy động lực. Thứ nhất là quan niệm về tính khách quan: nếu kết quả đúng bất kể ai làm, thì người làm nên biến mất khỏi câu --- một lập luận nghe hợp lý nhưng dẫn tới việc xoá cả những chỗ mà \emph{ai quyết định} thật sự quan trọng. Thứ hai là chuyên môn hoá: khi mỗi ngành phát triển hệ khái niệm riêng, những khái niệm đó phải được đặt tên, và đặt tên nghĩa là danh từ hoá --- lần này là chính đáng. Thứ ba là hiệu ứng bắt chước đã nói ở mục 5.
+
+Phản ứng ngược bắt đầu từ khoảng giữa thế kỷ 20 và mạnh dần\cite{zinsser2006,pinker2014}. Phong trào ngôn ngữ đơn giản trong hành chính và pháp lý ở Anh và Mỹ tấn công cùng một tập tật viết, với lập luận rất thực dụng: văn bản khó hiểu gây chi phí thật --- sai sót, khiếu nại, kiện tụng. Trong viết học thuật, hai công trình định hình cách dạy hiện nay: Williams đặt trọng tâm ở chủ thể và hành động\cite{williams2016}, còn Gopen và Swan\cite{gopenswan1990} chuyển câu hỏi từ ``câu này viết thế nào'' sang ``người đọc chờ gì ở vị trí nào'' --- ý tưởng mà \ptr{C/12} khai thác trọn vẹn.
+
+Điều đáng chú ý là cả hai truyền thống đều \emph{không} khuyên viết đơn giản hoá nội dung. Chúng khuyên đặt nội dung phức tạp vào cấu trúc câu đơn giản. Đó là hai việc rất khác nhau, và lẫn lộn chúng là lý do nhiều người phản đối lời khuyên ``viết rõ'' --- họ tưởng bị bảo phải làm nghèo ý.
+
+\begin{gocre}
+\gr{Thế kỷ 17--18 --- văn khoa học kể chuyện}{Báo cáo thí nghiệm cho một cộng đồng nhỏ.}{Ngôi thứ nhất, động từ hành động, dễ đọc.}
+\gr{Thế kỷ 19--20 --- văn phi cá nhân}{Quan niệm khách quan: kết quả đúng bất kể ai làm.}{Bị động và danh từ hoá thành mặc định; tác nhân biến mất kể cả ở chỗ cần.}
+\gr{Chuyên môn hoá ngành}{Khái niệm mới cần tên gọi.}{Danh từ hoá chính đáng --- và là lý do quy tắc ở mục 2 phải có ngoại lệ.}
+\gr{Giữa thế kỷ 20 --- ngôn ngữ đơn giản}{Văn bản hành chính, pháp lý khó hiểu gây chi phí thật.}{Chuẩn viết rõ trong hành chính; cùng một tập tật viết bị chỉ ra.}
+\gr{1990 --- Gopen \& Swan\cite{gopenswan1990}}{Vì sao văn khoa học khó đọc dù đúng ngữ pháp?}{Đổi câu hỏi: từ cách viết sang \emph{kỳ vọng của người đọc theo vị trí} --- nền cho \ptr{C/12}.}
+\gr{Williams\cite{williams2016}}{Dạy viết rõ mà không dạy thuộc lòng luật.}{Nguyên tắc chủ thể--hành động: một nguyên tắc giải thích nhiều tật.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Lập trình}{Đặt tên hàm và biến}{Cùng nguyên tắc: hàm nên là động từ (\emph{computeResidual}), dữ liệu nên là danh từ. Mã khó đọc thường vi phạm đúng kiểu này --- hành động nhốt trong tên danh từ.}
+\lh{Tâm lý học nhận thức}{Bộ nhớ làm việc có hạn}{Giải thích ở mục 3: câu khó vì số việc dở dang, không vì độ dài. Cùng lý do khiến mã lồng sâu khó đọc.}
+\lh{Thiết kế giao diện}{Đừng bắt người dùng nhớ}{Cùng triết lý: chuyển gánh nặng từ người dùng sang người thiết kế. Câu rõ là giao diện tốt cho ý tưởng.}
+\lh{Tiếng Việt hành chính}{Văn phong ``việc\ldots, sự\ldots''}{Nguyên nhân ba ở mục 5. Nhận ra tật này trong tiếng Việt giúp bạn không dịch nó sang tiếng Anh.}
+\lh{Luật và hành chính}{Phong trào ngôn ngữ đơn giản}{Cùng tập tật viết, cùng cách sửa, nhưng động cơ là chi phí pháp lý --- cho thấy vấn đề không riêng gì khoa học.}
+\lh{Toán học}{Ký hiệu tốt và ký hiệu xấu}{Cùng ý: ký hiệu tốt giảm tải nhận thức chứ không làm nội dung dễ hơn. Viết rõ cũng không làm ý đơn giản đi.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Vì cả ba hành động thật --- cài đặt, tối ưu, cải thiện --- đều bị nhốt trong danh từ (\emph{implementation}, \emph{optimisation}, \emph{improvement}), còn động từ duy nhất \emph{resulted in} không mang hành động nào. Người đọc phải dịch ngược ba lần mới biết ai làm gì. Sửa bằng cách đưa một hành động chính lên làm động từ: \emph{Optimising the loop improved accuracy by 3\%}.}
+\tl{Không. Cái làm câu khó là số \emph{việc dở dang} người đọc phải giữ trong đầu: chủ ngữ đang chờ động từ, danh từ hoá đang chờ dịch ngược, đại từ chưa biết trỏ vào đâu. Một câu ba mươi từ theo chuỗi chủ thể--hành động vẫn dễ; một câu mười hai từ với ba danh từ hoá thì khó. Lời khuyên ``viết câu ngắn'' có tác dụng phụ tốt nhưng chẩn đoán sai nguyên nhân.}
+\tl{Không. Bị động là công cụ chọn cái gì đứng đầu câu, và có bốn trường hợp nó đúng: chủ thể không quan trọng hoặc không biết; chủ thể quá hiển nhiên (\emph{we} lặp ba chục lần trong phần phương pháp); cần đối tượng đứng đầu để nối với câu trước --- lý do quan trọng nhất, xem \ptr{C/12}; và khi cố ý không nêu tác nhân. Kẻ thù thật là bị động cộng danh từ hoá cộng động từ rỗng đi chung.}
+\tl{Máy móc theo hậu tố: quét bài tìm các danh từ kết thúc bằng \emph{-tion}, \emph{-ment}, \emph{-ance}, \emph{-ence}, \emph{-ity}, \emph{-ness}, \emph{-al}, và các động từ rỗng \emph{make}, \emph{perform}, \emph{conduct}, \emph{carry out}, \emph{provide}, \emph{give}. Với mỗi chỗ tìm được, hỏi: đây có phải hành động chính của câu đang đội lốt danh từ không? Nếu phải thì trả về động từ; nếu nó là chủ đề đang bàn hoặc là thuật ngữ ngành thì giữ nguyên.}
+\tl{Ba nguyên nhân, không cái nào là tiếng Anh kém. Bắt chước bề mặt của các bài đã xuất bản, vốn cũng viết nặng. An toàn: cấu trúc mơ hồ cho phép không phải quyết định ai làm gì, nên khó sai --- nhưng người đọc trả giá. Và dịch từ tiếng mẹ đẻ: văn phong hành chính, học thuật tiếng Việt danh từ hoá rất mạnh (``việc triển khai\ldots dẫn đến sự cải thiện\ldots''). Cách chữa cho nguyên nhân ba: nghĩ ý bằng tiếng Việt \emph{nói} rồi mới dịch.}
+\end{traloi}
+
+\begin{dongian}
+Có một mẹo sửa văn tiếng Anh mà chỉ cần nhớ một câu: \emph{ai làm gì?}
+
+Thử với câu này: \emph{The implementation of the optimisation resulted in an improvement in accuracy.} Ngữ pháp không sai chữ nào, mà đọc vẫn mệt. Vì sao? Vì các hành động thật --- làm, tối ưu, cải thiện --- đều bị biến thành danh từ, còn động từ duy nhất trong câu (\emph{resulted in}) chẳng làm gì cả. Người đọc phải tự gỡ ba lần.
+
+Viết lại cho hành động trở về làm động từ: \emph{Optimising the loop improved accuracy by 3\%}. Ngắn hơn một nửa và hiểu ngay lập tức.
+
+Cách phát hiện rất máy móc, không cần cảm giác ngôn ngữ. Quét bài tìm các từ đuôi \emph{-tion}, \emph{-ment}, \emph{-ance}, \emph{-ity}. Mỗi lần gặp, hỏi: cái này có phải là việc \emph{đang xảy ra} trong câu không? Nếu phải, trả nó về động từ. Cũng quét luôn các cụm \emph{make an assumption}, \emph{perform a comparison}, \emph{conduct an analysis} --- mỗi cụm đó đều có một động từ ngắn gọn thay thế: \emph{assume}, \emph{compare}, \emph{analyse}.
+
+Một điều nên bỏ: lời khuyên ``viết câu ngắn''. Nó không sai hẳn nhưng chỉ đúng tình cờ. Câu dài vẫn dễ đọc nếu nó đi thẳng từ người làm tới việc làm. Câu ngắn vẫn khó nếu nó giấu hành động trong danh từ. Thứ làm người đọc mệt là phải giữ nhiều thứ dang dở trong đầu, không phải số từ.
+
+Và một điều nên biết để bớt tự trách: người Việt viết tiếng Anh hay bị nặng không phải vì tiếng Anh kém. Phần lớn là do dịch từ văn phong hành chính tiếng Việt --- ``việc triển khai giải pháp đã dẫn đến sự cải thiện''. Cách chữa: nghĩ ý như đang giải thích cho đồng nghiệp qua điện thoại, rồi mới dịch.
+\motcau{Chủ thể vào chủ ngữ, hành động vào động từ.}
+\chuadongian{Ranh giới giữa danh từ hoá xấu và thuật ngữ chính đáng đòi bạn biết ngành --- không có luật máy móc nào thay được.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Nguyên tắc trung tâm}{Chủ thể của hành động làm chủ ngữ; hành động làm động từ.}
+\ar[3]{Ba bước chẩn đoán}{Tìm hành động thật \(\rightarrow\) tìm chủ thể của nó \(\rightarrow\) viết lại cho hai thứ về đúng chỗ.}
+\ar[3]{Danh từ hoá}{Động từ hoặc tính từ biến thành danh từ; nhận ra qua hậu tố \emph{-tion}, \emph{-ment}, \emph{-ance}, \emph{-ence}, \emph{-ity}, \emph{-ness}.}
+\ar[3]{Động từ rỗng}{\emph{make}, \emph{perform}, \emph{conduct}, \emph{carry out}, \emph{provide}, \emph{give} --- chúng chỉ đỡ cho một danh từ hoá.}
+\ar[3]{Năm phép sửa}{Gỡ danh từ hoá; bỏ động từ rỗng; rút ngắn chủ ngữ; đưa động từ lên sớm; thay từ nối cồng kềnh.}
+\ar[2]{Vì sao câu khó}{Số việc dở dang người đọc phải giữ, không phải độ dài câu.}
+\ar[2]{Khi nào danh từ hoá là đúng}{Khi nó là chủ đề đang bàn, là thuật ngữ ngành, hoặc dùng để nối với câu trước.}
+\ar[2]{Bốn trường hợp bị động đúng}{Chủ thể không quan trọng; chủ thể hiển nhiên; cần đối tượng đứng đầu để nối mạch; cố ý không nêu tác nhân.}
+\ar[2]{Bộ ba gây hại}{Bị động \(+\) danh từ hoá \(+\) động từ rỗng đi cùng nhau xoá sạch dấu vết ai làm gì.}
+\ar[2]{Ba nguyên nhân viết nặng}{Bắt chước bề mặt; chọn cấu trúc mơ hồ cho an toàn; dịch từ văn phong hành chính tiếng mẹ đẻ.}
+\ar[1]{Cách chữa cho nguyên nhân dịch}{Nghĩ ý bằng tiếng Việt \emph{nói} như giải thích qua điện thoại, rồi mới dịch.}
+\ar[1]{Viết rõ không phải làm nghèo ý}{Đặt nội dung phức tạp vào cấu trúc câu đơn giản --- hai việc khác nhau.}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Tôi đọc bài của các giáo sư đầu ngành và họ viết rất nặng. Vậy quy tắc này có đúng không?}{Đúng, và bài của họ vẫn được đọc vì \emph{nội dung} chứ không nhờ văn phong. Hãy để ý một chuyện: những bài được trích dẫn nhiều và được nhắc lại trong các bài giảng thường là những bài viết rõ hơn mức trung bình của ngành. Ngoài ra, một tác giả đã có tên tuổi trả giá ít hơn cho văn khó đọc so với một người mới; người đọc cố gắng nhiều hơn với bài của họ. Bạn thì chưa có khoản tín dụng đó.}
+\qa{Dùng \emph{we} trong bài báo có bị coi là thiếu chuyên nghiệp không?}{Không, và điều này đã thay đổi rõ trong vài thập niên qua. Nhiều tạp chí và hội nghị lớn hiện khuyến khích ngôi thứ nhất số nhiều ở những chỗ nói về \emph{lựa chọn của tác giả}: \emph{we chose}, \emph{we assume}, \emph{we show}. Chỗ nên tránh \emph{we} là khi mô tả các thao tác thường quy mà ai làm cũng vậy. Nếu không chắc, hãy xem vài bài gần đây ở đúng nơi bạn định gửi --- quy ước là của cộng đồng đó chứ không phải luật chung.}
+\qa{Có công cụ nào tự phát hiện câu nặng không?}{Có nhiều công cụ đếm độ dài câu và tỉ lệ bị động, và chúng bắt được các trường hợp thô. Nhưng chúng không phân biệt được danh từ hoá xấu với thuật ngữ chính đáng, và cũng không biết ý chính của câu là gì --- hai việc mà mục 2 nói là cốt lõi. Dùng chúng như một máy quét thô để chọn câu cần xem lại, rồi tự áp câu hỏi ``ai làm gì''. Về việc dùng mô hình ngôn ngữ cho việc này, xem \ptr{E/20}.}
+\qa{Viết rõ có làm bài của tôi nghe kém học thuật đi không?}{Đây là nỗi lo phổ biến nhất và nó dựa trên một nhầm lẫn: giữa \emph{nội dung} phức tạp và \emph{câu} phức tạp. Bài của bạn nghe học thuật nhờ khái niệm chính xác, số liệu, và lập luận chặt --- những thứ mà văn rõ làm nổi bật chứ không xoá đi. Điều thật sự xảy ra khi bạn viết rõ là chỗ yếu trong lập luận trở nên lộ. Đó là lý do một số người vô thức thích văn nặng --- một luận điểm được trình bày thẳng thắn ở \cite{sword2012}.}
+\qa{Tôi nên sửa câu ngay khi viết hay viết xong rồi sửa?}{Viết xong rồi sửa. Cố viết đúng ngay ở bản nháp đầu làm chậm và thường khiến bạn mất mạch ý. Cách hiệu quả là tách hai việc: bản nháp lo \emph{nói được ý}, lượt sửa lo \emph{nói cho rõ}. \ptr{C/15} nói kỹ về quy trình này, và mục 2 của chương này chính là danh sách kiểm cho lượt sửa cấp câu.}
+\qa{Trong tiếng Việt tôi cũng nên áp dụng quy tắc này chứ?}{Có, và tác dụng còn rõ hơn vì văn phong hành chính tiếng Việt danh từ hoá rất mạnh. ``Việc triển khai giải pháp đã dẫn đến sự cải thiện về độ chính xác'' so với ``Tối ưu vòng lặp giúp độ chính xác tăng 3\%''. Luyện trong tiếng Việt có lợi kép: bạn viết tiếng Việt tốt hơn, và bạn không còn mang cấu trúc nặng đó sang tiếng Anh khi dịch.}
+\qa{Câu của tôi ngắn và có động từ thật rồi mà người đọc vẫn kêu khó theo. Vì sao?}{Rất có thể vấn đề không nằm ở cấp câu nữa mà ở cấp \emph{nối câu}: từng câu rõ nhưng thứ tự thông tin giữa các câu làm người đọc mất mạch. Đó chính là nội dung \ptr{C/12}. Dấu hiệu điển hình: mỗi câu đều bắt đầu bằng một thông tin mới toanh, khiến người đọc không thấy chúng liên quan gì tới nhau.}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Lấy một đoạn 5 câu bạn đã viết, gạch dưới mọi danh từ hoá và động từ rỗng}{Bài viết của bạn}{Chưa sửa, chỉ đếm; ghi lại con số để so sau.}
+\bt[1]{Viết lại 10 cụm động từ rỗng trong bảng ở mục 2 thành động từ đơn}{Mục 2}{Làm không nhìn đáp án, rồi đối chiếu.}
+\bt[2]{Sửa đoạn 5 câu ở bài 1 theo ba bước chẩn đoán}{Bài viết của bạn}{Đếm lại số từ trước và sau; mục tiêu giảm 20--30\% mà không mất ý.}
+\bt[2]{Tìm 5 câu bị động trong một bài báo và phân loại theo bốn trường hợp ở mục 4}{Bài báo ngành}{Câu nào không thuộc trường hợp nào thì thử viết lại chủ động.}
+\bt[2]{Viết một đoạn tiếng Việt \emph{nói} giải thích kết quả của bạn, rồi dịch sang tiếng Anh}{Bài viết của bạn}{So với bản tiếng Anh bạn viết trực tiếp; bản dịch thường nhẹ hơn.}
+\bt[3]{Lấy phần tóm tắt của một bài báo và viết lại toàn bộ theo nguyên tắc chủ thể--hành động}{Bài báo ngành}{Giữ nguyên nội dung và số liệu; chỉ đổi cấu trúc câu.}
+\bt[3]{Trong bốn tuần, mỗi tuần đo tỉ lệ danh từ hoá trên 100 từ trong bài của bạn}{Bài viết của bạn}{Chỉ số tiến bộ khách quan; kỳ vọng giảm dần rồi ổn định.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Chương này cho một nguyên tắc và năm phép sửa ở cấp câu, cùng hai điều chỉnh quan trọng với các lời khuyên phổ biến: độ dài không phải thủ phạm, và bị động không phải kẻ thù.
+
+Nhưng câu rõ chưa đủ. Bạn có thể viết mười câu, mỗi câu đều theo đúng chủ thể--hành động, mà đoạn văn vẫn rời rạc --- vì cái quyết định mạch không nằm trong từng câu mà nằm ở \emph{thứ tự thông tin giữa các câu}. Chương \ptr{C/12} xử lý đúng chỗ đó, và nó dựa trên một quan sát bất ngờ: người đọc gán nghĩa cho câu dựa vào \emph{vị trí} nhiều hơn bạn tưởng --- đầu câu là chỗ nối với cái đã biết, cuối câu là chỗ nhấn cái mới.
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

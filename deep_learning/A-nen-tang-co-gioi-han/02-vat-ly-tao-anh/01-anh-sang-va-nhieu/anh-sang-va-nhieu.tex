@@ -1,0 +1,141 @@
+% ============================================================================
+%  A/02-vat-ly-tao-anh/01-anh-sang-va-nhieu
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: A/01/03 (phương sai), A/01/04 (lấy mẫu). Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Ánh sáng, cảm biến và mô hình nhiễu (Light, Sensors and Noise Models)}
+\ptrtarget{A/02-vat-ly-tao-anh/01}\ptrtarget{A/02-vat-ly-tao-anh/01-anh-sang-va-nhieu}\ptrtarget{A/02/01}\ptrtarget{A/02/01-anh-sang-va-nhieu}
+\dependency{\ptr{A/01-toan-toi-thieu/03-xac-suat-va-thong-tin} (kỳ vọng, phương sai --- ở đây dùng cho một biến đếm Poisson); \ptr{A/01/04-hinh-hoc-va-tin-hieu} nếu muốn hiểu vì sao khử nhiễu và giảm mẫu tương tác với nhau.}
+
+\begin{tomtat}
+Mục này truy nguyên chuỗi nhân quả từ số photon rơi vào cảm biến tới lúc mô hình mất độ chính xác, và cho bạn một mô hình nhiễu định lượng dùng được: phương sai affine theo cường độ. Đọc xong bạn giải thích được vì sao ảnh thiếu sáng phá mô hình theo cách mà nhiễu Gauss thêm vào ảnh sRGB không mô phỏng nổi. Bạn cũng biết khi nào tăng ISO là vô ích, và vùng cháy sáng khác vùng chìm tối ở chỗ nào. Nếu chỉ nhớ một điều: \emph{nhiễu ảnh phụ thuộc tín hiệu}. Tỉ số tín hiệu trên nhiễu chỉ tăng theo \(\sqrt{N}\), với \(N\) là số photon. Mọi kỹ thuật ``làm sáng ảnh'' vì thế chỉ khuếch đại; chỉ thu thêm ánh sáng thật mới thêm thông tin.
+\end{tomtat}
+
+\begin{nentang}
+\kn{photon và electron}{photon là hạt ánh sáng; cảm biến ảnh biến mỗi photon bắt được thành một electron tích trong một ``giếng'' ứng với một pixel, rồi đếm số electron đó. Vì vậy giá trị pixel về bản chất là một \emph{phép đếm}.}
+\kn{phơi sáng (exposure)}{tổng lượng ánh sáng mà cảm biến thu được trong một lần chụp; nó do thời gian mở cửa trập và độ mở của ống kính quyết định.}
+\kn{ISO}{mức khuếch đại áp lên tín hiệu \emph{sau khi} đã đo. Tăng ISO làm ảnh sáng lên nhưng không làm cảm biến thu thêm ánh sáng.}
+\kn{tỉ số tín hiệu trên nhiễu (SNR)}{tỉ số giữa độ lớn của tín hiệu thật và độ lớn trung bình của nhiễu. SNR càng nhỏ thì càng khó phân biệt chi tiết thật với nhiễu.}
+\kn{phân phối Poisson}{phân phối của một phép đếm các sự kiện độc lập xảy ra với tốc độ trung bình cố định. Tính chất định nghĩa của nó là phương sai bằng kỳ vọng --- đếm được trung bình \(N\) thì dao động cỡ \(\sqrt{N}\).}
+\kn{ISP (image signal processor)}{chuỗi xử lý bên trong máy ảnh biến số đo thô của cảm biến thành ảnh xem được: nội suy màu, cân bằng trắng, nén dải sáng, khử nhiễu, nén file.}
+\kn{RAW so với sRGB}{RAW là số đo gần như thô của cảm biến, còn tuyến tính theo ánh sáng; sRGB là ảnh đã qua ISP, phi tuyến, đã bị chỉnh cho hợp mắt người. Mọi tính toán vật lý chỉ đúng trên RAW.}
+\kn{track trong SLAM}{trạng thái hệ thống còn bám được vào bản đồ và ước lượng được tư thế camera. ``Mất track'' nghĩa là không tìm đủ điểm khớp giữa ảnh hiện tại và bản đồ.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Có một câu hỏi mà hầu hết người làm deep learning cho thị giác không trả lời được, dù nó quyết định phần lớn thất bại thực tế: \emph{ảnh thiếu sáng khác ảnh đủ sáng ở chỗ nào, ngoài chuyện tối hơn?} Câu trả lời phổ biến --- ``nó nhiễu hơn'' --- đúng nhưng nông tới mức vô dụng, vì nó gợi ý một cách sửa sai: thêm nhiễu Gauss vào tập huấn luyện. Cách sửa đó gần như không giúp gì, và lý do nằm ở vật lý của phép đếm photon.
+
+Với người đã cài SLAM, đây là mảnh còn thiếu của một trải nghiệm quen thuộc. Bạn đã thấy hệ thống chạy hoàn hảo ban ngày và mất \en{track} ngay khi trời tối, và đã quy nó cho ``ít feature''. Đúng, nhưng chưa đủ: ít feature chỉ là triệu chứng cuối của một chuỗi bắt đầu từ số photon rơi vào mỗi giếng điện tích trong khoảng phơi sáng. Mục này đi ngược chuỗi đó tới tận gốc, vì gốc mới là chỗ can thiệp được.
+
+\textbf{Học xong mục này thì làm được gì mà trước đó không làm được?} Đo và fit mô hình nhiễu của một camera cụ thể bằng vài chục tấm ảnh; quyết định đúng giữa ``tăng thời gian phơi sáng'' và ``tăng ISO'' cho một robot đang chạy; và thiết kế \vn{tăng cường dữ liệu}{data augmentation} mô phỏng điều kiện thiếu sáng theo cách có cơ sở vật lý thay vì theo cảm tính.
+
+\begin{trucgiac}
+Cảm biến là một lưới xô hứng mưa, mở nắp trong đúng một khoảng thời gian. Số giọt rơi vào một cái xô là biến ngẫu nhiên: cùng cơn mưa, cùng khoảng thời gian, hai cái xô cạnh nhau vẫn đếm ra hai số khác nhau --- và độ dao động ấy là tính chất của mưa, không phải khuyết tật của xô. Đó là \en{shot noise}, và không cảm biến nào loại bỏ được. Tăng ISO không phải hứng thêm mưa; nó là đổi sang thước đo có vạch to hơn, để cái xô gần cạn cũng đọc ra một con số. Con số ấy vẫn dựa trên đúng vài giọt đã hứng, nên không đáng tin hơn chút nào.
+\end{trucgiac}
+
+\subsection{B. Ba núm điều khiển ánh sáng, và chỉ hai núm thêm thông tin}
+Lượng ánh sáng tới cảm biến được điều khiển bởi ba núm, nhưng chúng \emph{không} tương đương nhau --- đây là điểm bị hiểu sai nhiều nhất.
+
+\begin{table}[H]\centering\small
+\caption{Ba núm điều khiển phơi sáng. Cột ``thêm photon?'' là cột phân biệt bản chất; cột cuối quyết định lựa chọn trên robot.}
+\label{tab:phoi-sang}
+\begin{tabularx}{\linewidth}{@{}L{2.5cm}L{1.9cm}YL{4.2cm}@{}}
+\toprule
+\textbf{Núm} & \textbf{Thêm photon?} & \textbf{Cơ chế} & \textbf{Hỏng khi nào}\\
+\midrule
+Thời gian phơi sáng & \textbf{Có} & Mở cửa trập lâu hơn, thu nhiều photon hơn theo tỉ lệ tuyến tính & Vật chuyển động hoặc camera rung \(\Rightarrow\) nhoè; với robot di động đây thường là cái giá đắt hơn nhiễu\\
+Khẩu độ & \textbf{Có} & Mở rộng lỗ thu sáng & Giảm độ sâu trường ảnh nên vật ngoài mặt phẳng lấy nét bị mờ; nhiều camera nhúng có khẩu cố định\\
+ISO (khuếch đại) & \textbf{Không} & Nhân tín hiệu đã đo lên trước hoặc trong khi số hoá & Không thêm thông tin --- ảnh sáng lên và nhiễu sáng lên cùng hệ số; chỉ có ích khi read noise đang chi phối\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
+\lk{B/03}{cùng nguyên lý với}{độ khó không biến mất mà bị đẩy đi chỗ khác: giảm nhiễu bằng phơi sáng lâu thì trả giá bằng ảnh mờ do chuyển động}
+Chuỗi đánh đổi này giải thích vì sao ảnh ban đêm từ một robot di động luôn tệ theo \emph{hai} chiều cùng lúc: vừa nhiễu vừa nhoè. Nó cũng giải thích vì sao mô phỏng chỉ một trong hai chiều là không đủ để mô hình chịu được ban đêm thật.
+
+\subsection{C. Hai nguồn nhiễu, và chế độ nào đang chi phối}
+Số photon thu được trong một khoảng thời gian tuân theo phân phối Poisson, mà tính chất định nghĩa của Poisson là phương sai bằng kỳ vọng. Nếu trung bình một điểm ảnh thu \(N\) photon thì độ lệch chuẩn là \(\sqrt{N}\), nên
+\[
+\mathrm{SNR} \;=\; \frac{N}{\sqrt{N}} \;=\; \sqrt{N}.
+\]
+Nói bằng lời: \emph{muốn ảnh sạch gấp đôi thì phải thu gấp bốn lần ánh sáng} --- một quan hệ lợi ích giảm dần đặt trần cứng lên mọi thứ phía sau. Ví dụ tính tay: điểm thu \(10\,000\) photon có SNR bằng 100; điểm thu 100 photon có SNR bằng 10. Chênh một trăm lần về ánh sáng chỉ đổi lấy mười lần về SNR. Đó là lý do vùng bóng đổ luôn là chỗ mô hình sai trước tiên, ngay trong một tấm ảnh mà mắt người thấy là ``đủ sáng''.
+
+Nguồn thứ hai, \en{read noise}, đến từ mạch đọc và bộ chuyển đổi tương tự sang số. Nó gần như độc lập với mức tín hiệu, nên mô hình hoá bằng một hằng số cộng vào phương sai. Gộp lại, phương sai đo được ở miền tuyến tính có dạng affine:
+\[
+\operatorname{Var}(I) \;=\; a\,I \;+\; b .
+\]
+Nói bằng lời: \emph{phần tỉ lệ với cường độ là nhiễu photon, phần hằng số là nhiễu của mạch điện}. 
+\lk{A/01}{trường hợp riêng của}{mô hình nhiễu này \emph{là} một giả định phân phối, nên chọn hàm mất mát cho bài khử nhiễu chính là chọn mô hình nhiễu}
+Đây chính là mô hình mà mini project cuối chương yêu cầu bạn fit. Nó khớp rất tốt trên dữ liệu thật: đo được, không phải phỏng đoán.
+
+Hình~\ref{fig:snr-photon} cho thấy hai chế độ và chỗ giao nhau của chúng.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{loglogaxis}[width=0.8\linewidth,height=5.0cm,
+  xlabel={số photon \(N\) (thang log)},ylabel={SNR},
+  domain=1:10000,samples=120,
+  label style={font=\footnotesize},tick label style={font=\scriptsize},
+  legend style={font=\scriptsize,at={(0.02,0.98)},anchor=north west,draw=rulecol}]
+\addplot[inkblue,very thick] {x/sqrt(x+9)};
+\addlegendentry{SNR thật, read noise \(\sigma_r=3\)}
+\addplot[reddark,dashed,thick] {sqrt(x)};
+\addlegendentry{giới hạn thuần shot noise \(\sqrt{N}\)}
+\end{loglogaxis}
+\end{tikzpicture}
+\caption{Hai chế độ nhiễu. Ở mức sáng (bên phải) hai đường trùng nhau: shot noise chi phối, và không cải tiến mạch điện nào giúp được. Ở mức rất tối (bên trái) đường thật tụt hẳn xuống dưới: read noise chi phối, và đây là vùng duy nhất mà cảm biến tốt hơn tạo khác biệt thật --- một khác biệt phần cứng mà không kỹ thuật huấn luyện nào bù được.}
+\label{fig:snr-photon}
+\end{figure}
+
+Kiểm chứng bằng hai phép tính tay với \(\sigma_r = 3\) electron. Ở mức 100 photon, tổng độ lệch chuẩn là \(\sqrt{100+9}\approx 10{,}4\) --- gần như thuần shot noise, tăng ISO chẳng ích gì. Ở mức 4 photon, tổng là \(\sqrt{4+9}\approx 3{,}6\) so với tín hiệu 4, tức SNR khoảng \(1{,}1\): tín hiệu và nhiễu ngang nhau, ảnh chỉ còn là hạt.
+
+\subsection{D. Dải động: thông tin bị xoá vĩnh viễn theo hai kiểu khác nhau}
+\vn{Dải động}{dynamic range} của cảm biến là tỉ số giữa mức bão hoà của giếng điện tích và sàn nhiễu đọc, thường quy ra ``stop'' (mỗi stop là một lần gấp đôi). Cảnh thật thì có dải động lớn hơn nhiều: một hành lang có cửa sổ ban ngày dễ dàng vượt khả năng ghi của cảm biến điện thoại trong một lần phơi sáng. Hệ quả là hai chế độ mất mát \emph{không đối xứng}:
+
+\begin{itemize}
+\item \textbf{Vùng cháy sáng} --- bão hoà ở giá trị lớn nhất, mọi khác biệt bên trong bị xoá hoàn toàn. Không hậu xử lý nào, không mạng nào khôi phục được, vì thông tin không còn ở đó.
+\item \textbf{Vùng chìm tối} --- không bị xoá hẳn nhưng nằm dưới sàn nhiễu; kéo lên được, nhưng kéo lên chỉ khuếch đại nhiễu.
+\end{itemize}
+
+Sự bất đối xứng ấy có một hệ quả thực hành ít người tận dụng: khi phải chọn, \emph{phơi sáng thiếu một chút an toàn hơn phơi sáng thừa}. Nó cũng giải thích vì sao mọi hệ thống thị giác ngoài trời cần điều khiển phơi sáng thông minh hơn quy tắc ``giữ trung bình ảnh ở giữa''. Và vì sao HDR ghép nhiều mức phơi sáng gần như bắt buộc cho xe tự lái. Cái giá của HDR là bóng ma chuyển động khi ghép --- lại một đánh đổi mới.
+
+\begin{mach}[Mạch 1 --- ảnh thiếu sáng phá mô hình theo đúng thứ tự này]
+\item \vd{ít photon.} \hq SNR tụt theo \(\sqrt{N}\), nên vùng tối gần như chỉ còn nhiễu. \gd cảm biến hoạt động đúng --- đây là giới hạn vật lý, không phải lỗi kỹ thuật.
+\item \vd{ảnh quá tối để nhìn.} \gp khuếch đại bằng ISO và bằng đường cong tone của ISP. \gia nhiễu được khuếch đại cùng hệ số, và vì đường cong \en{gamma} dốc ở vùng tối, nhiễu ở bóng đổ bị kéo giãn \emph{mạnh hơn} nhiễu ở vùng sáng. \vdm nhiễu vốn đã phụ thuộc tín hiệu, sau bước này còn phụ thuộc theo một cách phi tuyến.
+\item \vd{ảnh nhiễu trông xấu.} \gp ISP bật khử nhiễu mạnh. \gia chi tiết tần số cao bị xoá cùng với nhiễu, nên góc và cạnh --- đúng thứ mà cả ORB lẫn tầng đầu của CNN dựa vào --- biến mất. \vdm mô hình đối mặt với một phân phối ảnh chưa từng thấy: mịn nhân tạo ở vùng phẳng, nhiễu có tương quan không gian ở vùng còn lại.
+\item \vd{muốn mô hình chịu được ban đêm nên thêm nhiễu Gauss vào ảnh sRGB khi huấn luyện.} \gd nhiễu là cộng, độc lập từng pixel, không phụ thuộc cường độ. \hq cả ba giả định đều sai sau khi qua ISP, nên augmentation kiểu này mô phỏng một thứ không tồn tại. \gp gỡ xử lý ảnh sRGB ngược về miền tuyến tính, thêm nhiễu shot cộng read đúng mô hình affine, rồi cho chạy lại qua ISP mô phỏng --- ý tưởng của dòng \emph{Unprocessing Images for Learned Raw Denoising} \cite{brooks2019unprocessing}.
+\end{mach}
+
+\subsection{E. Giới hạn và trường hợp hỏng}
+\begin{itemize}
+\item \textbf{Mô hình affine bỏ qua vài hiệu ứng thật.} Dòng tối phụ thuộc nhiệt độ, nên cùng một camera cho tham số khác nhau giữa sáng sớm và giữa trưa trên xe. Có nhiễu cố định theo vị trí (\en{fixed-pattern noise}) không ngẫu nhiên và không giảm khi lấy trung bình nhiều khung. Điểm ảnh chết và điểm nóng bị ISP nội suy đè lên, tạo cấu trúc giả.
+\item \textbf{Mô hình chỉ đúng ở miền tuyến tính.} Sau khử khảm và gamma thì nhiễu không còn độc lập giữa các pixel lẫn giữa các kênh --- chủ đề của mục tiếp theo.
+\item \textbf{Nhiễu thật khó mô phỏng đủ tốt để thay dữ liệu thật.} Các tập dữ liệu chụp cặp ảnh nhiễu--sạch trên điện thoại thật, chẳng hạn SIDD \cite{abdelhamed2018sidd}, tồn tại chính vì mô phỏng chưa đủ; một bộ khử nhiễu huấn luyện thuần trên nhiễu tổng hợp thường tụt rõ khi đem sang ảnh thật.
+\end{itemize}
+
+\begin{cambay}
+``Tăng độ sáng'' bằng cách nhân giá trị pixel không phải là mô phỏng phơi sáng nhiều hơn --- sai theo cả hai nghĩa. Sai về phi tuyến (mục sau tính ra con số cụ thể), và sai về thống kê: phơi sáng thật gấp đôi làm SNR tăng \(\sqrt{2}\) lần, còn nhân giá trị lên gấp đôi giữ nguyên SNR. Một mô hình học từ augmentation kiểu này sẽ tin rằng ảnh sáng và ảnh tối có cùng mức tin cậy --- đúng cái niềm tin làm nó sập lúc trời tối.
+\end{cambay}
+
+\begin{cannho}
+Nhiễu ảnh phụ thuộc tín hiệu: \(\operatorname{Var} = aI + b\), phần thứ nhất là photon, phần thứ hai là mạch điện. Hệ quả duy nhất cần mang theo: \emph{chỉ có thu thêm ánh sáng thật mới thêm thông tin}; mọi thứ khác --- ISO, kéo tone, khử nhiễu, augmentation độ sáng --- đều chỉ phân phối lại cái đã có, và thường xoá bớt. \T{1}
+\end{cannho}
+
+\subsection{F. Kết nối}
+Mục này là gốc của cả chương. Nó chuyển tiếp trực tiếp sang \ptr{A/02/02-isp-va-khong-gian-mau}, nơi ta theo dấu tín hiệu qua các tầng xử lý và thấy nhiễu bị biến dạng ra sao; và là tiền đề của \ptr{A/02/04}, vì ``mỗi cảm biến có đặc tính nhiễu riêng'' chỉ có nghĩa khi đã hiểu đặc tính nhiễu của cảm biến RGB. Theo chiều ngang nó nối với \ptr{A/01/03}: mô hình nhiễu ở đây \emph{là} một giả định phân phối, nên chọn loss cho bài khử nhiễu chính là chọn mô hình nhiễu. 
+\lk{E}{hệ quả của}{nhiều dạng nhiễu trong các benchmark robustness là mô phỏng thô của đúng chuỗi nhân quả này, nên điểm số trên chúng phải đọc thận trọng}
+Và nó nối với \code{E}: nhiều dạng \en{corruption} trong các benchmark robustness thực chất là mô phỏng thô của chuỗi nhân quả mô tả ở đây, nên điểm số trên chúng nên đọc thận trọng.
+
+\begin{tukiem}
+\item Nhiễu shot phụ thuộc tín hiệu. Điều đó phá vỡ giả định nào của mô hình nhiễu Gauss cộng, và hệ quả với hàm mất mát là gì?
+\item Vì sao tăng ISO không cải thiện SNR trong khi kéo dài thời gian phơi sáng thì có? Cái giá của lựa chọn thứ hai với một robot đang di chuyển là gì?
+\item Vùng cháy sáng và vùng chìm tối hỏng theo hai kiểu khác nhau. Kiểu nào cứu được, và điều đó gợi ý gì về chiến lược phơi sáng?
+\item Ở mức tín hiệu rất thấp, nguồn nhiễu nào chi phối, và làm sao nhận ra chế độ đó từ dữ liệu đo được?
+\item Vì sao thêm nhiễu Gauss vào ảnh sRGB là cách mô phỏng ban đêm tồi, và quy trình đúng gồm những bước nào?
+\item Bạn đo \(\operatorname{Var} = aI + b\) trên cùng một camera ở ISO 100 và ISO 6400. Hai tham số thay đổi thế nào, và vì sao?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

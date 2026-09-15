@@ -1,0 +1,251 @@
+% ---------------------------------------------------------------------------
+% Chương 13, mục 3 — ViT và bài học về inductive bias
+% Tạo: 2026-09-03  |  Sửa gần nhất: 2026-09-03  |  Ôn gần nhất: —
+% Phụ thuộc: C/13/01, C/13/02
+% Mức độ: cốt lõi
+% ---------------------------------------------------------------------------
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{ViT và bài học về inductive bias (Vision Transformers and Inductive Bias)}
+\ptrtarget{C/13-kien-truc-backbone/03}\ptrtarget{C/13-kien-truc-backbone/03-vit-va-inductive-bias}\ptrtarget{C/13/03}\ptrtarget{C/13/03-vit-va-inductive-bias}
+\dependency{\ptr{C/13/01-dong-cnn} (ba giả định mà convolution cài sẵn); \ptr{C/13/02-tu-chuoi-toi-attention} (attention, mã hoá vị trí, chi phí bậc hai).}
+
+\begin{tomtat}
+Mục này dùng \en{Vision Transformer} làm thí nghiệm sạch nhất cho một câu hỏi trung tâm của cả cây: cài sẵn giả định vào mô hình thì được gì và mất gì. ViT vứt bỏ hai giả định mà convolution cài sẵn, và cái giá lộ ra rất rõ ràng dưới dạng \emph{lượng dữ liệu cần có}. Đọc xong bạn quyết định được khi nào nên dùng ViT, khi nào nên dùng CNN, khi nào nên lai. Bạn cũng đọc được mã nguồn của một hệ detection trong mười phút, nhờ cách tách \en{backbone}, \en{neck} và \en{head}. Nếu chỉ nhớ một điều: \emph{inductive bias là một khoản vay trả trước cho dữ liệu} --- bạn hoặc trả bằng giả định, hoặc trả bằng mẫu, và ViT chỉ đơn giản chọn cách trả thứ hai.
+\end{tomtat}
+
+\begin{nentang}
+\kn{inductive bias}{tập giả định mà mô hình mang sẵn trước khi nhìn dữ liệu, ví dụ ``pixel gần nhau thì liên quan''; nó thu hẹp không gian giả thuyết nên học nhanh hơn với ít dữ liệu, nhưng nếu giả định sai thì nó chặn luôn nghiệm đúng.}
+\kn{patch}{ô vuông nhỏ được cắt ra từ ảnh, thường \(16\times16\) pixel, rồi làm phẳng thành một vectơ để coi như một token; đây là cách ViT biến ảnh thành chuỗi.}
+\kn{đẳng biến và bất biến (equivariance vs invariance)}{đẳng biến tịnh tiến nghĩa là dịch ảnh thì bản đồ đặc trưng dịch theo đúng như vậy; bất biến nghĩa là dịch ảnh thì đầu ra \emph{không đổi}. Convolution cho đẳng biến, còn phép gộp toàn cục ở cuối mới tạo ra bất biến.}
+\kn{pretraining và fine-tuning}{huấn luyện trước trên một tập rất lớn để học đặc trưng chung, rồi huấn luyện tiếp trên tập nhỏ của bài toán đích; đây là cách phổ biến nhất để bù lượng dữ liệu mà một mô hình ít giả định đòi hỏi.}
+\kn{chưng cất (distillation)}{huấn luyện mô hình học sinh bắt chước đầu ra của một mô hình thầy đã tốt, thay vì chỉ học từ nhãn cứng; nó chuyển được cả các giả định ngầm của thầy sang trò.}
+\kn{backbone, neck, head}{ba tầng chức năng của một hệ thị giác: backbone trích đặc trưng từ ảnh, neck hợp nhất đặc trưng ở nhiều tỉ lệ, head sinh đầu ra theo đúng bài toán (nhãn lớp, hộp, mặt nạ).}
+\kn{FPN (feature pyramid network)}{một kiểu neck ghép đặc trưng độ phân giải cao nhưng ngữ nghĩa yếu ở tầng nông với đặc trưng ngữ nghĩa mạnh nhưng thô ở tầng sâu, để phát hiện được cả vật nhỏ lẫn vật lớn.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Suốt chương 13 ta lặp lại một câu hỏi: nên cài sẵn bao nhiêu giả định vào mô hình? Câu hỏi đó rất khó trả lời bằng lý luận, vì hai vế của nó nằm ở hai đơn vị khác nhau. Một bên là ``mô hình biết trước điều gì''; bên kia là ``có bao nhiêu dữ liệu''. \en{Vision Transformer} (ViT) \cite{dosovitskiy2021vit} biến câu hỏi đó thành một thí nghiệm đo được: lấy một kiến trúc gần như không có giả định thị giác nào, huấn luyện nó ở nhiều quy mô dữ liệu khác nhau, và xem điểm giao cắt nằm ở đâu.
+
+Kết quả là câu trả lời sạch nhất mà ngành có: với dữ liệu ít, ViT thua CNN rõ rệt; với dữ liệu rất nhiều, ViT vượt. Giá trị cụ thể của mục này là biến quan sát đó thành một quy tắc quyết định dùng được. Quy tắc ấy chạy trên ba dữ kiện: bạn có bao nhiêu ảnh có nhãn, bạn có mô hình pretrain nào, và ràng buộc độ phân giải của bạn là gì. Mục này cũng cho bạn một cách đọc mã nguồn nhanh cho bất kỳ hệ thị giác nào.
+\lk{B/10}{tiền đề}{trục đánh đổi giả định--dữ liệu được phát biểu ở chương thiết kế kiến trúc; mục này là phép đo thực nghiệm cho chính trục đó}
+
+\subsection{B. ViT bỏ đi cái gì}
+ViT cắt ảnh thành các patch \(16\times16\), làm phẳng mỗi patch thành một vectơ, cộng mã hoá vị trí, rồi đưa cả dãy vào một transformer chuẩn. Phép biến đổi đó vứt bỏ hai trong ba giả định của convolution nêu ở \ptr{C/13/01}.
+
+\begin{itemize}
+\item \textbf{Tính cục bộ biến mất.} Ngay từ tầng đầu tiên, mọi patch nói chuyện với mọi patch. Không có gì trong kiến trúc nói rằng hai patch cạnh nhau liên quan nhiều hơn hai patch ở hai góc ảnh --- mô hình phải \emph{học} điều đó từ dữ liệu.
+\item \textbf{Đẳng biến tịnh tiến biến mất.} Convolution dùng chung một bộ trọng số cho mọi vị trí nên dịch ảnh thì đặc trưng dịch theo. ViT gắn một mã vị trí riêng cho từng ô, nên cùng một vật ở hai vị trí khác nhau đi qua hai đường tính toán hơi khác nhau.
+\item \textbf{Phân cấp cũng gần như biến mất} ở bản ViT gốc: mọi tầng chạy ở cùng một độ phân giải token, không có chuỗi giảm dần độ phân giải như CNN. Đây là giả định thứ ba, và chính nó sẽ được các biến thể phân cấp lấy lại đầu tiên.
+\end{itemize}
+
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  px/.style={draw=rulecol,line width=0.3pt,minimum size=0.30cm,inner sep=0pt},
+  pt/.style={draw=violetdark,line width=1.0pt},
+  tok/.style={draw=steel,fill=bluebg,rounded corners=1.5pt,minimum width=0.62cm,minimum height=1.05cm,inner sep=0pt},
+  pemb/.style={draw=reddark,fill=redbg,rounded corners=1.5pt,minimum width=0.62cm,minimum height=0.42cm,inner sep=0pt,font=\tiny},
+  ar/.style={-{Latex[length=2mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize,color=tiercol,align=center}]
+% anh chia luoi 8x8, patch 2x2
+\foreach \i in {0,...,7}\foreach \j in {0,...,7}{\node[px] at (0.30*\j,-0.30*\i) {};}
+\foreach \i in {0,2,4,6}\foreach \j in {0,2,4,6}{
+  \draw[pt] (0.30*\j-0.15,-0.30*\i+0.15) rectangle (0.30*\j+0.45,-0.30*\i-0.45);}
+\node[lb] at (1.05,-2.75) {ảnh, chia thành\\lưới patch \(16\times16\)};
+\draw[ar] (2.6,-1.05) -- (3.8,-1.05);
+\node[lb] at (3.2,-0.72) {làm phẳng\\từng patch};
+% chuoi token
+\foreach \k [count=\c from 0] in {1,2,3,4}{\node[tok] (t\k) at (4.6+0.85*\c,-1.05) {};}
+\node[lb] at (7.6,-1.05) {\ldots};
+\node[tok] (tn) at (8.4,-1.05) {};
+\foreach \k [count=\c from 0] in {1,2,3,4}{\node[pemb] at (4.6+0.85*\c,-2.05) {\(p_{\the\numexpr\c+1\relax}\)};}
+\node[pemb] at (8.4,-2.05) {\(p_{N}\)};
+\foreach \k [count=\c from 0] in {1,2,3,4}{\draw[reddark,thick,-{Latex[length=1.6mm]}] (4.6+0.85*\c,-1.78) -- (4.6+0.85*\c,-1.62);}
+\draw[reddark,thick,-{Latex[length=1.6mm]}] (8.4,-1.78) -- (8.4,-1.62);
+\node[lb] at (6.5,-2.72) {\(+\) mã hoá vị trí --- thứ tự \emph{không} còn nằm trong cấu trúc,\\nên phải được cấp từ bên ngoài};
+\draw[ar] (9.3,-1.05) -- (10.5,-1.05);
+\node[lb] at (9.9,-0.72) {đưa vào\\transformer};
+\node[draw=inkblue,fill=bluebg,rounded corners=2pt,inner sep=5pt,font=\small,align=center,text width=3.0cm] at (12.2,-1.05) {transformer chuẩn\\\emph{không biết gì} về ảnh};
+\node[lb,anchor=west,text width=4.4cm] at (10.7,-2.85) {Hai giả định đã mất ở bước này: không còn cửa sổ cục bộ, và không còn chia sẻ trọng số theo vị trí.};
+\end{tikzpicture}}
+\caption{Ba bước biến một ảnh thành thứ mà transformer xử lý được, và chỗ inductive bias rơi ra. Việc cắt patch vẫn giữ lại một chút tính cục bộ: \(256\) điểm ảnh trong một ô bị gộp cứng. Nhưng \emph{quan hệ giữa} các patch thì không còn được mã hoá ở đâu trong kiến trúc. Nó phải được cấp bằng một bảng vị trí học được. Đó là lý do đổi độ phân giải đầu vào mà quên nội suy bảng này làm mô hình xuống cấp lặng lẽ: bạn vừa cấp sai đúng cái thông tin mà kiến trúc không tự có.}
+\label{fig:patchify}
+\end{figure}
+
+Hình~\ref{fig:patchify} cho thấy điều mà câu ``ViT coi ảnh như một chuỗi'' còn giấu: chuỗi đó không có thứ tự tự nhiên, và toàn bộ hiểu biết về không gian hai chiều bị dồn vào một bảng tham số phụ.
+
+Cần nói ngay một điều để tránh hiểu quá đà: \emph{ViT không phải không có giả định}. Bản thân việc cắt thành patch là một giả định cục bộ khá mạnh --- \(256\) pixel trong một ô bị gộp thành một token và không bao giờ được xét riêng nữa. Ngoài ra, các phân tích attention cho thấy ở những tầng đầu, nhiều đầu tự học ra hành vi gần như cục bộ, tức mô hình khám phá lại một phần giả định đã bị vứt. Phát biểu đúng là: ViT giảm mạnh lượng giả định cài sẵn, chứ không xoá sạch.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[scale=0.34,
+  cl/.style={draw=rulecol,fill=white,minimum size=0.62cm,inner sep=0pt},
+  ct/.style={draw=violetdark,fill=violetbg,minimum size=0.62cm,inner sep=0pt,thick},
+  rf/.style={draw=reddark,thick},
+  cp/.style={font=\scriptsize,color=steel,align=center,text width=4.6cm},
+  lk/.style={draw=steel,thin,opacity=0.55}]
+\foreach \x in {0,...,8}\foreach \y in {0,...,8}{\node[cl] at (\x,\y) {};}
+\node[ct] at (4,4) {};
+\draw[rf] (2.65,2.65) rectangle (5.35,5.35);
+\draw[rf] (1.65,1.65) rectangle (6.35,6.35);
+\draw[rf] (0.65,0.65) rectangle (7.35,7.35);
+\node[cp] at (4,-1.9) {\textbf{CNN}: trường tiếp nhận lớn dần theo chiều sâu --- \(3\times3\), \(5\times5\), \(7\times7\)};
+\begin{scope}[xshift=14cm]
+\foreach \x in {0,...,8}\foreach \y in {0,...,8}{\node[cl] at (\x,\y) {};}
+\foreach \x in {0,2,4,6,8}\foreach \y in {0,2,4,6,8}{\draw[lk] (4,4) -- (\x,\y);}
+\draw[lk] (4,4) -- (1,7); \draw[lk] (4,4) -- (7,1); \draw[lk] (4,4) -- (7,7); \draw[lk] (4,4) -- (1,1);
+\node[ct] at (4,4) {};
+\draw[rf] (-0.35,-0.35) rectangle (8.35,8.35);
+\node[cp] at (4,-1.9) {\textbf{Attention toàn cục}: trường tiếp nhận là toàn ảnh ngay từ tầng thứ nhất};
+\end{scope}
+\end{tikzpicture}
+\caption{Hai cách phủ sóng thông tin. CNN mở rộng trường tiếp nhận dần dần và do đó \emph{cài sẵn} rằng quan hệ gần quan trọng hơn quan hệ xa; attention toàn cục nối mọi vị trí ngay lập tức và không cài giả định nào về khoảng cách, đổi lại phải học quan hệ đó từ dữ liệu và trả chi phí bậc hai. Swin và các biến thể cửa sổ nằm giữa hai thái cực này.}
+\label{fig:rf-cnn-vs-attn}
+\end{figure}
+
+Hình~\ref{fig:rf-cnn-vs-attn} là cách gọn nhất để thấy cả ưu điểm lẫn cái giá: bên trái, thông tin xa cần nhiều tầng nhưng mỗi tầng rẻ và có sẵn tiên nghiệm đúng cho ảnh tự nhiên; bên phải, thông tin xa có ngay nhưng phải trả bằng \(T^2\) cặp quan hệ và bằng việc mô hình không được cho biết cặp nào đáng quan tâm.
+
+\subsection{C. Cái giá hiện ra dưới dạng lượng dữ liệu}
+Kết quả gốc của ViT rất dễ tóm tắt: huấn luyện từ đầu trên ImageNet-1k thì nó thua các ResNet cùng hạng; pretrain trên một tập lớn hơn nhiều bậc rồi fine-tune thì nó vượt \cite{dosovitskiy2021vit}. Đây là minh chứng trực tiếp cho trục đánh đổi giả định--dữ liệu: giả định mà bạn không cài vào kiến trúc thì phải mua bằng mẫu.
+
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.86\linewidth,height=5.4cm,xmode=log,
+  xlabel={số ảnh có nhãn dùng để huấn luyện trước (thang log)}, ylabel={chất lượng khi chuyển sang tác vụ đích},
+  xmin=3e4,xmax=1e9, ymin=0, ymax=1.05, ytick=\empty,
+  legend style={font=\scriptsize,at={(0.02,0.97)},anchor=north west,draw=rulecol},
+  tick label style={font=\scriptsize}, label style={font=\scriptsize},
+  grid=major, grid style={rulecol,very thin}]
+\addplot[steel,thick,smooth] coordinates
+ {(3e4,0.30)(1e5,0.47)(1e6,0.66)(1e7,0.76)(1e8,0.81)(1e9,0.83)};
+\addlegendentry{CNN --- nhiều giả định cài sẵn}
+\addplot[violetdark,thick,smooth] coordinates
+ {(3e4,0.10)(1e5,0.24)(1e6,0.50)(1e7,0.73)(1e8,0.89)(1e9,0.97)};
+\addlegendentry{ViT phẳng --- rất ít giả định}
+\draw[reddark,dashed,thick] (axis cs:2.2e7,0) -- (axis cs:2.2e7,0.95);
+\node[font=\scriptsize,color=reddark,anchor=south,align=center] at (axis cs:2.2e7,0.95) {điểm giao};
+\node[font=\scriptsize,color=steel,anchor=west,align=left] at (axis cs:5e4,0.86) {giả định thay được\\cho dữ liệu};
+\node[font=\scriptsize,color=violetdark,anchor=east,align=right] at (axis cs:6e8,0.35) {giả định trở thành\\trần chặn};
+\end{axis}
+\end{tikzpicture}
+\caption{Trục đánh đổi giả định--dữ liệu, vẽ định tính. Ở phía trái, các giả định mà convolution cài sẵn là món quà miễn phí: chúng thu hẹp không gian giả thuyết đúng chỗ, nên CNN học được từ ít mẫu. Ở phía phải, chính các giả định ấy thành trần --- chúng cấm mô hình biểu diễn những quan hệ mà dữ liệu đã đủ để dạy nó. Điều quan trọng nhất trong hình là \emph{có} một điểm giao chứ không phải vị trí của nó: vị trí phụ thuộc tác vụ, recipe và quy mô mô hình, và ba cách trả nợ giả định ở mục C đều là cách kéo đường tím sang trái.}
+\label{fig:du-lieu-cnn-vit}
+\end{figure}
+
+Hình~\ref{fig:du-lieu-cnn-vit} biến một câu định tính thành một hình có thể tranh luận được: câu hỏi ``CNN hay ViT'' thực chất là câu hỏi ``tôi đang đứng ở đâu trên trục hoành''.
+
+Điều làm câu chuyện thú vị là có ít nhất ba cách trả khoản nợ đó, và chúng trả bằng ba loại tiền khác nhau.
+
+\begin{itemize}
+\item \textbf{Trả bằng dữ liệu} --- pretrain trên tập cực lớn, rồi fine-tune. Hiệu quả nhất về chất lượng, nhưng chỉ khả thi nếu bạn có tập đó hoặc có checkpoint của người khác; và nó đẩy toàn bộ chi phí sang một pha huấn luyện mà bạn không kiểm soát.
+\item \textbf{Trả bằng chính quy hoá và chưng cất} --- DeiT cho thấy với augmentation mạnh, lịch học dài và một thầy CNN để chưng cất, ViT huấn luyện được trên riêng ImageNet-1k \cite{touvron2021deit}. Đáng chú ý là thầy CNN chuyển sang trò không chỉ nhãn mà cả \emph{giả định} của mình --- đây là một cách cài inductive bias qua cửa sau.
+\item \textbf{Trả bằng kiến trúc} --- lắp lại một phần giả định đã bỏ, tức các biến thể phân cấp ở mục D. Rẻ nhất về dữ liệu, nhưng đánh mất sự thuần khiết và một phần khả năng mở rộng theo quy mô.
+\end{itemize}
+
+\lk{C/18}{hệ quả của}{pretraining tự giám sát là cách rẻ nhất để trả khoản nợ giả định; các backbone mạnh nhất hiện nay đều đến từ hướng này.}
+\lk{C/12/04}{cùng nguyên lý với}{augmentation mạnh và chưng cất đều bơm thêm giả định vào mô hình, chỉ khác đường đi.}
+
+\subsection{D. Phản ứng thứ nhất: ViT phân cấp}
+ViT phẳng có hai vấn đề thực dụng ngoài chuyện dữ liệu: nó chỉ sinh ra đặc trưng ở một tỉ lệ duy nhất, trong khi detection và segmentation cần nhiều tỉ lệ; và chi phí bậc hai chặn đường tới độ phân giải cao, như đã tính ở \ptr{C/13/02}. \term{Swin} giải cả hai bằng một thay đổi: giới hạn attention trong các cửa sổ cố định rồi \emph{dịch} cửa sổ ở tầng kế tiếp để thông tin rò qua ranh giới, đồng thời gộp patch dần để tạo kim tự tháp đặc trưng \cite{liu2021swin}. Chi phí trở thành tuyến tính theo số token, và đầu ra có đúng dạng mà FPN cần. PVT đi theo hướng gần giống nhưng giảm số khoá và giá trị thay vì giới hạn cửa sổ. Còn lai ghép đơn giản nhất là thay phép cắt patch bằng vài tầng convolution làm ``stem''. Cách này được biết là làm giai đoạn huấn luyện đầu ổn định hơn hẳn. Đây là kinh nghiệm thực hành rất phổ biến, không phải một kết quả tôi kiểm chứng lại.
+
+Cái giá thì cụ thể: cửa sổ tạo lại một dạng ``đường đi dài'' cho quan hệ xa, đúng thứ mà attention sinh ra để xoá; và kiến trúc nhiều giai đoạn khó mở rộng theo quy mô một cách trơn tru hơn so với một chồng khối đồng nhất.
+
+\subsection{E. Phản ứng thứ hai: ConvNeXt, và vì sao nó là phản chứng quan trọng}
+Hướng ngược lại không sửa transformer mà sửa cách so sánh. ConvNeXt giữ nguyên convolution rồi lần lượt áp từng thành phần recipe của transformer, đo sau mỗi bước, và kết quả là CNN bắt kịp \cite{liu2022convnext}. Kết luận đã nêu ở \ptr{C/13/01} và nhắc lại ở đây vì nó thay đổi cách đọc chính mục này: phần lớn khoảng cách được gán cho ``attention thay convolution'' thực ra thuộc về công thức huấn luyện. Nói cách khác, thí nghiệm ViT vẫn đúng về trục giả định--dữ liệu, nhưng \emph{độ lớn} của hiệu ứng kiến trúc đã bị phóng đại trong cách trình bày đương thời.
+
+\subsection{F. Ba dạng tổ chức và ba lớp bài toán}
+Chọn sai dạng tổ chức là lỗi thiết kế cơ bản, không phải lỗi tinh chỉnh. Không có siêu tham số nào cứu được một encoder-only đang bị bắt sinh chuỗi tự hồi quy.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Ba dạng tổ chức của một mô hình dựa trên transformer, và lớp bài toán tương ứng.}
+\label{tab:ba-dang}
+\begin{tabularx}{\linewidth}{@{}L{2.35cm}L{3.1cm}YY@{}}
+\toprule
+\textbf{Dạng} & \textbf{Cơ chế} & \textbf{Hợp với bài toán nào} & \textbf{Hỏng khi nào}\\
+\midrule
+Encoder-only & Mọi token thấy mọi token, một lượt & Hiểu và dự đoán từ toàn bộ đầu vào: phân loại, dự đoán dày, trích đặc trưng cho hệ khác & Cần sinh chuỗi có độ dài chưa biết trước, hoặc cần sinh tự hồi quy\\
+Decoder-only & Attention có mặt nạ nhân quả, sinh từng token dựa trên các token đã sinh & Sinh tự hồi quy: ngôn ngữ, chuỗi hành động, mã hoá ảnh thành token rồi sinh & Suy luận chậm vì tuần tự; lãng phí khi đầu ra là một nhãn duy nhất\\
+Encoder-decoder & Encoder đọc đầu vào, decoder sinh đầu ra và tra cứu encoder bằng cross-attention & Biến đổi chuỗi sang chuỗi; trong thị giác là DETR với tập truy vấn học được \cite{carion2020detr} & Nhiều tham số và nhiều đường nối hơn; hội tụ chậm hơn ở bài toán nhỏ\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{G. Tách backbone, neck, head --- cách đọc code nhanh nhất}
+Ba khái niệm này không phải lý thuyết mà là quy ước kỹ thuật, và chúng có giá trị thực dụng rất cao: gần như mọi repo detection và segmentation hiện đại đều tổ chức theo đúng ba khối này, nên nắm được chúng là đọc được cấu trúc một repo lạ trong mười phút thay vì một ngày.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  bb/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,font=\small,align=center,text width=1.75cm},
+  nk/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=4pt,font=\small,align=center,text width=1.75cm},
+  hd/.style={draw=reddark,fill=redbg,rounded corners=2pt,inner sep=4pt,font=\small,align=center,text width=2.3cm},
+  im/.style={draw=steel,fill=white,rounded corners=2pt,inner sep=4pt,font=\small,align=center,text width=1.5cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  gl/.style={font=\small\bfseries,color=inkblue}]
+\node[im] (img) at (0,4.5) {Ảnh};
+\node[bb] (c2) at (3.0,4.5) {\(C_2\)\\stride 4};
+\node[bb] (c3) at (3.0,3.0) {\(C_3\)\\stride 8};
+\node[bb] (c4) at (3.0,1.5) {\(C_4\)\\stride 16};
+\node[bb] (c5) at (3.0,0.0) {\(C_5\)\\stride 32};
+\node[nk] (p2) at (6.6,4.5) {\(P_2\)};
+\node[nk] (p3) at (6.6,3.0) {\(P_3\)};
+\node[nk] (p4) at (6.6,1.5) {\(P_4\)};
+\node[nk] (p5) at (6.6,0.0) {\(P_5\)};
+\node[hd] (h1) at (10.6,3.75) {Head phân loại\\và hộp};
+\node[hd] (h2) at (10.6,1.5) {Head mặt nạ};
+\node[hd] (h3) at (10.6,-0.6) {Head khác\\(độ sâu, hướng...)};
+\draw[ar] (img) -- (c2);
+\draw[ar] (c2) -- (c3); \draw[ar] (c3) -- (c4); \draw[ar] (c4) -- (c5);
+\foreach \a/\b in {c2/p2,c3/p3,c4/p4,c5/p5} \draw[ar] (\a) -- (\b);
+\draw[ar] (p5) -- node[font=\scriptsize,color=reddark,right]{lên mẫu} (p4);
+\draw[ar] (p4) -- (p3);
+\draw[ar] (p3) -- (p2);
+\foreach \a/\b in {p2/h1,p3/h1,p4/h2,p5/h3} \draw[ar] (\a) -- (\b);
+\node[gl] at (3.0,5.5) {Backbone};
+\node[gl] at (6.6,5.5) {Neck (FPN)};
+\node[gl] at (10.6,5.5) {Head};
+\end{tikzpicture}}
+\caption{Ba khối chức năng của một hệ thị giác dày. Backbone sinh đặc trưng ở nhiều stride; neck hợp nhất chúng theo chiều từ sâu về nông để mọi tỉ lệ đều có ngữ nghĩa mạnh; head chuyển đặc trưng thành đầu ra của bài toán. Thay backbone là thao tác rẻ nhất và hay làm nhất; thay neck ảnh hưởng chủ yếu tới vật nhỏ; thay head là đổi bài toán.}
+\label{fig:backbone-neck-head}
+\end{figure}
+
+Hình~\ref{fig:backbone-neck-head} cũng giải thích vì sao ViT phẳng khó lắp vào hệ detection: nó chỉ sinh ra một cột duy nhất chứ không sinh ra bốn mức \(C_2\) tới \(C_5\), nên hoặc phải chế thêm một neck đặc biệt, hoặc phải chuyển sang biến thể phân cấp. Đây là một ràng buộc kỹ thuật rất thực tế và thường quyết định lựa chọn backbone hơn cả điểm số ImageNet.
+\lk{C/14}{tiền đề}{các head của detection và segmentation giả định có sẵn bốn mức đặc trưng, nên dạng đầu ra của backbone quyết định head nào lắp được}
+
+\subsection{H. Giới hạn và trường hợp hỏng}
+Bốn chỗ hỏng đáng nhớ, xếp theo tần suất gặp trong thực hành.
+
+Thứ nhất, \emph{ViT huấn luyện từ đầu trên tập nhỏ}. Đây là cách phổ biến nhất để kết luận sai rằng ``transformer không hợp bài toán của tôi''. Nếu bạn có vài nghìn ảnh, kết luận đúng là bạn không đủ dữ liệu để trả khoản nợ giả định, chứ không phải kiến trúc kém.
+
+Thứ hai, \emph{kích thước patch so với kích thước đối tượng}. Một patch \(16\times16\) nghiền mọi đối tượng nhỏ hơn \(16\) pixel thành một phần của một token duy nhất. Với ảnh camera gắn xe, người đi bộ ở xa chỉ chiếm mươi pixel. Đây không phải chi tiết nhỏ mà là giới hạn cứng. Nó giải thích vì sao các hệ dự đoán dày dùng patch nhỏ hoặc dùng conv stem.
+
+Thứ ba, \emph{mã hoá vị trí khi đổi độ phân giải}, đã nói ở mục trước và nhắc lại vì nó thực sự hay xảy ra.
+
+Thứ tư, \emph{mất đẳng biến tịnh tiến là có thật và đo được}. Cùng một vật ở hai vị trí có thể cho đặc trưng hơi khác nhau. Trong phần lớn trường hợp, augmentation cắt ngẫu nhiên đã bù đủ. Nhưng ở các bài toán đo lường chính xác như ước lượng tư thế hay đo khoảng cách, đây là một nguồn sai số hệ thống đáng kiểm tra chứ không nên giả định là không có.
+
+Về độ tin cậy: quan hệ ``ít dữ liệu thì CNN thắng, nhiều dữ liệu thì ViT thắng'' là kết quả đã công bố và được lặp lại rộng rãi; còn mức dữ liệu cụ thể ở điểm giao cắt phụ thuộc tác vụ, recipe và quy mô mô hình tới mức tôi không nêu một con số nào ở đây.
+
+\begin{cambay}
+Cạm bẫy tư duy lớn nhất của mục này là đọc ``ViT không có inductive bias'' theo nghĩa đen rồi suy ra ``ViT là mô hình trung lập, không giả định gì''. Không đúng. Phép cắt patch là một giả định cục bộ rất mạnh. Mã hoá vị trí là một giả định về cách biểu diễn không gian. Và cách chọn dữ liệu pretrain là một giả định khổng lồ về thế giới mà mô hình sẽ gặp. Phát biểu chính xác là ViT \emph{dịch chuyển} giả định từ kiến trúc sang dữ liệu và recipe --- và giả định nằm trong dữ liệu thì khó nhìn thấy hơn nhiều so với giả định nằm trong kiến trúc.
+\end{cambay}
+
+\begin{cannho}
+Inductive bias là khoản vay trả trước cho dữ liệu: giả định bạn không cài vào kiến trúc thì phải mua bằng mẫu, bằng chưng cất, hoặc bằng augmentation. Khi chọn giữa CNN, ViT và các biến thể lai, câu hỏi đầu tiên không phải ``cái nào mạnh hơn'' mà là ``tôi có bao nhiêu dữ liệu và bao nhiêu tiên nghiệm đáng tin về bài toán này''. \T{2}
+\end{cannho}
+
+\subsection{I. Kết nối}
+Mục này khép lại chương 13 bằng cách trả lời câu hỏi mở ở \ptr{C/13/01-dong-cnn}: ba giả định của convolution đáng giá bao nhiêu, đo bằng lượng dữ liệu cần để thay thế chúng. Nó dựa hoàn toàn vào cơ chế attention ở \ptr{C/13/02-tu-chuoi-toi-attention}, và cách tách backbone--neck--head ở mục G là tiền đề trực tiếp cho \ptr{C/14-bai-toan-cv-loi}, nơi các head cụ thể được thiết kế. Về phía dữ liệu, việc trả nợ giả định bằng pretraining là nội dung của \ptr{C/18-pretraining-va-foundation}, còn việc trả bằng augmentation đã nằm ở \ptr{C/12/04-tong-quat-hoa-va-chan-doan}. Cuối cùng, bài học ConvNeXt nối sang \ptr{E/24-thi-nghiem-va-ablation}, chương duy nhất trong cây dạy cách không bị một bảng so sánh đánh lừa.
+
+\begin{tukiem}
+\item ViT bỏ đi hai giả định nào của convolution, và mỗi giả định bị bỏ gây ra hậu quả đo được nào?
+\item Vì sao nói ViT vẫn có inductive bias, dù nó bỏ tính cục bộ và đẳng biến tịnh tiến?
+\item Ba cách bù lại lượng dữ liệu mà ViT đòi hỏi là gì, và mỗi cách trả giá bằng loại tài nguyên nào?
+\item Vì sao Swin lắp vào một hệ detection dễ hơn ViT phẳng --- câu trả lời nằm ở khối nào trong sơ đồ backbone--neck--head?
+\item Nếu ConvNeXt cho thấy recipe quan trọng hơn kiến trúc, điều đó thay đổi cách bạn đọc một bảng so sánh backbone thế nào?
+\item Bạn cần phát hiện người đi bộ cách xa \(80\) mét, chỉ chiếm khoảng \(12\) pixel chiều cao. Vì sao ViT patch \(16\) là lựa chọn tệ, và hai cách sửa là gì?
+\item Trong hệ của bạn, thay backbone, thay neck và thay head có tác động khác nhau thế nào --- và vì sao thứ tự thử nên là backbone trước?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

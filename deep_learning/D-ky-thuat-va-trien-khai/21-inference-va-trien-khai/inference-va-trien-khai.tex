@@ -1,0 +1,281 @@
+% ============================================================================
+%  Chương 21 — Inference và triển khai
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: B/08, B/11, D/20 | Mức độ: cốt lõi
+% ============================================================================
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Inference và triển khai (Inference and Deployment)}
+\ptrtarget{D/21}\ptrtarget{D/21-inference-va-trien-khai}
+\dependency{\ptr{D/20-toi-uu-va-nen-mo-hinh} (mô hình đã nén là đầu vào của chương này); \ptr{B/11-gioi-han-tinh-toan} (băng thông, chi phí điều phối); \ptr{B/08-dich-chuyen-phan-phoi} (vì sao chỉ phân phối thật mới lộ ra lỗi thật); \ptr{D/19/02-pytorch-thanh-thao} (kỹ năng phân biệt ``lệch do bug'' với ``lệch do số học'').}
+
+\begin{tomtat}
+Mô hình chạy tốt trong notebook và hỏng trong production. Chương này liệt kê từng chỗ nó hỏng, theo đúng trình tự bạn sẽ gặp: export, sai lệch số học sau export, thời gian nằm ở chỗ bạn không ngờ, xung đột giữa thông lượng và độ trễ đuôi, giới hạn nhiệt của thiết bị biên, và cuối cùng là rủi ro của việc thay mô hình. Đọc xong bạn thiết kế được một quy trình triển khai có kiểm chứng ở từng bước thay vì một chuỗi thao tác hy vọng. Nếu chỉ nhớ một điều: mô hình không có một con số độ trễ --- \emph{hệ thống ở một trạng thái} mới có, nên mọi phép đo phải nêu rõ trạng thái nguồn, nhiệt và tải kèm theo, và phải báo cáo p99 chứ không phải trung bình.
+\end{tomtat}
+
+\begin{nentang}
+\kn{export}{quá trình chuyển mô hình từ mã Python/PyTorch sang một biểu diễn đồ thị tĩnh mà một \en{runtime} khác nạp được --- ONNX là định dạng trung gian phổ biến nhất.}
+\kn{opset và plugin}{\en{opset} là phiên bản tập toán tử mà ONNX định nghĩa; toán tử của bạn không nằm trong đó thì phải viết \en{plugin} cho runtime, hoặc chấp nhận nó bị thay bằng một tổ hợp xấp xỉ.}
+\kn{engine}{kết quả biên dịch của TensorRT cho \emph{một} tổ hợp cụ thể gồm phiên bản thư viện, kiến trúc GPU và cấu hình shape. Đổi bất kỳ thứ nào trong ba thứ đó là phải dựng lại.}
+\kn{dynamic shape và optimization profile}{shape đầu vào thay đổi lúc chạy (batch, độ phân giải). TensorRT đòi bạn khai báo trước dải shape (\en{optimization profile}) để biên dịch kernel phù hợp; không khai báo thì shape bị đóng băng lúc trace.}
+\kn{độ trễ p50 / p99}{phân vị của phân phối độ trễ --- p99 là ngưỡng mà 99\% yêu cầu nằm dưới. Trung bình che giấu đuôi, và đuôi mới là thứ người dùng cảm nhận.}
+\kn{batching động (dynamic batching)}{gom các yêu cầu đến gần nhau về thời gian thành một batch để tăng thông lượng, kèm một trần thời gian chờ để không phá ngân sách độ trễ.}
+\kn{KV cache}{bộ nhớ đệm lưu khoá và giá trị \en{attention} của các token đã sinh, để mỗi token mới không phải tính lại toàn bộ chuỗi. Đổi bộ nhớ lấy tốc độ.}
+\kn{shadow deployment}{chạy mô hình mới song song với mô hình cũ trên lưu lượng thật nhưng \emph{không} dùng kết quả của nó để phục vụ; chỉ để so sánh và phát hiện lỗi trước khi chuyển đổi.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao con số độ trễ đo trong notebook gần như luôn sai khi lên thiết bị thật, và nó sai theo hướng nào?}
+\h{Bạn tối ưu lượt xuôi nhanh hơn $30\%$ nhưng hệ thống chỉ nhanh hơn $7\%$ --- phần còn lại đã trốn ở đâu?}
+\h{Gộp \en{batch} làm thông lượng tăng gấp ba; vì sao nó vẫn có thể khiến hệ thống của bạn vi phạm ngân sách?}
+\h{Cùng một engine, cùng một chip, cùng một đầu vào --- vì sao phút thứ tám cho con số khác hẳn phút đầu tiên?}
+\h{Sau khi export, đầu ra lệch $10^{-2}$: làm sao biết đó là một bug hay chỉ là số học?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+Chương này viết cho người đã triển khai thật, nên nó không giải thích lại độ trễ là gì. Câu hỏi dẫn dắt hẹp hơn và khó hơn: \emph{mô hình chạy tốt trong notebook thì hỏng ở đâu khi ra production, và theo thứ tự nào?}
+
+Điểm khiến việc triển khai deep learning khác với việc triển khai một thư viện C++ thông thường không phải độ phức tạp mà là \emph{số lớp dịch}. Giữa mô hình bạn huấn luyện và thứ chạy trên thiết bị có ít nhất ba lần dịch --- đồ thị Python sang ONNX, ONNX sang engine của runtime, engine sang kernel cụ thể --- và mỗi lần dịch là một cơ hội để ngữ nghĩa thay đổi im lặng. Cộng thêm việc phần lớn phép đo hiệu năng trên GPU dễ đo sai theo những cách đã quen thuộc với người viết CUDA, và bạn có một hệ thống mà mọi con số đều phải được nghi ngờ cho tới khi có bằng chứng.
+
+\textbf{Học xong chương này thì làm được gì mà trước đó không làm được?} Bạn đặt được một quy trình triển khai trong đó \emph{mỗi bước có một phép kiểm chứng riêng}: so khớp từng tầng sau export, đo từng khối trong pipeline, đo p99 dưới tải nhiệt liên tục. Khi có sự cố, bạn khoanh vùng trong một giờ thay vì bới cả chuỗi.
+
+\begin{trucgiac}
+Một mô hình không có độ trễ. \emph{Một hệ thống ở một trạng thái} mới có độ trễ. Cùng một engine TensorRT trên cùng một Orin cho các con số khác nhau khi: chưa chạy lần nào (kernel autotune và cấp phát chưa xong), vừa chạy được ba mươi giây (mát, xung nhịp cao nhất), chạy liên tục tám phút (đã tụt xung vì nhiệt), hoặc chạy khi tiến trình SLAM bên cạnh đang ăn băng thông bộ nhớ chung.
+
+Đây chính là bài học bạn đã học khi làm benchmark cho SLAM: một lần chạy không phải một phép đo, và hai lần chạy khác nhau không phải một sự bất thường mà là dữ liệu về phương sai. Sự khác biệt duy nhất là ở đây phương sai có thêm một nguồn vật lý --- nhiệt độ --- vốn có tính \emph{trôi} chứ không phải \emph{ngẫu nhiên}, nên nó không tự triệt tiêu khi bạn lấy trung bình nhiều lần lặp ngắn.
+\end{trucgiac}
+
+\section{Mạch vấn đề \(\rightarrow\) giải pháp, theo trình tự triển khai thật}
+
+\begin{mach}[Tám nút thắt, đúng thứ tự bạn sẽ gặp]
+\item \vd{PyTorch eager quá chậm và quá nặng để triển khai.} \gp export sang một runtime chuyên dụng. \gia mất tính linh hoạt của Python và nhận về một tạo tác gắn chặt với phiên bản.
+\item \vd{export xong thì đầu ra lệch.} \gp so khớp từng tầng chứ không chỉ kết quả cuối, và kiểm tra bốn nguyên nhân theo đúng thứ tự. \gd bạn có một mẫu đầu vào cố định để so hai phía.
+\item \vd{\vn{lượt xuôi}{forward pass} không phải chỗ tốn thời gian.} \gp đo từng khối --- giải mã, tiền xử lý, lượt xuôi, hậu xử lý --- trước khi tối ưu bất cứ thứ gì. \hq trong hệ thống video, việc đưa giải mã và tiền xử lý lên GPU thường cho lợi ích lớn hơn mọi thứ bạn làm với mô hình.
+\item \vd{thông lượng và độ trễ xung đột.} \gp batching động kèm trần thời gian chờ. \gia p99 xấu đi khi hàng đợi dài, nên trần chờ là tham số thiết kế chứ không phải chi tiết cài đặt.
+\item \vd{mô hình sinh và VLM có cấu trúc chi phí khác hẳn.} \gp KV cache, giảm số bước sampler, chưng cất sampler, giải mã suy đoán. \hq lại là mẫu hình ``đẩy chi phí sang training-time'' của chương 17 và 20.
+\item \vd{vận hành.} \gp health check, autoscaling, warm-up bắt buộc, và báo cáo cả p50 lẫn p99. \gd bạn chấp nhận rằng lần chạy đầu luôn chậm và không cố giấu nó bằng cách bỏ qua mẫu đầu.
+\item \vd{thiết bị biên có giới hạn năng lượng và nhiệt.} \gp đo trong mười phút liên tục ở đúng chế độ nguồn sẽ triển khai, không đo một trăm lần lặp. \hq benchmark ngắn nói dối một cách có hệ thống, luôn theo hướng lạc quan.
+\item \vd{thay mô hình mới là một canh bạc.} \gp shadow deployment rồi A/B test. \gd chỉ phân phối thật mới lộ ra các lỗi mà tập test không có (\ptr{B/08-dich-chuyen-phan-phoi}).
+\end{mach}
+
+\section{Export và chọn runtime}
+
+\subsection{A. Bốn họ runtime}
+\begin{table}[H]\centering\footnotesize
+\caption{Bốn họ runtime và cái mà mỗi cái đánh đổi.}
+\label{tab:runtime}
+\begin{tabularx}{\linewidth}{@{}L{2.6cm}YYY@{}}
+\toprule
+\textbf{Runtime} & \textbf{Tối ưu cho} & \textbf{Đánh đổi} & \textbf{Hỏng khi nào}\\
+\midrule
+ONNX Runtime & Trung lập, chạy được nhiều nơi & Không nhanh nhất ở bất kỳ đâu & Khi bạn thực sự cần ép sát ngân sách trên một chip cụ thể\\
+TensorRT & GPU và DLA của NVIDIA & Khoá nhà cung cấp; build lâu; engine gắn với phiên bản và kiến trúc & Toán tử lạ phải viết plugin; nâng cấp JetPack là phải dựng lại toàn bộ\\
+OpenVINO & CPU và iGPU của Intel & Hẹp về phần cứng & Ngoài hệ sinh thái Intel\\
+ExecuTorch / CoreML / TFLite & Di động và nhúng & Tập toán tử hạn chế hơn hẳn & Mô hình dùng op động hoặc điều khiển luồng phức tạp\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Với một hệ thống thời gian thực trên Orin, hai chi tiết quyết định nhiều hơn bảng trên. Thứ nhất, engine TensorRT phải được \emph{dựng trên chính thiết bị đích} hoặc trên một môi trường trùng khít về phiên bản, vì nó nhúng cả lựa chọn kernel lẫn giả định về kiến trúc GPU. Thứ hai, Orin có DLA bên cạnh GPU; đẩy một phần đồ thị xuống DLA giải phóng GPU cho phần khác của hệ thống, nhưng DLA hỗ trợ ít toán tử hơn nên phần không chạy được sẽ rơi ngược về GPU và tạo ra các lần chuyển đổi tốn kém giữa hai bộ máy.
+
+\subsection{B. Sai lệch số học sau export --- bốn nguyên nhân theo thứ tự}
+Đây là bước mà kỷ luật quan trọng hơn kỹ thuật: \emph{so khớp đầu ra từng tầng sau mỗi lần export, không chỉ so kết quả cuối}. Lý do giống hệt lý do kiểm tra gradient từng tầng ở chương 19 --- giữ không gian nghi vấn ở một phần tử. Khi đã thấy chỗ lệch, kiểm theo thứ tự này:
+
+\lk{D/19/01}{cùng nguyên lý với}{so khớp từng tầng sau export là đúng một lập luận với kiểm tra gradient từng tầng: giữ không gian nghi vấn ở một phần tử thay vì ở tích các tương tác.}
+
+\begin{enumerate}
+\item \textbf{Dynamic shape bị cố định lúc trace.} Triệu chứng đặc trưng: đúng với đúng một kích thước đầu vào, sai hoặc lỗi với mọi kích thước khác. Đây là nguyên nhân phổ biến nhất và cũng rẻ nhất để loại trừ.
+\item \textbf{Toán tử không được hỗ trợ bị thay bằng bản xấp xỉ.} Triệu chứng: lệch tập trung ở một tầng cụ thể và không giảm khi bạn tăng độ chính xác. Kiểm bằng cách đọc log export --- nó thường có cảnh báo mà không ai đọc.
+\item \textbf{Khác biệt thứ tự phép toán ở fp16.} Triệu chứng: lệch nhỏ, phân tán đều, cỡ epsilon của fp16 và tích luỹ dần theo độ sâu. Đây là \emph{số học}, không phải bug --- và phân biệt được hai thứ này là kỹ năng bạn đã luyện ở mini project của chương 19.
+\item \textbf{Tiền xử lý khác nhau giữa hai phía.} Thứ tự kênh BGR so với RGB, giá trị mean/std, cách resize (song tuyến tính có căn góc hay không), và việc chia cho 255 hay không. Triệu chứng: lệch lớn và có hệ thống ngay từ tầng đầu tiên. Nghe tầm thường, nhưng đây là nguyên nhân tốn nhiều giờ người nhất trong danh sách, vì nó nằm ngoài mô hình nên không ai nghĩ tới nó khi đang debug mô hình \cite{sculley2015hidden}.
+\end{enumerate}
+
+\section{Chỗ thời gian thực sự nằm}
+Kỳ vọng mặc định là lượt xuôi chiếm phần lớn thời gian. Trong một hệ thống thị giác thật, kỳ vọng đó thường sai. Hình~\ref{fig:phan-ra-thoi-gian} minh hoạ một phân rã điển hình cho một bộ phát hiện chạy trên luồng video --- các con số là minh hoạ cho hình dạng, không phải một phép đo cụ thể.
+
+\begin{figure}[H]\centering
+\resizebox{0.95\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize]
+\def\yy{0}
+\fill[steel] (0,\yy) rectangle (2.6,\yy+0.8);
+\fill[steel!50] (2.6,\yy) rectangle (6.0,\yy+0.8);
+\fill[violetdark] (6.0,\yy) rectangle (9.4,\yy+0.8);
+\fill[reddark] (9.4,\yy) rectangle (12.6,\yy+0.8);
+\fill[rulecol] (12.6,\yy) rectangle (14.0,\yy+0.8);
+\node[white] at (1.3,\yy+0.4) {giải mã};
+\node[white] at (4.3,\yy+0.4) {resize + normalize};
+\node[white] at (7.7,\yy+0.4) {\textbf{lượt xuôi}};
+\node[white] at (11.0,\yy+0.4) {NMS};
+\node[black] at (13.3,\yy+0.4) {copy};
+\node[anchor=north] at (1.3,\yy-0.05) {19\%};
+\node[anchor=north] at (4.3,\yy-0.05) {24\%};
+\node[anchor=north] at (7.7,\yy-0.05) {24\%};
+\node[anchor=north] at (11.0,\yy-0.05) {23\%};
+\node[anchor=north] at (13.3,\yy-0.05) {10\%};
+\draw[-{Latex[length=2mm]}, draw=inkblue, thick] (0,\yy-0.9) -- (14.0,\yy-0.9) node[right]{thời gian một khung hình};
+\end{tikzpicture}}
+\caption{Phân rã thời gian điển hình của một bộ phát hiện trên luồng video (\emph{hình dạng minh hoạ, không phải số đo}). Phần được viết paper --- lượt xuôi --- thường chiếm khoảng một phần tư. Tối ưu 30\% của một phần tư cho lợi ích tổng 7\%; đưa giải mã và tiền xử lý lên GPU cho lợi ích lớn hơn nhiều, và đó là lý do các bộ công cụ như DALI hay DeepStream tồn tại.}
+\label{fig:phan-ra-thoi-gian}
+\end{figure}
+
+Hai chỗ đáng chú ý riêng. \textbf{\vn{Triệt phi cực đại}{non-maximum suppression, NMS}} là hậu xử lý tuần tự và phụ thuộc dữ liệu. Chi phí của nó tăng theo số hộp \emph{trước} ngưỡng. Nên một ngưỡng tin cậy đặt thấp làm p99 xấu đi nhiều hơn p50, đúng ở những khung hình đông đúc mà bạn quan tâm nhất \cite{bodla2017softnms}. \textbf{Sao chép giữa CPU và GPU} thường bị bỏ qua hoàn toàn trong phép đo; trên Orin, bộ nhớ hợp nhất cho phép tránh phần lớn các bản sao này, nhưng chỉ khi bạn cấp phát đúng loại bộ nhớ ngay từ đầu --- một quyết định phải làm ở lúc thiết kế chứ không sửa được về sau.
+
+\lk{B/11}{ràng buộc bởi}{trên Orin, GPU và CPU chia chung băng thông bộ nhớ, nên một tiến trình khác đang chạy đủ để đổi con số độ trễ mà không đổi một dòng mã nào.}
+
+\section{Batching động và ngân sách độ trễ}
+Gộp batch làm thông lượng tăng và độ trễ tăng. Cách đúng để nghĩ về nó là coi trần thời gian chờ là một tham số thiết kế, rồi tính xem tốc độ đến của yêu cầu có đủ để lấp batch trong trần đó không.
+
+\textbf{Ví dụ nhỏ nhất tính tay được.} Ngân sách p99 là $40$ ms. Forward cho batch $8$ tốn $20$ ms, nên còn $20$ ms cho hàng đợi. Muốn lấp đầy batch $8$ trong $20$ ms thì tốc độ đến phải ít nhất $8/0{,}02 = 400$ yêu cầu mỗi giây. Nếu thực tế chỉ có $100$ yêu cầu mỗi giây, trong $20$ ms bạn chỉ gom được $2$ yêu cầu --- nên bạn đang trả cái giá về độ trễ của batching mà chỉ nhận được lợi ích của batch $2$.
+
+\emph{Kết luận thiết kế:} batching động chỉ có lãi khi tốc độ đến vượt ngưỡng $B/T_{\text{chờ}}$. Dưới ngưỡng đó, cấu hình đúng là batch nhỏ hoặc không batch, và mọi nỗ lực chỉnh tham số batching là vô ích. Hình~\ref{fig:batch-p99} cho thấy hình dạng của cuộc đánh đổi.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.80\linewidth, height=5.6cm,
+  xlabel={Kích thước batch}, ylabel={Thông lượng (chuẩn hoá)},
+  axis y line*=left, xmin=0.5, xmax=34, ymin=0, ymax=4.4, xmode=log, log basis x=2,
+  xtick={1,2,4,8,16,32}, xticklabels={1,2,4,8,16,32},
+  tick label style={font=\footnotesize}, label style={font=\footnotesize},
+  grid=major, grid style={rulecol!60}]
+\addplot[thick, color=steel, mark=square*, mark size=1.6pt] coordinates {(1,1.0)(2,1.7)(4,2.6)(8,3.4)(16,3.9)(32,4.1)};
+\end{axis}
+\begin{axis}[width=0.80\linewidth, height=5.6cm,
+  axis y line*=right, axis x line=none, xmin=0.5, xmax=34, ymin=0, ymax=170, xmode=log, log basis x=2,
+  ylabel={Độ trễ p99 (ms)}, tick label style={font=\footnotesize}, label style={font=\footnotesize},
+  legend style={font=\footnotesize, at={(0.03,0.97)}, anchor=north west, draw=rulecol}]
+\addplot[thick, color=steel, mark=square*, mark size=1.6pt, forget plot] coordinates {(1,-10)};
+\addlegendimage{thick, color=steel, mark=square*}\addlegendentry{thông lượng (trục trái)}
+\addplot[thick, color=reddark, mark=*, mark size=1.6pt] coordinates {(1,14)(2,18)(4,27)(8,45)(16,84)(32,158)};
+\addlegendentry{p99 (trục phải)}
+\draw[draw=violetdark, thick, dashed] (axis cs:0.5,40) -- (axis cs:34,40);
+\node[font=\footnotesize, color=violetdark, anchor=south east] at (axis cs:33,41) {ngân sách 40 ms};
+\end{axis}
+\end{tikzpicture}
+\caption{Thông lượng bão hoà trong khi p99 tiếp tục tăng gần tuyến tính theo kích thước batch (\emph{số liệu minh hoạ}). Sau batch 8 bạn gần như không mua thêm được thông lượng nhưng vẫn trả đủ giá về độ trễ --- và đúng ở đó ngân sách bị phá.}
+\label{fig:batch-p99}
+\end{figure}
+
+\section{Mô hình sinh và VLM --- cấu trúc chi phí khác hẳn}
+Với mô hình sinh tự hồi quy, chi phí không nằm ở một lượt xuôi mà ở $n$ lượt, mỗi lượt sinh một \en{token}. KV cache biến bài toán từ ``tính lại toàn bộ chuỗi mỗi bước'' thành ``chỉ tính token mới'': đổi bộ nhớ lấy tốc độ. Nhưng lượng bộ nhớ ấy tăng tuyến tính theo độ dài chuỗi và theo số yêu cầu đồng thời. Nó vì thế trở thành ràng buộc chính của việc phục vụ. Với mô hình khuếch tán, đòn bẩy tương ứng là giảm số bước sampler và chưng cất sampler; với LLM là giải mã suy đoán. Cả ba đều là cùng một mẫu hình: chuyển công việc từ lúc chạy sang lúc huấn luyện.
+
+Điểm cần nhớ cho một hệ thống robotics: đưa một VLM vào vòng điều khiển thời gian thực là một quyết định kiến trúc, không phải một tối ưu. Độ trễ của nó phụ thuộc độ dài đầu ra, tức phụ thuộc \emph{nội dung}, nên nó không có chặn trên tự nhiên --- và mọi thành phần thời gian thực nối vào nó phải được thiết kế với một cơ chế hết giờ và một hành vi dự phòng.
+
+\section{Vận hành và cách đo cho đúng}
+Ba nguyên tắc, nêu ngắn vì bạn đã biết chúng ở phía C++:
+
+\begin{itemize}
+\item \textbf{Warm-up là bắt buộc, không phải mẹo.} Lần chạy đầu gánh cấp phát bộ nhớ, autotune kernel của cuDNN, và nạp trọng số vào cache. Bỏ vài chục lần lặp đầu là chuẩn mực; không bỏ thì bạn đang báo cáo một phân phối trộn hai chế độ.
+\item \textbf{Đo phân vị, không đo trung bình.} Trung bình che giấu đúng thứ làm người dùng khó chịu và làm hệ thống điều khiển mất ổn định. p99 là con số ràng buộc thiết kế; p50 chỉ để biết hệ thống có đang lành mạnh không.
+\item \textbf{Đồng bộ hoá trước khi bấm giờ.} Lệnh CUDA là bất đồng bộ; một phép đo bằng đồng hồ tường quanh lời gọi chỉ đo thời gian xếp hàng.
+\end{itemize}
+
+\section{Thiết bị biên: nơi benchmark ngắn nói dối}
+Trên Jetson và các NPU di động, hai ràng buộc vật lý chi phối mọi thứ: ngân sách năng lượng và tản nhiệt. Hệ quả trực tiếp là \emph{một trăm lần lặp không phải một phép đo}. Chip chạy ở xung nhịp cao khi mát, rồi tụt xung khi nhiệt độ chạm ngưỡng; nếu vòng lặp benchmark của bạn kết thúc trước lúc đó, bạn đo được một con số mà hệ thống sẽ không bao giờ duy trì được.
+
+Quy trình đo tối thiểu cho một thiết bị biên gồm bốn điều kiện, và cả bốn đều phải ghi vào báo cáo: chạy \emph{liên tục ít nhất mười phút}; ở \emph{đúng chế độ nguồn} sẽ triển khai (trên Orin là \code{nvpmodel}, và cần biết rằng \code{jetson\_clocks} không tự giữ qua lần khởi động lại); \emph{cùng với các tiến trình khác} sẽ chạy song song, vì chúng chia sẻ băng thông bộ nhớ; và ghi lại nhiệt độ cùng xung nhịp theo thời gian chứ không chỉ ghi độ trễ. Nếu đường độ trễ theo thời gian có một bậc thang, bạn vừa tìm thấy ngưỡng nhiệt --- và con số đúng để báo cáo là con số \emph{sau} bậc thang đó.
+
+\section{Thay mô hình an toàn}
+Thay mô hình mới là canh bạc vì tập test của bạn, dù tốt tới đâu, cũng không phải phân phối thật (\ptr{B/08-dich-chuyen-phan-phoi}). Quy trình giảm rủi ro có hai bước và thứ tự không đảo được: \textbf{shadow deployment} --- chạy song song trên lưu lượng thật, ghi lại kết quả nhưng không dùng chúng --- rồi \textbf{A/B test} trên một phần lưu lượng. Shadow bắt được các lỗi kỹ thuật (tiền xử lý sai, shape sai, độ trễ vượt ngân sách, phân phối đầu ra lệch) mà không gây thiệt hại; A/B mới đo được tác động thật lên chỉ số nghiệp vụ. Bỏ qua bước shadow để đi thẳng vào A/B là cách phổ biến để phát hiện một lỗi tiền xử lý bằng chính người dùng.
+
+\lk{B/08}{tiền đề}{tập test là một mẫu cố định của quá khứ; chỉ lưu lượng thật mới bộc lộ các vùng phân phối đã trôi kể từ lúc thu dữ liệu.}
+
+\section{Thực hành}
+\begin{description}
+\item[Repo và tài nguyên.] \emph{Runtime:} \repo{microsoft/onnxruntime}, \repo{NVIDIA/TensorRT}, \repo{openvinotoolkit/openvino}, \repo{pytorch/executorch}. \emph{Phục vụ:} \repo{triton-inference-server/server}, \repo{Lightning-AI/LitServe}. \emph{Pipeline video:} \repo{NVIDIA/DALI} và DeepStream. \emph{Phục vụ mô hình sinh và VLM:} \repo{vllm-project/vllm}, \repo{sgl-project/sglang}. Danh sách chốt tại tháng 9/2026; các runtime hạ tầng ở đây bền hơn nhiều so với tên các bộ phục vụ LLM, vốn thay đổi từng quý.
+
+\item[Câu hỏi kiểm tra hiểu.] Sau khi export ONNX, đầu ra lệch $10^{-2}$ so với PyTorch --- bốn nguyên nhân theo thứ tự cần kiểm là gì, và triệu chứng phân biệt chúng? Vì sao p99 mới là con số ràng buộc thiết kế chứ không phải trung bình? Batching động cải thiện thông lượng nhưng làm hỏng gì, và ngưỡng tốc độ đến tối thiểu để nó có lãi được tính thế nào?
+
+\item[Mini project (vài giờ đến hai ngày).] Export một bộ phát hiện sang ONNX rồi sang TensorRT. Ở mỗi bước, kiểm tra khớp đầu ra \emph{từng tầng} và đo p50 cùng p99. Lập bảng thời gian theo từng khối: giải mã, tiền xử lý, lượt xuôi, NMS, sao chép. Kết quả đáng giá nhất của bài này thường là phát hiện rằng khối chiếm nhiều thời gian nhất không phải khối bạn định tối ưu.
+
+\end{description}
+
+\section{Giới hạn và trường hợp hỏng}
+\begin{itemize}
+\item \textbf{Engine gắn chặt với phiên bản.} Nâng JetPack, đổi phiên bản TensorRT, hay đổi biến thể GPU là phải dựng lại và \emph{kiểm chứng lại} --- không phải chỉ dựng lại. Đây là chi phí vận hành thường xuyên chứ không phải chi phí một lần.
+\item \textbf{So khớp từng tầng không bắt được lỗi phụ thuộc dữ liệu.} Một mẫu đầu vào cố định không kích hoạt nhánh điều khiển hiếm; NMS với số hộp bất thường, hoặc một shape ngoài optimization profile, vẫn có thể hỏng sau khi mọi phép so đã qua.
+\item \textbf{p99 đo trên lưu lượng tổng hợp không dự báo p99 thật.} Lưu lượng thật có cụm và có tương quan; một bộ sinh yêu cầu đều đặn cho phân phối hàng đợi lạc quan hơn nhiều so với thực tế.
+\item \textbf{Shadow deployment không phát hiện được vấn đề về vòng phản hồi.} Nếu mô hình mới thay đổi hành vi hệ thống và hành vi đó thay đổi phân phối đầu vào, chỉ A/B mới thấy --- shadow theo định nghĩa không tác động gì nên không tạo ra vòng lặp đó.
+\end{itemize}
+
+\begin{cambay}
+Ba cách đo sai làm bạn tin vào một con số không tồn tại. \textbf{Một:} bấm giờ bằng đồng hồ tường quanh một lời gọi CUDA mà không đồng bộ hoá --- bạn đo thời gian \emph{xếp hàng lệnh}, thường nhỏ hơn thời gian chạy thật một bậc. \textbf{Hai:} không warm-up, rồi lấy trung bình gồm cả lần chạy đầu vốn gánh autotune và cấp phát; con số ra vừa sai vừa có phương sai lớn giả tạo. \textbf{Ba:} benchmark một trăm lần lặp trên thiết bị biên đang mát, rồi báo cáo con số đó như hiệu năng bền vững. Hệ thống sẽ chạy chậm hơn ngay khi vào ca làm việc thật. Và không ai tái hiện được vấn đề, vì mọi người đều benchmark theo cách cũ.
+\end{cambay}
+
+\begin{cannho}
+Một phép đo độ trễ chỉ có nghĩa khi kèm trạng thái: chế độ nguồn, nhiệt độ đã bão hoà chưa, có tiến trình nào chạy cùng không, đã warm-up chưa, và đó là phân vị nào. Thiếu bất kỳ mục nào trong danh sách đó thì con số không tái hiện được và không dùng để ra quyết định được. Và nguyên tắc bao trùm cả chương: sau mỗi lần dịch --- Python sang ONNX, ONNX sang engine --- phải có một phép kiểm chứng riêng, vì mỗi lần dịch là một cơ hội để ngữ nghĩa đổi im lặng. \T{2}
+\end{cannho}
+
+
+\begin{onbai}
+\ar[3]{Export}{Chuyển mô hình từ mã Python sang một đồ thị tĩnh mà runtime khác nạp được; ONNX là định dạng trung gian phổ biến nhất. Mỗi lần dịch là một cơ hội đổi ngữ nghĩa im lặng.}
+\ar[2]{Opset và plugin}{Opset là phiên bản tập toán tử ONNX; plugin là phần bạn phải tự viết khi runtime không có op đó. Không viết thì op bị thay bằng một xấp xỉ.}
+\ar[3]{Engine TensorRT}{Kết quả biên dịch cho một tổ hợp cụ thể gồm phiên bản thư viện, kiến trúc GPU và dải shape. Đổi bất kỳ thứ nào là phải dựng lại \emph{và kiểm chứng lại}.}
+\ar[2]{Optimization profile}{Khai báo trước dải shape động để TensorRT sinh kernel phù hợp. Không khai báo thì shape bị đóng băng lúc trace.}
+\ar[2]{Vì sao phải so khớp đầu ra từng tầng sau export?}{Để giữ không gian nghi vấn ở một tầng thay vì cả chuỗi ba lần dịch. Cùng lập luận với kiểm tra gradient từng tầng ở chương 19.}
+\ar[3]{Lệch sau export}{Theo thứ tự kiểm: shape động bị cố định lúc trace; op không hỗ trợ bị thay bằng xấp xỉ; khác thứ tự phép toán ở fp16; và tiền xử lý lệch giữa hai phía.}
+\ar[3]{Triệt phi cực đại}{Hậu xử lý tuần tự, phụ thuộc dữ liệu, chi phí tăng theo số hộp \emph{trước} ngưỡng. Ngưỡng tin cậy thấp làm p99 xấu đi nhiều hơn p50.}
+\ar[3]{Vì sao phải warm-up trước khi đo?}{Lần chạy đầu gánh cấp phát bộ nhớ, autotune kernel và nạp trọng số vào cache. Không bỏ chúng đi thì bạn báo cáo một phân phối trộn hai chế độ.}
+\ar[3]{Vì sao p99 mới là con số ràng buộc thiết kế?}{Vì trung bình che đúng cái đuôi mà người dùng cảm nhận và mà hệ điều khiển phải chịu. p50 chỉ để biết hệ thống có đang lành mạnh không.}
+\ar[2]{Batching động}{Gom yêu cầu đến gần nhau thành một batch, kèm trần thời gian chờ. Chỉ có lãi khi tốc độ đến vượt \(B/T_{\text{chờ}}\).}
+\ar[2]{KV cache}{Lưu khoá và giá trị attention của các token đã sinh để không tính lại chuỗi mỗi bước. Bộ nhớ tăng tuyến tính theo độ dài chuỗi và số yêu cầu đồng thời.}
+\ar[2]{DLA trên Orin}{Bộ máy suy luận riêng bên cạnh GPU, dùng để giải phóng GPU cho phần khác của hệ thống. Hỗ trợ ít op hơn, nên phần không chạy được rơi ngược về GPU.}
+\ar[2]{Vì sao bấm giờ quanh một lời gọi CUDA cho số sai?}{Lệnh CUDA bất đồng bộ, nên đồng hồ tường chỉ đo thời gian xếp hàng. Phải đồng bộ hoá hoặc dùng CUDA event.}
+\ar[1]{Shadow deployment}{Chạy mô hình mới song song trên lưu lượng thật nhưng không dùng kết quả. Bắt lỗi kỹ thuật mà không gây thiệt hại; không bắt được vấn đề vòng phản hồi.}
+\ar[2]{Thông lượng tăng gấp ba mà p99 vượt ngân sách?}{Batch quá lớn. Thông lượng bão hoà trong khi p99 vẫn tăng gần tuyến tính, nên sau một điểm bạn trả giá mà không mua thêm được gì.}
+\ar[2]{Đầu ra đúng với một kích thước ảnh, sai với mọi kích thước khác?}{Shape động đã bị cố định lúc trace, hoặc thiếu optimization profile. Đây là nguyên nhân phổ biến nhất và rẻ nhất để loại trừ.}
+\ar[2]{Độ trễ ổn định tám phút rồi nhảy một bậc?}{Chip chạm ngưỡng nhiệt và tụt xung. Con số đúng để báo cáo là con số \emph{sau} bậc thang đó.}
+\ar[2]{Tối ưu lượt xuôi nhanh hơn 30\% mà hệ thống chỉ nhanh hơn 7\%?}{Lượt xuôi chỉ chiếm khoảng một phần tư thời gian. Phần còn lại là giải mã, tiền xử lý, triệt phi cực đại và sao chép giữa CPU với GPU.}
+\end{onbai}
+
+
+\begin{ungdung}
+\ud{ONNX Runtime, TensorRT, OpenVINO}{Toàn bộ mạch export \(\rightarrow\) engine \(\rightarrow\) kernel, kể cả optimization profile cho shape động}{Hạ tầng; ONNX là định dạng trung gian bền nhất trong nhóm}
+\ud{Triton Inference Server}{Batching động kèm trần thời gian chờ --- đúng cuộc đánh đổi thông lượng với p99 ở mục batching}{Hạ tầng phục vụ; cơ chế batching của nó là hiện thực sạch của bất đẳng thức $B/T_{\text{chờ}}$}
+\ud{\repo{vllm}, \repo{sglang}}{KV cache và lập lịch yêu cầu cho mô hình sinh, tức đổi bộ nhớ lấy tốc độ ở quy mô nhiều người dùng}{Nhóm công cụ đổi nhanh nhất trong danh sách; ý tưởng KV cache thì không đổi}
+\ud{DALI, DeepStream}{Đưa giải mã và tiền xử lý lên GPU vì chúng, chứ không phải lượt xuôi, mới chiếm phần lớn thời gian}{Đúng kết luận của Hình~\ref{fig:phan-ra-thoi-gian}, đóng gói thành sản phẩm}
+\ud{DLA trên Jetson Orin}{Đẩy một phần đồ thị sang bộ máy khác để giải phóng GPU cho phần còn lại của hệ thống}{Chỉ có lãi khi toàn bộ nhánh chạy được trên DLA; op không hỗ trợ rơi ngược về GPU và tạo chuyển đổi tốn kém}
+\end{ungdung}
+
+\begin{duan}{Phân rã độ trễ của một pipeline SLAM có thành phần học}{1--2 ngày}
+\dmt tìm ra khối nào thật sự ăn thời gian trong hệ của bạn. Rồi đo nó theo cách mà con số còn đúng sau mười phút chạy liên tục, không chỉ trong một trăm lần lặp.
+\ddl hệ SLAM của bạn chạy trên Orin với một chuỗi EuRoC phát lại ở tốc độ thật, có cắm tầng mô tả INT8 từ mini project chương 20 vào frontend.
+\dbc bọc năm khối bằng CUDA event --- giải mã và hiệu chỉnh méo, phát hiện đặc trưng, mô tả bằng mạng, ghép cặp cùng RANSAC, và tối ưu --- chứ không bấm giờ bằng đồng hồ tường. Bỏ 200 khung hình đầu làm warm-up. Chạy liên tục mười phút ở đúng chế độ \code{nvpmodel} sẽ triển khai, với các tiến trình thật chạy song song. Ghi lại nhiệt độ và xung nhịp theo thời gian cùng với độ trễ.
+\dxk bạn chỉ ra được khối chiếm nhiều thời gian nhất, kèm phần trăm của nó. Bạn nói được p99 cao hơn trung bình bao nhiêu phần trăm. Và trên đồ thị độ trễ theo thời gian, bạn chỉ được bậc thang do tụt xung vì nhiệt --- hoặc chứng minh bằng đường nhiệt độ rằng nó chưa xuất hiện trong mười phút.
+\dnv \ptr{D/21} cho hình phân rã thời gian và cuộc đánh đổi thông lượng với p99; \ptr{B/11} cho lý do băng thông chung trên Orin làm con số đổi khi có tiến trình khác. Bộ đo dựng ở đây chính là thứ mini project chương 22 đem đi kiểm tính tái lập.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì notebook đo một hệ thống ở trạng thái tốt nhất: đã warm-up hoặc chưa, mát, không có tiến trình nào tranh băng thông, và thường bấm giờ bằng đồng hồ tường quanh một lệnh CUDA bất đồng bộ. Cả bốn sai lệch đều đi cùng một hướng --- lạc quan.}
+\tl{Vào những khối bạn không đo: giải mã, resize và chuẩn hoá, triệt phi cực đại, và các bản sao giữa CPU với GPU. Nếu lượt xuôi chỉ chiếm một phần tư thời gian thì $30\%$ của một phần tư đúng bằng $7{,}5\%$ tổng --- số học chứ không phải nghịch lý.}
+\tl{Vì thông lượng bão hoà trong khi p99 tiếp tục tăng gần tuyến tính theo kích thước batch. Sau một điểm nào đó bạn gần như không mua thêm được thông lượng nhưng vẫn trả đủ giá độ trễ, và nếu tốc độ đến nhỏ hơn $B/T_{\text{chờ}}$ thì bạn còn không lấp nổi batch trong trần chờ.}
+\tl{Vì phút thứ tám là một trạng thái khác: chip đã chạm ngưỡng nhiệt và tụt xung. Đường độ trễ theo thời gian có một bậc thang, và con số đúng để báo cáo là con số \emph{sau} bậc thang đó.}
+\tl{Bằng triệu chứng. Lệch do số học thì nhỏ, phân tán đều, cỡ epsilon của fp16 và tích luỹ dần theo độ sâu. Lệch do bug thì tập trung ở một tầng và không giảm khi bạn tăng độ chính xác --- hoặc lớn và có hệ thống ngay từ tầng đầu, dấu hiệu kinh điển của tiền xử lý lệch.}
+\end{traloi}
+
+\begin{dongian}
+Một nhà hàng bị chê phục vụ chậm. Chủ quán liền thuê đầu bếp giỏi hơn, nấu nhanh hơn ba mươi phần trăm --- và khách vẫn chê. Lý do: nấu chỉ chiếm một phần tư thời gian một món. Phần còn lại là nhặt rau, rửa, thái, xếp đĩa và bưng ra. Muốn nhanh thì phải bấm giờ từng khâu trước đã, chứ không phải cải thiện đúng cái khâu ai cũng nói tới.
+
+Chuyện thứ hai là cách báo cáo. Nói ``trung bình hai mươi phút một món'' nghe rất ổn, nhưng khách nhớ cái lần họ chờ năm mươi phút. Con số ràng buộc thiết kế là cái lần xui xẻo đó, không phải trung bình.
+
+Chuyện thứ ba là trạng thái của bếp. Bếp lúc mới mở khác hẳn bếp đã chạy tám phút liên tục: nóng lên thì mọi thứ chậm lại. Đo mười lượt lúc bếp còn nguội rồi công bố con số ấy là tự lừa mình.
+
+Chuyện thứ tư là gộp đơn. Nấu một lượt cho tám bàn thì tổng số món phục vụ được nhiều hơn hẳn, nhưng bàn đến trước phải ngồi đợi cho đủ tám. Nếu quán chỉ có một trăm khách một giờ thì chờ cho đủ tám bàn là quá lâu, và bạn đang trả cái giá của gộp đơn mà không nhận được lợi ích của nó.
+
+Cái giá chung của cả chương: mọi con số bạn đo chỉ đúng kèm điều kiện --- bếp nóng hay nguội, đông hay vắng, đã chạy thử chưa.
+
+\motcau{Đừng hỏi mô hình chạy nhanh bao nhiêu; hãy hỏi cả hệ thống, ở đúng trạng thái thật, phục vụ được người khách xui xẻo thứ chín mươi chín trong một trăm.}
+\end{dongian}
+
+\section{Kết nối}
+Chương này nhận đầu vào từ \ptr{D/20-toi-uu-va-nen-mo-hinh} và trả lại cho nó một bài học ngược: mọi phép đo dùng để vẽ đường Pareto ở chương 20 chỉ hợp lệ nếu được đo theo đúng kỷ luật của chương này, nên hai chương thực chất là một vòng lặp chứ không phải một chuỗi. Nó là ứng dụng của \ptr{B/11-gioi-han-tinh-toan} ở phía \vn{suy luận}{inference}, và nó dựa vào \ptr{B/08-dich-chuyen-phan-phoi} cho toàn bộ lập luận về shadow deployment. Về phía sau, nó là tiền đề của \ptr{D/22-tai-lap-va-mlops}: một khi mô hình đã chạy trong production, câu hỏi đổi từ ``nó có nhanh không'' sang ``sáu tháng nữa tôi có dựng lại được đúng nó không, và tôi có biết nó đang xuống cấp không''. Và nó nối thẳng sang \ptr{E/25-do-tin-cay-va-van-hanh} cho phần hành vi khi mô hình gặp đầu vào ngoài phân phối.
+
+\begin{tukiem}
+\item Sau khi export ONNX, đầu ra lệch $10^{-2}$ --- bốn nguyên nhân theo thứ tự cần kiểm là gì, và triệu chứng nào phân biệt ``lệch do số học'' với ``lệch do toán tử bị thay thế''?
+\item Vì sao p99 là con số ràng buộc thiết kế còn trung bình thì không, và điều đó đổi cách bạn chọn ngưỡng tin cậy của NMS như thế nào?
+\item Với ngân sách p99 là 40 ms và lượt xuôi batch 8 tốn 20 ms, tốc độ đến tối thiểu để batching động có lãi là bao nhiêu, và dưới ngưỡng đó cấu hình đúng là gì?
+\item Vì sao một benchmark một trăm lần lặp trên Jetson nói dối, và phép đo tối thiểu để không bị nó lừa gồm những điều kiện nào?
+\item Vì sao engine TensorRT phải dựng lại sau khi nâng JetPack, và vì sao ``dựng lại'' là chưa đủ?
+\item Shadow deployment bắt được loại lỗi nào mà tập test không bắt được, và loại lỗi nào nó vẫn không bắt được?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

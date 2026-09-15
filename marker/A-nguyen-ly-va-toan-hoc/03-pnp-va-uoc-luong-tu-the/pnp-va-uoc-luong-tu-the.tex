@@ -1,0 +1,405 @@
+% ---------------------------------------------------------------------------
+% Chương 3 — PnP và ước lượng tư thế
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-13  |  Ôn gần nhất: —
+% Phụ thuộc: A/01 (mô hình chiếu, K), A/02 (homography làm khởi tạo)
+% Mức độ: XƯƠNG SỐNG — cỗ máy biến góc thành pose; cấp Jacobian cho A/05.
+% Kiểm chứng công thức lõi:
+%   (1) P3P có tối đa 4 nghiệm — cửa (c) haralick1994review (phân tích đầy đủ,
+%       truy về Grunert 1841) và kneip2011novel; kiến thức chuẩn.
+%   (2) Sai số tái chiếu và Gauss-Newton: δ = -(J^T Σ^-1 J)^-1 J^T Σ^-1 r
+%       — cửa (a) tự dẫn từ điều kiện dừng bậc nhất; cửa (c) hartley2004 App 6.
+%   (3) PnP hợp nhất trên N tag ≠ trung bình N pose
+%       — cửa (a) dẫn ở mục 6 bằng tính không giao hoán của nghịch đảo và tổng;
+%         cửa (c) luận điểm tương đương trong triggs2000bundle §2.
+%   (4) Trọng số theo covariance: MLPnP / weighted PnP
+%       — cửa (c) urban2016mlpnp; cửa (a) dẫn từ hàm hợp lý Gauss.
+% Ghi chú trung thực: chương không chứa số đo thực nghiệm. Nhận định về tốc độ
+%   và độ chính xác tương đối giữa các thuật toán PnP là BẬC ĐỘ LỚN kinh nghiệm,
+%   KHÔNG phải benchmark có điều kiện xác định — đánh dấu rõ ở mục 4.
+% ---------------------------------------------------------------------------
+\documentclass[../../marker.tex]{subfiles}
+\begin{document}
+\chapter{PnP và ước lượng tư thế (Perspective-n-Point)}
+\ptrtarget{A/03}\ptrtarget{A/03-pnp-va-uoc-luong-tu-the}
+\dependency{\ptr{A/01-mo-hinh-camera-va-distortion} (mô hình chiếu và ma trận \(K\) --- PnP giả định cả hai đã biết chính xác); \ptr{A/02-homography-va-hinh-hoc-phang} (phân rã homography, một trong các cách khởi tạo).}
+
+\begin{tomtat}
+Chương này dựng cỗ máy trung tâm của cả cây: cho một tập điểm 3D đã biết toạ độ trong hệ vật và hình chiếu của chúng trên ảnh, tìm pose của camera. Bức tranh gồm hai tầng và tách bạch chúng là điều quan trọng nhất cần mang ra khỏi chương. Tầng thứ nhất là các lời giải \emph{dạng đóng} --- P3P, EPnP, DLT, IPPE --- chúng nhanh, không cần khởi tạo, và \emph{không} tối ưu theo tiêu chí có ý nghĩa. Tầng thứ hai là \emph{tinh chỉnh phi tuyến} cực tiểu hoá sai số tái chiếu, và đây mới là nghiệm cuối cùng. Ba điều thực hành: với target phẳng hãy dùng IPPE vì nó cho cả hai nghiệm; với nhiều tag hãy chạy \emph{một} PnP trên toàn bộ tập góc chứ đừng trung bình pose; và hãy trọng số hoá theo chất lượng từng góc thay vì coi mọi góc như nhau. Nếu chỉ nhớ một điều: \emph{lời giải dạng đóng là để khởi tạo, tinh chỉnh mới là kết quả} --- và Jacobian của bước tinh chỉnh chính là ma trận mà \ptr{A/05} đảo để ra mọi công thức sai số của cây.
+\end{tomtat}
+
+\begin{nentang}
+\kn{PnP}{\en{Perspective-n-Point}: bài toán tìm pose camera từ \(n\) điểm 3D đã biết và hình chiếu 2D của chúng, với \(K\) đã biết. Ba điểm là số tối thiểu cho một tập nghiệm hữu hạn; bốn điểm thường đủ để chọn ra một nghiệm.}
+\kn{sai số tái chiếu (reprojection error)}{với một pose giả định \(\xi\), chiếu điểm 3D ra ảnh được \(\hat{u}_i(\xi)\), rồi lấy hiệu với góc đo được \(u_i\). Đây là hàm mục tiêu có ý nghĩa vật lý vì nó đo đúng đại lượng mà nhiễu tác động lên --- toạ độ pixel.}
+\kn{sai số đại số (algebraic error)}{đại lượng mà các lời giải tuyến tính như DLT cực tiểu hoá, thường có dạng \(\|A\mathbf{h}\|\). Nó dễ giải vì tuyến tính, và nó \emph{không} tỉ lệ với sai số tái chiếu --- đó là toàn bộ lý do cần bước tinh chỉnh.}
+\kn{Gauss--Newton}{phương pháp lặp cho bình phương tối thiểu phi tuyến: tuyến tính hoá phần dư quanh ước lượng hiện tại, giải một hệ tuyến tính cho bước cập nhật, lặp lại. Nó xấp xỉ Hessian bằng \(J^\top J\), bỏ số hạng chứa đạo hàm bậc hai của mô hình.}
+\kn{Levenberg--Marquardt (LM)}{Gauss--Newton có thêm số hạng chính quy hoá \(\lambda I\) trên đường chéo, nội suy giữa Gauss--Newton (khi \(\lambda\) nhỏ) và bước giảm gradient (khi \(\lambda\) lớn). Nó bền hơn khi khởi tạo xa hoặc khi \(J^\top J\) kém điều kiện.}
+\kn{tham số hoá tối thiểu của xoay}{pose có sáu bậc tự do nhưng \(R\) có chín phần tử với sáu ràng buộc. Để tối ưu trên \(SO(3)\) cần một tham số hoá cục bộ sáu tham số --- thường là véctơ xoay qua ánh xạ mũ, tức \(\mathfrak{se}(3)\). Dùng góc Euler thay vào là nguồn của kỳ dị gimbal lock.}
+\kn{RANSAC}{\en{Random Sample Consensus}: chọn ngẫu nhiên tập con tối thiểu, giải, đếm số điểm phù hợp, lặp và giữ tập con tốt nhất \cite{fischler1981ransac}. Nó loại điểm ngoại lai chứ không cải thiện độ chính xác của điểm nội lai.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{P3P với ba điểm cho tối đa bốn nghiệm hình học hợp lệ. Vì sao bốn mà không phải hai hay tám, và điều đó có ý nghĩa gì với việc bạn phải làm ở tầng code?}
+\h{EPnP chạy nhanh, không cần khởi tạo, xử lý được hàng trăm điểm. Vì sao nó vẫn không đủ, và cụ thể đại lượng nào nó cực tiểu hoá mà không phải đại lượng bạn quan tâm?}
+\h{Bạn có bốn tag, mỗi tag bốn góc. Có hai cách: bốn lần PnP rồi gộp, hoặc một lần PnP trên mười sáu góc. Chúng cho kết quả khác nhau đáng kể --- vì sao, và cách nào đúng?}
+\h{Bộ tối ưu của bạn dùng góc Euler để tham số hoá xoay. Nó chạy tốt trong thử nghiệm rồi thỉnh thoảng phân kỳ hoàn toàn ở một số tư thế. Cơ chế gì, và cách sửa đúng là gì?}
+\h{Một tag ở xa và nghiêng mạnh, một tag ở gần và nhìn thẳng, cả hai đều nhìn thấy. Nếu bạn cho chúng trọng số như nhau trong PnP hợp nhất, bạn đang giả định gì --- và giả định ấy sai theo chiều nào?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{A/03/01}
+
+Toàn bộ cây này quy về một phép biến đổi: từ vài chục toạ độ pixel sang sáu con số pose. Chương này là chương mô tả phép biến đổi ấy.
+
+Bài toán có một lịch sử dài hơn thị giác máy tính. Trường hợp ba điểm được Grunert giải năm 1841 trong bối cảnh trắc địa --- xác định vị trí một trạm quan trắc từ ba mốc đã biết --- và phân tích đầy đủ về số nghiệm của nó được Haralick và cộng sự tổng hợp lại một thế kỷ rưỡi sau \cite{haralick1994review}. Trường hợp \(n\) điểm tổng quát thì có nhiều lời giải hiện đại, mỗi lời giải đánh đổi khác nhau giữa tốc độ, độ bền và độ chính xác.
+
+Điều đáng nói với người làm marker --- và lý do chương này không chỉ là một danh mục thuật toán --- là một sự nhầm lẫn rất phổ biến về \emph{vai trò} của các thuật toán ấy. Người ta hay hỏi ``dùng PnP nào tốt nhất'', như thể đó là một lựa chọn duy nhất. Câu hỏi ấy đặt sai, vì bức tranh đúng có hai tầng và chúng phục vụ hai mục đích khác nhau.
+
+Tầng thứ nhất gồm các lời giải \emph{dạng đóng}: P3P, EPnP, DLT, IPPE, SQPnP. Chúng giải một hệ đại số và cho ra nghiệm trong một số hữu hạn phép tính, không cần điểm khởi đầu. Ưu điểm rõ ràng; nhược điểm thì kín đáo hơn: chúng cực tiểu hoá một đại lượng đại số nào đó \emph{không phải} sai số tái chiếu. Hệ quả là nghiệm chúng cho ra nói chung không phải nghiệm hợp lý cực đại, và độ lệch ấy đáng kể khi nhiễu không nhỏ.
+
+Tầng thứ hai là \emph{tinh chỉnh phi tuyến}: xuất phát từ một pose khởi tạo, lặp Gauss--Newton hoặc LM để cực tiểu hoá sai số tái chiếu. Đây là bước cho ra nghiệm hợp lý cực đại dưới giả thiết nhiễu Gauss, và đây là nghiệm duy nhất mà công thức hiệp phương sai của \ptr{A/05} áp dụng được. Bỏ bước này là bỏ đi cả độ chính xác lẫn khả năng nói gì đó có cơ sở về bất định.
+
+Cách hiển nhiên mà nhiều cài đặt thực tế làm --- gọi một hàm PnP dạng đóng rồi dùng thẳng kết quả --- do đó hỏng theo hai cách cùng lúc. Nó mất một phần độ chính xác, và nó mất luôn ma trận thông tin mà bước tinh chỉnh sinh ra như một sản phẩm phụ miễn phí. Cái thứ hai đắt hơn cái thứ nhất, vì không có ma trận thông tin thì không có trọng số để hợp nhất, không có cơ sở để loại ngoại lai theo chi-square, và không có gì để đưa vào ngân sách sai số.
+
+Có một cách hiển nhiên thứ hai cũng hỏng, và nó phổ biến hơn: khi có nhiều tag, chạy PnP cho từng tag rồi gộp các pose lại. \ptr{A/05} mục~7 đã nêu kết luận; mục~6 của chương này giải thích cơ chế bằng ngôn ngữ của bài toán tối ưu.
+
+\begin{trucgiac}
+Hình dung bài toán PnP như việc định vị bằng giác kế.
+
+Bạn đứng ở một chỗ chưa biết và nhìn thấy vài cột mốc mà bạn biết chính xác toạ độ. Với mỗi cột mốc, bạn đo được \emph{hướng} tới nó --- không phải khoảng cách, chỉ hướng. Câu hỏi: bạn đang ở đâu và đang quay mặt về phía nào?
+
+Mỗi cột mốc cho bạn một tia: ``từ chỗ tôi đứng, cột mốc này nằm theo hướng đó''. Với một cột mốc thì vô số vị trí thoả mãn. Với hai thì bớt đi. Với ba thì --- và đây là chỗ bất ngờ --- vẫn còn tới bốn vị trí có thể, vì bài toán đại số ẩn sau nó là bậc bốn. Phải có cột mốc thứ tư để loại bớt.
+
+Bây giờ thêm nhiễu. Bạn đo hướng không chính xác tuyệt đối, nên các tia không giao nhau ở đúng một điểm --- chúng tạo thành một chùm tia hơi lệch nhau. Không có vị trí nào thoả mãn \emph{tất cả} các phép đo. Câu hỏi đổi thành: vị trí nào làm tổng bình phương độ lệch nhỏ nhất?
+
+Và đây là chỗ hai tầng xuất hiện. Lời giải dạng đóng giống như việc dùng một công thức sẵn có để ra ngay một đáp án gần đúng --- nhanh, và nó tối thiểu hoá một thứ gì đó tiện tính chứ không phải thứ bạn thật sự quan tâm. Tinh chỉnh giống như việc đứng ở đáp án ấy rồi dịch chuyển từng chút một theo hướng làm tổng lệch giảm, cho tới khi không giảm được nữa.
+
+Điều đáng nói cuối: khi bạn dừng lại, độ \emph{cong} của mặt tổng-lệch quanh chỗ bạn đứng cho bạn biết bạn chắc chắn tới mức nào. Dốc đứng theo mọi hướng thì vị trí xác định tốt; có một hướng gần phẳng thì theo hướng ấy bạn không biết gì cả. Đó chính là ma trận thông tin của \ptr{A/05}, và nó chỉ tồn tại nếu bạn đã làm bước tinh chỉnh.
+\end{trucgiac}
+
+\section{P3P: ba điểm và bốn nghiệm}
+\ptrtarget{A/03/02}
+
+Trường hợp tối thiểu, và nó đáng hiểu vì nó là hạt nhân của RANSAC.
+
+Cho ba điểm \(P_1, P_2, P_3\) đã biết khoảng cách đôi một \(d_{12}, d_{13}, d_{23}\), và ba hướng tia đơn vị \(\mathbf{v}_1, \mathbf{v}_2, \mathbf{v}_3\) từ tâm camera tới chúng (tính được từ toạ độ ảnh và \(K^{-1}\)). Ẩn là ba khoảng cách \(s_1, s_2, s_3\) từ tâm camera tới ba điểm.
+
+Định lý cosin trong ba tam giác cho ba phương trình:
+\[
+s_i^2 + s_j^2 - 2s_i s_j \cos\theta_{ij} = d_{ij}^2, \qquad \cos\theta_{ij} = \mathbf{v}_i^\top\mathbf{v}_j .
+\]
+Ba phương trình bậc hai, ba ẩn. Khử hai ẩn cho ra một đa thức bậc bốn theo ẩn còn lại, và đó là nguồn gốc của con số bốn trong ``tối đa bốn nghiệm'' --- đây là câu trả lời cho Q1. Không phải hai vì hệ thực sự bậc bốn; không phải tám vì các nghiệm âm (điểm sau camera) bị loại bởi vật lý.
+
+Sau khi có \(s_i\), toạ độ ba điểm trong hệ camera là \(s_i\mathbf{v}_i\), và pose thu được bằng cách khớp hai tập ba điểm --- một bài toán Procrustes giải bằng SVD.
+
+Ý nghĩa thực hành của ``bốn nghiệm'' là rất cụ thể: \emph{bạn phải có điểm thứ tư để chọn}. Quy trình chuẩn là dùng ba điểm giải P3P, được tới bốn ứng viên, rồi chiếu điểm thứ tư bằng từng ứng viên và giữ ứng viên cho sai số tái chiếu nhỏ nhất. Đây là lý do mọi cài đặt RANSAC cho PnP dùng tập con bốn điểm chứ không phải ba.
+
+Có nhiều công thức hoá khác nhau cho P3P, khác nhau ở độ ổn định số học và tốc độ; công thức của Kneip và cộng sự tránh được bước khớp Procrustes bằng cách xây trực tiếp một hệ toạ độ trung gian \cite{kneip2011novel}. Với mục đích của cây thì chi tiết ấy không quan trọng --- điều quan trọng là biết P3P tồn tại, nó cho nhiều nghiệm, và vai trò của nó là \emph{hạt nhân tối thiểu cho RANSAC}, không phải bộ giải chính.
+
+\begin{cambay}
+Đừng nhầm bốn nghiệm của P3P với hai nghiệm của target phẳng ở \ptr{A/04}. Chúng là hai hiện tượng khác nhau và cách xử lý khác nhau.
+
+Bốn nghiệm của P3P là hệ quả của việc \emph{thiếu dữ liệu}: ba điểm không đủ để xác định sáu bậc tự do một cách duy nhất. Thêm một điểm thứ tư (không suy biến) là loại được ba trong bốn, và vấn đề biến mất hoàn toàn.
+
+Hai nghiệm của target phẳng là hệ quả của một \emph{đối xứng hình học} và nó \emph{không} biến mất khi thêm điểm --- miễn là các điểm thêm vào vẫn đồng phẳng. Đó là một loại bệnh hoàn toàn khác, chữa bằng cách phá tính đồng phẳng chứ không bằng cách thêm dữ liệu.
+
+Hệ quả cài đặt: một tag vuông đơn lẻ có bốn góc, đủ để loại bớt nghiệm P3P, nhưng \emph{vẫn} có hai nghiệm phẳng. Nếu bạn thấy hai nghiệm sau khi đã dùng cả bốn góc thì đó không phải bug.
+\end{cambay}
+
+\section{Các lời giải dạng đóng cho \texorpdfstring{\(n\)}{n} điểm}
+\ptrtarget{A/03/03}
+
+Bốn họ, mỗi họ một ý tưởng.
+
+\textbf{DLT.} Viết phương trình chiếu thành hệ tuyến tính theo mười hai phần tử của \([R|\mathbf{t}]\), bỏ qua ràng buộc trực giao, giải bằng SVD, rồi chiếu về \(SO(3)\) sau. Đơn giản nhất, và cũng kém chính xác nhất, vì nó ``quên'' sáu ràng buộc rồi sửa sau. Nó cũng không dùng được \(K\) đã biết một cách hiệu quả. Vai trò thực tế: giá trị giáo dục, và khởi tạo khi không có gì tốt hơn.
+
+\textbf{EPnP.} Ý tưởng đẹp: biểu diễn \(n\) điểm 3D bằng tổ hợp affine của bốn ``điểm điều khiển ảo'', rồi giải cho toạ độ camera của bốn điểm ảo ấy thay vì cho \(n\) điểm. Bài toán rút gọn về kích thước cố định bất kể \(n\), nên độ phức tạp là \(O(n)\) \cite{lepetit2009epnp}. Đây là lựa chọn tốt cho bài toán có nhiều điểm.
+
+\textbf{IPPE.} Chuyên cho target phẳng. Nó khai thác cấu trúc phẳng bằng cách phân tích phép biến đổi \emph{vi phân} quanh mỗi điểm, và điều quan trọng nhất với ta: nó trả về \emph{cả hai} nghiệm cùng sai số tái chiếu của từng nghiệm \cite{collins2014ippe}. Với marker vuông --- tức gần như toàn bộ bài toán của cây --- đây là lựa chọn đúng, và biến thể cho tag vuông có trong OpenCV dưới tên \code{SOLVEPNP\_IPPE\_SQUARE}.
+
+\textbf{SQPnP và các phương pháp tối ưu toàn cục.} Giải bài toán bình phương tối thiểu trên \(SO(3)\) bằng lập trình bậc hai tuần tự, đảm bảo tìm được cực tiểu toàn cục của một hàm mục tiêu đại số \cite{terzakis2020sqpnp}. Chúng khắc phục nhược điểm ``không tối ưu'' của các phương pháp trước ở mức đại số, nhưng vẫn không phải nghiệm tối ưu theo sai số tái chiếu.
+
+\begin{table}[H]\centering\small
+\caption{Bốn họ lời giải dạng đóng: ý tưởng, ưu nhược, và vai trò trong pipeline marker.}
+\label{tab:a03-pnp}
+\begin{tabularx}{\linewidth}{@{}L{2.0cm}L{3.5cm}L{3.0cm}Y@{}}
+\toprule
+\textbf{Phương pháp} & \textbf{Ý tưởng} & \textbf{Điểm yếu} & \textbf{Vai trò cho marker}\\
+\midrule
+P3P & Định lý cosin, đa thức bậc bốn & Tối đa 4 nghiệm, cần điểm thứ tư để chọn & Hạt nhân RANSAC; không dùng làm bộ giải chính\\
+DLT & Bỏ ràng buộc trực giao, giải tuyến tính & Kém chính xác nhất; không tận dụng \(K\) & Khởi tạo dự phòng; giá trị giáo dục\\
+EPnP \cite{lepetit2009epnp} & Bốn điểm điều khiển ảo, \(O(n)\) & Cực tiểu sai số đại số, không phải tái chiếu & Tốt khi nhiều điểm và không đồng phẳng\\
+IPPE \cite{collins2014ippe} & Khai thác cấu trúc phẳng, phân tích vi phân & Chỉ cho target phẳng & \textbf{Lựa chọn mặc định cho marker vuông} --- cho cả hai nghiệm\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\emph{Ghi chú trung thực:} tôi \emph{không} đưa vào chương này các con số so sánh tốc độ hay độ chính xác giữa các thuật toán, dù chúng có sẵn trong các bài báo gốc. Lý do là những con số ấy được đo trên các cấu hình rất khác nhau --- số điểm, mức nhiễu, phân bố hình học --- và trích chúng ra khỏi ngữ cảnh thì chúng không so sánh được với nhau. Điều tôi khẳng định ở đây chỉ là các \emph{tính chất cấu trúc}: IPPE cho cả hai nghiệm của target phẳng, EPnP là \(O(n)\), P3P cho tối đa bốn nghiệm. Ba điều ấy là tính chất toán học chứ không phải kết quả đo.
+
+\section{Tinh chỉnh: nghiệm thật sự}
+\ptrtarget{A/03/04}
+
+Đây là bước quyết định, và nó là bước cấp Jacobian cho \ptr{A/05}.
+
+Hàm mục tiêu là sai số tái chiếu có trọng số:
+\begin{equation}
+C(\xi) = \tfrac{1}{2}\sum_{i=1}^{N} \mathbf{r}_i(\xi)^\top \Sigma_i^{-1} \mathbf{r}_i(\xi),
+\qquad
+\mathbf{r}_i(\xi) = u_i - \hat{u}_i(\xi).
+\label{eq:a03-cost}
+\end{equation}
+Đây là hàm hợp lý âm (negative log-likelihood) dưới giả thiết nhiễu Gauss độc lập trên toạ độ pixel, nên nghiệm của nó là ước lượng hợp lý cực đại --- \emph{đó} là lý do nó đáng làm, chứ không phải vì nó ``chính xác hơn'' một cách mơ hồ.
+
+\subsection{A. Tham số hoá xoay: vì sao phải dùng \texorpdfstring{\(\mathfrak{se}(3)\)}{se(3)}}
+
+Trước khi lấy đạo hàm, phải quyết định biểu diễn \(\xi\) thế nào. Đây là chỗ Q4 chỉ tới và nó là một lỗi cài đặt hay gặp.
+
+Vấn đề: \(R\) có chín phần tử nhưng chỉ ba bậc tự do. Tối ưu trực tiếp trên chín phần tử với sáu ràng buộc là phiền; tối ưu trên \emph{góc Euler} thì gặp \vn{khoá gimbal}{gimbal lock} --- ở một số tư thế, hai trong ba trục trùng nhau và Jacobian mất hạng. Triệu chứng đúng như Q4 mô tả: chạy tốt phần lớn thời gian rồi phân kỳ ở một số tư thế cụ thể, lặp đi lặp lại ở đúng những tư thế ấy.
+
+Cách đúng là dùng một \emph{tham số hoá cục bộ}: giữ ước lượng hiện tại \(R_k\) dưới dạng ma trận (hoặc quaternion), và tham số hoá \emph{số gia} bằng một véctơ ba chiều \(\boldsymbol{\omega}\) qua ánh xạ mũ:
+\[
+R_{k+1} = R_k \exp(\boldsymbol{\omega}^\wedge),
+\]
+với \(\cdot^\wedge\) là toán tử đưa véctơ ba chiều thành ma trận phản đối xứng. Tại mỗi bước lặp ta tối ưu trên \(\boldsymbol{\omega}\) quanh không, nơi tham số hoá không có kỳ dị, rồi cập nhật và đặt lại. Đây là ý tưởng chuẩn của tối ưu trên đa tạp, và một tài liệu tham chiếu gọn cho nó là \cite{sola2018microlie}.
+
+\subsection{B. Bước Gauss--Newton}
+
+Tuyến tính hoá \(\mathbf{r}_i\) quanh \(\xi_k\):
+\[
+\mathbf{r}_i(\xi_k + \delta) \approx \mathbf{r}_i(\xi_k) - J_i\,\delta,
+\qquad J_i = \frac{\partial \hat{u}_i}{\partial \xi}\bigg|_{\xi_k}.
+\]
+Thay vào~\eqref{eq:a03-cost}, lấy đạo hàm theo \(\delta\) và cho bằng không:
+\begin{equation}
+\Big(\sum_i J_i^\top \Sigma_i^{-1} J_i\Big)\delta = \sum_i J_i^\top \Sigma_i^{-1}\mathbf{r}_i .
+\label{eq:a03-normal}
+\end{equation}
+Đây là \emph{phương trình chuẩn}, và ma trận bên trái là chính xác ma trận thông tin \(\mathcal{I}\) mà \ptr{A/05} đảo để ra hiệp phương sai. Điểm đáng nhấn mạnh: \(\mathcal{I}\) không phải một thứ phải tính thêm --- nó \emph{đã có sẵn} như một sản phẩm phụ của mỗi bước lặp. Bỏ qua nó là vứt đi thông tin miễn phí.
+
+Với sáu ẩn, hệ~\eqref{eq:a03-normal} là \(6\times6\) --- giải trong micro giây. Đây cũng là lý do PnP tinh chỉnh rẻ đến mức không có lý do gì để bỏ qua: vài chục bước lặp trên một hệ \(6\times6\) là không đáng kể so với chi phí chạy detector.
+
+LM thêm số hạng \(\lambda\,\mathrm{diag}(\mathcal{I})\) vào vế trái, điều chỉnh \(\lambda\) theo mức độ thành công của từng bước. Nó bền hơn khi khởi tạo xa hoặc khi \(\mathcal{I}\) kém điều kiện --- tức đúng các tình huống mà \ptr{A/02} mục~4 cảnh báo.
+
+\subsection{C. Jacobian của phép chiếu}
+
+Để hoàn chỉnh, đây là mảnh ghép cuối. Với điểm trong hệ camera \(\mathbf{X}_c = (X, Y, Z)\), phép chiếu là \(\hat{u} = f X/Z + c_x\), \(\hat{v} = f Y/Z + c_y\). Đạo hàm theo \(\mathbf{X}_c\):
+\[
+\frac{\partial \hat{u}}{\partial \mathbf{X}_c}
+= \frac{f}{Z}\begin{pmatrix} 1 & 0 & -X/Z \\ 0 & 1 & -Y/Z \end{pmatrix}.
+\]
+Nhìn ma trận này một lát thì thấy ngay nguồn gốc của mọi kết luận ở \ptr{A/05}: hệ số chung là \(f/Z\), giải thích vì sao sai số ngang là \(Z\sigma/f\); và cột thứ ba --- đạo hàm theo chiều sâu --- mang thêm hệ số \(X/Z\) và \(Y/Z\), tức \emph{tỉ lệ với độ lệch khỏi trục quang}. Một điểm nằm đúng trên trục quang có \(X = Y = 0\) nên đạo hàm theo \(Z\) bằng không: dịch nó ra xa hay lại gần không đổi hình chiếu chút nào. Đây chính là cơ chế sâu xa vì sao chiều sâu khó đo, và vì sao nó chỉ đo được nhờ các điểm \emph{cách xa trục quang} --- tức nhờ kích thước tag.
+
+Phần còn lại của Jacobian là đạo hàm của \(\mathbf{X}_c\) theo \(\xi\), và nó có dạng chuẩn \([\,I \;\; -\mathbf{X}_c^\wedge\,]\) với tham số hoá \(\mathfrak{se}(3)\). Ghép lại bằng quy tắc chuỗi.
+
+\begin{cannho}
+Ba lý do bắt buộc phải tinh chỉnh, không phải một.
+
+Một, độ chính xác: lời giải dạng đóng cực tiểu sai số đại số, tinh chỉnh cực tiểu sai số tái chiếu --- chỉ cái sau là ước lượng hợp lý cực đại.
+
+Hai, và đây là lý do hay bị quên: tinh chỉnh sinh ra ma trận thông tin \(\mathcal{I} = \sum J^\top\Sigma^{-1}J\) \emph{miễn phí}. Không có nó thì không có hiệp phương sai để hợp nhất, không có cơ sở loại ngoại lai theo chi-square, và không có gì đưa vào ngân sách sai số.
+
+Ba, chi phí gần như bằng không: một hệ \(6\times6\) giải vài chục lần, không đáng kể so với detector.
+
+Kết luận thực hành: \code{solvePnPRefineLM} hoặc tương đương phải luôn có trong pipeline, ngay sau lời giải dạng đóng.
+\end{cannho}
+
+\section{PnP hợp nhất trên nhiều tag}
+\ptrtarget{A/03/05}
+
+Đây là mục quan trọng nhất của chương với bài toán docking, và nó trả lời Q3.
+
+Tình huống: \(M\) tag, mỗi tag bốn góc, toạ độ 3D của tất cả \(4M\) góc đã biết \emph{trong cùng một hệ toạ độ dock}. Câu hỏi: tìm pose của camera so với hệ dock.
+
+Cách đúng là chạy \eqref{eq:a03-cost} với \(N = 4M\), tức một bài toán tối ưu duy nhất trên toàn bộ tập góc. Không có gì đặc biệt về mặt thuật toán --- vẫn là \eqref{eq:a03-normal} với tổng chạy qua nhiều số hạng hơn. Cái đặc biệt nằm ở chỗ \emph{thông tin hình học được sử dụng}.
+
+Để thấy rõ, so sánh hai cách bằng ngôn ngữ của ma trận thông tin.
+
+\emph{Cách hợp nhất} cộng các ma trận thông tin trong cùng một hệ toạ độ:
+\[
+\mathcal{I}_{\text{hợp nhất}} = \sum_{m=1}^{M}\sum_{i \in \text{tag } m} J_i^\top \Sigma_i^{-1} J_i .
+\]
+Các \(J_i\) ở đây được tính với toạ độ 3D thật của từng góc trong hệ dock, nên chúng \emph{biết} rằng tag 1 nằm cách tag 2 một khoảng \(B\).
+
+\emph{Cách trung bình pose} tính \(M\) pose riêng, mỗi pose có hiệp phương sai \(\Sigma_m = \mathcal{I}_m^{-1}\) tính \emph{trong hệ của riêng tag ấy}, rồi gộp. Ngay cả khi gộp đúng cách (trung bình có trọng số theo nghịch đảo hiệp phương sai, trên đa tạp), kết quả vẫn khác, vì phép nghịch đảo và phép tổng không giao hoán:
+\[
+\Big(\sum_m \mathcal{I}_m\Big)^{-1} \neq \Big(\sum_m \mathcal{I}_m^{-1}\Big)^{-1}\cdots
+\]
+và quan trọng hơn cả bất đẳng thức đại số: khi tính \(\mathcal{I}_m\) riêng cho từng tag, ta đã \emph{vứt bỏ} ràng buộc rằng các tag gắn cứng với nhau. Ràng buộc ấy chính là thứ tạo ra cơ chế baseline của \ptr{A/05} mục~6.
+
+Luận điểm này là trường hợp riêng của một nguyên lý tổng quát trong hiệu chỉnh chùm tia: \emph{cộng thông tin, đừng cộng ước lượng} \cite[§2]{triggs2000bundle}. Nó xuất hiện ở khắp nơi trong ước lượng trạng thái, và nó luôn nói cùng một điều: gộp ở tầng phần dư thì giữ được cấu trúc, gộp ở tầng kết quả thì mất.
+
+\begin{cambay}
+Có một điều kiện tiên quyết cho PnP hợp nhất mà nếu không thoả thì nó \emph{tệ hơn} trung bình pose: \emph{toạ độ 3D của các tag trong hệ dock phải đúng}.
+
+Lý do: PnP hợp nhất tin vào mô hình constellation và ép một pose duy nhất giải thích mọi góc. Nếu mô hình sai --- tag 2 thực ra cách tag 1 là 398\,mm chứ không phải 400\,mm như CAD --- thì bộ giải phải thoả hiệp, và nó phân bổ sai lệch ấy vào pose theo một cách không kiểm soát được. Trung bình pose thì ``rộng lượng'' hơn: mỗi pose riêng vẫn đúng trong hệ của tag nó, và sai lệch constellation chỉ làm các pose tản mát.
+
+Hệ quả: \emph{PnP hợp nhất chỉ tốt hơn nếu bạn đã đo constellation cẩn thận}, và đó là lý do \ptr{B/12} đặt bước hiệu chuẩn constellation bằng bundle adjustment ở mức bắt buộc chứ không phải tuỳ chọn.
+
+May mắn là có một chỉ báo: nếu sai số tái chiếu sau khi hợp nhất lớn hơn hẳn so với khi giải từng tag riêng, thì mô hình constellation của bạn sai. Đây là một phép thử miễn phí và nó đáng chạy định kỳ.
+\end{cambay}
+
+\section{Trọng số: không phải góc nào cũng như nhau}
+\ptrtarget{A/03/06}
+
+Công thức~\eqref{eq:a03-cost} có \(\Sigma_i\) cho từng góc, và phần lớn cài đặt đặt \(\Sigma_i = \sigma^2 I\) như nhau cho mọi góc. Mục này trả lời Q5: giả định ấy sai theo chiều nào, và sửa thế nào.
+
+Bốn nguồn làm \(\Sigma_i\) khác nhau giữa các góc.
+
+\emph{Khoảng cách và kích thước biểu kiến.} Một tag ở xa có kích thước nhỏ trên ảnh; các cạnh của nó ngắn hơn nên đường thẳng khớp lên chúng kém xác định hơn, nên góc kém chính xác hơn. Đây là nguồn lớn nhất trong bài toán docking vì các tag trong constellation có thể ở các khoảng cách rất khác nhau khi robot tới gần.
+
+\emph{Góc nghiêng.} Một tag nhìn rất chếch có các cạnh bị nén, và số pixel dọc theo cạnh ít đi, nên định vị kém hơn. Thêm nữa, cạnh bị nén có gradient thay đổi theo cách khác, làm phép khớp đường kém ổn định.
+
+\emph{Vị trí trên ảnh.} Méo còn sót lại lớn hơn ở rìa (\ptr{A/01}), và nó thể hiện như một thành phần thiên lệch --- không phải nhiễu, nhưng nếu ta không mô hình hoá được nó thì cách thực dụng là tăng \(\Sigma\) cho các góc ở rìa để giảm ảnh hưởng của chúng.
+
+\emph{Điều kiện quang học cục bộ.} Một góc nằm trong vùng bị loá, hoặc bị mờ do độ sâu trường ảnh, hoặc có tương phản thấp, thì kém chính xác hơn (\ptr{A/06}, \ptr{B/14}).
+
+Hai cách hiện thực hoá. Cách đơn giản là gán \(\Sigma_i\) theo một quy tắc heuristic --- chẳng hạn tỉ lệ nghịch với kích thước tag trên ảnh --- và điều đó đã tốt hơn nhiều so với trọng số đều. Cách đúng hơn là để chính detector ước lượng bất định của mỗi góc: bước khớp đường thẳng ở \ptr{B/08} sinh ra một hiệp phương sai cho mỗi góc như sản phẩm phụ, và nó mang cả thông tin về \emph{hướng} --- một góc trên một cạnh dài và sắc nét được xác định tốt theo hướng vuông góc cạnh và kém hơn theo hướng dọc cạnh, tức \(\Sigma_i\) dị hướng.
+
+Khung xử lý dị hướng đúng cách đã được đưa ra trong MLPnP \cite{urban2016mlpnp}, và ý tưởng của nó áp dụng thẳng vào đây: dùng hiệp phương sai thật của từng phép đo thay vì một hằng số. Lợi ích không chỉ là độ chính xác mà còn là \emph{tính trung thực của hiệp phương sai đầu ra} --- nếu \(\Sigma_i\) đầu vào đúng thì \(\mathcal{I}^{-1}\) đầu ra mới là một ước lượng bất định đáng tin, và cả chuỗi hợp nhất ở \ptr{B/11} phụ thuộc vào điều đó.
+
+\section{Loại ngoại lai}
+\ptrtarget{A/03/07}
+
+Bình phương tối thiểu rất nhạy với điểm ngoại lai: một góc sai 50 px đóng góp vào hàm mục tiêu gấp \(250^2\) lần một góc sai 0,2 px, nên nó kéo nghiệm về phía nó.
+
+Trong bài toán marker, ngoại lai đến từ đâu? Không nhiều như trong bài toán đặc trưng tự nhiên --- đó là một lợi thế lớn của marker. Nhưng vẫn có: một tag bị che một phần cho góc sai; một tag bị bẩn hoặc mòn cho decode đúng nhưng góc lệch; một tag decode nhầm hướng cho bốn tương ứng xoay 90 độ; và một tag trong constellation bị lắp sai vị trí so với mô hình cho một sai lệch có hệ thống trông như ngoại lai.
+
+Ba lớp công cụ, dùng theo thứ tự.
+
+\emph{RANSAC ở mức tag, không ở mức góc.} Vì bốn góc của một tag hoặc cùng đúng hoặc cùng sai, việc lấy mẫu ngẫu nhiên ở mức góc là lãng phí. Lấy mẫu ở mức tag: chọn ngẫu nhiên hai tag, giải PnP, đếm số tag phù hợp, lặp \cite{fischler1981ransac}. Rẻ hơn và đúng cấu trúc hơn.
+
+\emph{Cổng chi-square trên phần dư.} Sau khi hội tụ, phần dư chuẩn hoá \(\mathbf{r}_i^\top\Sigma_i^{-1}\mathbf{r}_i\) theo lý thuyết có phân bố \(\chi^2\) hai bậc tự do. Loại các góc vượt quá một phân vị --- chẳng hạn 99\% --- rồi giải lại. Đây là phép thử có cơ sở thống kê chứ không phải một ngưỡng tuỳ ý, và nó \emph{đòi} \(\Sigma_i\) đúng --- một lý do nữa để làm mục~6 cho tử tế.
+
+\emph{Hàm mất mát bền (robust loss).} Thay bình phương bằng Huber hoặc Cauchy, làm giảm ảnh hưởng của phần dư lớn mà không loại hẳn. Ưu điểm so với loại cứng: liên tục, nên không gây nhảy khi một điểm dao động quanh ngưỡng. Nhược điểm: nó làm hiệp phương sai đầu ra khó diễn giải hơn.
+
+\begin{cannho}
+Có một phép kiểm nhất quán riêng cho constellation mà không hệ nào tự làm và nó rất đáng thêm: \emph{giải PnP riêng cho từng tag, rồi so các pose với nhau}.
+
+Nếu constellation đúng và mọi tag lành, các pose ấy phải nhất quán trong phạm vi hiệp phương sai của chúng. Nếu pose từ tag A và tag B lệch nhau quá ngưỡng, thì một trong ba điều đã sai: mô hình constellation sai (tag bị lắp lệch, hoặc CAD sai), một tag bị che hoặc bẩn, hoặc một tag đang ở nghiệm ambiguity khác.
+
+Phép kiểm này không thay thế PnP hợp nhất --- nó chạy \emph{song song} với nó như một giám sát. Chi phí thấp, và nó bắt được đúng loại lỗi mà sai số tái chiếu của bài toán hợp nhất có thể che giấu khi số tag lớn.
+\end{cannho}
+
+\section{Giới hạn và chế độ hỏng}
+\ptrtarget{A/03/08}
+
+\textbf{Giả thiết \(K\) và hệ số méo đúng.} PnP coi chúng là hằng số đã biết. Nếu chúng sai thì PnP vẫn hội tụ, sai số tái chiếu vẫn nhỏ, và pose sai --- không có tín hiệu nào. Đây là lý do \ptr{A/01} nằm trước chương này và \ptr{B/12} nằm ở mức xương sống.
+
+\textbf{Giả thiết toạ độ 3D đúng.} Như mục~5 đã nêu, PnP hợp nhất khuếch đại hậu quả của sai số constellation. Chỉ báo: so sai số tái chiếu giữa hợp nhất và từng tag.
+
+\textbf{Giả thiết tương ứng đúng.} PnP giả định biết góc nào ứng với điểm 3D nào. Với tag có mã thì decode giải quyết, nhưng decode sai hướng cho một chế độ hỏng thầm lặng: pose sai đúng 90 độ và sai số tái chiếu vẫn nhỏ vì hình vuông đối xứng bốn lần. Phép bắt: kiểm tính nhất quán với tag khác trong constellation.
+
+\textbf{Tối ưu cục bộ.} Tinh chỉnh hội tụ về cực tiểu gần nhất, không phải cực tiểu toàn cục. Với target phẳng thì có đúng hai cực tiểu (\ptr{A/04}), và khởi tạo quyết định bạn rơi vào cái nào. Đây là lý do khởi tạo bằng IPPE --- vốn tìm cả hai --- tốt hơn khởi tạo bằng bất cứ thứ gì khác.
+
+\textbf{Giả thiết nhiễu Gauss.} Hàm mục tiêu bình phương là hợp lý cực đại chỉ dưới giả thiết này. Với nhiễu có đuôi nặng (ngoại lai), nó không còn tối ưu --- đó là lý do mục~7 tồn tại.
+
+\section{Thực hành}
+\ptrtarget{A/03/09}
+
+Pipeline khuyến nghị, năm bước, và nó là công thức tôi khuyên dùng làm mặc định.
+
+\emph{Một}, khử méo toạ độ góc (hoặc đưa méo vào hàm chiếu --- \ptr{A/01} mục~7).
+
+\emph{Hai}, khởi tạo bằng IPPE cho target phẳng, lấy \emph{cả hai} nghiệm và tỉ số sai số tái chiếu \(\rho\) của chúng. Với constellation không đồng phẳng, dùng EPnP hoặc SQPnP.
+
+\emph{Ba}, tinh chỉnh LM trên toàn bộ tập góc của mọi tag nhìn thấy, với toạ độ 3D trong hệ dock và trọng số theo \(\Sigma_i\) từ mục~6.
+
+\emph{Bốn}, cổng chi-square trên phần dư, loại góc ngoại lai, giải lại nếu có loại.
+
+\emph{Năm}, xuất ra \emph{ba} thứ chứ không phải một: pose, hiệp phương sai \(\mathcal{I}^{-1}\), và \(\rho\). Ba con số ấy là tối thiểu để tầng trên (\ptr{B/11}, \ptr{B/13}) làm việc có cơ sở.
+
+Trong OpenCV, chuỗi ấy là \code{undistortPoints} \(\rightarrow\) \code{solvePnPGeneric} với \code{SOLVEPNP\_IPPE\_SQUARE} \(\rightarrow\) \code{solvePnPRefineLM}, cộng phần tính \(\mathcal{I}\) tự viết (OpenCV không trả về nó, và đây là một thiếu sót đáng tiếc của API).
+
+\begin{onbai}
+\ar[3]{Hai tầng của PnP}{Dạng đóng (P3P, EPnP, IPPE, DLT) cực tiểu sai số \emph{đại số}, không cần khởi tạo, nhanh. Tinh chỉnh phi tuyến cực tiểu sai số \emph{tái chiếu} --- đây mới là ước lượng hợp lý cực đại và là nghiệm cuối.}
+\ar[3]{Vì sao P3P có tối đa 4 nghiệm}{Khử hai trong ba phương trình định lý cosin cho một đa thức bậc bốn \cite{haralick1994review}. Cần điểm thứ tư để chọn --- đó là lý do RANSAC cho PnP dùng tập con 4 điểm.}
+\ar[3]{4 nghiệm P3P vs 2 nghiệm phẳng}{Khác loại. 4 nghiệm P3P là do \emph{thiếu dữ liệu}, biến mất khi thêm điểm. 2 nghiệm phẳng là do \emph{đối xứng hình học}, không biến mất khi thêm điểm đồng phẳng (\ptr{A/04}).}
+\ar[3]{Ba lý do phải tinh chỉnh}{Độ chính xác (hợp lý cực đại); ma trận thông tin \(\mathcal{I} = \sum J^\top\Sigma^{-1}J\) sinh ra \emph{miễn phí}; và chi phí gần bằng không (hệ \(6\times6\)).}
+\ar[3]{Phương trình chuẩn}{\((\sum_i J_i^\top\Sigma_i^{-1}J_i)\,\delta = \sum_i J_i^\top\Sigma_i^{-1}\mathbf{r}_i\). Ma trận vế trái chính là \(\mathcal{I}\) mà \ptr{A/05} đảo.}
+\ar[3]{Vì sao không dùng góc Euler}{Khoá gimbal: ở một số tư thế hai trục trùng nhau, Jacobian mất hạng, bộ giải phân kỳ. Triệu chứng đặc trưng: hỏng lặp lại ở đúng vài tư thế cụ thể. Cách đúng: tham số hoá cục bộ \(R_{k+1} = R_k\exp(\boldsymbol{\omega}^\wedge)\) \cite{sola2018microlie}.}
+\ar[3]{Jacobian của phép chiếu}{\(\partial\hat{u}/\partial\mathbf{X}_c = (f/Z)\begin{psmallmatrix} 1 & 0 & -X/Z \\ 0 & 1 & -Y/Z\end{psmallmatrix}\). Hệ số chung \(f/Z\) giải thích \(\delta x = Z\sigma/f\); cột thứ ba tỉ lệ với \(X/Z\) --- điểm trên trục quang không cho thông tin chiều sâu nào.}
+\ar[3]{PnP hợp nhất vs trung bình pose}{Hợp nhất cộng \emph{thông tin} trong cùng hệ toạ độ, nên giữ được ràng buộc rằng các tag gắn cứng với nhau --- tức giữ được cơ chế baseline. Trung bình pose cộng \emph{ước lượng}, vứt bỏ ràng buộc ấy \cite[§2]{triggs2000bundle}.}
+\ar[3]{Điều kiện để hợp nhất tốt hơn}{Toạ độ 3D constellation phải đúng. Nếu sai, hợp nhất \emph{tệ hơn} trung bình vì nó ép một pose duy nhất giải thích mô hình sai. Chỉ báo: so sai số tái chiếu hợp nhất với từng tag riêng.}
+\ar[2]{Bốn nguồn làm \(\Sigma_i\) khác nhau}{Khoảng cách và kích thước biểu kiến (lớn nhất trong docking); góc nghiêng; vị trí trên ảnh (méo còn sót ở rìa); điều kiện quang học cục bộ.}
+\ar[2]{Vì sao trọng số đúng quan trọng hơn độ chính xác}{Vì \(\mathcal{I}^{-1}\) chỉ là ước lượng bất định đáng tin nếu \(\Sigma_i\) đầu vào đúng, và cả chuỗi hợp nhất ở \ptr{B/11} lẫn cổng chi-square ở mục 7 phụ thuộc vào tính đúng ấy \cite{urban2016mlpnp}.}
+\ar[2]{RANSAC ở mức nào}{Mức \emph{tag}, không mức góc --- vì bốn góc một tag cùng đúng hoặc cùng sai. Chọn ngẫu nhiên hai tag, giải, đếm tag phù hợp.}
+\ar[2]{Cổng chi-square}{Phần dư chuẩn hoá \(\mathbf{r}^\top\Sigma^{-1}\mathbf{r} \sim \chi^2_2\); loại góc vượt phân vị 99\% rồi giải lại. Có cơ sở thống kê, nhưng \emph{đòi} \(\Sigma\) đúng.}
+\ar[2]{Phép kiểm nhất quán constellation}{Giải PnP riêng từng tag rồi so các pose. Lệch quá ngưỡng \(\Rightarrow\) constellation sai, tag bị che/bẩn, hoặc một tag đang ở nghiệm ambiguity khác. Chạy song song với hợp nhất như một giám sát.}
+\ar[1]{Chế độ hỏng thầm lặng nhất}{Decode sai hướng: pose sai đúng \(90^\circ\) và sai số tái chiếu \emph{vẫn nhỏ} vì hình vuông đối xứng bốn lần. Chỉ bắt được bằng kiểm nhất quán với tag khác.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{\repo{OpenCV} \code{solvePnPGeneric}}{Trả về nhiều nghiệm kèm sai số tái chiếu từng nghiệm; hỗ trợ IPPE, EPnP, SQPnP, P3P}{API quan trọng nhất của cả cây --- xem \ptr{D/17}}
+\ud{\repo{OpenCV} \code{solvePnPRefineLM}}{Bước tinh chỉnh LM trên sai số tái chiếu}{Bắt buộc có trong pipeline; rẻ}
+\ud{\repo{apriltag} \code{apriltag\_pose.c}}{Cài IPPE cho tag vuông, tính cả hai nghiệm và tỉ số}{Đọc để thấy mục 3 và \ptr{A/04} thành code}
+\ud{\repo{Ceres} \cite{agarwal2012ceres}, \repo{GTSAM}}{Tối ưu tổng quát với tham số hoá trên đa tạp và hàm mất mát bền}{Dùng khi bài toán vượt quá một pose duy nhất --- \ptr{B/12}}
+\ud{MLPnP \cite{urban2016mlpnp}}{PnP với hiệp phương sai dị hướng cho từng phép đo}{Nguồn cho mục 6; ý tưởng áp thẳng vào trọng số góc marker}
+\end{ungdung}
+
+\begin{duan}{So PnP hợp nhất với trung bình pose, và đo cái giá của constellation sai}{2 ngày}
+\dmt chuyển luận điểm trung tâm của mục 5 từ một lập luận thành một cặp đường cong, và đồng thời đo được ngưỡng sai số constellation mà trên đó hợp nhất bắt đầu tệ hơn.
+\ddl mô phỏng, nối tiếp script của \ptr{A/05} và \ptr{A/04}.
+\dbc dựng constellation bốn tag với baseline \(B\), toạ độ 3D chân trị đã biết; chiếu, thêm nhiễu \(\sigma\); chạy hai đường: (i) PnP hợp nhất trên 16 góc, (ii) bốn PnP riêng rồi trung bình Karcher trên \(SO(3)\) cộng trung bình có trọng số cho tịnh tiến; so sai số góc và sai số vị trí của hai cách qua 2000 lần chạy; lặp khi quét \(B\). Sau đó phần thứ hai: cố ý làm sai mô hình constellation --- dịch toạ độ 3D của một tag đi \(e\) mm so với chân trị --- và quét \(e\) từ 0 tới 5 mm, xem cách nào xuống dốc nhanh hơn.
+\dxk bạn có hai đồ thị. Đồ thị một cho thấy hợp nhất thắng rõ về sai số góc và khoảng cách thắng tăng theo \(B\). Đồ thị hai cho thấy một giao điểm: với \(e\) vượt một ngưỡng nào đó, trung bình pose bắt đầu bền hơn. Con số ngưỡng ấy chính là yêu cầu độ chính xác cơ khí cho constellation của bạn. Kiểm tra chéo bắt buộc: ở \(e = 0\) và \(B\) rất nhỏ, hai cách phải cho kết quả gần như nhau --- nếu không thì phép trung bình Karcher của bạn có lỗi.
+\dnv \ptr{B/09} và \ptr{B/12} nhận con số ngưỡng này làm yêu cầu thiết kế; \ptr{C/15} đưa nó vào bảng ngân sách.
+\end{duan}
+
+\begin{traloi}
+\tl{Bốn vì hệ ba phương trình định lý cosin, sau khi khử hai ẩn, cho một đa thức bậc bốn theo ẩn còn lại \cite{haralick1994review}; không phải hai vì hệ thực sự bậc bốn chứ không suy biến, và không phải tám vì các nghiệm ứng với điểm nằm sau camera bị vật lý loại. Ý nghĩa ở tầng code rất cụ thể: bạn \emph{phải} có một điểm thứ tư để chọn trong bốn ứng viên, bằng cách chiếu nó qua từng ứng viên và giữ cái cho sai số tái chiếu nhỏ nhất. Đó là lý do mọi cài đặt RANSAC cho PnP lấy mẫu bốn điểm chứ không ba, dù ba mới là số tối thiểu để giải.}
+\tl{Vì EPnP cực tiểu hoá một sai số \emph{đại số} --- độ lệch trong hệ phương trình tuyến tính của bốn điểm điều khiển ảo --- chứ không phải sai số tái chiếu tính bằng pixel \cite{lepetit2009epnp}. Hai đại lượng ấy không tỉ lệ với nhau, nên nghiệm tối ưu theo cái này không tối ưu theo cái kia, và chênh lệch đáng kể khi nhiễu không nhỏ. Nhưng có một lý do thứ hai quan trọng không kém: EPnP không sinh ra ma trận thông tin. Không có \(\mathcal{I}\) thì không có hiệp phương sai để hợp nhất ở \ptr{B/11}, không có cơ sở cho cổng chi-square, và không có gì đưa vào ngân sách sai số. Bước tinh chỉnh cho cả hai thứ với chi phí gần bằng không.}
+\tl{Khác nhau vì PnP hợp nhất \emph{biết} rằng bốn tag gắn cứng với nhau ở những vị trí đã biết, còn trung bình pose thì không. Cụ thể: hợp nhất cộng các ma trận thông tin \(J_i^\top\Sigma_i^{-1}J_i\) trong cùng một hệ toạ độ, với \(J_i\) tính từ toạ độ 3D thật của từng góc trong hệ dock --- nên thông tin về hướng đến từ chênh lệch vị trí giữa các tag cách nhau \(B\), tức cơ chế baseline của \ptr{A/05}. Trung bình pose tính hiệp phương sai riêng cho từng tag trong hệ của tag ấy, vứt bỏ ràng buộc liên tag, nên mỗi pose vẫn chịu hệ số \(\sin\theta\) và trung bình chỉ giảm nhiễu theo \(\sqrt{M}\). Cách đúng là hợp nhất --- với một điều kiện: toạ độ 3D constellation phải đúng, nếu không thì hợp nhất lại tệ hơn.}
+\tl{Khoá gimbal. Góc Euler có kỳ dị ở một số tư thế nơi hai trục quay trùng nhau; tại đó ánh xạ từ ba tham số sang \(SO(3)\) mất hạng, nên Jacobian mất hạng, nên phương trình chuẩn suy biến và bước cập nhật nổ tung. Triệu chứng đặc trưng và chẩn đoán được: nó hỏng \emph{lặp lại ở đúng vài tư thế cụ thể} chứ không ngẫu nhiên --- nếu bạn thấy phân kỳ luôn xảy ra quanh cùng một giá trị pitch thì gần như chắc chắn là chuyện này. Cách sửa đúng không phải thêm chính quy hoá hay đổi ngưỡng mà là đổi tham số hoá: giữ \(R\) dưới dạng ma trận hoặc quaternion, tham số hoá \emph{số gia} bằng véctơ ba chiều qua ánh xạ mũ, và đặt lại sau mỗi bước --- tức tối ưu quanh gốc của \(\mathfrak{se}(3)\) nơi không có kỳ dị \cite{sola2018microlie}.}
+\tl{Bạn đang giả định rằng mọi góc có cùng độ tin cậy, và giả định ấy sai theo chiều \emph{nguy hiểm}: các góc kém nhất được cho cùng tiếng nói với các góc tốt nhất, nên chúng kéo nghiệm về phía chúng nhiều hơn mức đáng có. Cụ thể trong tình huống mô tả: tag ở xa có kích thước nhỏ trên ảnh nên cạnh ngắn nên định vị góc kém, và tag nghiêng mạnh có cạnh bị nén nên càng kém --- cả hai hiệu ứng cộng lại có thể làm \(\sigma\) của nó lớn gấp nhiều lần tag gần. Hậu quả thứ hai, và nó tệ hơn hậu quả thứ nhất: hiệp phương sai \(\mathcal{I}^{-1}\) mà bạn xuất ra sẽ \emph{sai}, vì nó được tính từ \(\Sigma_i\) giả định. Nó sẽ báo một bất định nhỏ hơn thực tế, và mọi tầng phía trên dùng con số ấy làm trọng số sẽ bị lừa theo.}
+\end{traloi}
+
+\begin{dongian}
+Bạn đứng giữa một cánh đồng và nhìn thấy vài cái cột mà bạn biết chính xác chúng ở đâu. Bạn không đo được khoảng cách tới chúng, chỉ đo được hướng: cột này ở bên trái một chút, cột kia ở bên phải nhiều hơn. Câu hỏi là bạn đang đứng ở đâu và quay mặt về hướng nào.
+
+Một cái cột thì chưa nói được gì. Ba cái thì gần đủ --- nhưng chỉ gần, vì hoá ra vẫn còn tới bốn chỗ mà từ đó ba cái cột trông đúng như vậy. Phải có cái cột thứ tư mới loại được ba chỗ giả.
+
+Với phép đo hoàn hảo thì xong ở đó. Nhưng phép đo không hoàn hảo: bạn đo hướng lệch đi một chút, nên không có chỗ nào trên cánh đồng làm mọi hướng khớp cùng lúc. Bài toán đổi thành: tìm chỗ mà tổng độ lệch nhỏ nhất.
+
+Và ở đây có hai cách làm, thường bị nhầm là một. Cách thứ nhất là dùng một công thức có sẵn để ra ngay một chỗ khá tốt --- nhanh, nhưng công thức ấy tối thiểu hoá một thứ tiện tính chứ không phải chính cái tổng độ lệch mà bạn quan tâm. Cách thứ hai là đứng ở chỗ ấy rồi dịch từng chút theo hướng làm tổng lệch giảm, cho tới khi hết giảm được. Cách thứ hai mới cho câu trả lời đúng, và nó rẻ --- vài chục bước tính toán nhỏ.
+
+Nhưng cái quý nhất của cách thứ hai không phải câu trả lời. Khi bạn dừng lại, bạn biết thêm một thứ: mặt đất quanh chỗ bạn đứng \emph{dốc} thế nào. Dốc đứng theo mọi hướng nghĩa là bạn rất chắc chắn --- dịch đi một tí là tổng lệch tăng ngay. Có một hướng mà đi dọc theo nó gần như phẳng nghĩa là theo hướng ấy bạn hầu như không biết gì. Cái độ dốc đó chính là thước đo độ tin cậy, và nó có sẵn trong phép tính --- ai bỏ bước dịch chuyển thì cũng mất luôn nó, và mất nó thì không còn gì để nói mình chắc chắn tới đâu.
+
+Còn một chuyện nữa, về mấy cái cột. Nếu bạn biết chúng gắn cứng với nhau trên cùng một cái khung --- cột này cách cột kia đúng bốn mươi phân --- thì bạn nên dùng thông tin đó. Cách sai là tính riêng vị trí theo từng cột rồi lấy trung bình bốn kết quả; làm thế là vứt bỏ hiểu biết về cái khung. Cách đúng là để cả bốn cột cùng kéo về một lời giải duy nhất, vì khi ấy chính khoảng cách giữa chúng trở thành thước đo góc.
+
+\chuadongian{cái giá của chuyện dùng khung là bạn phải \emph{tin} vào khung. Nếu cái khung thật ra không đúng như bản vẽ --- cột lệch đi vài milimét --- thì cách dùng khung lại tệ hơn cách tính riêng, vì nó ép mọi thứ khớp với một mô hình sai. Ranh giới giữa hai chế độ ấy thì phải đo, không suy ra được.}
+\motcau{Công thức cho bạn chỗ gần đúng, việc dịch từng chút cho bạn chỗ đúng \emph{và} cho bạn biết mình chắc tới đâu.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{A/03/10}
+
+Mệnh đề chính --- \emph{PnP hợp nhất trên toàn bộ tập góc tốt hơn trung bình pose từng tag, và khoảng cách thắng tăng theo baseline} --- bị bác bỏ nếu mô phỏng ở mini project cho thấy hai cách cho cùng độ tản mát góc trên constellation trải rộng, với toạ độ 3D chính xác. Đây là mệnh đề tôi dẫn bằng lập luận thông tin (cửa a) và đối chiếu với nguyên lý tổng quát trong \cite[§2]{triggs2000bundle} (cửa c một phần), và nó \emph{chưa} qua cửa (b). Nó là mệnh đề có hậu quả kiến trúc lớn nhất trong chương nên nên kiểm sớm.
+
+Mệnh đề thứ hai --- \emph{hợp nhất trở nên tệ hơn trung bình khi sai số constellation vượt một ngưỡng} --- là một dự đoán định tính của tôi dựa trên cơ chế ở mục~5. Nó bị bác bỏ nếu mô phỏng cho thấy hợp nhất vẫn thắng ở mọi mức sai số constellation cho tới khi cả hai đều vô dụng. Nếu vậy thì lời cảnh báo ở mục~5 là quá mạnh và nên được nới.
+
+Mệnh đề thứ ba --- \emph{tinh chỉnh cải thiện độ chính xác đáng kể so với lời giải dạng đóng} --- bị bác bỏ nếu mô phỏng cho thấy chênh lệch nhỏ hơn nhiều so với \(\sigma\) ở mức nhiễu thực tế. Điều đáng nói: kể cả nếu mệnh đề này bị bác bỏ, lời khuyên ``luôn tinh chỉnh'' vẫn đứng vững, vì lý do thứ hai --- ma trận thông tin miễn phí --- không phụ thuộc vào nó.
+
+Cuối cùng, một mệnh đề mà tôi đã cố ý \emph{không} phát biểu: chương này không xếp hạng các thuật toán PnP theo độ chính xác, vì tôi không có dữ liệu so sánh được. Nếu bạn cần xếp hạng ấy cho hệ của mình thì nó phải đo trên chính cấu hình của bạn --- và mini project cung cấp khung để làm việc đó.
+
+\section{Kết nối}
+\ptrtarget{A/03/11}
+
+Chương này là trục của Phần~A: nó nhận mô hình từ hai chương trước và cấp Jacobian cho hai chương sau.
+
+Nối lên trên. \ptr{A/01-mo-hinh-camera-va-distortion} cấp hàm chiếu \(\hat{u}(\xi)\) và cảnh báo rằng PnP coi \(K\) cùng hệ số méo là hằng số đúng --- nếu chúng sai thì PnP hội tụ về một pose sai mà không có tín hiệu. \ptr{A/02-homography-va-hinh-hoc-phang} cấp một cách khởi tạo, và cũng cấp lý do vì sao IPPE là lựa chọn tốt hơn phân rã \(H\) cho target phẳng.
+
+Nối xuống dưới trong Phần~A. \ptr{A/04-pose-ambiguity-target-phang} là hệ quả trực tiếp của mục~8: tối ưu là cục bộ, có hai cực tiểu, và khởi tạo quyết định bạn rơi vào cái nào. \ptr{A/05-lan-truyen-sai-so-pixel-sang-pose} nhận \emph{đúng} ma trận \(\mathcal{I}\) từ phương trình chuẩn~\eqref{eq:a03-normal} và toàn bộ chương ấy chỉ làm một việc là đọc ý nghĩa vật lý của \(\mathcal{I}^{-1}\); Jacobian ở mục~4C là chỗ nguồn gốc của bốn quan hệ tỉ lệ lộ ra rõ nhất.
+
+Nối xuống Phần~B. \ptr{B/08-corner-refinement} cấp \(\Sigma_i\) mà mục~6 cần --- không chỉ độ lớn mà cả hướng, vì hiệp phương sai của một góc từ giao hai đường thẳng vốn dị hướng. \ptr{B/09-multi-marker-constellation} là chương biến mục~5 thành thiết kế: nó trả lời đặt tag ở đâu để \(\mathcal{I}\) có điều kiện tốt nhất. \ptr{B/12-calibration-cho-docking} nhận cảnh báo ở mục~5 làm lý do bắt buộc cho bước đo constellation bằng bundle adjustment. \ptr{B/11-uoc-luong-theo-thoi-gian} nhận \(\mathcal{I}^{-1}\) làm trọng số khi hợp nhất theo thời gian --- và nó chỉ làm được điều đó nếu bước tinh chỉnh đã chạy.
+
+Cuối cùng, một nối sang \ptr{B/13-docking-control}: mục~9 khuyến nghị xuất ra ba thứ (pose, hiệp phương sai, \(\rho\)) chứ không phải một, và lý do đầy đủ của khuyến nghị ấy nằm ở chương điều khiển --- một bộ điều khiển docking cần biết không chỉ ``mục tiêu ở đâu'' mà cả ``tôi tin điều đó tới mức nào'' và ``có phải tôi đang nhìn nhầm nghiệm không''.
+
+\begin{tukiem}
+\item Vì sao ba điểm cho bốn nghiệm chứ không phải hai, và vì sao đó là một loại đa nghiệm hoàn toàn khác với hai nghiệm của target phẳng?
+\item Nêu ba lý do bắt buộc phải chạy tinh chỉnh sau lời giải dạng đóng, và chỉ ra lý do nào vẫn đứng vững kể cả khi cải thiện độ chính xác là không đáng kể.
+\item Trong Jacobian của phép chiếu, cột thứ ba tỉ lệ với \(X/Z\) và \(Y/Z\). Điều đó nói gì về khả năng đo chiều sâu của một điểm nằm trên trục quang, và nó nối với công thức nào ở \ptr{A/05}?
+\item Một đồng nghiệp trung bình bốn pose từ bốn tag. Giải thích chính xác thông tin gì bị vứt bỏ, và nêu điều kiện mà dưới đó cách làm của họ lại \emph{đúng hơn} cách hợp nhất.
+\item Bộ giải của bạn phân kỳ ở đúng một vài tư thế và chạy tốt ở mọi tư thế khác. Nêu nguyên nhân khả dĩ nhất, cơ chế của nó, và cách sửa đúng.
+\item Vì sao cổng chi-square trên phần dư đòi \(\Sigma_i\) đúng, và chuyện gì xảy ra với tỉ lệ loại nhầm nếu bạn dùng một \(\sigma\) chung quá nhỏ?
+\item Decode sai hướng cho pose sai \(90^\circ\) mà sai số tái chiếu vẫn nhỏ. Vì sao, và cơ chế nào trong chương này phát hiện được nó?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

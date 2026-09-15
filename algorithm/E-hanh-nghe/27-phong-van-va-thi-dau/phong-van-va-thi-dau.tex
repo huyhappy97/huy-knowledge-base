@@ -1,0 +1,206 @@
+% ============================================================================
+%  E/27-phong-van-va-thi-dau — file chương
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+%  Dependency: A/01, A/02, E/25. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../algorithm.tex]{subfiles}
+\begin{document}
+\chapter{Phỏng vấn và thi đấu (Interviews and Contests)}
+\ptrtarget{E/27}\ptrtarget{E/27-phong-van-va-thi-dau}
+\dependency{\ptr{A/01} cho quy trình bốn bước --- ở đây nó được nén lại dưới sức ép thời gian; \ptr{A/02} cho tầng tự giám sát; \ptr{E/25} cho bảng kiểm trước khi nộp.}
+
+\begin{tomtat}
+Hai bối cảnh trong chương này --- phỏng vấn và thi đấu --- khác nhau ở tiêu chí chấm nhưng giống nhau ở điều quyết định kết quả: không phải lượng kiến thức mà là \emph{quản lý thời gian và quản lý bản thân dưới sức ép}. Chương đưa ra một quy trình bảy bước cho buổi phỏng vấn, trong đó bước quan trọng nhất là nói ra suy nghĩ, vì người phỏng vấn chấm quá trình chứ không chỉ chấm kết quả. Với thi đấu, chương nói về đọc toàn bộ đề trước, phân bổ thời gian, quy tắc bỏ bài, và cách xử lý khi bị sai liên tiếp. Nếu chỉ nhớ một điều: dưới sức ép, thứ khiến bạn mất điểm nhiều nhất không phải bài khó mà là hai lỗi rất tránh được --- hiểu sai đề, và bám vào một hướng sai quá lâu.
+\end{tomtat}
+
+\begin{nentang}
+\kn{nói ra suy nghĩ}{diễn đạt thành lời quá trình suy nghĩ trong lúc giải, để người nghe theo được đường đi của bạn.}
+\kn{thi ảo}{tự tổ chức một kỳ thi từ đề cũ, đúng thời lượng và điều kiện thật, để luyện chiến thuật chứ không chỉ luyện kiến thức.}
+\kn{phạt thời gian}{ở nhiều thể thức thi, mỗi lần nộp sai cộng thêm một khoảng vào tổng thời gian --- điều này thay đổi hẳn chiến thuật nộp bài.}
+\kn{chấm từng phần}{thể thức cho điểm theo số test qua được hoặc theo nhóm test; khuyến khích nộp lời giải chậm hơn để lấy điểm bộ phận.}
+\kn{tilt}{trạng thái mất bình tĩnh sau một thất bại, dẫn tới các quyết định tệ tiếp theo --- thuật ngữ mượn từ cờ và thể thao điện tử.}
+\kn{bảng kiểm trước khi nộp}{danh sách ngắn các ca biên và lỗi kinh điển cần rà lại, dùng để chống bỏ sót dưới áp lực (\ptr{E/25}).}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Vì sao người phỏng vấn thường quan tâm tới quá trình suy nghĩ hơn là lời giải cuối cùng?}
+\h{Trong một kỳ thi ba tiếng với sáu bài, vì sao đọc hết cả sáu đề trước lại quan trọng hơn bắt tay vào bài đầu tiên ngay?}
+\h{Bạn đã bỏ 40 phút cho một bài và vẫn chưa ra. Quyết định đúng là gì, và làm sao biết được điều đó \emph{trước khi} hết giờ?}
+\h{Vì sao im lặng suy nghĩ trong phỏng vấn lại là một sai lầm, kể cả khi bạn đang nghĩ tốt?}
+\h{Sau một lần nộp sai, vì sao xác suất lần nộp tiếp theo cũng sai lại cao hơn bình thường?}
+\end{khoigoi}
+
+Hai bối cảnh trong chương này có một điểm chung mà người luyện thường không chuẩn bị: chúng không đo kiến thức thuần tuý. Một kỳ thi ba tiếng đo khả năng \emph{chọn bài, phân bổ thời gian và giữ bình tĩnh} nhiều không kém khả năng nghĩ ra thuật toán. Một buổi phỏng vấn 45 phút đo khả năng \emph{giao tiếp và làm việc dưới quan sát} nhiều không kém năng lực kỹ thuật.
+
+Điều đó có nghĩa là hai bối cảnh này luyện được riêng, và phần lớn người học bỏ qua việc luyện đó. Họ giải hàng trăm bài nhưng chưa bao giờ tự tổ chức một kỳ thi ảo đúng thời lượng, chưa bao giờ tập nói ra suy nghĩ trong lúc giải. Rồi đến ngày thật, họ mất điểm ở đúng những chỗ có thể luyện được.
+
+\section{Phỏng vấn: quy trình bảy bước}
+
+Một buổi phỏng vấn thuật toán điển hình kéo dài 40--60 phút cho một hoặc hai bài. Quy trình dưới đây nén bốn bước của Pólya (\ptr{A/01}) vào khung thời gian đó, và nó cũng chính là thứ người phỏng vấn mong thấy.
+
+\emph{Bước 1 --- làm rõ đề (2--4 phút).} Hỏi về kích thước dữ liệu, kiểu dữ liệu, trường hợp biên, điều gì được đảm bảo. Đây là bước bị bỏ nhiều nhất và cũng là bước bị chấm điểm âm nặng nhất khi bỏ, vì trong công việc thật, viết code trước khi hiểu yêu cầu là một lỗi nghiêm trọng.
+
+\emph{Bước 2 --- ví dụ (2 phút).} Tự viết một ví dụ nhỏ và giải nó bằng tay, xác nhận với người phỏng vấn rằng bạn hiểu đúng. Bước này bắt được phần lớn hiểu lầm và tốn rất ít thời gian.
+
+\emph{Bước 3 --- lời giải vét cạn (2--3 phút).} Nói ra cách giải chậm nhưng đúng, kèm độ phức tạp của nó. Đừng ngại: điều này cho thấy bạn hiểu bài, và nó tạo điểm xuất phát để cải thiện --- đúng lập luận ở \ptr{C/13}.
+
+\emph{Bước 4 --- cải thiện (5--10 phút).} Hỏi to câu ``vét cạn này lãng phí ở đâu'', rồi đi theo cây quyết định ở hình của chương \ptr{A/01}. Đây là phần mà người phỏng vấn quan tâm nhất, và cũng là phần bạn nên nói nhiều nhất.
+
+\emph{Bước 5 --- thống nhất trước khi viết (1 phút).} Tóm tắt lời giải trong ba câu và hỏi ``tôi bắt đầu viết nhé''. Nếu hướng sai, người phỏng vấn thường gợi ý ở đúng lúc này --- và bạn tiết kiệm được mười lăm phút.
+
+\emph{Bước 6 --- viết mã (10--15 phút).} Viết sạch, đặt tên rõ, tách hàm khi hợp lý. Nói ngắn gọn khi làm điều gì đó không hiển nhiên.
+
+\emph{Bước 7 --- tự kiểm (3--5 phút).} Chạy tay ví dụ ở bước 2 qua code, rồi rà bảng kiểm ca biên: mảng rỗng, một phần tử, giá trị trùng, tràn số. Chủ động làm bước này thay vì chờ được hỏi --- nó tạo ấn tượng mạnh vì rất nhiều ứng viên bỏ qua.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[yscale=0.8,xscale=0.98]
+\foreach \x/\w/\lab/\col in {
+  0/1.1/{1. làm rõ}/steel,
+  1.15/0.75/{2. ví dụ}/steel,
+  1.95/0.95/{3. vét cạn}/steel,
+  2.95/2.6/{4. cải thiện}/accent,
+  5.6/0.5/{5.}/steel,
+  6.15/3.4/{6. viết mã}/steel,
+  9.6/1.4/{7. tự kiểm}/accent}{
+  \fill[\col!14,draw=\col,thick] (\x,0) rectangle (\x+\w,0.95);
+  \node[font=\scriptsize,color=\col,align=center] at (\x+\w/2,0.47) {\lab};}
+\draw[-{Latex[length=2.2mm]},color=tiercol,thick] (0,-0.35) -- (11.1,-0.35);
+\foreach \x/\t in {0/0, 2.95/10, 6.15/20, 9.6/35, 11.0/45}{
+  \draw[color=tiercol] (\x,-0.25) -- (\x,-0.45);
+  \node[font=\scriptsize,color=tiercol,anchor=north] at (\x,-0.5) {\t};}
+\node[font=\scriptsize,color=tiercol,anchor=north] at (5.5,-1.05) {phút};
+\node[font=\scriptsize,color=accent,anchor=west,text width=3.4cm] at (11.4,0.5)
+  {Hai ô tô hổ phách là phần được chấm cao nhất --- và là hai phần hay bị cắt nhất khi vội.};
+\end{tikzpicture}
+\caption{Phân bổ thời gian gợi ý cho một buổi phỏng vấn 45 phút. Điều đáng chú ý là bước 5 --- thống nhất hướng trước khi viết --- chỉ tốn một phút nhưng ngăn được kịch bản tốn kém nhất: viết mười lăm phút theo hướng sai. Bước 7 nên chủ động làm, không đợi được hỏi.}
+\label{fig:interview-timeline}
+\end{figure}
+
+\begin{cannho}
+Điều được chấm không phải ``có ra lời giải tối ưu không'' mà là ``người này có phải người tôi muốn cùng gỡ một bài khó lúc hai giờ sáng không''. Bốn thứ tạo nên ấn tượng đó: hỏi làm rõ trước khi làm, nói ra suy nghĩ, phản ứng tốt với gợi ý, và tự kiểm tra mà không đợi nhắc. Cả bốn đều luyện được, và cả bốn đều không liên quan tới việc bạn thuộc bao nhiêu thuật toán.
+\end{cannho}
+
+\subsection{Ba lỗi giao tiếp phổ biến}
+
+\emph{Im lặng suy nghĩ.} Đây là câu trả lời cho câu hỏi mở đầu thứ tư: người phỏng vấn không đọc được suy nghĩ của bạn, nên với họ, ba phút im lặng trông giống hệt ba phút bế tắc. Tệ hơn, họ không có cơ hội gợi ý đúng chỗ. Nếu cần nghĩ yên, hãy nói trước: ``cho tôi một phút suy nghĩ về cấu trúc dữ liệu''.
+
+\emph{Nhảy vào viết code quá sớm.} Viết trước khi thống nhất hướng là cách nhanh nhất để mất mười lăm phút và phải xoá làm lại.
+
+\emph{Phòng thủ khi được góp ý.} Gợi ý của người phỏng vấn gần như luôn là gợi ý thật, không phải bẫy. Cách phản ứng tốt là dừng lại, hỏi lại cho rõ, và đi theo hướng đó.
+
+\section{Thi đấu: chiến thuật quan trọng ngang kiến thức}
+
+Trong một kỳ thi có nhiều bài và giới hạn thời gian, ba quyết định chiến thuật ảnh hưởng tới kết quả nhiều hơn hầu hết kiến thức kỹ thuật.
+
+\emph{Quyết định 1 --- đọc hết đề trước.} Dành 5--10 phút đầu đọc toàn bộ và ước lượng độ khó từng bài. Lý do rất thực dụng: thứ tự đề \emph{không} luôn theo độ khó, và mỗi phút bạn dùng cho một bài khó trong khi còn một bài dễ chưa đọc là một phút bị lãng phí. Đây là câu trả lời cho câu hỏi mở đầu thứ hai. Nếu bảng điểm hiển thị số người giải được từng bài, đó là nguồn thông tin về độ khó chính xác hơn cảm giác của bạn.
+
+\emph{Quyết định 2 --- đặt mốc thời gian và tuân thủ.} Trước khi bắt đầu một bài, tự đặt một hạn: ``nếu 25 phút nữa chưa có hướng rõ ràng, tôi chuyển bài''. Không có mốc thì bạn sẽ phát hiện mình chọn sai bài lúc chỉ còn mười phút --- đúng mô hình phân bổ thời gian mà Schoenfeld quan sát được ở \ptr{A/01}. Có mốc thì bạn mất tối đa 25 phút cho một quyết định sai.
+
+\emph{Quyết định 3 --- biết khi nào bỏ và khi nào quay lại.} Bỏ bài không phải thất bại. Rất thường xuyên, ý tưởng cho bài đã bỏ xuất hiện trong lúc bạn làm bài khác --- hiện tượng ``ấp ủ'' ở \ptr{A/01}. Quy tắc thực dụng: khi bỏ, hãy ghi lại một dòng về chỗ bạn đang kẹt, để khi quay lại không phải nạp lại từ đầu.
+
+\subsection{Nộp bài và xử lý sai}
+
+Thể thức chấm quyết định chiến thuật nộp. Nếu có \emph{phạt thời gian} cho mỗi lần nộp sai, hãy dành thêm hai phút rà bảng kiểm trước khi nộp --- rẻ hơn nhiều so với tiền phạt. Nếu có \emph{chấm từng phần}, hãy nộp lời giải chậm hơn để lấy điểm bộ phận trước khi cố tối ưu; nhiều người mất điểm vì theo đuổi lời giải đầy đủ tới hết giờ.
+
+Sau một lần nộp sai, có một hiệu ứng tâm lý cần biết, và nó là câu trả lời cho câu hỏi mở đầu thứ năm: xác suất lần nộp tiếp theo cũng sai cao hơn bình thường. Lý do là bạn thường sửa \emph{triệu chứng} chứ không sửa nguyên nhân, và bạn làm việc đó dưới áp lực với sự chú ý bị thu hẹp. Cách chống là bắt buộc mình dừng lại 60 giây và trả lời hai câu trước khi sửa: \emph{ca dữ liệu nào có thể làm sai}, và \emph{giả định nào của tôi có thể không đúng}. Nếu không trả lời được, hãy viết stress test thay vì đoán tiếp (\ptr{E/25}).
+
+\section{Luyện hai kỹ năng này thế nào}
+
+Cả hai bối cảnh đều luyện được, và cách luyện rất cụ thể.
+
+\emph{Cho phỏng vấn:} giải bài với việc \emph{nói to} toàn bộ suy nghĩ, kể cả khi ngồi một mình --- ban đầu rất gượng, nhưng đó chính là kỹ năng cần luyện. Tốt hơn nữa là luyện theo cặp, thay nhau đóng vai người phỏng vấn. Ngoài ra, tự đặt giới hạn thời gian 40 phút cho mỗi bài để làm quen với sức ép.
+
+\emph{Cho thi đấu:} thi ảo là công cụ không thể thay thế. Lấy một đề cũ, đặt đồng hồ đúng thời lượng, không tra cứu, làm nghiêm túc. Sau đó ghi lại mốc thời gian mỗi lần đổi bài và đối chiếu với hai quyết định chiến thuật ở mục 2. Rồi upsolve theo quy trình ở \ptr{A/02}.
+
+\emph{Cho cả hai:} chuẩn bị sẵn hai thứ. Một \emph{thư viện mẫu} đã kiểm chứng cho các cấu trúc hay dùng --- DSU, cây phân đoạn, Dijkstra, luồng --- vì thời gian gõ lại từ đầu là thời gian không dùng để nghĩ. Và một \emph{bảng kiểm trước khi nộp} gồm năm tới bảy dòng, rút từ nhật ký lỗi của chính bạn.
+
+\section{Gốc rễ: từ một cuộc thi ở Texas tới quy trình phỏng vấn hiện đại}
+
+Thi lập trình có tuổi đời khá dài. Các cuộc thi giữa các trường đại học bắt đầu từ đầu thập niên 1970 ở Mỹ và dần lớn thành giải vô địch lập trình sinh viên quốc tế; kỳ thi tin học quốc tế dành cho học sinh phổ thông bắt đầu năm 1989. Hai thể thức này khác nhau ở một điểm ảnh hưởng lớn tới chiến thuật: thi đồng đội theo kiểu ICPC chấm đúng/sai kèm phạt thời gian, còn IOI chấm từng phần theo nhóm test. Sự khác biệt đó tạo ra hai văn hoá luyện tập khác nhau --- một bên nhấn mạnh tốc độ và độ chính xác lần nộp đầu, một bên nhấn mạnh khả năng lấy điểm bộ phận và tối ưu dần.
+
+Phỏng vấn kỹ thuật có một lịch sử ngắn hơn và nhiều thay đổi hơn. Giai đoạn đầu của các công ty công nghệ lớn nổi tiếng với các câu đố mẹo --- những câu hỏi kiểu ``vì sao nắp cống hình tròn'' --- và cách làm đó dần bị bỏ khi có bằng chứng rằng chúng không dự báo được năng lực làm việc. Từ giữa thập niên 2000, các câu hỏi thuật toán có cấu trúc trở thành chuẩn, và bộ sách hướng dẫn phỏng vấn\cite{mcdowell2015} đóng vai trò lớn trong việc chuẩn hoá kỳ vọng của cả hai phía.
+
+Điều đáng nhớ về mặt phương pháp là vì sao quy trình bảy bước ở mục 1 lại được chấm cao. Nó không phải một nghi thức: mỗi bước tương ứng với một hành vi mà người phỏng vấn thực sự cần dự báo. Hỏi làm rõ trước khi làm dự báo việc bạn có xây sai thứ trong dự án thật hay không. Nói ra suy nghĩ dự báo việc cộng tác. Tự kiểm tra dự báo chất lượng mã bạn giao. Nhìn theo cách đó, buổi phỏng vấn là một mô phỏng thu nhỏ --- và cách luyện tốt nhất là làm việc theo đúng quy trình đó cả khi không ai xem, cho tới khi nó thành phản xạ.
+
+\begin{gocre}
+\gr{Đầu thập niên 1970 --- thi lập trình sinh viên}{Cần một cách đánh giá kỹ năng lập trình mang tính thi đấu.}{Thể thức đồng đội, chấm đúng/sai kèm phạt thời gian; định hình văn hoá coi trọng độ chính xác lần nộp đầu.}
+\gr{1989 --- kỳ thi tin học quốc tế}{Đánh giá học sinh phổ thông ở quy mô quốc tế.}{Chấm từng phần theo nhóm test; sinh ra chiến thuật lấy điểm bộ phận và tối ưu dần.}
+\gr{Thập niên 1990--2000 --- phỏng vấn kiểu câu đố}{Cần lọc ứng viên nhanh ở quy mô lớn.}{Câu đố mẹo phổ biến rồi bị bỏ vì không dự báo được năng lực làm việc thật.}
+\gr{Giữa thập niên 2000 --- phỏng vấn thuật toán có cấu trúc}{Cần tiêu chí đánh giá lặp lại được và công bằng hơn.}{Bài thuật toán 45 phút thành chuẩn; sách hướng dẫn chuẩn hoá kỳ vọng của cả hai phía\cite{mcdowell2015}.}
+\gr{Thập niên 2010 --- nền tảng luyện tập trực tuyến}{Người học cần môi trường luyện có phản hồi tức thì.}{Kho bài phân loại theo độ khó và thi ảo; độ trễ phản hồi giảm mạnh, đúng yếu tố mà \ptr{A/02} nói là quan trọng nhất.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Cờ vua}{Quản lý đồng hồ, tránh áp lực thời gian}{Kỳ thủ mạnh không tính sâu hơn nhiều mà \emph{phân bổ thời gian} tốt hơn --- đúng phát hiện của Schoenfeld ở \ptr{A/01}. Cùng bài học: quyết định nhanh ở thế đơn giản để dành thời gian cho thế phức tạp.}
+\lh{Thể thao}{Thi đấu tập, mô phỏng điều kiện thật}{Thi ảo chính là buổi tập có tính giờ. Nguyên tắc chung: kỹ năng chịu sức ép chỉ luyện được khi có sức ép, nên tập nhẹ nhàng không chuẩn bị cho ngày thi.}
+\lh{Hàng không}{Bảng kiểm, huấn luyện buồng lái mô phỏng}{Bảng kiểm trước khi nộp bài giống bảng kiểm trước cất cánh: không phải vì bạn không biết, mà để chống bỏ sót dưới áp lực. Buồng lái mô phỏng chính là thi ảo.}
+\lh{Y khoa}{Thi lâm sàng có cấu trúc, ``nghĩ to'' khi chẩn đoán}{Sinh viên y được dạy diễn đạt lập luận chẩn đoán thành lời --- vì cùng lý do với mục 1.2: người chấm cần thấy quá trình, và bệnh nhân cần hiểu lý do.}
+\lh{Trình bày và bảo vệ nghiên cứu}{Trả lời câu hỏi của hội đồng}{Cùng ba lỗi giao tiếp: im lặng quá lâu, trả lời trước khi hiểu câu hỏi, và phòng thủ khi bị góp ý. Cách chữa cũng giống nhau.}
+\lh{Tâm lý học thể thao}{Trạng thái mất bình tĩnh sau thất bại}{Hiện tượng nộp sai liên tiếp ở mục 2.1 là một dạng của nó. Biện pháp cũng tương tự: một thủ tục cố định để chạy sau mỗi thất bại, thay vì dựa vào ý chí.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Vì lời giải cuối cùng nói rất ít về việc bạn sẽ làm việc thế nào. Bạn có thể đã gặp đúng bài đó, hoặc gặp một bài hoàn toàn xa lạ --- hai trường hợp cho cùng kết quả nhưng nói hai điều khác nhau. Quá trình thì dự báo được: hỏi làm rõ trước khi làm dự báo bạn có xây sai thứ trong dự án thật hay không; nói ra suy nghĩ dự báo khả năng cộng tác; tự kiểm tra dự báo chất lượng mã bạn giao. Buổi phỏng vấn là một mô phỏng thu nhỏ của việc cùng làm việc.}
+\tl{Vì thứ tự đề không luôn theo độ khó, và bạn không thể phân bổ thời gian hợp lý cho thứ mình chưa biết. Mười phút đọc hết đề cho bạn một bức tranh để xếp thứ tự làm, và nó thường tiết kiệm được nửa giờ. Ngoài ra, việc đọc một bài rồi để đó có tác dụng phụ tốt: não bạn tiếp tục xử lý nó trong lúc bạn làm bài khác --- hiện tượng ấp ủ ở \ptr{A/01}.}
+\tl{Quyết định đúng gần như luôn là chuyển sang bài khác và quay lại sau, kèm ghi một dòng về chỗ đang kẹt. Cách biết trước khi hết giờ là đặt mốc \emph{ngay khi bắt đầu bài}: ``nếu 25 phút nữa chưa có hướng rõ ràng thì chuyển''. Mốc phải đặt trước, vì khi đã bỏ 40 phút thì tâm lý tiếc công đã bỏ ra sẽ khiến bạn quyết định tệ. Đây chính là tầng tự giám sát mà \ptr{A/01} mô tả, ở dạng cụ thể nhất.}
+\tl{Vì im lặng với bạn là suy nghĩ, còn với người phỏng vấn là không có thông tin --- ba phút nghĩ tốt và ba phút bế tắc trông giống hệt nhau. Quan trọng hơn, im lặng làm họ mất cơ hội gợi ý đúng chỗ, mà gợi ý là một phần của quy trình chứ không phải sự nhân nhượng. Nếu cần yên tĩnh để nghĩ, hãy nói trước một câu: ``cho tôi một phút cân nhắc về cấu trúc dữ liệu'' --- điều đó vừa giữ được sự yên tĩnh vừa giữ được liên lạc.}
+\tl{Vì bạn thường sửa triệu chứng chứ không sửa nguyên nhân: bạn đổi một dấu so sánh, thêm một trường hợp riêng, mà không biết vì sao sai. Cộng thêm áp lực làm sự chú ý thu hẹp và loại bỏ khả năng suy xét rộng. Cách chống là một thủ tục cố định: dừng 60 giây, trả lời hai câu --- ca dữ liệu nào có thể sai, giả định nào của tôi có thể không đúng --- và nếu không trả lời được thì viết stress test thay vì đoán tiếp (\ptr{E/25}).}
+\end{traloi}
+
+\begin{dongian}
+Cả kỳ thi lẫn buổi phỏng vấn đều không đo mỗi lượng kiến thức. Chúng đo cách bạn xoay xở khi có đồng hồ chạy và có người nhìn.
+
+Trong phỏng vấn, điều làm người nghe an tâm không phải bạn ra đáp án nhanh, mà là họ theo được bạn đang nghĩ gì. Hãy hình dung bạn đang chỉ đường cho ai đó: nếu bạn im lặng đi trước rồi bất ngờ dừng lại nói ``tới rồi'', người ta không biết bạn có đi đúng đường không. Vì vậy hãy hỏi cho rõ trước khi đi, nói ra bạn định rẽ hướng nào, và khi tới nơi thì tự kiểm tra lại xem có đúng địa chỉ không. Ba việc đó quan trọng hơn việc đi nhanh.
+
+Trong kỳ thi, sai lầm tốn kém nhất không phải làm sai một bài khó, mà là dành cả tiếng cho bài khó trong khi có một bài dễ hơn chưa đọc tới. Cách phòng rất đơn giản và ít người làm: đọc hết đề trước rồi mới chọn bài, và mỗi khi bắt đầu một bài thì tự hẹn giờ --- nếu quá hạn mà chưa thấy hướng thì chuyển sang bài khác, ghi lại một dòng về chỗ đang kẹt.
+
+Còn khi vừa nộp sai một lần, hãy cưỡng lại việc sửa ngay. Trong trạng thái sốt ruột, người ta thường sửa cái nhìn thấy chứ không sửa cái gây ra lỗi, nên lần nộp sau lại sai. Một phút dừng lại tự hỏi ``dữ liệu nào có thể làm nó sai'' rẻ hơn nhiều so với ba lần nộp hỏng.
+\motcau{Kiến thức quyết định bạn giải được bài nào; chiến thuật quyết định bạn kịp giải bao nhiêu bài trong số đó.}
+\chuadongian{Áp lực thật không mô phỏng hoàn toàn được; thi ảo giúp nhiều nhưng không thay thế được kinh nghiệm dự thi thật.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Bảy bước phỏng vấn}{Làm rõ \(\rightarrow\) ví dụ \(\rightarrow\) vét cạn \(\rightarrow\) cải thiện \(\rightarrow\) thống nhất trước khi viết \(\rightarrow\) viết \(\rightarrow\) tự kiểm.}
+\ar[3]{Điều thực sự được chấm}{Không phải lời giải tối ưu, mà là: hỏi trước khi làm, nói ra suy nghĩ, phản ứng tốt với gợi ý, tự kiểm tra không cần nhắc.}
+\ar[3]{Ba lỗi giao tiếp}{Im lặng suy nghĩ; nhảy vào viết code trước khi thống nhất hướng; phòng thủ khi được góp ý.}
+\ar[3]{Ba quyết định chiến thuật thi đấu}{Đọc hết đề trước (5--10 phút); đặt mốc thời gian trước khi bắt đầu mỗi bài; biết khi nào bỏ và ghi lại chỗ kẹt.}
+\ar[3]{Sau khi nộp sai}{Dừng 60 giây, hỏi ``ca nào có thể sai'' và ``giả định nào có thể không đúng''; không trả lời được thì viết stress test thay vì đoán.}
+\ar[2]{Thể thức quyết định chiến thuật}{Có phạt thời gian: rà bảng kiểm thêm hai phút trước khi nộp. Chấm từng phần: nộp lời giải chậm lấy điểm bộ phận trước khi tối ưu.}
+\ar[2]{Cách luyện phỏng vấn}{Giải bài với việc nói to toàn bộ suy nghĩ, kể cả khi ngồi một mình; luyện theo cặp; tự đặt giới hạn 40 phút mỗi bài.}
+\ar[2]{Cách luyện thi đấu}{Thi ảo đúng thời lượng, không tra cứu; ghi mốc thời gian mỗi lần đổi bài; upsolve sau đó theo quy trình ở \ptr{A/02}.}
+\ar[2]{Hai thứ cần chuẩn bị trước}{Thư viện mẫu đã stress test; bảng kiểm trước khi nộp rút từ nhật ký lỗi của chính bạn.}
+\ar[2]{Vì sao đặt mốc thời gian \emph{trước}}{Vì khi đã bỏ 40 phút, tâm lý tiếc công sẽ làm bạn quyết định tệ; mốc phải đặt lúc còn khách quan.}
+\ar[1]{Hai thể thức, hai văn hoá}{Chấm đúng/sai kèm phạt thời gian coi trọng độ chính xác lần đầu; chấm từng phần coi trọng khả năng lấy điểm bộ phận và tối ưu dần.}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Nếu tôi bí hoàn toàn trong phỏng vấn thì sao?}{Nói ra chính xác chỗ bạn kẹt, dạng ``tôi biết cách làm nếu\dots{} nhưng chưa biết xử lý khi\dots'' --- đúng kỹ thuật ở \ptr{A/01}. Điều này có ba tác dụng: cho người phỏng vấn biết bạn đang ở đâu để gợi ý đúng chỗ; cho thấy bạn suy nghĩ có cấu trúc; và rất thường xuyên, chính lúc phát biểu ra thì bạn nhìn thấy hướng đi. Điều nên tránh là im lặng, và điều tuyệt đối nên tránh là giả vờ đang tiến triển.}
+\qa{Có nên nói thẳng rằng tôi đã từng gặp bài này không?}{Nên, và hầu hết người phỏng vấn đánh giá cao sự thẳng thắn đó. Họ thường sẽ đổi bài, hoặc yêu cầu bạn giải thích sâu hơn --- cả hai đều tốt hơn cho bạn so với việc giả vờ nghĩ ra rồi bị hỏi một biến thể mà bạn không hiểu bản chất. Ngoài ra, việc giả vờ rất dễ lộ: người có kinh nghiệm nhận ra ngay khi ứng viên đi thẳng tới lời giải tối ưu mà không qua bước nào.}
+\qa{Trong contest, tôi nên đọc đề theo thứ tự nào?}{Đọc lướt toàn bộ theo thứ tự đề, ghi cho mỗi bài một ước lượng độ khó và một dòng về ý tưởng nếu đã thấy. Sau đó làm theo thứ tự khó tăng dần \emph{theo ước lượng của bạn}, không theo thứ tự đề. Nếu có bảng điểm trực tuyến, hãy dùng số người đã giải làm nguồn thông tin --- nó chính xác hơn cảm giác cá nhân, đặc biệt với những bài mà đề dài làm bạn thấy đáng sợ hơn thực tế.}
+\qa{Tôi nên chuẩn bị thư viện mẫu tới mức nào?}{Đủ để không phải gõ lại những thứ dài và dễ sai: DSU, cây phân đoạn có lazy, Dijkstra, luồng cực đại, hình học cơ bản, số học modulo. Nguyên tắc quan trọng nhất: mỗi đoạn phải \emph{do bạn viết} và đã stress test --- chép về mà không hiểu thì khi cần sửa cho biến thể lạ bạn sẽ kẹt (\ptr{A/02}). Đừng nhồi quá nhiều: một thư viện mà bạn không nhớ có gì trong đó thì vô dụng.}
+\qa{Phỏng vấn thiết kế hệ thống có liên quan gì tới quyển sách này không?}{Có, ở phần tư duy đánh đổi chứ không ở phần thuật toán cụ thể. Các câu hỏi ở đó xoay quanh đúng những chủ đề của \ptr{E/26}: chọn cấu trúc theo mẫu truy cập, ước lượng quy mô bằng phép tính phong bì, độ trễ đuôi, đánh đổi giữa nhất quán và khả dụng. Kiến thức trực tiếp dùng lại: băm nhất quán, B-cây và chỉ mục, hàng đợi, và các cấu trúc xấp xỉ cho luồng dữ liệu.}
+\qa{Tôi luyện nhiều mà thi vẫn kém. Nguyên nhân hay gặp là gì?}{Ba nguyên nhân, và cả ba đều thuộc về chiến thuật chứ không kiến thức. Một, chưa bao giờ luyện có tính giờ --- nên kỹ năng dưới sức ép chưa được tập. Hai, không đọc hết đề nên chọn sai bài. Ba, không có bảng kiểm nên mất điểm vào lỗi cài đặt lặp đi lặp lại. Cách chẩn đoán: sau vài kỳ thi, phân loại các bài bạn \emph{không} giải được thành ``không nghĩ ra'', ``nghĩ ra nhưng không kịp'', và ``làm sai''. Tỉ lệ ba nhóm cho biết bạn cần luyện gì.}
+\qa{Có nên luyện gõ code nhanh không?}{Ở mức vừa phải thì có, nhưng nó không phải nút thắt của phần lớn người học. Điều đáng luyện hơn là \emph{gõ ít lỗi}: viết bất biến trước, giữ quy ước nhất quán, và có thư viện mẫu để không phải gõ lại thứ dài. Nếu bạn thấy mình thường xuyên hết giờ khi đang gõ chứ không khi đang nghĩ, thì hãy xem lại xem vấn đề có thật sự là tốc độ gõ hay là bạn viết lại từ đầu những thứ lẽ ra đã có sẵn.}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Giải một bài quen thuộc và nói to toàn bộ suy nghĩ, có ghi âm}{Bài tập giao tiếp}{Nghe lại và đếm số lần im lặng quá 30 giây; đó là con số cần giảm.}
+\bt[1]{Chạy quy trình bảy bước cho một bài dễ, tính giờ 40 phút}{Bài tập quy trình}{Mục tiêu là đủ bảy bước, không phải ra lời giải tối ưu.}
+\bt[2]{Thi ảo một đề contest cũ, đúng thời lượng}{Codeforces, AtCoder, CSES\cite{cses}}{Ghi mốc thời gian mỗi lần đổi bài; đối chiếu với hai quyết định chiến thuật ở mục 2.}
+\bt[2]{Phân loại các bài bạn không giải được trong ba kỳ thi gần nhất}{Bài tập tự chẩn đoán}{Ba nhóm: không nghĩ ra, không kịp, làm sai. Tỉ lệ cho biết nên luyện gì.}
+\bt[2]{Luyện phỏng vấn theo cặp, thay nhau đóng vai người phỏng vấn}{Bài tập giao tiếp}{Đóng vai người phỏng vấn dạy nhiều không kém đóng vai ứng viên.}
+\bt[2]{Lập bảng kiểm trước khi nộp gồm 5--7 dòng từ nhật ký lỗi của bạn}{Bài tập tự tổ chức}{Dùng nó trong ba kỳ thi tiếp theo và đếm số lần nó cứu bạn.}
+\bt[3]{Xây thư viện mẫu cho sáu cấu trúc hay dùng, mỗi cái có stress test}{Bài tập cài đặt}{DSU, cây phân đoạn lazy, Dijkstra, luồng, hình học cơ bản, số học modulo.}
+\bt[3]{Thi ảo với ràng buộc chỉ được nộp mỗi bài một lần}{Bài tập kỷ luật}{Luyện thói quen rà bảng kiểm; đo xem tỉ lệ đúng lần đầu của bạn là bao nhiêu.}
+\bt[3]{Upsolve toàn bộ một đề contest cho tới khi giải hết}{Bài tập upsolving}{Đây là bài tập tạo tiến bộ lớn nhất trong danh sách, và cũng là bài tập ít vui nhất.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Chương này về hai bối cảnh có sức ép, và luận điểm chính là chúng đo những thứ luyện được mà người học thường không luyện. Ba điều đáng mang theo: quy trình bảy bước cho phỏng vấn, trong đó bước làm rõ đề và bước tự kiểm là hai bước tạo khác biệt lớn nhất; ba quyết định chiến thuật cho thi đấu, đặc biệt việc đặt mốc thời gian \emph{trước} khi bắt đầu một bài; và thủ tục 60 giây sau mỗi lần nộp sai.
+
+Chương cuối cùng gom toàn bộ quyển sách thành thứ bạn mang theo được: một lộ trình luyện tập theo tuần, một cách theo dõi tiến bộ, và một ngân hàng bài tập phân loại theo 27 chương trước --- để sau khi gấp sách, bạn có việc cụ thể để làm vào sáng mai (\ptr{E/28}).
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

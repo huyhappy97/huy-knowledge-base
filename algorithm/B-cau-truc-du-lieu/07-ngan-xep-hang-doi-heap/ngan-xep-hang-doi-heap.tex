@@ -1,0 +1,262 @@
+% ============================================================================
+%  B/07-ngan-xep-hang-doi-heap — file chương
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-07 | Ôn gần nhất: chưa
+%  Dependency: B/06, A/03. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../algorithm.tex]{subfiles}
+\begin{document}
+\chapter{Ngăn xếp, hàng đợi và heap (Stacks, Queues, Heaps)}
+\ptrtarget{B/07}\ptrtarget{B/07-ngan-xep-hang-doi-heap}
+\dependency{\ptr{B/06} cho kỹ thuật quét tuyến tính; \ptr{A/03} cho phân tích khấu hao --- ngăn xếp đơn điệu là ví dụ khấu hao đẹp nhất trong cả quyển sách.}
+
+\begin{tomtat}
+Ba cấu trúc trong chương này trả lời cùng một câu hỏi với ba câu trả lời khác nhau: \emph{trong đống dữ liệu đang chờ, phần tử nào nên xử lý tiếp?} Ngăn xếp nói ``cái mới nhất'', hàng đợi nói ``cái cũ nhất'', heap nói ``cái nhỏ nhất''. Ba lựa chọn ấy sinh ra ba họ thuật toán rất khác nhau: đệ quy và duyệt sâu, duyệt rộng và mô phỏng theo thời gian, và các thuật toán tham lam kiểu Dijkstra hay Huffman. Chương cũng dựng hai kỹ thuật có tỉ lệ sức mạnh trên độ dài code rất cao: ngăn xếp đơn điệu và hàng đợi hai đầu đơn điệu. Nếu chỉ nhớ một điều: heap cố tình duy trì \emph{ít trật tự hơn} mảng đã sắp --- nó chỉ biết ai nhỏ nhất --- và chính sự tiết chế đó làm nó rẻ.
+\end{tomtat}
+
+\begin{nentang}
+\kn{ngăn xếp (stack)}{cấu trúc vào sau ra trước (LIFO): thêm và lấy đều ở một đầu, cả hai \Ob{1}.}
+\kn{hàng đợi (queue)}{vào trước ra trước (FIFO): thêm ở một đầu, lấy ở đầu kia.}
+\kn{hàng đợi hai đầu (deque)}{thêm và lấy được ở cả hai đầu, mỗi thao tác \Ob{1}.}
+\kn{heap nhị phân}{cây nhị phân gần đầy, mỗi nút không lớn hơn các con của nó, lưu bằng mảng: con của \(i\) là \(2i\) và \(2i+1\). Lấy nhỏ nhất \Ob{1}, thêm và xoá \Ob{\log n}.}
+\kn{hàng đợi ưu tiên (priority queue)}{giao diện trừu tượng ``thêm phần tử, lấy phần tử ưu tiên nhất''; heap là cách cài phổ biến nhất nhưng không phải duy nhất.}
+\kn{ngăn xếp đơn điệu}{ngăn xếp mà các phần tử trong nó luôn giữ thứ tự tăng (hoặc giảm); dùng để tìm ``phần tử lớn hơn kế tiếp'' cho mọi vị trí trong \Ob{n}.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Ngăn xếp đơn điệu có vòng lặp lồng nhau và trông như \Ob{n^2}. Vì sao nó thật sự là \Ob{n}?}
+\h{Vì sao heap chỉ cho biết phần tử nhỏ nhất mà không cho biết phần tử thứ hai một cách trực tiếp --- và vì sao đó lại là \emph{ưu điểm} chứ không phải khuyết điểm?}
+\h{Xây heap từ \(n\) phần tử tốn \Ob{n} chứ không phải \Ob{n\log n}, dù mỗi lần chèn tốn \Ob{\log n}. Chỗ nào trong lập luận ``\(n\) lần chèn'' bị sai?}
+\h{Duyệt sâu dùng ngăn xếp, duyệt rộng dùng hàng đợi --- chỉ khác một dòng code. Vì sao hai thuật toán lại có tính chất khác nhau đến vậy?}
+\h{Khi nào một mảng đã sắp xếp tốt hơn heap, và ngược lại?}
+\end{khoigoi}
+
+Chương trước quét dữ liệu theo thứ tự chỉ số. Nhưng rất nhiều bài toán không cho phép làm vậy: bạn xử lý một phần tử, việc đó sinh ra công việc mới, và công việc mới phải xếp vào một chỗ nào đó để xử lý sau. Câu hỏi trung tâm trở thành: \emph{trong đống công việc đang chờ, cái nào làm tiếp?}
+
+Ba cấu trúc trong chương này là ba câu trả lời, và điều đáng chú ý là chúng chỉ khác nhau ở đúng chỗ đó --- cùng một khung ``lấy ra, xử lý, đẩy vào'' nhưng đổi quy tắc lấy ra thì được ba thuật toán khác hẳn nhau về hành vi. Duyệt sâu, duyệt rộng và Dijkstra là cùng một chương trình với ba cấu trúc chờ khác nhau, và nhận ra điều đó làm ba thuật toán ấy sụp thành một.
+
+\section{Ngăn xếp: cái mới nhất trước}
+
+Ngăn xếp là cấu trúc gắn liền với \emph{sự lồng nhau}. Mỗi khi bài toán có cấu trúc ``mở rồi phải đóng theo đúng thứ tự ngược lại'' thì ngăn xếp là công cụ tự nhiên: dấu ngoặc trong biểu thức, thẻ trong tài liệu đánh dấu, lời gọi hàm trong chương trình, thao tác hoàn tác trong trình soạn thảo.
+
+Điều đáng để ý về mặt khái niệm: đệ quy và ngăn xếp là cùng một thứ. Máy tính thực hiện đệ quy bằng cách đẩy trạng thái lời gọi vào ngăn xếp phần cứng. Vì vậy mọi thuật toán đệ quy đều viết lại được thành vòng lặp với ngăn xếp tường minh --- một kỹ thuật đáng biết vì đôi khi nó là cách duy nhất tránh tràn ngăn xếp khi độ sâu lên tới hàng trăm nghìn (\ptr{E/25}).
+
+\subsection{Ngăn xếp đơn điệu: kỹ thuật đáng giá nhất của chương}
+
+Bài toán: với mỗi vị trí \(i\) trong mảng, tìm vị trí đầu tiên bên phải có giá trị lớn hơn \(a_i\). Vét cạn \Ob{n^2}. Ngăn xếp đơn điệu cho \Ob{n}.
+
+Ý tưởng: quét từ trái sang phải, duy trì một ngăn xếp chứa các vị trí mà \emph{chưa tìm được phần tử lớn hơn}. Khi tới vị trí \(i\), lấy ra khỏi ngăn xếp mọi vị trí có giá trị nhỏ hơn \(a_i\) --- với mỗi vị trí lấy ra, đáp án của nó chính là \(i\). Rồi đẩy \(i\) vào.
+
+Bất biến: \emph{ngăn xếp luôn chứa các giá trị giảm dần từ đáy lên đỉnh, và đó đúng là những vị trí còn đang chờ đáp án}. Vì sao \Ob{n}? Mỗi vị trí được đẩy vào đúng một lần và lấy ra nhiều nhất một lần, nên tổng số thao tác không quá \(2n\) --- lập luận khấu hao y hệt lập luận ``tổng quãng đường con trỏ'' ở chương \ptr{B/06}. Vòng lặp trong có thể chạy nhiều bước ở một số lần lặp, nhưng khi đó nó vừa xoá đi nhiều phần tử mà ai đó đã trả tiền lúc đẩy vào.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[xscale=0.95,yscale=0.44]
+\foreach \i/\h in {1/3, 2/1, 3/4, 4/1, 5/5, 6/9, 7/2, 8/6}{
+  \fill[bluebg,draw=steel,thick] (\i-0.42,0) rectangle (\i+0.42,\h);
+  \node[font=\scriptsize,color=inkblue] at (\i,\h+0.55) {\h};}
+\draw[-{Latex[length=2mm]},very thick,color=accent] (5,5.35) -- (5,9.0);
+\node[font=\scriptsize,color=accent,anchor=west] at (5.15,7.2) {phần tử lớn hơn kế tiếp của cột 5};
+\draw[-{Latex[length=2mm]},very thick,color=accent] (3,4.35) -- (3,4.9) -- (4.55,4.9);
+\node[font=\scriptsize,color=reddark,anchor=west,text width=4.2cm] at (9.0,3.0)
+  {Mỗi cột vào ngăn xếp đúng một lần và ra nhiều nhất một lần \(\Rightarrow\) tổng \Ob{n}};
+\end{tikzpicture}
+\caption{Ngăn xếp đơn điệu tìm ``phần tử lớn hơn kế tiếp''. Các cột đang nằm trong ngăn xếp luôn giảm dần từ trái sang phải; khi gặp một cột cao hơn, tất cả các cột thấp hơn nó bị lấy ra và nhận cột này làm đáp án. Cùng cấu trúc giải bài ``hình chữ nhật lớn nhất trong biểu đồ cột'' --- ở đó mỗi cột bị lấy ra chính là lúc ta biết được cả biên trái lẫn biên phải của hình chữ nhật cao bằng nó.}
+\label{fig:monostack}
+\end{figure}
+
+Họ bài giải bằng ngăn xếp đơn điệu rộng hơn tưởng tượng: phần tử lớn hơn/nhỏ hơn kế tiếp hai phía, hình chữ nhật lớn nhất trong biểu đồ cột, nước mưa mắc kẹt, số đoạn con mà một phần tử là cực đại, và cả việc dựng cây Cartesian. Dấu hiệu nhận biết trên đề: \emph{với mỗi phần tử, cần biết phần tử gần nhất về một phía thoả một quan hệ so sánh}.
+
+\section{Hàng đợi và hàng đợi hai đầu}
+
+Hàng đợi gắn với việc xử lý theo \emph{lớp}: duyệt rộng trên đồ thị xử lý hết các đỉnh cách 1 bước rồi mới tới các đỉnh cách 2 bước, và chính tính chất đó làm duyệt rộng cho đường đi ngắn nhất trên đồ thị không trọng số (\ptr{C/17}). Trong hệ thống thật, hàng đợi là cấu trúc của mọi thứ có ``xếp hàng chờ'': hàng đợi tin nhắn, bộ đệm, lịch tiến trình.
+
+Hàng đợi hai đầu cho một kỹ thuật quan trọng: \emph{cực đại trên cửa sổ trượt} trong \Ob{n}. Duy trì một deque chứa các chỉ số có giá trị giảm dần; khi cửa sổ tiến, bỏ ở đầu những chỉ số đã rơi ra ngoài cửa sổ, và bỏ ở cuối những chỉ số có giá trị nhỏ hơn phần tử mới --- vì chúng không bao giờ còn cơ hội làm cực đại nữa. Đây là kết hợp của cửa sổ trượt (\ptr{B/06}) với ý tưởng đơn điệu của mục trước, và nó cũng là bước tăng tốc chuẩn cho một họ bài quy hoạch động (\ptr{C/16}).
+
+\section{Heap: chỉ biết ai nhỏ nhất, và chỉ cần thế}
+
+Heap nhị phân là một cây nhị phân gần đầy lưu trong mảng, với tính chất: mỗi nút không lớn hơn các con của nó. Chú ý điều \emph{không} được đảm bảo: hai anh em không có quan hệ gì với nhau, và mảng biểu diễn heap hoàn toàn không sắp xếp. Heap chỉ biết đúng một điều --- gốc là nhỏ nhất.
+
+Sự tiết chế đó chính là nguồn sức mạnh. Duy trì trật tự toàn phần (mảng đã sắp) tốn \Ob{n} cho mỗi lần chèn; duy trì trật tự bộ phận của heap chỉ tốn \Ob{\log n}. Nếu bài toán chỉ cần biết ai nhỏ nhất --- và rất nhiều bài chỉ cần thế --- thì trả tiền cho trật tự toàn phần là lãng phí.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.5cm and 0.35cm,
+  n/.style={circle,draw=steel,fill=bluebg,inner sep=0pt,minimum size=7mm,font=\small},
+  ar/.style={draw=steel,thick}]
+\node[n] (a) at (3.6,2.6) {2};
+\node[n] (b) at (2.0,1.5) {4};
+\node[n] (c) at (5.2,1.5) {3};
+\node[n] (d) at (1.2,0.4) {7};
+\node[n] (e) at (2.8,0.4) {5};
+\node[n] (f) at (4.4,0.4) {9};
+\draw[ar] (a)--(b); \draw[ar] (a)--(c); \draw[ar] (b)--(d); \draw[ar] (b)--(e); \draw[ar] (c)--(f);
+\foreach \i/\v in {1/2, 2/4, 3/3, 4/7, 5/5, 6/9}{
+  \fill[amberbg,draw=accent,thick] (6.6+\i*0.95-0.45,1.1) rectangle (6.6+\i*0.95+0.45,1.9);
+  \node[font=\small,color=accent] at (6.6+\i*0.95,1.5) {\v};
+  \node[font=\scriptsize,color=tiercol] at (6.6+\i*0.95,0.85) {\i};}
+\node[font=\scriptsize,color=tiercol,anchor=west,text width=4.6cm] at (7.4,2.6)
+  {con của \(i\) là \(2i\) và \(2i{+}1\);\\cha của \(i\) là \(\lfloor i/2 \rfloor\)};
+\end{tikzpicture}
+\caption{Heap nhị phân và biểu diễn mảng của nó. Không có con trỏ nào --- quan hệ cha con là phép tính chỉ số, nên heap vừa tiết kiệm bộ nhớ vừa thân thiện với cache. Chú ý mảng \emph{không} sắp xếp: 4 đứng trước 3. Heap chỉ hứa mỗi nút nhỏ hơn các con của nó, không hứa gì về quan hệ giữa các nhánh.}
+\label{fig:heap}
+\end{figure}
+
+Ba thao tác và chi phí: lấy nhỏ nhất \Ob{1}; thêm phần tử \Ob{\log n} bằng cách đặt vào cuối rồi đẩy lên; xoá nhỏ nhất \Ob{\log n} bằng cách đưa phần tử cuối lên gốc rồi đẩy xuống. Còn một thao tác đáng nhớ vì nó phản trực giác: \emph{xây heap từ \(n\) phần tử có sẵn tốn \Ob{n}, không phải \Ob{n\log n}}. Lý do: nếu đi từ dưới lên và đẩy xuống, thì các nút ở tầng đáy --- chiếm một nửa số nút --- gần như không phải làm gì, các nút ở tầng trên thì ít. Tổng chi phí là \(\sum_h (n/2^h)\cdot h\), một chuỗi hội tụ về \Ob{n}. Đây là ứng dụng trực tiếp của ``cấp số nhân giảm bị chặn bởi hằng số'' ở chương \ptr{A/05}.
+
+\subsection{Ba mẫu dùng heap đáng thuộc}
+
+\emph{Chọn \(k\) phần tử lớn nhất trong \(n\) phần tử.} Giữ một heap nhỏ nhất kích thước \(k\); mỗi phần tử mới, nếu lớn hơn gốc thì thay gốc. Chi phí \Ob{n\log k} và bộ nhớ \Ob{k} --- tốt hơn hẳn việc sắp toàn bộ khi \(k \ll n\), và quan trọng hơn, nó chạy được cả khi dữ liệu là luồng không lưu hết được (\ptr{D/24}).
+
+\emph{Trộn \(k\) danh sách đã sắp.} Heap chứa phần tử đầu của mỗi danh sách; mỗi lần lấy ra cái nhỏ nhất rồi nạp phần tử kế tiếp của danh sách đó. Chi phí \Ob{N\log k}. Đây là thuật toán nền của việc sắp xếp ngoài (dữ liệu lớn hơn bộ nhớ) và của phép trộn trong nhiều hệ cơ sở dữ liệu.
+
+\emph{Trung vị của luồng dữ liệu.} Hai heap: một heap lớn nhất giữ nửa nhỏ, một heap nhỏ nhất giữ nửa lớn, giữ cho kích thước chênh nhau tối đa 1. Trung vị luôn ở đỉnh của một trong hai. Mẫu này --- \emph{tách dữ liệu thành hai nửa, mỗi nửa một heap quay ngược nhau} --- còn dùng cho nhiều bài ``duy trì phân vị''.
+
+\begin{center}\footnotesize
+\begin{tabularx}{\linewidth}{@{}L{3.0cm}L{2.3cm}L{2.3cm}L{2.4cm}Y@{}}
+\toprule
+\textbf{Cấu trúc} & \textbf{Lấy nhỏ nhất} & \textbf{Chèn} & \textbf{Tìm phần tử thứ \(k\)} & \textbf{Nên chọn khi}\\
+\midrule
+Mảng chưa sắp & \Ob{n} & \Ob{1} & \Ob{n} & Dữ liệu tĩnh, ít truy vấn\\
+Mảng đã sắp & \Ob{1} & \Ob{n} & \Ob{1} & Xây một lần, truy vấn nhiều, không chèn\\
+Heap nhị phân & \Ob{1} & \Ob{\log n} & \emph{không hỗ trợ} & Chỉ cần cực trị, có chèn liên tục\\
+Cây cân bằng (\ptr{B/09}) & \Ob{\log n} & \Ob{\log n} & \Ob{\log n} & Cần cả thứ tự lẫn cực trị\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Bảng trên trả lời câu hỏi mở đầu thứ năm: heap thắng khi có chèn liên tục và chỉ cần cực trị; mảng đã sắp thắng khi dữ liệu tĩnh và cần truy vấn theo hạng; cây cân bằng đắt hơn cả hai nhưng làm được cả hai việc.
+
+\begin{cambay}
+Heap nhị phân chuẩn \emph{không} hỗ trợ hai thao tác mà người ta hay tưởng là có: xoá một phần tử bất kỳ, và giảm khoá của một phần tử. Muốn có chúng cần lưu thêm chỉ số vị trí của từng phần tử, tức là một heap có đánh dấu. Trong lập trình thi đấu, mẹo thông dụng hơn là \emph{xoá lười}: cứ đẩy bản ghi mới vào và khi lấy ra thì bỏ qua những bản ghi đã lỗi thời. Đây chính là lý do bản Dijkstra viết bằng hàng đợi ưu tiên thường có dòng kiểm tra ``nếu khoảng cách lấy ra lớn hơn khoảng cách đã biết thì bỏ qua'' (\ptr{C/17}).
+\end{cambay}
+
+\section{Cùng một khung, ba cấu trúc, ba thuật toán}
+
+Đây là chỗ chương này trả công nhiều nhất về mặt tư duy. Xét khung chương trình sau: lấy một phần tử từ kho chờ, xử lý nó, đẩy các phần tử liên quan vào kho chờ, lặp lại. Đổi kho chờ, bạn được ba thuật toán khác nhau:
+
+\begin{itemize}
+\item \textbf{Ngăn xếp} \(\rightarrow\) duyệt sâu. Đi tới cùng một nhánh rồi mới quay lại. Dùng để tìm thành phần liên thông, phát hiện chu trình, sắp thứ tự tô-pô.
+\item \textbf{Hàng đợi} \(\rightarrow\) duyệt rộng. Xử lý theo lớp khoảng cách. Cho đường đi ngắn nhất trên đồ thị không trọng số.
+\item \textbf{Hàng đợi ưu tiên} \(\rightarrow\) Dijkstra và A\(^\ast\). Xử lý theo thứ tự chi phí tăng dần. Cho đường đi ngắn nhất với trọng số không âm.
+\end{itemize}
+
+Nhận ra ba thuật toán này là một giúp bạn nhớ ít hơn và suy được nhiều hơn. Ví dụ, câu hỏi ``vì sao Dijkstra cần trọng số không âm'' trở thành hiển nhiên khi nhìn theo khung này: thuật toán chốt một đỉnh ngay khi lấy nó ra khỏi hàng đợi ưu tiên, tức là nó tin rằng không có đường nào rẻ hơn sẽ tới sau --- và niềm tin ấy chỉ đúng nếu mọi cạnh đều làm chi phí tăng lên. Chương \ptr{C/17} khai thác đầy đủ cách nhìn này.
+
+\section{Giảm khoá và bài học Fibonacci heap: khi cận và máy thật không cùng kết luận}
+
+Khối \emph{Cạm bẫy} ở trên nói heap nhị phân không có thao tác giảm khoá. Câu hỏi tự nhiên là: có cấu trúc nào có không, và nó đáng giá bao nhiêu? Câu trả lời dẫn tới một trong những câu chuyện đáng học nhất của ngành cấu trúc dữ liệu.
+
+Bắt đầu từ chỗ thao tác này thực sự tốn tiền. Dijkstra (\ptr{C/17}) mỗi lần thư giãn một cạnh là một lần muốn hạ nhãn của một đỉnh. Với heap nhị phân, cách làm phổ biến là đẩy thêm một bản ghi mới rồi bỏ qua bản ghi lỗi thời khi lấy ra --- nghĩa là hàng đợi chứa tới \(m\) phần tử và tổng chi phí là \Ob{m\log n}. Fredman và Tarjan\cite{fredman1987} đặt câu hỏi: nếu giảm khoá rẻ đi thì Dijkstra rẻ đi bao nhiêu? Với \Ob{1} cho giảm khoá và \Ob{\log n} cho lấy nhỏ nhất, tổng thành \Ob{m + n\log n} --- tốt hơn hẳn khi đồ thị dày, vì lúc đó \(m\) lớn hơn \(n\log n\) nhiều lần.
+
+Fibonacci heap đạt hai cận đó theo nghĩa \emph{khấu hao}, và cơ chế của nó là một minh hoạ đẹp cho phương pháp thế năng ở chương \ptr{A/03}: hoãn mọi việc dọn dẹp tới lúc bắt buộc. Chèn chỉ là thêm một cây vào danh sách gốc, không so sánh gì cả. Giảm khoá chỉ là \emph{cắt} nút đó ra khỏi cha và biến nó thành một gốc mới --- cũng không so sánh gì. Toàn bộ việc gộp các cây cùng bậc bị dồn sang lần lấy nhỏ nhất kế tiếp, và để cây không bị cắt tới mức xơ xác, mỗi nút bị mất con lần thứ hai sẽ bị cắt lên theo dây chuyền. Hàm thế năng đếm số cây gốc cùng số nút đã bị đánh dấu, và chính nó trả tiền cho những lần dọn dẹp đắt đỏ.
+
+Đến đây lý thuyết rất đẹp. Nhưng câu hỏi thực dụng --- \emph{có nên dùng không} --- lại được trả lời bằng máy đo chứ không bằng chứng minh, và câu trả lời không đơn giản như hai phe vẫn nói. Larkin, Sen và Tarjan\cite{larkin2014} cài mười biến thể heap theo cùng một chuẩn ``không tối ưu hoá lắt léo'' rồi đo trên ba loại tải: dãy thao tác nhân tạo, Dijkstra trên bản đồ đường thật, và một bộ mô phỏng sự kiện rời rạc. Bốn kết luận của họ đáng nhớ hơn bất kỳ bảng độ phức tạp nào.
+
+Thứ nhất, thời gian chạy tương quan mạnh với \emph{tỉ lệ trượt cache}, đặc biệt là cache L1 --- nghĩa là quyết định thiết kế ở tầng cao nhất, ``mảng hay con trỏ'', chi phối kết quả nhiều hơn cận khấu hao. Thứ hai, pairing heap thắng Fibonacci heap trên mọi tải mà họ thử: cùng ý tưởng hoãn dọn dẹp nhưng ít siêu dữ liệu hơn nên ít trượt cache hơn. Thứ ba, cả hai điều mà ``ai cũng biết'' đều sai ở một số tải: heap \(d\) phân lưu trong mảng \emph{không} phải luôn tốt nhất, và Fibonacci heap \emph{không} phải luôn chậm thảm hại --- có tải nó vượt heap mảng. Thứ tư, và mỉa mai nhất, những biến thể được đề xuất về sau nhằm \emph{đơn giản hoá} Fibonacci heap thường chạy chậm hơn chính bản gốc.
+
+Bài học rút ra không phải ``đừng tin lý thuyết'' mà là một câu chính xác hơn: cận khấu hao đếm \emph{số thao tác trên cấu trúc}, còn máy tính tính tiền theo \emph{cách bố trí bộ nhớ}. Hai thước đo ấy chỉ trùng nhau khi mỗi thao tác có giá như nhau, mà điều đó không đúng từ khi có phân cấp cache (\ptr{A/03}). Vì vậy quy tắc thực hành gọn lại thành ba dòng: trong thi đấu, dùng heap nhị phân của thư viện kèm mẹo xoá lười; trong hệ thống thật mà hàng đợi ưu tiên nằm trên đường nóng, hãy đo với đúng tải của mình (\ptr{E/26}); và chỉ nghĩ tới Fibonacci heap khi đồ thị dày tới mức số lần giảm khoá lớn hơn hẳn số lần lấy nhỏ nhất --- một điều kiện hiếm gặp hơn nhiều so với ấn tượng mà giáo trình để lại.
+
+\section{Gốc rễ: từ máy tính không có đệ quy tới lịch trình hệ điều hành}
+
+Ngăn xếp có một lịch sử gắn liền với việc làm cho đệ quy trở nên khả thi. Những máy tính đầu tiên không có cơ chế gọi hàm lồng nhau: địa chỉ trở về được ghi đè vào một ô cố định, nên hàm không thể gọi lại chính nó. Cuối thập niên 1950, khi ngành trình biên dịch cần đánh giá biểu thức toán học có dấu ngoặc lồng nhau, hai nhà nghiên cứu người Đức là Friedrich Bauer và Klaus Samelson đề xuất dùng một cấu trúc vào sau ra trước để lưu các phép toán đang chờ --- và cùng thời gian đó, việc thiết kế ngôn ngữ Algol 60 với đệ quy đã biến ngăn xếp thành một phần của kiến trúc máy. Ngày nay ``ngăn xếp lời gọi'' là khái niệm mà mọi lập trình viên gặp mỗi lần đọc thông báo lỗi, nhưng nó là một phát minh có ngày tháng, không phải điều hiển nhiên.
+
+Heap ra đời năm 1964 từ một nhu cầu rất cụ thể: J.\,W.\,J.\ Williams muốn một thuật toán sắp xếp tại chỗ với đảm bảo \Ob{n\log n} ở trường hợp xấu nhất --- thứ mà quicksort không có --- và ông thiết kế cấu trúc heap để phục vụ heapsort. Ngay sau đó, Robert Floyd đưa ra cách xây heap từ dưới lên trong \Ob{n}. Điều thú vị là cấu trúc sinh ra để phục vụ sắp xếp lại trở nên nổi tiếng hơn ở vai trò khác: hàng đợi ưu tiên cho mô phỏng sự kiện rời rạc, cho lịch trình hệ điều hành, và cho các thuật toán tham lam trên đồ thị.
+
+Câu chuyện đó lặp lại một lần nữa hai mươi năm sau. Fredman và Tarjan thiết kế Fibonacci heap\cite{fredman1987} với mục tiêu rất hẹp: giảm độ phức tạp của Dijkstra từ \Ob{m\log n} xuống \Ob{m + n\log n}, bằng cách làm cho thao tác giảm khoá tốn \Ob{1} khấu hao. Họ đạt được mục tiêu lý thuyết, nhưng hằng số lớn tới mức trong thực tế heap nhị phân thường vẫn nhanh hơn --- một ví dụ kinh điển cho bài học ``tiệm cận không phải tất cả'' ở chương \ptr{A/03}, và cũng là ví dụ cho thấy một kết quả lý thuyết vẫn có giá trị dù ít khi được cài đặt: nó xác lập đâu là giới hạn.
+
+\begin{gocre}
+\gr{Cuối thập niên 1950 --- Bauer, Samelson và Algol 60}{Đánh giá biểu thức có ngoặc lồng nhau; và làm cho hàm gọi được chính nó.}{Ngăn xếp trở thành cấu trúc nền của trình biên dịch và của kiến trúc máy; ``ngăn xếp lời gọi'' ra đời.}
+\gr{1964 --- Williams}{Cần thuật toán sắp xếp tại chỗ có đảm bảo \Ob{n\log n} ở trường hợp xấu nhất.}{Heap nhị phân và heapsort; cấu trúc sau đó nổi tiếng hơn ở vai trò hàng đợi ưu tiên.}
+\gr{1964 --- Floyd}{Xây heap bằng \(n\) lần chèn tốn \Ob{n\log n}, có cách rẻ hơn không?}{Xây từ dưới lên trong \Ob{n}; ví dụ mẫu mực cho việc tổng của cấp số nhân giảm là hằng số.}
+\gr{Thập niên 1960--70 --- mô phỏng sự kiện rời rạc, hệ điều hành}{Cần lấy sự kiện sắp xảy ra sớm nhất trong hàng triệu sự kiện đang chờ.}{Hàng đợi ưu tiên trở thành cấu trúc lõi của mô phỏng và của bộ lập lịch.}
+\gr{1984--87 --- Fredman \& Tarjan}{Dijkstra bị chặn bởi chi phí giảm khoá.}{Fibonacci heap: giảm khoá \Ob{1} khấu hao, cho \Ob{m+n\log n}; nhưng hằng số lớn nên hiếm khi thắng trong thực tế.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Kiến trúc máy tính}{Ngăn xếp lời gọi, khung ngăn xếp, tràn ngăn xếp}{Không phải chỉ tương tự --- đệ quy \emph{được cài đặt} bằng đúng cấu trúc này. Hệ quả thực dụng: đệ quy sâu quá thì sập, và cách chữa là viết lại bằng ngăn xếp tường minh (\ptr{E/25}).}
+\lh{Trình biên dịch}{Phân tích biểu thức, khớp ngoặc, ký pháp Ba Lan ngược}{Ứng dụng lịch sử đầu tiên của ngăn xếp. Mọi bài ``kiểm tra dãy ngoặc hợp lệ'' trong phỏng vấn là phiên bản thu nhỏ của bộ phân tích cú pháp thật.}
+\lh{Hệ điều hành}{Lịch trình tiến trình theo độ ưu tiên, hàng đợi sẵn sàng}{Cùng cấu trúc hàng đợi ưu tiên. Khác ở ràng buộc: bộ lập lịch phải tránh bỏ đói tiến trình, nên độ ưu tiên thay đổi theo thời gian chờ --- một yêu cầu không có trong bài toán thuật toán thuần tuý.}
+\lh{Mô phỏng sự kiện rời rạc}{Lịch sự kiện: luôn lấy sự kiện có thời điểm sớm nhất}{Đây là ứng dụng ``đúng nghĩa đen'' của hàng đợi ưu tiên, và là lý do cấu trúc này quan trọng ngoài phạm vi thuật toán đồ thị.}
+\lh{Lập kế hoạch đường đi cho robot}{A\(^\ast\) với biên là hàng đợi ưu tiên}{Cùng khung ``lấy ra, mở rộng, đẩy vào'' ở mục 4, chỉ đổi khoá ưu tiên thành \(g+h\). Bài học chuyển thẳng: chọn cấu trúc kho chờ chính là chọn thuật toán.}
+\lh{Xử lý dòng dữ liệu}{Giữ \(k\) phần tử lớn nhất bằng heap kích thước \(k\)}{Cùng mẫu ở mục 3.1. Ưu điểm quyết định trong bối cảnh luồng: bộ nhớ \Ob{k} không phụ thuộc độ dài luồng (\ptr{D/24}).}
+\lh{Nén dữ liệu}{Thuật toán Huffman: luôn gộp hai tần suất nhỏ nhất}{Một thuật toán tham lam mà hàng đợi ưu tiên là công cụ thực thi trực tiếp. Xem \ptr{C/15} cho phần chứng minh vì sao tham lam ở đây đúng.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Vì mỗi phần tử được đẩy vào ngăn xếp đúng một lần và bị lấy ra nhiều nhất một lần trong suốt cả thuật toán, nên tổng số thao tác không quá \(2n\) bất kể vòng lặp trong chạy dài tới đâu ở một số lần lặp cụ thể. Đây là lập luận khấu hao kiểu tổng gộp (\ptr{A/03}): một lần lấy ra nhiều phần tử chỉ xảy ra được sau khi đã có nhiều lần đẩy vào tương ứng. Cùng dạng lập luận với ``tổng quãng đường con trỏ'' ở \ptr{B/06}.}
+\tl{Vì duy trì ít trật tự hơn thì rẻ hơn. Sắp xếp toàn phần đòi \Ob{n\log n} và mỗi lần chèn vào mảng đã sắp tốn \Ob{n}; heap chỉ duy trì quan hệ cha--con nên chèn chỉ \Ob{\log n}. Nếu bài toán chỉ hỏi ``ai nhỏ nhất'' --- và rất nhiều thuật toán tham lam chỉ hỏi đúng thế --- thì trả tiền cho trật tự toàn phần là lãng phí. Đây là ví dụ tiêu biểu của nguyên tắc chung ở phần B: chọn cấu trúc duy trì \emph{đúng} lượng trật tự mà bài cần, không hơn.}
+\tl{Sai ở chỗ giả định mọi phần tử đều phải đi hết \(\log n\) tầng. Khi xây từ dưới lên, một nửa số nút nằm ở tầng đáy và không phải đẩy xuống bước nào; một phần tư ở tầng kế và đi tối đa một bước; cứ thế. Tổng chi phí là \(\sum_h (n/2^h)\cdot h\), một chuỗi hội tụ, cho \Ob{n}. Còn cách chèn lần lượt thì ngược lại: phần tử vào sau đi từ đáy lên nên đúng là tốn \Ob{\log n} mỗi cái.}
+\tl{Vì thứ tự lấy ra quyết định thứ tự khám phá. Ngăn xếp lấy cái mới nhất nên thuật toán lao sâu theo một nhánh trước khi quay lại --- hợp cho việc phát hiện chu trình và tính thứ tự tô-pô, vì thời điểm vào/ra của mỗi đỉnh mang thông tin cấu trúc. Hàng đợi lấy cái cũ nhất nên khám phá theo lớp khoảng cách tăng dần --- đó chính xác là lý do duyệt rộng cho đường đi ngắn nhất trên đồ thị không trọng số. Cùng chương trình, đổi một dòng, đổi hẳn tính chất được đảm bảo.}
+\tl{Mảng đã sắp thắng khi dữ liệu tĩnh: nó cho cả cực trị lẫn truy vấn phần tử thứ \(k\) trong \Ob{1}, còn heap không trả lời được câu thứ hai. Heap thắng khi có chèn xen kẽ liên tục, vì chèn vào mảng đã sắp tốn \Ob{n} còn heap chỉ \Ob{\log n}; và heap còn thắng khi bạn chỉ cần \(k\) phần tử đầu của một luồng rất dài, vì bộ nhớ chỉ \Ob{k}. Cần cả hai khả năng thì phải trả giá cao hơn bằng cây cân bằng ở \ptr{B/09}.}
+\end{traloi}
+
+\begin{dongian}
+Ba cấu trúc này chỉ khác nhau ở một câu hỏi: trong đống việc đang chờ, làm việc nào trước?
+
+Ngăn xếp giống chồng giấy tờ trên bàn: bạn luôn xử lý tờ trên cùng, tức là tờ mới đặt xuống gần nhất. Kiểu này hợp khi công việc lồng nhau --- đang làm việc A thì phát sinh việc B phải xong trước, xong B mới quay lại A. Đó cũng đúng là cách máy tính chạy hàm gọi hàm.
+
+Hàng đợi giống hàng người chờ mua vé: ai tới trước phục vụ trước. Kiểu này hợp khi bạn muốn lan toả đều ra xung quanh, ví dụ ``tìm những chỗ cách đây đúng ba bước'' --- vì mọi chỗ cách hai bước sẽ được xử lý xong trước khi chạm tới chỗ cách ba bước.
+
+Heap giống phòng cấp cứu: không xét ai tới trước, mà xét ai nặng nhất. Điều đáng nói là phòng cấp cứu không cần xếp hạng toàn bộ bệnh nhân từ nặng tới nhẹ; nó chỉ cần biết \emph{ai nặng nhất ngay lúc này}. Chính vì đòi hỏi ít hơn nên nó làm nhanh hơn --- và đó là bài học chung: đừng sắp xếp mọi thứ khi bạn chỉ cần biết cái đứng đầu.
+
+Còn ngăn xếp đơn điệu thì giống việc bạn xếp các cột chờ ``ai sẽ cao hơn tôi''. Mỗi cột mới cao lên sẽ giải quyết xong một loạt cột thấp đang chờ, và những cột đó rời hàng vĩnh viễn. Vì mỗi cột vào hàng một lần và rời hàng một lần, tổng công việc chỉ tỉ lệ với số cột, dù có lúc một cột mới giải quyết hết cả chục cột cũ.
+\motcau{Chọn cấu trúc kho chờ chính là chọn thuật toán: mới nhất, cũ nhất, hay nhỏ nhất.}
+\chuadongian{Việc heap không hỗ trợ ``xoá phần tử bất kỳ'' là hạn chế thật, không phải chi tiết cài đặt; muốn có nó thì phải trả bằng cấu trúc phức tạp hơn hoặc bằng mẹo xoá lười.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Ba cấu trúc, ba quy tắc lấy ra}{Ngăn xếp: mới nhất (LIFO). Hàng đợi: cũ nhất (FIFO). Heap: nhỏ nhất. Đổi kho chờ trong cùng một khung thì được duyệt sâu, duyệt rộng, Dijkstra.}
+\ar[3]{Ngăn xếp đơn điệu --- ý tưởng}{Giữ các vị trí chưa tìm được đáp án theo thứ tự đơn điệu; phần tử mới giải quyết và loại bỏ mọi vị trí nhỏ hơn nó.}
+\ar[3]{Ngăn xếp đơn điệu --- vì sao \Ob{n}}{Mỗi phần tử vào một lần, ra tối đa một lần; tổng \(\le 2n\) thao tác. Khấu hao kiểu tổng gộp.}
+\ar[3]{Dấu hiệu dùng ngăn xếp đơn điệu}{``Với mỗi phần tử, tìm phần tử gần nhất về một phía thoả quan hệ so sánh'' --- gồm cả biểu đồ cột, nước mưa, số đoạn mà phần tử là cực đại.}
+\ar[3]{Tính chất heap}{Mỗi nút \(\le\) các con; lưu bằng mảng, con của \(i\) là \(2i, 2i{+}1\). Không đảm bảo gì về quan hệ giữa hai nhánh; mảng không sắp xếp.}
+\ar[3]{Chi phí heap}{Lấy nhỏ nhất \Ob{1}; chèn và xoá gốc \Ob{\log n}; \emph{xây từ \(n\) phần tử có sẵn \Ob{n}}.}
+\ar[3]{Vì sao xây heap là \Ob{n}}{Xây từ dưới lên: nửa số nút ở đáy không phải làm gì; tổng \(\sum_h (n/2^h)h\) hội tụ. Cấp số nhân giảm bị chặn bởi hằng số (\ptr{A/05}).}
+\ar[2]{Cực đại trên cửa sổ trượt}{Deque chứa chỉ số có giá trị giảm dần; bỏ đầu khi rơi khỏi cửa sổ, bỏ cuối khi nhỏ hơn phần tử mới. \Ob{n} tổng cộng.}
+\ar[2]{Ba mẫu dùng heap}{\(k\) lớn nhất bằng heap kích thước \(k\) (\Ob{n\log k}, bộ nhớ \Ob{k}); trộn \(k\) danh sách đã sắp; trung vị luồng bằng hai heap ngược nhau.}
+\ar[2]{Heap không hỗ trợ gì}{Xoá phần tử bất kỳ và giảm khoá --- cần heap có đánh dấu vị trí, hoặc dùng mẹo xoá lười (kiểm tra bản ghi lỗi thời khi lấy ra).}
+\ar[2]{Vì sao Dijkstra cần trọng số không âm}{Vì nó chốt đỉnh ngay khi lấy ra khỏi hàng đợi ưu tiên; niềm tin ``không có đường rẻ hơn tới sau'' chỉ đúng khi mọi cạnh làm chi phí tăng.}
+\ar[2]{Heap so với mảng đã sắp}{Mảng đã sắp: dữ liệu tĩnh, cần truy vấn theo hạng. Heap: có chèn liên tục, chỉ cần cực trị. Cần cả hai thì dùng cây cân bằng (\ptr{B/09}).}
+\ar[1]{Fibonacci heap}{Giảm khoá \Ob{1} khấu hao, cho Dijkstra \Ob{m+n\log n}; hằng số lớn nên hiếm khi thắng trong thực tế.}
+\ar[2]{Fibonacci heap có đáng dùng không}{Cận \Ob{m+n\log n} cho Dijkstra là thật, nhưng đo thực nghiệm cho thấy pairing heap thắng nó trên mọi tải và thời gian chạy bám theo tỉ lệ trượt cache L1. Thi đấu: heap nhị phân kèm xoá lười.}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Khi nào tôi nên viết lại đệ quy thành vòng lặp với ngăn xếp tường minh?}{Chủ yếu khi độ sâu đệ quy có thể lớn --- duyệt sâu trên đồ thị \(10^5\) đỉnh dạng đường thẳng sẽ làm tràn ngăn xếp trong nhiều môi trường. Lý do phụ nhưng cũng quan trọng: khi bạn cần lưu trạng thái tuỳ biến ở mỗi mức, hoặc cần tạm dừng và tiếp tục việc duyệt. Cái giá là code dài hơn và dễ sai hơn, nên đừng làm khi không cần: đệ quy dễ đọc hơn và khớp với chứng minh quy nạp (\ptr{A/04}).}
+\qa{Ngăn xếp đơn điệu tăng hay giảm --- làm sao khỏi nhầm?}{Đừng nhớ theo tên, hãy suy từ mục tiêu. Nếu bạn tìm ``phần tử lớn hơn kế tiếp'', thì những phần tử còn chờ đáp án phải là những phần tử chưa gặp ai lớn hơn --- và nếu \(a_i \le a_j\) với \(i<j\) thì \(a_i\) không thể còn chờ khi \(a_j\) đã vào, nên ngăn xếp giữ giá trị giảm dần từ đáy lên đỉnh. Cách kiểm tra nhanh: viết mảng bốn phần tử ra giấy và chạy tay --- nhanh hơn nhớ quy tắc.}
+\qa{Tôi dùng hàng đợi ưu tiên cho Dijkstra và bị quá thời gian. Nguyên nhân hay gặp?}{Ba nguyên nhân, theo thứ tự tần suất. Một, quên bỏ qua bản ghi lỗi thời khi lấy ra --- không có dòng kiểm tra đó thì mỗi đỉnh bị xử lý nhiều lần và số cạnh duyệt tăng vọt. Hai, đẩy vào hàng đợi mọi cạnh kể cả khi không cải thiện được khoảng cách. Ba, dùng cấu trúc nặng làm khoá (chuỗi, cặp lớn) khiến hằng số so sánh cao. Kiểm điểm một trước vì nó là lỗi phổ biến nhất.}
+\qa{Deque và hai heap --- khi nào dùng cái nào cho bài cửa sổ trượt?}{Nếu bạn chỉ cần cực trị của cửa sổ, deque đơn điệu cho \Ob{n} và hằng số rất nhỏ --- luôn chọn nó. Nếu bạn cần trung vị hoặc phần tử thứ \(k\) của cửa sổ thì deque không làm được, và bạn cần hai heap có xoá lười hoặc một cây cân bằng (\ptr{B/09}), chấp nhận \Ob{n\log n}. Nguyên tắc chung: dùng cấu trúc yếu nhất còn trả lời được câu hỏi của bạn.}
+\qa{Vì sao heapsort ít được dùng dù có đảm bảo \Ob{n\log n} ở trường hợp xấu nhất?}{Vì nó truy cập bộ nhớ theo kiểu nhảy cóc giữa các tầng của cây, rất không thân thiện với cache, trong khi quicksort quét gần như tuần tự. Kết quả là quicksort thường nhanh hơn đáng kể trên máy thật dù tệ hơn trên giấy. Giải pháp thực tế của các thư viện là kết hợp: bắt đầu bằng quicksort, chuyển sang heapsort khi độ sâu đệ quy vượt ngưỡng --- đúng ý tưởng introsort\cite{musser1997}, một ví dụ đẹp cho chương \ptr{E/26}.}
+\qa{Có cấu trúc nào thay heap được không?}{Có vài lựa chọn tuỳ bối cảnh. Nếu khoá là số nguyên nhỏ và tăng dần theo thời gian --- ví dụ Dijkstra với trọng số nhỏ --- thì hàng đợi theo nhóm (bucket queue) cho \Ob{1} mỗi thao tác. Nếu chỉ có hai loại trọng số 0 và 1, deque thay được hoàn toàn và cho thuật toán 0--1 BFS (\ptr{C/17}). Nếu cần hợp nhất hai hàng đợi thường xuyên, các cấu trúc heap có thể hợp nhất như pairing heap sẽ hợp hơn. Câu hỏi luôn là: cấu trúc yếu nhất còn đủ dùng ở đây là gì.}
+\qa{Trong hệ thống thật, hàng đợi ưu tiên có nhược điểm gì mà bài tập không nhắc?}{Có, và nó quan trọng: sự bỏ đói. Nếu luôn phục vụ phần tử ưu tiên cao nhất, các phần tử ưu tiên thấp có thể chờ vô hạn. Hệ điều hành và bộ lập lịch tác vụ giải quyết bằng cách tăng dần độ ưu tiên theo thời gian chờ, tức là biến khoá thành hàm của cả nội dung lẫn thời gian. Đây là ví dụ điển hình của việc bài toán thật có thêm ràng buộc công bằng mà mô hình thuật toán thuần tuý bỏ qua --- chủ đề của \ptr{E/26}.}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Kiểm tra dãy ngoặc hợp lệ}{LeetCode ``Valid Parentheses''}{Ứng dụng ngăn xếp cổ điển nhất; chú ý trường hợp còn dư ngoặc mở khi hết chuỗi.}
+\bt[1]{Trộn \(k\) danh sách đã sắp}{LeetCode ``Merge k Sorted Lists''}{Heap kích thước \(k\); so sánh với cách trộn đôi một để thấy \Ob{N\log k} từ đâu ra.}
+\bt[1]{\(k\) phần tử lớn nhất trong luồng}{LeetCode ``Kth Largest Element in a Stream''}{Heap nhỏ nhất kích thước \(k\); giải thích vì sao không dùng heap lớn nhất kích thước \(n\).}
+\bt[2]{Phần tử lớn hơn kế tiếp cho mọi vị trí}{CSES ``Nearest Smaller Values''\cite{cses}}{Ngăn xếp đơn điệu; viết bất biến ra trước khi cài.}
+\bt[2]{Cực đại trên mọi cửa sổ độ dài \(k\)}{CSES ``Sliding Window Cost''-loại; LeetCode ``Sliding Window Maximum''}{Deque đơn điệu; chú ý lưu chỉ số chứ không lưu giá trị.}
+\bt[2]{Trung vị của luồng dữ liệu}{LeetCode ``Find Median from Data Stream''}{Hai heap cân bằng; bất biến về chênh lệch kích thước là chỗ dễ sai nhất.}
+\bt[2]{Nhiệm vụ và hạn chót, tối đa số việc làm được}{Bài tập kinh điển}{Tham lam kết hợp heap: nhận hết rồi bỏ việc tệ nhất khi quá tải --- mẫu ``tham lam có hối tiếc''.}
+\bt[3]{Hình chữ nhật lớn nhất trong biểu đồ cột}{LeetCode ``Largest Rectangle in Histogram''}{Ngăn xếp đơn điệu; mấu chốt là hiểu rằng lúc một cột bị lấy ra thì cả hai biên của nó đã xác định.}
+\bt[3]{Hình chữ nhật toàn số 1 lớn nhất trong ma trận nhị phân}{LeetCode ``Maximal Rectangle''}{Quy về bài biểu đồ cột trên từng hàng --- ví dụ đẹp về việc quy bài lạ về bài đã giải.}
+\bt[3]{Nước mưa mắc kẹt bằng ngăn xếp}{LeetCode ``Trapping Rain Water''}{Đã gặp ở \ptr{B/06} bằng hai con trỏ; lần này bắt buộc dùng ngăn xếp để thấy hai góc nhìn.}
+\bt[3]{Tổng của cực tiểu trên mọi đoạn con}{LeetCode ``Sum of Subarray Minimums''}{Với mỗi phần tử, đếm số đoạn mà nó là cực tiểu bằng ngăn xếp đơn điệu; cẩn thận với phần tử bằng nhau để khỏi đếm trùng.}
+\bt[3]{Sắp xếp ngoài: trộn nhiều tệp đã sắp lớn hơn bộ nhớ}{Bài tập hệ thống}{Heap \(k\) đường; nối trực tiếp với mô hình bộ nhớ ngoài ở \ptr{D/24}.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Ba cấu trúc, ba quy tắc chọn phần tử tiếp theo, và một bài học chung đáng mang theo cả phần B: hãy dùng cấu trúc \emph{yếu nhất mà vẫn trả lời được câu hỏi của bạn}. Heap rẻ hơn cây cân bằng vì nó biết ít hơn; deque rẻ hơn heap vì nó biết còn ít hơn nữa. Mỗi lần bạn đòi hỏi thêm một khả năng, bạn trả thêm tiền --- và rất nhiều lời giải chậm là do đòi hỏi những khả năng không dùng tới.
+
+Hai chương tiếp theo là hai câu trả lời đối lập cho bài toán tra cứu. Chương \ptr{B/08} hỏi ``làm sao tìm được phần tử theo khoá thật nhanh nếu tôi \emph{không} cần thứ tự'', và câu trả lời là băm --- kèm một cạm bẫy an ninh mà rất ít giáo trình nói tới. Chương \ptr{B/09} hỏi câu ngược lại: nếu tôi \emph{cần} thứ tự thì phải trả thêm bao nhiêu.
+\begin{docthem}
+\ct{Fredman \& Tarjan, ``Fibonacci Heaps and Their Uses in Improved Network Optimization Algorithms''}{Journal of the ACM, 1987}{Nguồn của cận \Ob{m+n\log n} cho Dijkstra. Đọc mục mô tả cấu trúc và hàm thế năng; phần ứng dụng cho cây khung nhỏ nhất đọc sau cũng được.}
+\ct{Larkin, Sen, Tarjan, ``A Back-to-Basics Empirical Study of Priority Queues''}{ALENEX (SIAM), 2014}{Số đo thật cho mười biến thể heap. Đọc phần kết luận và bảng Dijkstra trên bản đồ đường --- đây là tài liệu chữa bệnh ``chọn cấu trúc theo bảng tiệm cận''.}
+\ct[2]{Tarjan, ``Amortized Computational Complexity''}{SIAM Journal on Algebraic and Discrete Methods, 1985}{Đọc khi muốn hiểu phương pháp thế năng đủ kỹ để tự phân tích một cấu trúc hoãn việc.}
+\ct[2]{Sedgewick \& Wayne, \emph{Algorithms} (4th ed.), chương 2.4}{Addison-Wesley, 2011}{Bản trình bày heap nhị phân kèm số đo và mã chạy được; hợp để đối chiếu cài đặt của bạn.}
+\end{docthem}
+
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

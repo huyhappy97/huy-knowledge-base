@@ -1,0 +1,19 @@
+% 00-map.tex — bản đồ Phần C: có gì, mức đầu tư, thứ tự đọc.
+% Ngày tạo: 2026-09-13 | Sửa gần nhất: 2026-09-13 | Ôn gần nhất: chưa
+% Dependency: ../00-map.tex | Mức độ: điều hướng
+\documentclass[../marker.tex]{subfiles}
+\begin{document}
+\begin{table}[H]\centering\small
+\caption{Bản đồ Phần C: hai chương, và việc cụ thể mỗi chương bắt bạn phải làm.}
+\begin{tabularx}{\linewidth}{@{}L{0.8cm}L{3.7cm}YL{1.6cm}@{}}
+\toprule
+\textbf{Ch.} & \textbf{Thư mục} & \textbf{Nội dung --- và sản phẩm phải có sau khi đọc} & \textbf{Mức}\\
+\midrule
+15 & \code{15-ngan-sach-sai-so} & Bốn quan hệ tỉ lệ thành số; ví dụ tính tay đầy đủ cho \(f=600\,\)px, \(Z=0{,}5\,\)m, tag 100\,mm; chuỗi biến đổi từ tag tới base frame; cộng sai số thế nào cho đúng; sáu kết luận thiết kế. \emph{Sản phẩm: một bảng ngân sách cho cấu hình của chính bạn} & \muc{3}\\
+16 & \code{16-danh-gia-va-nghiem-thu} & Monte Carlo với script chạy được; ground truth bằng toàn đạc/laser tracker/motion capture/đồ gá; tách bias khỏi độ lặp lại; bản đồ sai số theo khoảng cách và góc; thử độ bền; kiểm nhất quán hiệp phương sai. \emph{Sản phẩm: phân bố sai số của các phương án bố trí, trước khi gia công} & \muc{3}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent Hai chương này nên đọc liền nhau và nên đọc \emph{sớm} --- lý tưởng nhất là ngay sau chương 5, trước cả Phần B. Chương 15 cho bạn con số ước lượng, chương 16 cho bạn cách kiểm con số ấy có đúng không. Sản phẩm của một buổi chiều làm việc với hai chương này là một quyết định hình học có cơ sở, và đó là thứ đắt nhất mà cây này có thể đưa cho bạn.
+\end{document}

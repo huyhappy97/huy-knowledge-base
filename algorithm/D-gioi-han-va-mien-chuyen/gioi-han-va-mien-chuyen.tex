@@ -1,0 +1,21 @@
+% ============================================================================
+%  D — file phần: Giới hạn và miền chuyên
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../algorithm.tex]{subfiles}
+\begin{document}
+\part{GIỚI HẠN VÀ MIỀN CHUYÊN}
+\begin{tomtat}
+Phần D trả lời hai câu hỏi mà phần C cố tình gác lại: ``khi nào thì nên ngừng tìm lời giải nhanh hơn'' và ``những miền nào có bộ công cụ riêng mà kinh nghiệm chung không chuyển sang được''. Chương 21 là số học và đại số tính toán, chương 22 là hình học tính toán --- hai miền mà cạm bẫy chủ yếu không nằm ở ý tưởng mà ở số học hữu hạn. Chương 23 là độ khó và quy dẫn: cách nhận ra một bài là NP-khó và cách sống chung với nó. Chương 24 là cận dưới và các mô hình tính toán khác --- luồng dữ liệu, trực tuyến, song song, bộ nhớ ngoài. Nếu chỉ nhớ một điều: biết một bài là NP-khó không phải là thất bại, đó là thông tin đắt giá nhất bạn có thể có trước khi bỏ ra ba ngày tìm lời giải đa thức không tồn tại.
+\end{tomtat}
+
+Ba chương đầu của phần này có một điểm chung dễ bị bỏ qua: chúng đều nói về chỗ mà \emph{mô hình lý tưởng gặp thực tế}. Trong chương 21, mô hình lý tưởng nói ``cộng hai số mất \Ob{1}'', còn thực tế nói số nguyên có 64 bit và phép nhân tràn im lặng. Trong chương 22, mô hình lý tưởng nói ``ba điểm thẳng hàng hoặc không'', còn thực tế nói số thực dấu phẩy động không có khái niệm bằng nhau. Trong chương 23, mô hình lý tưởng nói ``có thuật toán đa thức hoặc không'', còn thực tế nói bài NP-khó vẫn được giải hàng ngày trong công nghiệp bằng heuristic và bộ giải SAT.
+
+Chương 24 đứng riêng vì nó phá bỏ giả định lớn nhất của cả quyển sách: giả định rằng dữ liệu nằm vừa trong bộ nhớ, đọc được nhiều lần, và máy chỉ có một lõi. Khi giả định đó sai --- dữ liệu chảy qua một lần, quyết định phải ra ngay khi chưa thấy tương lai, hoặc đĩa chậm hơn RAM hàng nghìn lần --- thì bảng xếp hạng thuật toán thay đổi hoàn toàn. Đây cũng là chương gần với công việc kỹ thuật thật nhất trong cả phần D.
+\subfile{00-map}
+\subfile{21-so-hoc-va-dai-so/so-hoc-va-dai-so}
+\subfile{22-hinh-hoc-tinh-toan/hinh-hoc-tinh-toan}
+\subfile{23-do-kho-va-quy-dan/do-kho-va-quy-dan}
+\subfile{24-can-duoi-va-mo-hinh-khac/can-duoi-va-mo-hinh-khac}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

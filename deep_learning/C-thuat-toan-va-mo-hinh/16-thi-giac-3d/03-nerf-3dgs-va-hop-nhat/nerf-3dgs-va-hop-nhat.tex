@@ -1,0 +1,242 @@
+% ---------------------------------------------------------------------------
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: C/16-thi-giac-3d/01, C/16-thi-giac-3d/02
+%  Mức độ: cốt lõi — phần xa chuyên môn SLAM nhất, viết kỹ nhất
+% ---------------------------------------------------------------------------
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{NeRF, 3DGS và hợp nhất cảm biến (Neural Rendering and Sensor Fusion)}
+\ptrtarget{C/16-thi-giac-3d/03}\ptrtarget{C/16-thi-giac-3d/03-nerf-3dgs-va-hop-nhat}\ptrtarget{C/16/03}\ptrtarget{C/16/03-nerf-3dgs-va-hop-nhat}
+\dependency{\ptr{C/16-thi-giac-3d/01-bon-the-he-3d} (thế hệ ba nằm ở đâu trong pipeline); \ptr{C/16-thi-giac-3d/02-bieu-dien-3d-va-depth} (trường ẩn và Gaussian trong bảng biểu diễn); \ptr{A/02-vat-ly-tao-anh} (phơi sáng, cân bằng trắng, hiệu chỉnh ngoại).}
+
+\begin{tomtat}
+Mục này giải thích cơ chế thật của \en{neural rendering}: vì sao NeRF phải biểu diễn cảnh bằng mật độ liên tục chứ không bằng bề mặt, và 3DGS đổi cái gì lấy tốc độ. Nửa sau chuyển sang bài toán hợp nhất camera--LiDAR--IMU. Đọc xong bạn quyết định được khi nào một bản đồ render được là đáng giá cho robot, và khi nào bản đồ thưa cổ điển vẫn đúng hơn. Bạn cũng tính được bằng con số vì sao \en{early fusion} nhạy với lệch hiệu chỉnh còn \en{late fusion} thì không. Nếu chỉ nhớ một điều: hàm mất mát của neural rendering chỉ ràng buộc \emph{ảnh render}, không ràng buộc \emph{hình học}. Nên PSNR cao không chứng minh bản đồ đúng. Nếu robot sắp va chạm dựa trên bản đồ đó, phải đánh giá bằng độ chính xác hình học so với một quét chân trị.
+\end{tomtat}
+
+\begin{nentang}
+\kn{novel view synthesis (dựng ảnh ở góc nhìn mới)}{bài toán: cho một số ảnh đã chụp của một cảnh, hãy tạo ra ảnh của cảnh đó từ một vị trí camera chưa từng chụp.}
+\kn{radiance field (trường bức xạ)}{một hàm gán cho mỗi điểm trong không gian và mỗi hướng nhìn một màu và một độ đặc; đây là ``cảnh'' mà NeRF học, thay cho bề mặt.}
+\kn{volume rendering (dựng ảnh thể tích)}{cách tổng hợp một pixel bằng cách lấy mẫu nhiều điểm dọc theo tia nhìn rồi cộng dồn màu có trọng số theo độ đục tích luỹ --- thay vì tìm giao điểm với một bề mặt cứng.}
+\kn{splat / Gaussian splatting}{``splat'' là vết loang một hạt để lại khi bị chiếu xuống mặt ảnh. 3DGS mô tả cảnh bằng hàng triệu hạt Gaussian mờ, và render là chiếu chúng xuống rồi trộn theo thứ tự độ sâu.}
+\kn{rasterize}{chuyển một hình học đã chiếu thành pixel bằng cách quét trực tiếp trên lưới ảnh; nhanh hơn nhiều so với đi dò dọc từng tia, và là thứ GPU sinh ra để làm.}
+\kn{PSNR}{chỉ số đo sai lệch ảnh dựa trên bình phương trung bình theo pixel, tính bằng decibel; cao là ``gần ảnh gốc theo nghĩa số học'', không phải ``trông giống theo nghĩa thị giác''.}
+\kn{hiệu chỉnh ngoại (extrinsic calibration)}{phép xác định vị trí và hướng tương đối giữa hai cảm biến; sai một độ ở đây biến thành sai vài chục centimét ở tầm hai chục mét.}
+\kn{early / late fusion}{hai tầng hợp nhất cảm biến: gộp ở mức đặc trưng (sớm, giàu thông tin) hoặc gộp ở mức kết quả từng nhánh (muộn, bền hơn).}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Giả sử SfM đã chạy xong: bạn có pose của bốn mươi tấm ảnh và một point cloud thưa. Bây giờ hãy render cảnh đó từ một góc nhìn chưa từng chụp. Kết quả sẽ tệ, và tệ theo cách rất đặc trưng: thủng lỗ ở chỗ không có điểm, viền răng cưa ở biên vật thể, mặt kính và mặt kim loại sai hoàn toàn vì màu của chúng phụ thuộc góc nhìn còn point cloud chỉ lưu được một màu cho mỗi điểm. Vấn đề nằm ở chỗ pipeline cổ điển tối ưu cho \emph{độ chính xác hình học} rồi hy vọng ảnh đẹp theo sau, trong khi cái ta cần ở đây là ngược lại.
+
+Neural rendering đảo ngược thứ tự đó bằng một ý tưởng đơn giản tới mức khó chịu: \emph{nếu thứ ta muốn là ảnh, hãy đặt ảnh vào hàm mất mát}. Tham số hoá cảnh bằng một biểu diễn nào đó, viết một bộ render \vn{khả vi}{differentiable} từ biểu diễn đó ra ảnh, rồi hạ \en{gradient} trên tham số của biểu diễn cho tới khi ảnh render trùng khít mọi ảnh quan sát. Không có bước tìm tương ứng, không tam giác hoá, không ràng buộc epipolar nào được viết ra --- hình học nếu có xuất hiện thì xuất hiện như một \emph{tác dụng phụ} của việc khớp ảnh. Câu ``nếu có'' đó là toàn bộ nội dung mục này.
+
+\textbf{Học mục này thì làm được gì mà trước đó không làm được?} Ba việc rất cụ thể: đánh giá được một đề xuất kiểu ``thay bản đồ SLAM bằng Gaussian'' thay vì phải tin hay không tin; đọc được một bài neural rendering và chỉ ra ngay giả định nào trong ba giả định nền của nó bị dữ liệu robot vi phạm; và biến câu ``hiệu chỉnh phải chính xác'' thành một ngân sách sai số tính bằng centimét ở một tầm xa cụ thể.
+
+\begin{trucgiac}
+Vì sao NeRF dựng khói chứ không dựng tường? Vì đạo hàm. Nếu cảnh gồm các bề mặt cứng, dịch một bề mặt đi một phần nghìn mét thì một pixel hoặc đổi màu hẳn, hoặc không đổi gì cả. Hàm mất mát khi đó là bậc thang: gradient bằng không gần như mọi nơi, và \vn{hạ gradient}{gradient descent} không biết vặn về hướng nào. Thay bề mặt cứng bằng một trường mật độ liên tục thì mỗi pixel trở thành tổng có trọng số của hàng chục điểm dọc theo tia, và \emph{mọi} điểm đều nhận được một phần gradient. Đây là phép đổi một công tắc bật/tắt thành một chiết áp: chỉ chiết áp mới nói được nên vặn theo chiều nào.
+\end{trucgiac}
+
+\subsection{B. NeRF: cảnh là một hàm, ảnh là tích phân dọc tia}
+NeRF biểu diễn cảnh bằng một MLP nhận toạ độ 3D và hướng nhìn, trả về mật độ \(\sigma\) và màu \(c\) \cite{mildenhall2020nerf}. Để render một pixel, lấy mẫu \(N\) điểm dọc tia đi qua pixel đó rồi tổng hợp theo công thức dựng ảnh thể tích rời rạc hoá:
+\[
+C(\mathbf{r}) \;=\; \sum_{i=1}^{N} T_i\,\bigl(1-e^{-\sigma_i \delta_i}\bigr)\,c_i,
+\qquad
+T_i \;=\; \exp\Bigl(-\sum_{j<i}\sigma_j\delta_j\Bigr).
+\]
+\emph{Công thức này thực sự nói gì:} \(T_i\) là xác suất tia đi tới được điểm thứ \(i\) mà chưa bị chặn, còn \(1-e^{-\sigma_i\delta_i}\) là xác suất nó dừng lại đúng ở đó; vậy màu pixel là \emph{kỳ vọng của màu tại điểm tia dừng lại}. Điều đáng nhớ là mọi số hạng đều khả vi theo \(\sigma\) và \(c\), nên gradient của sai số ảnh chảy ngược được về mọi điểm mẫu --- đó là toàn bộ lý do NeRF hoạt động; phần MLP chỉ là một lựa chọn triển khai, và mục sau sẽ thay nó.
+\lk{C/12/01}{tiền đề}{toàn bộ cơ chế đứng trên một điều duy nhất: mọi nút trên đường từ tham số tới ảnh phải khả vi.}
+
+Hình~\ref{fig:volume-rendering} vẽ đúng ba đại lượng trong công thức trên một tia duy nhất.
+
+\begin{figure}[H]\centering
+\resizebox{0.95\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize]
+% camera + tia
+\draw[inkblue,thick] (-0.45,-0.3) -- (0,0) -- (-0.45,0.3) -- cycle;
+\node[font=\scriptsize,inkblue,anchor=east] at (-0.55,0) {camera};
+\draw[-{Stealth[length=5pt]},steel,very thick] (0,0) -- (5.6,0);
+\node[font=\scriptsize,steel,anchor=west] at (5.65,0) {tia};
+% mau sigma (cot tren tia)
+\foreach \x/\sg in {0.4/0.02,0.8/0.02,1.2/0.03,1.6/0.05,2.0/0.10,2.4/0.42,2.8/1.10,3.2/0.72,3.6/0.14,4.0/0.04,4.4/0.02,4.8/0.02}
+ {\fill[steel,opacity=0.8] (\x-0.07,0.05) rectangle (\x+0.07,0.05+\sg);
+  \fill[inkblue] (\x,0) circle (1.1pt);}
+\node[font=\scriptsize,steel,anchor=west] at (0.15,1.32) {mật độ \(\sigma_i\) tại các điểm mẫu};
+% trong so w
+\foreach \x/\w in {2.0/0.04,2.4/0.28,2.8/0.41,3.2/0.12,3.6/0.02}
+  \fill[reddark,opacity=0.85] (\x-0.07,-0.12-\w) rectangle (\x+0.07,-0.12);
+\node[font=\scriptsize,reddark,anchor=west] at (3.75,-0.42) {trọng số \(w_i=T_i(1-e^{-\sigma_i\delta_i})\)};
+% duong T
+\draw[violetdark,thick,dashed] plot coordinates
+ {(0.4,-1.35) (0.8,-1.35) (1.2,-1.35) (1.6,-1.36) (2.0,-1.38) (2.4,-1.42) (2.8,-1.58) (3.2,-1.82) (3.6,-1.92) (4.0,-1.94) (4.4,-1.95) (4.8,-1.95)};
+\node[font=\scriptsize,violetdark,anchor=west] at (0.15,-1.20) {\(T_i\): xác suất tia còn đi tới được (giảm dần, không bao giờ tăng)};
+\draw[decorate,decoration={brace,amplitude=4pt},reddark] (2.15,-0.62) -- (3.35,-0.62)
+  node[midway,below=5pt,font=\scriptsize,reddark,align=center]{``bề mặt'' chỉ xuất hiện ở đây\\ như một \emph{đỉnh của trọng số}, không phải một mặt phẳng};
+\end{tikzpicture}}
+\caption{Dựng ảnh thể tích, vẽ trên một tia. Mạng không trả lời câu hỏi ``mặt ở đâu'' mà trả lời ``mật độ tại điểm này bao nhiêu'' ở hàng chục điểm dọc tia; màu pixel là tổng có trọng số của màu tại các điểm đó. Ba hàng trong hình giải thích công thức: mật độ \(\sigma_i\) quyết định tia dừng lại bao nhiêu ở mỗi điểm, \(T_i\) là phần tia còn sống sót tới đó, và tích của hai thứ cho trọng số. Vì mọi số hạng đều liên tục, \emph{mọi} điểm mẫu đều nhận được gradient --- đó chính là điều mà một bề mặt cứng không làm được.}
+\label{fig:volume-rendering}
+\end{figure}
+
+Một chi tiết dễ bỏ qua nhưng quyết định chất lượng là \vn{mã hoá vị trí}{positional encoding}: nhồi thẳng toạ độ vào MLP cho ra ảnh mờ nhoè, vì MLP có thiên lệch mạnh về hàm tần số thấp. Ánh xạ toạ độ qua một dãy sin/cos nhiều tần số trước khi đưa vào mạng là cách trả lại cho mạng khả năng biểu diễn chi tiết sắc nét --- cùng câu chuyện \en{spectral bias} đã gặp ở \ptr{B/10-thiet-ke-kien-truc}.
+\lk{B/10}{hệ quả của}{mã hoá vị trí là cách bù cho một thiên lệch quy nạp có sẵn của MLP, chứ không phải một mẹo kỹ thuật rời rạc.}
+
+Cái giá là chi phí tính toán, và nó lớn hơn trực giác nhiều. Một ảnh \(800\times 600\) có 480\,000 tia; với 64 điểm mẫu thô cộng 128 điểm mẫu tinh, ta cần khoảng \(9{,}2\times 10^{7}\) lần chạy MLP cho \emph{một} khung hình. Nhân với hàng chục nghìn bước huấn luyện thì thành nhiều giờ GPU cho một cảnh duy nhất --- và đây là nút thắt sinh ra cả dòng công trình tiếp theo, tóm tắt ở Hình~\ref{fig:timeline-nr}.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  st/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,
+             font=\scriptsize,text width=2.85cm,minimum height=1.35cm},
+  ar/.style={-{Stealth[length=5pt]},steel,very thick},
+  nt/.style={font=\scriptsize,color=reddark,align=center,text width=3.1cm}]
+\node[st] (n1) {\textbf{NeRF} (2020)\\ MLP \(+\) lấy mẫu dọc tia};
+\node[st,right=1.35cm of n1] (n2) {\textbf{Instant-NGP} (2022)\\ bảng băm đa độ phân giải};
+\node[st,right=1.35cm of n2] (n3) {\textbf{3DGS} (2023)\\ Gaussian tường minh, rasterize};
+\node[st,right=1.35cm of n3] (n4) {\textbf{Feed-forward splatting}\\ (2024--)\ dự đoán thẳng Gaussian};
+\foreach \x/\y in {n1/n2,n2/n3,n3/n4} \draw[ar] (\x) -- (\y);
+\node[nt,below=0.28cm of n1] {nút thắt: hàng giờ GPU cho \emph{một} cảnh};
+\node[nt,below=0.28cm of n2] {gỡ bằng: dời sức chứa từ trọng số sang cấu trúc dữ liệu không gian};
+\node[nt,below=0.28cm of n3] {gỡ bằng: bỏ hẳn việc ``đi tìm vật chất'' dọc mỗi tia};
+\node[nt,below=0.28cm of n4] {gỡ bằng: prior học sẵn thay vòng tối ưu riêng từng cảnh \emph{(chưa chín)}};
+\end{tikzpicture}}
+\caption{Dòng thời gian của neural rendering, đọc theo nút thắt. Mỗi bước không phải ``phiên bản tốt hơn'' mà là câu trả lời cho đúng một nút cổ chai của bước trước; biết nút thắt nào đang cắn trong bài toán của mình thì biết nên dừng ở mốc nào.}
+\label{fig:timeline-nr}
+\end{figure}
+
+Instant-NGP tấn công đúng chi phí đó. Nó chuyển phần lớn sức chứa của mô hình từ trọng số MLP sang một bảng băm đa độ phân giải đặt trong không gian, để MLP chỉ còn nhỏ xíu \cite{mueller2022instant}. Thời gian huấn luyện tụt từ hàng giờ xuống hàng chục giây. Đây là một mẫu hình sẽ gặp lại nhiều lần: khi mạng phải học một hàm có cấu trúc không gian rõ ràng, đưa cấu trúc đó vào \emph{cấu trúc dữ liệu} rẻ hơn nhiều so với bắt trọng số học lại nó.
+
+\subsection{C. 3DGS: đổi biểu diễn ẩn lấy biểu diễn tường minh}
+Ngay cả với bảng băm, NeRF vẫn phải đi dọc từng tia và lấy mẫu --- vẫn ``đi tìm vật chất ở đâu'' cho mỗi pixel mỗi khung hình. 3D Gaussian splatting bỏ hẳn bước tìm kiếm đó: cảnh là một tập hữu hạn Gaussian dị hướng, mỗi cái có vị trí, ma trận hiệp phương sai, độ đục và màu phụ thuộc góc nhìn; render là chiếu từng Gaussian xuống mặt phẳng ảnh, sắp xếp theo độ sâu, rồi trộn theo thứ tự \cite{kerbl20233dgs}. Toán tổng hợp màu vẫn đúng công thức trên, nhưng phép chiếu có dạng giải tích nên bộ rasterize chạy được ở tốc độ thời gian thực.
+
+Hình~\ref{fig:nerf-vs-3dgs-tia} đặt hai cách tính cùng một pixel cạnh nhau, và cho thấy khoản tiết kiệm đến từ đâu.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize]
+% --- NeRF ---
+\begin{scope}
+\node[font=\scriptsize\bfseries,inkblue] at (2.8,1.35) {NeRF: đi dò dọc tia};
+\draw[inkblue,thick] (-0.4,-0.25) -- (0,0) -- (-0.4,0.25) -- cycle;
+\shade[inner color=steel,outer color=white,opacity=0.55] (2.9,0) ellipse (0.85 and 0.55);
+\draw[-{Stealth[length=4pt]},steel,very thick] (0,0) -- (5.2,0);
+\foreach \x in {0.4,0.75,1.1,1.45,1.8,2.15,2.5,2.85,3.2,3.55,3.9,4.25,4.6,4.95}
+  {\fill[inkblue] (\x,0) circle (1.3pt);
+   \draw[tiercol,very thin] (\x,-0.16) -- (\x,0.16);}
+\node[font=\scriptsize,tiercol,align=center,text width=5.4cm] at (2.6,-1.0)
+  {mỗi chấm là \emph{một} lần chạy MLP.\\ Một ảnh \(800\times600\) với 192 mẫu/tia \(\approx 9{,}2\times10^{7}\) lần chạy cho \textbf{một} khung hình};
+\end{scope}
+% --- 3DGS ---
+\begin{scope}[xshift=7.4cm]
+\node[font=\scriptsize\bfseries,inkblue] at (2.8,1.35) {3DGS: chiếu rồi trộn theo thứ tự};
+\draw[inkblue,thick] (-0.4,-0.25) -- (0,0) -- (-0.4,0.25) -- cycle;
+\draw[-{Stealth[length=4pt]},steel,very thick] (0,0) -- (5.2,0);
+\foreach \x/\y/\r/\op in {2.15/0.12/25/0.30, 2.85/-0.05/-15/0.45, 3.45/0.08/40/0.25}
+  {\fill[steel,opacity=\op,rotate around={\r:(\x,\y)}] (\x,\y) ellipse (0.42 and 0.20);}
+\foreach \x/\lb in {2.15/1,2.85/2,3.45/3}
+  {\fill[reddark] (\x,0) circle (1.3pt);
+   \node[font=\scriptsize,reddark,anchor=south] at (\x,0.30) {\lb};}
+\node[font=\scriptsize,tiercol,align=center,text width=5.4cm] at (2.6,-1.0)
+  {chỉ ba lần trộn: phép chiếu Gaussian có \emph{dạng giải tích}, nên không phải đi tìm ``vật chất ở đâu''};
+\end{scope}
+\end{tikzpicture}}
+\caption{Cùng một tia, hai cách tính màu pixel. Bên trái, NeRF phải lấy mẫu dày dọc tia vì nó \emph{không biết trước} vật chất nằm ở đâu --- toàn bộ chi phí đến từ việc đi tìm. Bên phải, 3DGS đã lưu sẵn vật chất thành các nguyên thể tường minh, nên chỉ cần chiếu chúng xuống mặt ảnh, sắp xếp theo độ sâu và trộn ba lần. Toán tổng hợp màu ở hai bên là một; thứ thay đổi là ai đi tìm --- và đó là toàn bộ khoản chênh hai tới ba bậc độ lớn về tốc độ render.}
+\label{fig:nerf-vs-3dgs-tia}
+\end{figure}
+
+\begin{table}[H]\centering\small
+\caption{Ba mốc của neural rendering. Cả ba chia chung một tập giả định --- pose đã biết, cảnh tĩnh, phơi sáng nhất quán --- nên hỏng chung ở những chỗ đó, và hỏng riêng ở cột cuối.}
+\label{tab:nerf-3dgs}
+\begin{tabularx}{\linewidth}{@{}L{2.1cm}YL{2.3cm}Y@{}}
+\toprule
+\textbf{Phương pháp} & \textbf{Cơ chế} & \textbf{Chi phí} & \textbf{Hỏng khi / mất gì}\\
+\midrule
+NeRF (MLP) & MLP \(+\) lấy mẫu dọc tia \(+\) tích phân thể tích & Huấn luyện hàng giờ; render \(<1\) fps; mô hình vài MB & Chậm cả hai đầu; không chỉnh sửa được cục bộ\\
+Instant-NGP & Bảng băm đa độ phân giải thay phần lớn trọng số & Huấn luyện hàng chục giây; tốn VRAM & Va chạm băm gây nhiễu ở vùng chi tiết\\
+3D Gaussian splatting & Tập Gaussian tường minh, rasterize có sắp xếp & Render thời gian thực; mô hình vài trăm MB & Dung lượng lớn; bề mặt không tường minh; nhạy với khởi tạo từ SfM\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Tính tay dung lượng một lần cho nhớ.} Mỗi Gaussian lưu 3 số vị trí, 3 số tỉ lệ, 4 số quaternion, 1 số độ đục và 48 hệ số \vn{hàm điều hoà cầu}{spherical harmonics} bậc ba cho màu: tổng 59 số thực 32-bit, tức 236 byte. Một cảnh phòng khách dựng tốt thường cần cỡ một triệu Gaussian, tức khoảng 236 MB --- so với vài megabyte cho trọng số của một NeRF MLP. Đó chính là ``giá phải trả'' hay được nhắc chung chung: đổi khoảng hai bậc độ lớn dung lượng lấy khoảng hai tới ba bậc độ lớn tốc độ render.
+
+Cái mất thứ hai tinh tế hơn và quan trọng hơn với người làm robot: \textbf{hình học kém tường minh}. Trong một trường \en{SDF}, bề mặt là tập mức 0 --- định nghĩa sạch, trích mesh bằng \en{marching cubes} là chuyện cơ học. Trong 3DGS, ``bề mặt'' không được định nghĩa ở đâu cả: tối ưu chỉ đòi ảnh render đúng, nên nó thoải mái đặt các Gaussian dẹt lơ lửng trước một bức tường nếu làm vậy khớp ảnh tốt hơn. Muốn trích mesh dùng được, người ta phải thêm ràng buộc ép Gaussian bám bề mặt (dẹt hoá, gắn pháp tuyến) --- tức là trả lại đúng phần ràng buộc hình học mà bước đầu đã cố tình bỏ đi.
+
+\subsection{D. Ba giả định chung, và điều gì xảy ra khi chúng sai}
+Cả họ neural rendering đứng trên ba giả định, và với dữ liệu quay bằng camera robot thì cả ba đều dễ vỡ:
+\begin{itemize}
+\item \textbf{Pose đã biết và chính xác.} Sai lệch vài phần mười độ làm các ảnh mâu thuẫn nhau; vì tối ưu luôn tìm cách giảm loss, nó bù bằng cách sinh ra vật chất giả lơ lửng --- hiện tượng \en{floater}. Đây là lý do 3DGS ``nhạy với khởi tạo từ SfM'': rác vào thì rác ra, chỉ khác là rác ra trông rất đẹp.
+\item \textbf{Cảnh tĩnh.} Người đi qua khung hình để lại vệt mờ hoặc khối đục lơ lửng ở giữa phòng.
+\item \textbf{Quá trình tạo ảnh nhất quán.} Camera bật phơi sáng và cân bằng trắng tự động vi phạm giả định này liên tục, và mô hình buộc phải giải thích thay đổi độ sáng bằng cách nhét thêm hình học sai. \vn{Ảnh mờ do chuyển động}{motion blur} cũng thuộc nhóm này: một khung hình mờ không phải quan sát nhiễu của cảnh tĩnh mà là tích phân của cảnh dọc một quãng chuyển động, và mô hình render không có chỗ nào biểu diễn điều đó.
+\end{itemize}
+
+\begin{cambay}
+PSNR cao trên các view giữ lại \emph{không} chứng minh hình học đúng. Hàm mất mát chỉ ràng buộc ảnh render; hai cấu hình mật độ rất khác nhau có thể sinh ra cùng bộ ảnh, đặc biệt khi màu được phép phụ thuộc hướng nhìn --- mô hình có thể ``vẽ'' thứ đáng lẽ phải ``dựng''. Triệu chứng chẩn đoán: chất lượng đẹp ở các view nội suy gần quỹ đạo chụp và sập ngay khi ngoại suy ra ngoài. Nếu bạn định dùng đầu ra làm bản đồ để robot va chạm hay bám bề mặt, hãy đánh giá bằng độ chính xác hình học so với một quét chân trị, không phải bằng PSNR hay \en{LPIPS} \cite{zhang2018lpips}.
+\end{cambay}
+
+Với người làm SLAM, hệ quả thực hành gọn lại thành một câu hỏi: \emph{bạn có thực sự cần render không?} Nếu chỉ cần định vị, bản đồ thưa của SLAM cổ điển vẫn là lựa chọn đúng --- rẻ hơn nhiều bậc và có sai số kiểm chứng được. Neural rendering đáng đưa vào khi bài toán hạ nguồn thật sự cần ảnh: kiểm tra trực quan từ xa, sinh dữ liệu huấn luyện từ góc nhìn mới, mô phỏng cảm biến, hoặc định vị lại bằng cách so ảnh render với ảnh thật.
+\lk{C/17/02}{cùng nguyên lý với}{cùng một ý tưởng ``đặt thứ ta muốn vào hàm mất mát rồi tối ưu trên chính đối tượng cần tạo ra'', chỉ khác biến tối ưu là ảnh thay vì cảnh.}
+
+\subsection{E. Hợp nhất camera, LiDAR và IMU}
+Ba cảm biến này bù trừ cho nhau gần như hoàn hảo: camera cho ngữ nghĩa và độ phân giải góc cao nhưng không có tỉ lệ; LiDAR cho hình học metric thưa và bền với ánh sáng; IMU cho chuyển động tần số cao và quan sát được phương trọng lực nhưng trôi rất nhanh khi tích phân. Câu hỏi thiết kế là hợp nhất ở tầng nào (Hình~\ref{fig:fusion}).
+
+\begin{figure}[H]\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  s/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=3.5pt,align=center,font=\scriptsize,minimum width=1.5cm},
+  f/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=3.5pt,align=center,font=\scriptsize,minimum width=1.6cm},
+  o/.style={draw=reddark,fill=redbg,rounded corners=2pt,inner sep=3.5pt,align=center,font=\scriptsize,minimum width=1.5cm},
+  ar/.style={-{Stealth[length=4pt]},steel}]
+% early
+\node[font=\scriptsize\bfseries,inkblue] at (1.9,1.75) {Early fusion};
+\node[s] (ec) at (0,1.0) {camera};
+\node[s] (el) at (0,0.0) {LiDAR};
+\node[f] (ef) at (2.1,0.5) {ghép ở mức\\ \textbf{đặc trưng}};
+\node[o] (eo) at (4.2,0.5) {đầu ra\\ chung};
+\draw[ar] (ec) -- (ef); \draw[ar] (el) -- (ef); \draw[ar] (ef) -- (eo);
+\node[font=\scriptsize,reddark,align=center,text width=4.4cm] at (2.1,-0.95)
+  {giàu tương tác chéo, nhưng lệch hiệu chỉnh \(1^{\circ}\) ở 20 m \(=\) 35 cm \(\Rightarrow\) điểm rơi lên \emph{nhầm vật}};
+% late
+\node[font=\scriptsize\bfseries,inkblue] at (9.5,1.75) {Late fusion};
+\node[s] (lc) at (7.0,1.0) {camera};
+\node[s] (ll) at (7.0,0.0) {LiDAR};
+\node[f] (lc2) at (9.1,1.0) {phát hiện\\ riêng};
+\node[f] (ll2) at (9.1,0.0) {phát hiện\\ riêng};
+\node[o] (lo) at (11.3,0.5) {liên kết ở\\ mức \textbf{đối tượng}};
+\draw[ar] (lc) -- (lc2); \draw[ar] (ll) -- (ll2);
+\draw[ar] (lc2) -- (lo); \draw[ar] (ll2) -- (lo);
+\node[font=\scriptsize,reddark,align=center,text width=4.6cm] at (9.5,-0.95)
+  {mất tương tác chéo, nhưng 35 cm chỉ làm hai hộp lệch nhau mà vẫn chồng lấn \(\Rightarrow\) liên kết vẫn đúng};
+\end{tikzpicture}}
+\caption{Cùng một sai số hiệu chỉnh, hai hậu quả khác hẳn nhau. Early fusion liên kết ở mức pixel nên sai số biến thành \emph{đầu vào rác}; late fusion liên kết ở mức đối tượng, nơi vài chục centimét vẫn nằm trong kích thước của vật, nên sai số chỉ thành nhiễu đầu ra. Đó là toàn bộ nội dung của cuộc đánh đổi ``giàu thông tin'' đối lại ``bền vững''.}
+\label{fig:fusion}
+\end{figure}
+
+Con số trong hình tính ra như sau: sai số hiệu chỉnh ngoại xoay \(1^{\circ}\) chuyển thành sai số ngang \(\tan 1^{\circ} \approx 17{,}5\) mm trên mỗi mét tầm xa, nên ở 20 m là 35 cm. Lệch đồng bộ thời gian sinh ra đúng loại lỗi đó, nhưng âm thầm hơn vì nó chỉ xuất hiện khi có chuyển động. Robot quay \(100^{\circ}\)/s với lệch nhãn thời gian 5 ms cho sai lệch góc \(0{,}5^{\circ}\). Con số này tỉ lệ thuận với tốc độ quay. Nghĩa là hệ thống chạy hoàn hảo khi đứng yên, rồi hỏng đúng lúc đang xoay nhanh --- đúng lúc bạn cần nó nhất. Đây là lý do một nhận định lặp đi lặp lại trong thực hành: ở các hệ đa cảm biến, phần lớn thời gian sửa lỗi nằm ở đồng bộ thời gian và hiệu chỉnh ngoại chứ không ở thuật toán hợp nhất.
+
+\begin{cannho}
+Sai số hiệu chỉnh và sai số đồng bộ không phải nhiễu --- chúng là sai số \emph{có hệ thống}, phụ thuộc tầm xa và tốc độ, nên không trung bình về không khi gom nhiều quan sát. Hệ quả bắt buộc: chúng phải được đưa vào mô hình như biến cần ước lượng (hiệu chỉnh trực tuyến, ước lượng độ trễ \(t_d\)) chứ không phải được hy vọng là nhỏ. Và với neural rendering, điều tương đương là: hàm mất mát ràng buộc ảnh, nên hình học phải được kiểm tra bằng một phép đo bên ngoài. \T{4}
+\end{cannho}
+
+\subsection{F. Giới hạn và trường hợp hỏng}
+Bên cạnh bài toán tối ưu riêng từng cảnh (per-scene optimization), người triển khai 3DGS và NeRF trên robot và hệ thống nhúng phải đối mặt với ba rủi ro kỹ thuật rất cụ thể:
+
+\begin{itemize}
+\item \emph{Bùng nổ bộ nhớ VRAM khi mở rộng bản đồ (VRAM Explosion):} Một phòng làm việc nhỏ có thể sinh ra từ 2 tới 5 triệu hạt Gaussian, ngốn từ 1.5 tới 3\,GB VRAM trên GPU. Khi robot di chuyển qua toà nhà hoặc môi trường ngoài trời rộng lớn, việc lưu trữ toàn bộ Gaussian trong bộ nhớ đồ hoạ dẫn tới tràn RAM GPU (OOM) lập tức. Mặc dù các kỹ thuật nén (như Scaffold-GS hay lượng tử hoá thuộc tính) giảm dung lượng đáng kể, chúng làm tăng chi phí giải nén thời gian thực và làm mờ các chi tiết hình học mảnh.
+\item \emph{Vật cản ma (Phantom Obstacles) và hình học suy biến:} Do hàm mất mát chỉ tối ưu trên ảnh 2D, tại những vùng camera ít quan sát hoặc góc nhìn hẹp, 3DGS có xu hướng sinh ra các Gaussian hình cây kim dài (needle-like Gaussians) hoặc các đám mây lơ lửng trước ống kính nhằm hạ loss một cách cơ hội. Đối với một hệ thống robot tự hành lấy bản đồ này để lập đường đi, những đám mây giả đó sẽ bị hiểu nhầm là vật cản thực tế, làm robot dừng đột ngột hoặc lập lộ trình vòng vèo vô ích.
+\item \emph{Tính phi bất biến trước biến thiên ánh sáng:} Cả NeRF và 3DGS sử dụng hàm cầu điều hoà (Spherical Harmonics) để mô tả tính phản xạ phụ thuộc hướng nhìn (view-dependent appearance). Khi môi trường có ánh sáng biến động mạnh (đèn bật/tắt, bóng râm thay đổi, phơi sáng camera tự động nhảy), mô hình sẽ nhầm lẫn giữa sự thay đổi bức xạ và sự thay đổi hình học, từ đó ``khắc'' các vệt sáng tối vĩnh viễn vào vị trí của các hạt 3D.
+\end{itemize}
+
+Về hợp nhất, chế độ hỏng đáng sợ nhất là hỏng \emph{im lặng} của một nhánh. Mưa làm LiDAR sinh điểm giả; đường hầm làm camera mất hết đặc trưng; rung động làm IMU bão hoà. Một hệ hợp nhất không kiểm tra tính nhất quán giữa các nhánh sẽ vẫn cho ra ước lượng trông bình thường, với hiệp phương sai cũng trông bình thường. Vì vậy phần đáng đầu tư trong một hệ thật thường không phải bộ hợp nhất mà là bộ chẩn đoán từng nhánh: phần dư theo từng cảm biến, kiểm tra chi bình phương, và một cơ chế hạ cấp có kiểm soát khi một nhánh bị loại.
+\lk{E/25}{hệ quả của}{hỏng im lặng của một nhánh cảm biến là trường hợp cụ thể của yêu cầu chung: hệ thống phải biết lúc nào nó không đáng tin.}
+
+\subsection{G. Kết nối}
+Mục này khép lại chương 16 và nối ngược lên \ptr{C/16-thi-giac-3d/01-bon-the-he-3d}: neural rendering là thế hệ ba, đứng \emph{sau} khâu pose, nên nó tiêu thụ đầu ra của thế hệ một chứ không thay thế. Ý tưởng ``đặt cái ta muốn vào hàm mất mát rồi hạ gradient trên chính đối tượng cần tạo ra'' sẽ trở lại nguyên vẹn ở \ptr{C/17-mo-hinh-sinh/02-toi-uu-tren-pixel}, chỉ khác là biến tối ưu ở đó là ảnh chứ không phải cảnh. Các giả định về quá trình tạo ảnh thuộc \ptr{A/02-vat-ly-tao-anh}; việc chẩn đoán từng nhánh cảm biến và hạ cấp có kiểm soát thuộc \ptr{E/25-do-tin-cay-va-van-hanh}.
+
+\begin{tukiem}
+\item Vì sao biểu diễn cảnh bằng mật độ liên tục là điều kiện cần để gradient descent hoạt động, trong khi bề mặt cứng thì không?
+\item 3DGS nhanh hơn NeRF nhờ đổi cái gì lấy cái gì, và vì sao cái mất đó lại đặc biệt bất tiện cho robot?
+\item Một cảnh có PSNR rất cao trên các view giữ lại nhưng bản đồ hình học sai. Cơ chế nào cho phép hai điều đó cùng đúng, và bạn thiết kế phép thử nào để phát hiện?
+\item Vì sao một hệ early fusion có thể chạy hoàn hảo khi robot đứng yên và hỏng khi robot xoay nhanh, dù không tham số nào thay đổi?
+\item Nếu buộc phải chọn giữa một tuần cải tiến thuật toán hợp nhất và một tuần dựng lại quy trình hiệu chỉnh cùng đồng bộ thời gian, bạn chọn cái nào và dựa trên bằng chứng gì?
+\item Hình~\ref{fig:timeline-nr} đọc theo nút thắt. Trong bài toán của bạn, nút thắt đang cắn là thời gian dựng, tốc độ render, hay dung lượng bản đồ --- và điều đó chỉ về mốc nào?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

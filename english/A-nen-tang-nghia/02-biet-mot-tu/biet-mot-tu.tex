@@ -1,0 +1,212 @@
+% ============================================================================
+%  A/02-biet-mot-tu — file chương
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+%  Dependency: A/01. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../english.tex]{subfiles}
+\begin{document}
+\chapter{Biết một từ là biết những gì (What It Means to Know a Word)}
+\ptrtarget{A/02}\ptrtarget{A/02-biet-mot-tu}
+\dependency{\ptr{A/01} --- chương này biến nhận xét ``nghĩa nằm ở cách dùng'' thành một danh sách kiểm cụ thể cho việc học từ.}
+
+\begin{tomtat}
+Chương này trả lời hai câu hỏi bằng số. Thứ nhất: \emph{biết một từ} gồm những gì --- có chín mặt, và phần lớn người học chỉ nắm hai. Thứ hai: cần bao nhiêu từ để đọc được tài liệu ngành mà không phải tra liên tục --- câu trả lời xoay quanh ngưỡng độ phủ 98\%, và nó giải thích vì sao đọc một bài báo lại dễ hơn đọc một tiểu thuyết dù bài báo ``khó hơn''. Chương cũng phân biệt vốn từ chủ động với bị động, giải thích vì sao một từ cần gặp lại nhiều lần mới thành của bạn, và chỉ ra bốn thành phần tối thiểu cho một mục trong sổ từ. Nếu chỉ nhớ một điều: với tài liệu chuyên ngành, việc học vài trăm từ kỹ thuật của đúng ngành bạn có giá trị hơn việc học vài nghìn từ chung chung.
+\end{tomtat}
+
+\begin{nentang}
+\kn{họ từ (word family)}{một từ gốc cùng các dạng biến đổi và phái sinh dễ đoán của nó: \emph{analyse, analyses, analysed, analysing, analysis, analytic, analytical} được tính là một họ. Các con số về vốn từ trong chương này đều tính theo họ.}
+\kn{độ phủ (coverage)}{tỉ lệ phần trăm số từ trong một văn bản mà bạn đã biết. Độ phủ 98\% nghĩa là cứ 50 từ có 1 từ lạ.}
+\kn{từ vựng bị động / chủ động}{từ bạn hiểu khi gặp so với từ bạn tự dùng được khi viết. Vốn bị động luôn lớn hơn vốn chủ động vài lần.}
+\kn{từ vựng học thuật}{nhóm từ không thuộc chuyên ngành nào nhưng xuất hiện dày ở mọi văn bản học thuật: \emph{analyse, significant, approach, constitute, derive}.}
+\kn{từ vựng kỹ thuật}{từ chỉ dùng trong một ngành, mang nghĩa quy ước hẹp: \emph{covariance}, \emph{keyframe}, \emph{gradient descent}.}
+\kn{gánh nặng học (learning burden)}{lượng công sức để học một từ mới, phụ thuộc vào việc nó giống bao nhiêu với thứ bạn đã biết --- gốc từ quen, cách phát âm quen, khái niệm quen.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Bạn ``biết'' một từ nghĩa là gì? Liệt kê được bao nhiêu thứ bạn cần biết về nó?}
+\h{Vì sao bạn hiểu được nhiều từ hơn số từ bạn dùng được, và khoảng cách đó nói lên điều gì về cách học?}
+\h{Cần biết bao nhiêu phần trăm số từ trong một trang thì mới đọc trôi chảy được? Con số đó có phản trực giác không?}
+\h{Vì sao một bài báo chuyên ngành khó lại có thể \emph{dễ đọc} hơn một bài báo phổ thông cho người trong nghề?}
+\h{Gặp một từ mới bao nhiêu lần thì nó thành của bạn, và làm sao rút ngắn con số đó?}
+\end{khoigoi}
+
+Có một trải nghiệm khiến nhiều người học lâu năm nản: bạn tra một từ, thấy quen, và nhận ra mình đã tra chính từ đó vài tháng trước. Cảm giác là ``tôi học rồi lại quên''. Nhưng thường thì chuyện xảy ra khác: bạn chưa từng học từ đó theo nghĩa đủ để dùng --- bạn mới chỉ \emph{nhận ra} nó một lần trong một ngữ cảnh.
+
+Chương này làm rõ khoảng cách đó bằng cách trả lời câu hỏi ``biết một từ là biết những gì''. Câu trả lời có cấu trúc, và khi thấy cấu trúc rồi thì bạn sẽ hiểu vì sao việc ghi ``\emph{significant} = đáng kể'' vào sổ gần như không tạo ra khả năng dùng được từ đó, và bạn cần ghi những gì thay thế.
+
+Phần thứ hai của chương trả lời một câu hỏi thực dụng hơn: bạn cần bao nhiêu từ. Ở đây có những con số đã được nghiên cứu kỹ, và chúng thay đổi hẳn cách lập kế hoạch học --- đặc biệt với người chỉ cần đọc tài liệu của một ngành hẹp.
+
+\section{Chín mặt của việc biết một từ}
+
+Paul Nation, người có ảnh hưởng lớn nhất trong nghiên cứu về từ vựng ngoại ngữ, phân tích ``biết một từ'' thành ba nhóm với chín mặt\cite{nation2013}. Danh sách này đáng đọc chậm, vì nó chính là danh sách kiểm khi bạn học một từ mới.
+
+\emph{Nhóm hình thức.} (1) Nghe ra được từ này khi người khác nói. (2) Viết đúng chính tả. (3) Nhận ra các bộ phận cấu tạo --- gốc, tiền tố, hậu tố (\ptr{A/04}).
+
+\emph{Nhóm nghĩa.} (4) Nối được hình thức với nghĩa: thấy từ thì biết nghĩa, và nghĩ tới nghĩa thì nhớ ra từ. (5) Biết khái niệm và phạm vi quy chiếu: từ này bao gồm những gì và \emph{không} bao gồm những gì. (6) Biết các liên tưởng: từ nào gần nghĩa, từ nào trái nghĩa, từ nào cùng nhóm.
+
+\emph{Nhóm sử dụng.} (7) Biết chức năng ngữ pháp: từ loại, mẫu câu nó tham gia, giới từ đi kèm. (8) Biết kết hợp từ: những từ thường đứng cạnh nó. (9) Biết ràng buộc sử dụng: văn vực, mức trang trọng, tần suất, và ngành nào hay dùng.
+
+Với mỗi mặt còn có hai chiều: \emph{bị động} (hiểu khi gặp) và \emph{chủ động} (tự dùng được). Nhân lên thành mười tám ô --- và điều đáng nói là phần lớn người học chỉ điền hai ô: hình thức viết và nghĩa bị động.
+
+\begin{cannho}
+Bốn thành phần tối thiểu cho một mục trong sổ từ, đủ để lấp các ô quan trọng nhất: (i) \emph{câu thật} bạn gặp từ đó, giữ nguyên; (ii) nghĩa diễn đạt bằng tiếng Anh đơn giản, không phải một nhãn tiếng Việt; (iii) hai tới ba \emph{kết hợp từ} hay gặp; (iv) một ghi chú về văn vực hoặc ngữ pháp nếu có gì bất thường --- giới từ lạ, không đếm được, chỉ dùng trong văn viết. Ghi bốn thứ này tốn thêm một phút và thay đổi hẳn khả năng dùng lại.
+\end{cannho}
+
+\section{Vốn từ bị động và chủ động}
+
+Vốn từ bị động của một người học thường lớn hơn vốn chủ động vài lần, và khoảng cách đó là bình thường --- ngay cả người bản ngữ cũng hiểu nhiều từ hơn số từ họ dùng. Điều quan trọng là hiểu \emph{vì sao} khoảng cách tồn tại, vì nó chỉ ra cách thu hẹp.
+
+Nhận ra một từ khi đọc là bài toán dễ: ngữ cảnh đã loại bỏ hầu hết khả năng, và bạn chỉ cần khớp hình thức với một nghĩa mờ. Tự dùng một từ là bài toán khó hơn nhiều: bạn phải nhớ ra nó khi \emph{chỉ có ý tưởng trong đầu}, phải biết nó đi với giới từ nào, hợp với danh từ nào, và có đúng văn vực không. Nói theo ngôn ngữ của \ptr{A/01}: đọc chỉ cần tầng nghĩa quy chiếu, còn viết cần cả ba tầng.
+
+Hệ quả thực hành: muốn chuyển một từ từ bị động sang chủ động, chỉ gặp lại nó khi đọc là không đủ --- bạn phải \emph{sản xuất} nó. Ba cách rẻ nhất: viết lại một câu bạn vừa đọc bằng cấu trúc khác nhưng giữ từ đó; viết một câu về chính công việc của mình dùng từ đó; hoặc dịch ngược một câu tiếng Việt rồi so với bản gốc. Cả ba đều là ``luyện đầu ra có tập trung'', tức nhánh thứ hai trong bốn nhánh của Nation ở \ptr{E/19}.
+
+\section{Cần bao nhiêu từ: các con số}
+
+Đây là mục thay đổi kế hoạch học của nhiều người, vì các con số ở đây phản trực giác.
+
+Từ vựng tiếng Anh phân bố cực kỳ lệch: một số ít từ chiếm phần lớn số lần xuất hiện. Khoảng 2000 họ từ thông dụng nhất phủ chừng 80\% số từ trong một văn bản viết thông thường. Nhưng 80\% nghe nhiều mà thực ra rất thấp: nó có nghĩa cứ năm từ có một từ lạ, tức là mỗi dòng vài từ không hiểu --- không đọc nổi.
+
+Câu hỏi đúng là: cần độ phủ bao nhiêu để đọc trôi chảy? Nghiên cứu của Hu và Nation cho thấy ngưỡng cho việc đọc \emph{không cần trợ giúp} nằm quanh 98\%\cite{hunation2000}; ở mức 95\% thì người đọc vẫn hiểu được đại ý nhưng phải đoán liên tục và mệt\cite{laufer2010}. Ở mức 98\%, cứ 50 từ mới có một từ lạ --- khoảng hai đến ba từ mỗi trang, đủ thưa để đoán từ ngữ cảnh mà không đứt mạch.
+
+Vấn đề là để đạt 98\% với văn bản phổ thông --- tiểu thuyết, báo chí --- cần khoảng 8000 tới 9000 họ từ\cite{nation2006}. Đó là con số lớn và là lý do rất nhiều người học cảm thấy mãi không tới đích.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=11.2cm,height=5.4cm, xmin=0,xmax=9000, ymin=0,ymax=102,
+  xlabel={\footnotesize số họ từ đã biết (từ thông dụng nhất trở xuống)},
+  ylabel={\footnotesize độ phủ văn bản (\%)},
+  tick label style={font=\scriptsize,color=tiercol}, label style={font=\scriptsize,color=tiercol},
+  grid=both, grid style={rulecol,very thin}, xtick={0,2000,4000,6000,8000}]
+\addplot[domain=50:9000,samples=120,very thick,color=steel] {100*(1-exp(-x/2200))*0.995};
+\draw[dashed,thick,color=reddark] (axis cs:0,98) -- (axis cs:9000,98);
+\node[font=\scriptsize,color=reddark,anchor=west] at (axis cs:300,95.2) {ngưỡng đọc trôi chảy 98\%};
+\draw[dashed,color=greendark] (axis cs:2000,0) -- (axis cs:2000,80);
+\node[font=\scriptsize,color=greendark,anchor=west] at (axis cs:2100,60) {2000 họ từ \(\approx\) 80\%};
+\end{axis}
+\end{tikzpicture}
+\caption{Đường độ phủ theo số họ từ đã biết (dạng minh hoạ, dựa trên các con số đã được nghiên cứu). Hai điều đáng nhìn kỹ: phần đầu dốc đứng --- vài nghìn từ đầu tiên đáng giá hơn hẳn phần sau --- và phần đuôi rất phẳng, nên chặng từ 95\% lên 98\% tốn hàng nghìn họ từ. Đó là lý do chiến lược ``học thêm từ chung chung'' cho cảm giác không tiến, và là lý do mục 4 đề xuất một đường vòng.}
+\label{fig:coverage}
+\end{figure}
+
+\section{Đường vòng: từ vựng học thuật và từ vựng ngành}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ tư, và nó là thông tin có giá trị nhất chương với người đọc tài liệu chuyên ngành.
+
+Con số 8000--9000 họ từ áp cho văn bản \emph{phổ thông}, nơi chủ đề thay đổi tự do và tác giả dùng cả từ hiếm lẫn thành ngữ. Văn bản chuyên ngành thì ngược lại: chủ đề hẹp, từ vựng lặp lại nhiều, và tác giả tránh cách nói bóng bẩy. Điều đó tạo ra ba nhóm từ với ba chiến lược khác nhau.
+
+\emph{Nhóm một --- từ thông dụng.} Khoảng 2000--3000 họ từ đầu tiên. Phủ khoảng 80\%. Đây là phần bắt buộc, không có đường tắt, nhưng phần lớn người đã học tiếng Anh nhiều năm đã có gần đủ.
+
+\emph{Nhóm hai --- từ học thuật.} Nhóm từ không thuộc ngành nào nhưng xuất hiện dày trong mọi văn bản học thuật: \emph{significant, approach, derive, constitute, hence, thereby}. Danh sách từ học thuật kinh điển gồm khoảng 570 họ từ và phủ thêm chừng 10\% văn bản học thuật\cite{coxhead2000}. Đây là nhóm có tỉ lệ lợi ích trên công sức \emph{cao nhất} trong cả ba: vài trăm từ, dùng được ở mọi ngành, và chúng chính là các từ nối lập luận mà chương \ptr{B/06} sẽ khai thác.
+
+\emph{Nhóm ba --- từ kỹ thuật của ngành bạn.} Số lượng không lớn --- thường vài trăm tới một hai nghìn --- nhưng mật độ trong văn bản ngành thì cao, tuỳ lĩnh vực có thể từ 5\% tới hơn 20\% số từ\cite{chungnation2003}. Điểm đặc biệt: bạn thường \emph{đã biết khái niệm} bằng tiếng Việt, nên gánh nặng học rất nhẹ --- chỉ là gắn một nhãn mới vào một khái niệm đã có.
+
+Cộng ba nhóm lại, một người đọc tài liệu trong đúng ngành của mình có thể đạt độ phủ gần 98\% với tổng vốn từ nhỏ hơn nhiều so với con số 8000--9000 cho văn bản phổ thông. Đó chính là lý do một kỹ sư có thể đọc trôi bài báo trong ngành mình mà vẫn chật vật với một bài báo trên tạp chí phổ thông --- và nó gợi ý một chiến lược rõ ràng: \emph{đọc hẹp}. Chọn một chủ đề hẹp và đọc mười bài về nó, thay vì mười bài về mười chủ đề. Từ vựng lặp lại, mỗi từ được gặp nhiều lần trong ngữ cảnh khác nhau, và đó chính là điều kiện để nó thành của bạn.
+
+\section{Bao nhiêu lần gặp thì thành của mình}
+
+Học một từ từ việc đọc là quá trình tăng dần chứ không phải một sự kiện. Các nghiên cứu về học từ ngẫu nhiên qua đọc cho thấy cần nhiều lần gặp --- thường được nhắc tới trong khoảng mười tới hai mươi lần, tuỳ độ nổi bật của từ trong ngữ cảnh và tuỳ bạn có chú ý tới nó hay không\cite{webbnation2017}. Mỗi lần gặp thêm một mảnh: lần này bạn thấy giới từ đi kèm, lần khác thấy nó dùng trong câu bị động, lần khác nữa thấy nó ở văn vực trang trọng.
+
+Có hai cách rút ngắn con số đó, và cả hai đều được nói kỹ ở phần E.
+
+\emph{Cách một --- chú ý có chủ đích.} Việc dừng lại một giây để \emph{nhận ra} rằng đây là một từ đáng học, và tự hỏi nó đi với những từ nào, làm tăng mạnh khả năng nhớ. Đây là lý do đọc chủ động hiệu quả hơn đọc thụ động dù cùng số trang.
+
+\emph{Cách hai --- truy xuất có ngắt quãng.} Thay vì đọc lại, hãy \emph{tự nhớ lại}: che nghĩa và cố gọi ra, hoặc dùng thẻ ghi nhớ với khoảng cách tăng dần. Hiệu ứng của việc kiểm tra lại trí nhớ mạnh hơn hẳn việc đọc lại cùng một lượng thời gian\cite{roediger2006}, và khoảng cách giãn dần cho kết quả tốt hơn ôn dồn\cite{cepeda2006}. Cách thiết kế thẻ nằm ở \ptr{E/20}.
+
+\begin{cambay}
+Một sai lầm phổ biến của người học chăm chỉ: học từ theo danh sách chủ đề --- ``100 từ về môi trường'', ``50 từ về kinh tế''. Cách này có hai vấn đề. Thứ nhất, các từ trong cùng chủ đề thường gần nghĩa nhau nên gây nhiễu lẫn nhau khi nhớ. Thứ hai, và nghiêm trọng hơn, bạn học chúng ngoài ngữ cảnh nên chỉ điền được ô ``hình thức--nghĩa'' trong mười tám ô ở mục 1. Cách thay thế: học từ \emph{trong tài liệu bạn đang thật sự đọc}, và ưu tiên những từ xuất hiện lại nhiều lần --- tần suất trong ngành bạn quan trọng hơn tần suất chung.
+\end{cambay}
+
+\section{Gốc rễ: từ danh sách từ tới nghiên cứu ngưỡng}
+
+Ý tưởng đếm tần suất từ để dạy ngoại ngữ có tuổi đời gần một thế kỷ, và nó bắt đầu từ một ràng buộc rất thực tế: sách in đắt và thời gian học có hạn, nên phải chọn dạy từ nào trước.
+
+Năm 1953, Michael West công bố danh sách khoảng 2000 từ thông dụng dùng cho việc biên soạn sách đọc phân cấp\cite{west1953}. Danh sách được xây từ việc đếm tay trên một kho văn bản --- công việc khổng lồ trước thời máy tính --- và nó đặt nền cho toàn bộ ngành sách đọc phân cấp dành cho người học.
+
+Bước ngoặt thứ hai là khi máy tính cho phép đếm ở quy mô lớn và kiểm chứng các giả định cũ. Từ đó ra đời hai kết quả định hình chương này: danh sách từ học thuật của Coxhead năm 2000, xây từ kho văn bản học thuật thật và cho thấy chỉ 570 họ từ phủ thêm khoảng 10\% văn bản học thuật\cite{coxhead2000}; và loạt nghiên cứu về ngưỡng độ phủ của Hu, Nation, Laufer và cộng sự, trả lời câu hỏi ``cần biết bao nhiêu phần trăm để hiểu'' bằng thực nghiệm thay vì bằng cảm tính\cite{hunation2000,laufer2010,nation2006}.
+
+Có một liên hệ đáng chú ý với chương \ptr{A/01}: cả hai bước ngoặt đều đến từ việc \emph{đếm dữ liệu thật} thay vì tin vào trực giác chuyên gia. Cùng một cuộc cách mạng ngữ liệu đã sinh ra từ điển dựa trên dữ liệu cũng sinh ra các danh sách từ và các con số ngưỡng ở chương này. Với người học, bài học chung là: những câu hỏi tưởng như mơ hồ --- ``từ nào đáng học trước'', ``bao nhiêu là đủ'' --- thực ra đã có câu trả lời định lượng, và dùng chúng để lập kế hoạch tốt hơn nhiều so với học theo cảm giác.
+
+\begin{gocre}
+\gr{1953 --- West}{Sách in đắt, thời gian học ít: dạy từ nào trước?}{Danh sách từ thông dụng đầu tiên; nền của sách đọc phân cấp và của ý tưởng ``ưu tiên theo tần suất''.}
+\gr{Thập niên 1980--90 --- ngữ liệu máy tính}{Đếm tay không đủ quy mô để tin cậy.}{Kho ngữ liệu lớn cho phép đo tần suất và độ phủ thật; kiểm chứng lại nhiều giả định cũ.}
+\gr{2000 --- Coxhead}{Người học đã thuộc từ thông dụng vẫn không đọc nổi văn bản học thuật.}{Danh sách 570 họ từ học thuật phủ thêm \(\approx\)10\%: nhóm có tỉ lệ lợi ích trên công sức cao nhất.}
+\gr{2000--2010 --- Hu, Nation, Laufer}{``Cần biết bao nhiêu từ'' vẫn là câu hỏi cảm tính.}{Ngưỡng 95\% và 98\%; con số 8000--9000 họ từ cho văn bản phổ thông; định lượng hoá việc lập kế hoạch học.}
+\gr{2003 --- Chung \& Nation}{Từ kỹ thuật chiếm bao nhiêu trong văn bản chuyên ngành?}{Mật độ cao và thay đổi mạnh theo ngành; giải thích vì sao đọc trong ngành mình lại dễ hơn đọc phổ thông.}
+\gr{2006 --- Cepeda và cộng sự; Roediger \& Karpicke}{Ôn thế nào cho nhớ lâu?}{Truy xuất chủ động hơn hẳn đọc lại; khoảng cách giãn dần hơn ôn dồn --- cơ sở cho \ptr{E/20}.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Luật phân bố lệch}{Định luật Zipf: tần suất tỉ lệ nghịch với thứ hạng}{Đường độ phủ ở hình~\ref{fig:coverage} chính là dạng tích luỹ của phân bố Zipf\cite{zipf1949}. Hệ quả giống hệt nguyên tắc 80/20: một phần nhỏ tạo ra phần lớn giá trị, và phần đuôi rất tốn công.}
+\lh{Bộ nhớ đệm trong máy tính}{Giữ lại thứ hay dùng nhất, loại thứ ít dùng}{Chiến lược ``học theo tần suất'' chính là chính sách bộ đệm theo tần suất. Và giống bộ đệm, cái quyết định hiệu quả là tần suất \emph{trong tải công việc của bạn}, không phải tần suất chung --- đó là lý do từ vựng ngành đáng ưu tiên.}
+\lh{Nén dữ liệu}{Mã Huffman: ký hiệu hay gặp được mã ngắn}{Cùng nguyên lý phân bổ tài nguyên theo tần suất. Ngôn ngữ tự làm điều này: các từ thông dụng nhất trong tiếng Anh gần như đều rất ngắn.}
+\lh{Học máy}{Từ hiếm và bài toán đuôi dài}{Mô hình ngôn ngữ gặp đúng vấn đề của người học: phần đuôi phân bố chứa vô số từ hiếm, tốn kém để phủ. Giải pháp của cả hai giống nhau: tách từ thành đơn vị nhỏ hơn --- tức là học gốc và phụ tố (\ptr{A/04}).}
+\lh{Thư viện và tra cứu}{Tài liệu tham khảo dùng nhiều được để gần}{Cùng logic sắp xếp theo tần suất sử dụng, ở dạng vật lý.}
+\lh{Khoa học nhận thức}{Hiệu ứng kiểm tra và hiệu ứng giãn cách}{Hai kết quả vững nhất về trí nhớ, và chúng áp thẳng vào việc học từ: tự truy xuất hơn đọc lại, giãn dần hơn dồn một lúc\cite{roediger2006,cepeda2006}.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Có chín mặt, chia ba nhóm. Hình thức: nghe ra, viết đúng, nhận ra bộ phận cấu tạo. Nghĩa: nối hình thức với nghĩa, biết phạm vi khái niệm, biết các liên tưởng. Sử dụng: chức năng ngữ pháp và giới từ đi kèm, kết hợp từ, ràng buộc về văn vực. Mỗi mặt lại có chiều bị động và chủ động, thành mười tám ô --- và phần lớn người học chỉ điền hai ô là hình thức viết cùng nghĩa bị động.}
+\tl{Vì nhận ra một từ khi đọc là bài toán dễ hơn nhiều: ngữ cảnh đã loại bỏ hầu hết khả năng và bạn chỉ cần khớp hình thức với một nghĩa mờ. Còn tự dùng từ thì phải gọi nó ra chỉ từ ý tưởng trong đầu, kèm giới từ đúng, danh từ đi cùng đúng, văn vực đúng. Khoảng cách này cho biết cách thu hẹp: phải \emph{sản xuất} từ đó --- viết lại câu, viết câu về công việc của mình --- chứ chỉ đọc lại thì không đủ.}
+\tl{Khoảng 98\% để đọc không cần trợ giúp; ở 95\% vẫn nắm được đại ý nhưng phải đoán liên tục và mệt. Con số phản trực giác ở chỗ 80\% nghe như ``hiểu phần lớn'' nhưng thực ra là cứ năm từ có một từ lạ, tức vài từ mỗi dòng --- không đọc nổi. Ở 98\% thì mỗi trang chỉ còn hai ba từ lạ, đủ thưa để đoán từ ngữ cảnh mà không đứt mạch.}
+\tl{Vì văn bản chuyên ngành có chủ đề hẹp, từ vựng lặp lại nhiều, ít thành ngữ và ít cách nói bóng bẩy; hơn nữa từ kỹ thuật thường ứng với khái niệm bạn \emph{đã biết} bằng tiếng Việt nên gánh nặng học rất nhẹ. Cộng lại, độ phủ 98\% trong ngành của bạn đạt được với tổng vốn từ nhỏ hơn nhiều so với 8000--9000 họ từ cần cho văn bản phổ thông. Hệ quả chiến lược: đọc hẹp --- mười bài về một chủ đề thay vì mười bài về mười chủ đề.}
+\tl{Thường phải gặp lại nhiều lần, con số hay được nhắc là trong khoảng mười tới hai mươi, vì mỗi lần gặp chỉ thêm một mảnh trong chín mặt ở mục 1. Rút ngắn bằng hai cách: chú ý có chủ đích --- dừng một giây để nhận ra đây là từ đáng học và tự hỏi nó đi với từ nào; và truy xuất có ngắt quãng --- tự nhớ lại thay vì đọc lại, với khoảng cách giãn dần. Hai cơ chế này là lý do tồn tại của thẻ ghi nhớ ở \ptr{E/20}.}
+\end{traloi}
+
+\begin{dongian}
+Hỏi ``bạn có biết từ này không'' là một câu hỏi kém, vì biết một từ không phải chuyện có hay không mà là chuyện biết \emph{bao nhiêu phần}.
+
+Hãy nghĩ tới việc quen một người. Biết tên là một chuyện. Biết họ làm nghề gì, hay đi với ai, nói năng kiểu trang trọng hay xuề xoà, thường xuất hiện ở đâu --- đó mới là quen. Với một từ cũng vậy: bạn cần biết nó đi với những từ nào, thuộc loại văn bản nào, và mang thái độ gì. Ghi ``significant = đáng kể'' vào sổ giống như ghi mỗi cái tên rồi bảo mình đã quen người đó.
+
+Còn về số lượng, có một con số đáng nhớ: để đọc trôi chảy, bạn cần biết khoảng 98\% số từ trên trang, tức cứ 50 từ mới có một từ lạ. Nghe thì cao, nhưng hãy thử: nếu cứ năm từ có một từ lạ --- tức là bạn ``biết 80\%'' --- thì mỗi dòng có vài chỗ hổng và bạn không đọc nổi.
+
+Tin tốt là với tài liệu chuyên ngành, bạn tới ngưỡng đó nhanh hơn nhiều so với đọc tiểu thuyết. Lý do rất đơn giản: bài báo trong ngành bạn dùng đi dùng lại một tập từ hẹp, và phần lớn từ kỹ thuật thì bạn đã hiểu khái niệm sẵn bằng tiếng Việt --- chỉ cần gắn nhãn tiếng Anh vào. Vì vậy chiến lược tốt nhất là đọc \emph{hẹp}: mười bài về cùng một chủ đề, thay vì mười bài mười chủ đề khác nhau. Từ sẽ tự lặp lại, và mỗi lần lặp bạn nhặt thêm một mảnh.
+
+Cuối cùng, đừng chờ nhớ được từ chỉ nhờ đọc. Hãy dùng nó: viết một câu về đúng công việc của bạn có chứa từ đó. Một câu tự viết bằng mười lần đọc lướt.
+\motcau{Biết một từ không phải chuyện có hay không, mà là chuyện bạn đã có bao nhiêu mảnh trong chín mảnh.}
+\chuadongian{Con số ``mười tới hai mươi lần gặp'' chỉ là khoảng ước lượng; nó thay đổi mạnh theo từ, theo ngữ cảnh và theo mức chú ý của bạn.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Chín mặt của việc biết một từ}{Hình thức (nghe, viết, bộ phận cấu tạo); nghĩa (hình thức--nghĩa, phạm vi khái niệm, liên tưởng); sử dụng (ngữ pháp và giới từ, kết hợp từ, văn vực). Mỗi mặt có chiều bị động và chủ động.}
+\ar[3]{Bốn thành phần tối thiểu của một mục sổ từ}{Câu thật giữ nguyên ngữ cảnh; nghĩa bằng tiếng Anh đơn giản; hai ba kết hợp từ; ghi chú văn vực hoặc ngữ pháp bất thường.}
+\ar[3]{Ngưỡng độ phủ}{98\% để đọc không cần trợ giúp; 95\% thì hiểu đại ý nhưng phải đoán liên tục; 80\% (2000 họ từ) là không đọc nổi.}
+\ar[3]{Vì sao đọc trong ngành dễ hơn}{Chủ đề hẹp, từ lặp lại nhiều, ít thành ngữ; từ kỹ thuật ứng với khái niệm đã biết nên gánh nặng học nhẹ.}
+\ar[3]{Ba nhóm từ và chiến lược}{2000--3000 họ từ thông dụng (bắt buộc); \(\approx\)570 họ từ học thuật (lợi ích trên công sức cao nhất); vài trăm tới hai nghìn từ kỹ thuật của ngành bạn.}
+\ar[3]{Đọc hẹp}{Mười bài cùng một chủ đề thay vì mười chủ đề: từ tự lặp lại trong ngữ cảnh khác nhau --- điều kiện để một từ thành của bạn.}
+\ar[2]{Bị động so với chủ động}{Đọc chỉ cần tầng nghĩa quy chiếu; viết cần cả ba tầng. Muốn chuyển sang chủ động thì phải \emph{sản xuất}: viết lại câu, viết câu về công việc mình.}
+\ar[2]{Số lần gặp để học một từ}{Thường mười tới hai mươi lần trong ngữ cảnh; mỗi lần thêm một mảnh trong chín mặt.}
+\ar[2]{Hai cách rút ngắn}{Chú ý có chủ đích (dừng một giây, hỏi từ này đi với gì); truy xuất có ngắt quãng (tự nhớ lại, khoảng cách giãn dần).}
+\ar[2]{Vì sao học theo danh sách chủ đề kém}{Các từ gần nghĩa gây nhiễu lẫn nhau; và học ngoài ngữ cảnh chỉ điền được ô hình thức--nghĩa.}
+\ar[2]{Họ từ là gì}{Từ gốc cùng các dạng biến đổi và phái sinh dễ đoán; mọi con số về vốn từ đều tính theo họ, không theo dạng.}
+\ar[1]{8000--9000 họ từ}{Mức cần để đạt 98\% với văn bản phổ thông (tiểu thuyết, báo chí) --- lớn hơn nhiều so với mức cần cho tài liệu trong một ngành hẹp.}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Làm sao biết vốn từ hiện tại của tôi khoảng bao nhiêu?}{Có các bài kiểm tra kích thước vốn từ được thiết kế theo mức tần suất: chúng lấy mẫu từ ở mỗi nghìn từ thông dụng và ước lượng bạn biết bao nhiêu phần trăm mỗi mức. Kết quả chỉ là ước lượng thô, nhưng nó trả lời được câu hữu ích hơn: bạn đang thiếu ở \emph{mức nào}. Nếu thiếu ở hai nghìn đầu thì ưu tiên là từ thông dụng; nếu hai nghìn đầu đã vững thì chuyển sang từ học thuật và từ ngành --- đúng thứ tự ở mục 4.}
+\qa{Tôi nên học bao nhiêu từ mới mỗi ngày?}{Ít hơn bạn nghĩ và đều hơn bạn nghĩ. Năm tới mười từ mỗi ngày, học kỹ theo bốn thành phần ở khối \emph{Cần nhớ}, cộng với ôn lại các từ cũ, là nhịp bền được lâu. Ba mươi từ mỗi ngày cho cảm giác tiến nhanh nhưng phần lớn sẽ rơi rụng vì bạn không có thời gian gặp lại chúng đủ số lần cần thiết. Nhớ rằng phần lớn việc học từ xảy ra khi \emph{đọc}, không phải khi ngồi trước thẻ ghi nhớ; thẻ chỉ để giữ lại những gì đã gặp.}
+\qa{Có nên học danh sách từ học thuật một cách hệ thống không?}{Có, và đây là ngoại lệ đáng giá nhất cho lời khuyên ``đừng học theo danh sách''. Lý do: nhóm này nhỏ (khoảng 570 họ), dùng được ở mọi ngành, và chúng là các từ nối lập luận nên hiểu chúng cải thiện ngay khả năng đọc. Cách làm tốt: học theo từng nhóm nhỏ, nhưng luôn kèm câu thật lấy từ tài liệu bạn đang đọc, không dùng câu ví dụ chung chung.}
+\qa{Từ kỹ thuật trong ngành tôi nên học tiếng Anh hay giữ tiếng Việt?}{Nên nắm cả hai nhưng ưu tiên dạng tiếng Anh cho việc đọc và viết chuyên môn, vì tài liệu và trao đổi quốc tế đều dùng dạng đó. Điều cần cẩn thận là những từ có bản dịch tiếng Việt \emph{không khớp hoàn toàn}: bản dịch quen thuộc có thể hẹp hơn hoặc rộng hơn nghĩa gốc, và bạn sẽ mang theo hiểu nhầm đó khi đọc. Cách kiểm: tìm định nghĩa tiếng Anh trong một tài liệu chuẩn của ngành và so với khái niệm bạn đang có.}
+\qa{Tôi quên từ rất nhanh dù đã ghi vào sổ. Vấn đề ở đâu?}{Gần như luôn ở hai chỗ. Thứ nhất, mục ghi quá nghèo: chỉ có từ và nghĩa, nên không có gì để móc vào trí nhớ. Thứ hai, không có truy xuất: bạn \emph{đọc lại} sổ thay vì \emph{tự nhớ lại}. Hai kết quả vững nhất trong nghiên cứu trí nhớ nói rằng tự kiểm tra hiệu quả hơn đọc lại, và khoảng cách giãn dần hiệu quả hơn ôn dồn\cite{roediger2006,cepeda2006}. Sửa hai chỗ đó trước khi đổi công cụ.}
+\qa{Đọc sách phân cấp cho người học có đáng không, hay nên đọc thẳng tài liệu thật?}{Tuỳ độ phủ hiện tại của bạn với loại văn bản đó. Nếu bạn phải tra hơn năm từ mỗi trăm từ thì tài liệu quá khó để học ngôn ngữ từ nó --- bạn sẽ mất mạch và không đoán được nghĩa từ ngữ cảnh. Lúc đó sách phân cấp hoặc bài viết phổ thông về đúng chủ đề của bạn là bước đệm hợp lý. Nếu tra dưới hai từ mỗi trăm từ thì hãy đọc thẳng tài liệu thật, vì nó cho bạn đúng thứ từ vựng bạn cần.}
+\qa{Vốn từ bao nhiêu là đủ để viết bài báo tiếng Anh?}{Ít hơn nhiều so với để đọc, nhưng phải \emph{sâu} hơn. Viết học thuật dùng một tập từ khá hẹp và lặp lại --- các động từ báo cáo, các từ nối, các cụm cố định của thể loại. Cái quyết định không phải số lượng mà là bạn có biết mỗi từ đi với giới từ nào, mẫu câu nào, và mức cam kết nào không. Vì vậy chiến lược cho viết là: chọn khoảng vài trăm cụm dùng đi dùng lại trong ngành bạn, học chúng tới mức chủ động, và bồi dần. Phần C của quyển sách này xây trực tiếp trên tập đó.}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Chọn 10 từ trong sổ từ cũ và kiểm xem bạn có bao nhiêu trong chín mặt}{Sổ của bạn}{Kết quả thường gây bất ngờ và cho biết cần bổ sung gì.}
+\bt[1]{Viết lại 10 mục sổ từ theo bốn thành phần ở khối \emph{Cần nhớ}}{Sổ của bạn}{Câu thật, nghĩa bằng tiếng Anh, kết hợp từ, ghi chú văn vực.}
+\bt[2]{Đo độ phủ của bạn với một trang tài liệu ngành}{Tài liệu của bạn}{Đếm số từ lạ trong 100 từ liên tiếp; dưới 2 là tốt, trên 5 là tài liệu quá khó để học ngôn ngữ từ nó.}
+\bt[2]{Đọc hẹp: chọn một chủ đề và đọc năm bài về nó trong một tuần}{Tài liệu ngành}{Ghi lại những từ xuất hiện ở từ ba bài trở lên --- đó chính là từ vựng lõi của chủ đề.}
+\bt[2]{Lấy 20 từ học thuật hay gặp và tìm câu thật chứa chúng trong bài báo của ngành bạn}{\cite{coxhead2000}}{Không dùng câu ví dụ chung chung; câu phải lấy từ tài liệu thật.}
+\bt[3]{Chuyển 10 từ từ bị động sang chủ động}{Bài tập viết}{Với mỗi từ, viết một câu về đúng công việc của bạn; kiểm kết hợp từ bằng kho ngữ liệu\cite{coca}.}
+\bt[3]{Lập danh sách từ kỹ thuật lõi của ngành bạn (100--200 từ)}{Tài liệu ngành}{Kèm định nghĩa tiếng Anh lấy từ một nguồn chuẩn, không tự dịch từ tiếng Việt.}
+\bt[3]{Thiết kế bộ thẻ ghi nhớ đầu tiên cho 30 từ, theo hướng dẫn ở \ptr{E/20}}{Bài tập công cụ}{Mặt trước là câu có chỗ trống, không phải từ đơn lẻ.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Chương này cho hai thứ dùng được ngay: danh sách chín mặt để biết mình còn thiếu gì khi học một từ, và các con số về độ phủ để lập kế hoạch thay vì học theo cảm giác. Kết luận thực dụng nhất: với người đọc tài liệu chuyên ngành, thứ tự ưu tiên là từ học thuật rồi tới từ kỹ thuật của ngành, và chiến lược đọc hẹp rút ngắn con đường rất nhiều.
+
+Nhưng biết từ chưa đủ để đọc được những câu dài bốn dòng trong một bài báo. Chương \ptr{A/03} cấp lượng ngữ pháp tối thiểu cho việc đó --- không phải để làm bài tập ngữ pháp, mà để tách một câu phức thành mệnh đề chính cộng các phần bổ nghĩa, và để đọc ra thông tin mà thì, thể và cách dùng danh hoá đang mang.
+\end{document}

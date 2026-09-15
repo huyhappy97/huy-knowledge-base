@@ -1,0 +1,17 @@
+% Bản đồ chương 18 — cập nhật 2026-09-03
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ chương 18 --- Pretraining, transfer và mô hình nền tảng}
+
+Chương này trả lời một câu hỏi duy nhất --- \emph{tín hiệu giám sát miễn phí lấy từ đâu, và mua bao nhiêu thì đủ} --- nhưng câu hỏi đó có hai nửa dùng hai loại lập luận khác nhau, nên chương chia làm hai mục và thứ tự đọc là bắt buộc.
+
+\textbf{18.1 --- Nguồn giám sát ngày càng rẻ} \T{3} \emph{(cốt lõi)}. Chuỗi bốn nguồn giám sát xếp theo chi phí giảm dần: nhãn của người khác (transfer learning và bảng bốn ô quyết định), chính bức ảnh (ba triết lý tự giám sát và ba cách chống sụp khác nhau), văn bản đi kèm ảnh (CLIP và ngữ nghĩa mở), và cuối cùng là ghép thị giác vào một LLM (VLM). Đây là mục phải nắm chắc: nó là tiền đề trực tiếp của open-vocabulary detection ở chương 14 và của mọi quyết định chọn backbone về sau. Điểm cần mang theo là cột ``hỏng khi nào'' của bảng ba họ tự giám sát, và ý thức rằng mỗi bất biến bạn ép vào augmentation là một loại thông tin bạn cố tình vứt đi.
+
+\textbf{18.2 --- Kinh tế học của pretraining} \T{2}\T{3} \emph{(cốt lõi phần nguyên lý, tham khảo phần con số)}. Mặt định lượng: scaling laws cho phép ngoại suy thay vì thử mù; bài học Chinchilla cho thấy cả ngành đã thổi tham số mà quên dữ liệu; chất lượng corpus thắng số lượng; contamination phá huỷ hiệu lực của mọi benchmark công khai; PEFT/LoRA đổi hoàn toàn kinh tế học của việc thích nghi; và quyết định cuối cùng luôn là thí nghiệm điểm giao trên dữ liệu của chính bạn. Nguyên lý ở đây thuộc tầng bền (\T{2}); các hằng số cụ thể --- tỉ lệ 20 token trên tham số, hạng LoRA hợp lý --- thì không, và nên tra lại thay vì nhớ.
+
+\textbf{Vì sao chia như vậy.} Mục 18.1 trả lời ``có những gì và nó giả định gì''; mục 18.2 trả lời ``tiêu bao nhiêu vào đâu''. Nếu gộp lại, phần định lượng sẽ nuốt mất phần định tính --- người đọc nhớ con số mà quên cơ chế. Mục 18.2 dùng lại từ vựng của 18.1 (linear probe, fine-tune, mô hình nền tảng) như đã biết, nên đọc ngược sẽ vấp.
+
+\textbf{Phụ thuộc lên trên.} \ptr{B/06-chat-luong-du-lieu} (vì sao nhãn đắt và bẩn), \ptr{B/07-chia-du-lieu-va-danh-gia} (vì sao contamination là vấn đề chết người), \ptr{B/09-thiet-ke-ham-mat-mat} (contrastive loss), \ptr{C/13-kien-truc-backbone/03-vit-va-inductive-bias} (vì sao ViT cần pretraining lớn).
+
+\textbf{Toả xuống dưới.} \ptr{C/14-bai-toan-cv-loi} kế thừa trực tiếp không gian nhúng CLIP; \ptr{D/20-toi-uu-va-nen-mo-hinh} và \ptr{D/21-inference-va-trien-khai} nhận lấy mô hình nền tảng như một ràng buộc phải nén; \ptr{E/24-thi-nghiem-va-ablation} dạy cách chạy thí nghiệm điểm giao mà không tự lừa mình.
+\end{document}

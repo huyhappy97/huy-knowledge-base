@@ -1,0 +1,17 @@
+\documentclass[../marker.tex]{subfiles}
+\begin{document}
+\part{FRAMEWORK VÀ CÔNG CỤ}
+\begin{tomtat}
+Phần D là tầng công cụ: thư viện phát hiện marker, các API PnP và ý nghĩa chính xác của từng cờ, hộp công cụ hiệu chuẩn, thư viện visual servoing, công cụ photogrammetry để đo constellation, và công cụ đánh giá. Nó được đặt gần cuối vì nó \emph{hết hạn nhanh nhất} --- một API đổi tên, một hàm mới xuất hiện, và chương này sai. Nếu chỉ nhớ một điều: trong toàn bộ danh sách, hàm có giá trị cao nhất cho bài toán docking là \code{solvePnPGeneric}, vì nó trả về \emph{nhiều nghiệm kèm sai số tái chiếu của từng nghiệm} --- tức là nó đưa thẳng cho bạn đại lượng cần để đo ambiguity, thứ mà mọi API PnP khác giấu đi.
+\end{tomtat}
+
+Có một cách dùng Phần~D làm nó có giá trị hơn hẳn một danh sách phần mềm, và tôi khuyến nghị nó: \emph{đọc mã nguồn như một phép kiểm tra xem mình đã hiểu lý thuyết đúng chưa}. Cụ thể, có đúng ba tệp đáng đọc thật sự trong toàn bộ hệ sinh thái marker. Tệp \code{apriltag\_pose.c} của \repo{apriltag} cho thấy IPPE và hai nghiệm được cài ra sao và nó tính tỉ số sai số tái chiếu như thế nào --- tức toàn bộ chương~4 và chương~10 gói trong vài trăm dòng. Phần \code{objdetect} của \repo{OpenCV} cho thấy ArUco và ChArUco khác nhau ở đúng chỗ nào, và vì sao ChArUco có thêm một bước tinh chỉnh mà ArUco không có --- tức chương~7 và chương~8. Và hàm \code{solvePnPGeneric} cho thấy cái mà cả chương~3 gọi là ``tập nghiệm'' trông thế nào khi nó là một mảng thật.
+
+Hai chương của phần này chia theo một ranh giới đơn giản. Chương~17 nói về thứ nằm trong vòng lặp thời gian thực: detector và bộ giải PnP --- những thứ chạy ở mỗi khung hình. Chương~18 nói về thứ chạy một lần rồi cho ra một tệp tham số hoặc một con số nghiệm thu: hiệu chuẩn, hand-eye, photogrammetry, visual servoing framework, đánh giá quỹ đạo. Ranh giới ấy cũng gần trùng với ranh giới ``thứ bạn phải tự cài'' và ``thứ bạn nên dùng đồ có sẵn''.
+
+Cảnh báo về thời hạn áp cho cả phần: nội dung chốt tại \textbf{tháng 9/2026}. Các tên hàm, tên cờ và cấu trúc module ở đây đúng tại thời điểm ấy và cần rà lại mỗi sáu tháng. Phần lý thuyết ở Phần~A tới~C thì không có vấn đề này --- hình học phối cảnh không đổi phiên bản.
+\subfile{00-map}
+\subfile{17-thu-vien-va-detector/thu-vien-va-detector}
+\subfile{18-cong-cu-calib-servo-va-do-dac/cong-cu-calib-servo-va-do-dac}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

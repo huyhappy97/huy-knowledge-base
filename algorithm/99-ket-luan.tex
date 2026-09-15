@@ -1,0 +1,58 @@
+% ============================================================================
+%  99-ket-luan.tex — kết luận toàn cây
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06
+% ============================================================================
+\documentclass[algorithm.tex]{subfiles}
+\begin{document}
+\chapter*{Kết luận: cây này nói gì, và dùng tiếp thế nào}
+\addcontentsline{toc}{chapter}{Kết luận}
+\markboth{Kết luận}{}
+
+\begin{tomtat}
+Phần kết này làm ba việc. Một, gom lại những sợi chỉ chạy xuyên suốt 28 chương --- có năm sợi, và chúng là thứ đáng nhớ hơn bất kỳ thuật toán riêng lẻ nào. Hai, nói rõ những gì quyển sách này \emph{không} làm và nên đọc gì để bù. Ba, hướng dẫn cách mở rộng cây khi bạn học thêm, để nó lớn lên cùng bạn thay vì trở thành một tài liệu đóng băng.
+\end{tomtat}
+
+\section*{Năm sợi chỉ xuyên suốt}
+
+Đọc lại 28 chương, có năm ý quay lại nhiều lần ở những chỗ rất khác nhau. Chúng là phần đáng mang theo nhất, vì thuật toán cụ thể thì tra được còn các ý này thì phải thấm.
+
+\emph{Sợi thứ nhất --- mọi lời giải nhanh bắt đầu từ một lời giải chậm.} Vét cạn không phải bước lùi mà là điểm xuất phát bắt buộc: nó buộc bạn phát biểu chính xác bài toán, nó làm trọng tài cho stress test, và quan trọng nhất, nó đổi câu hỏi mơ hồ ``giải thế nào'' thành câu hỏi sắc bén ``vì sao nó chậm''. Cả bảy chương còn lại của phần C đều là các câu trả lời cho câu hỏi thứ hai (\ptr{C/13}).
+
+\emph{Sợi thứ hai --- hãy dùng cấu trúc yếu nhất còn đủ dùng.} Heap rẻ hơn cây cân bằng vì nó chỉ biết ai nhỏ nhất. DSU gần như miễn phí vì nó chỉ trả lời hai câu hỏi. Băm nhanh hơn cây vì nó vứt bỏ thứ tự. Mỗi khả năng bạn đòi thêm đều có giá, và rất nhiều lời giải chậm là do đòi hỏi những khả năng không dùng tới (\ptr{B/07}--\ptr{B/11}).
+
+\emph{Sợi thứ ba --- khi trường hợp xấu phụ thuộc dữ liệu, hãy chuyển nó sang một nguồn ngẫu nhiên bạn kiểm soát.} Ý này xuất hiện năm lần: băm phổ dụng, treap, chốt quicksort, ước lượng cây quay lui, và cuối cùng được phát biểu thành nguyên lý ở \ptr{C/20}. Nó không phải sự cầu may mà là cách tước bỏ khả năng dự đoán của đối thủ.
+
+\emph{Sợi thứ tư --- mô hình chi phí quyết định thuật toán.} Cùng bài toán sắp xếp, đổi đơn vị chi phí từ ``phép so sánh'' sang ``lần chuyển khối'' thì lời giải tốt nhất đổi hình dạng. B-cây, cache-oblivious, thuật toán luồng dữ liệu, và cả sự khác biệt giữa thi đấu và hệ thống thời gian thực --- tất cả đều là hệ quả của việc đổi mô hình (\ptr{A/03}, \ptr{D/24}, \ptr{E/26}).
+
+\emph{Sợi thứ năm --- năng lực đến từ vòng phản hồi, không từ số giờ.} Bốn trường phái ở \ptr{A/02} khác nhau ở thước đo nhưng giống nhau ở chỗ ai cũng có một thước đo khách quan và ai cũng sửa cách làm theo kết quả đo. Với người học, vòng phản hồi ấy là chấm bài, stress test, nhật ký lỗi và upsolving --- và toàn bộ \ptr{E/28} chỉ là cách vận hành nó.
+
+\section*{Những gì quyển sách này không làm}
+
+Trung thực về giới hạn cũng là một phần của tài liệu tốt.
+
+Nó \emph{không} là tài liệu tra cứu đầy đủ. Nhiều thuật toán quan trọng chỉ được nhắc tên: cây Blossom cho ghép đôi tổng quát, link-cut tree, suffix automaton ở mức cài đặt, các thuật toán xấp xỉ chuyên sâu. Khi cần, hãy tra ở \cite{clrs2022} cho chứng minh chuẩn, \cite{skiena2020} cho việc nhận diện bài toán, và các nguồn cộng đồng như \cite{cpalgorithms} cho cài đặt.
+
+Nó \emph{không} thay được việc giải bài. Mỗi chương có bài tập vì lý do đó, và chương \ptr{E/28} nói thẳng rằng đọc mà không giải chỉ tạo cảm giác quen thuộc.
+
+Nó \emph{không} phủ các mảng gần kề: tối ưu hoá liên tục, học máy, lý thuyết mã, thuật toán phân tán ở mức sâu. Những chỗ đó được nhắc trong các bảng \emph{Liên hệ ngang}, đủ để bạn biết ranh giới nằm ở đâu và mở đúng cửa khi cần.
+
+Cuối cùng, nó không phủ \emph{thiết kế hệ thống} --- một chủ đề đủ lớn để có cây riêng, và các khái niệm chuẩn bị cho nó nằm rải ở \ptr{B/08}, \ptr{B/09}, \ptr{D/24} và \ptr{E/26}.
+
+\section*{Mở rộng cây này thế nào}
+
+Cây tri thức chỉ có giá trị nếu nó lớn lên cùng người viết. Bốn quy tắc để mở rộng mà không làm hỏng cấu trúc.
+
+\emph{Thêm chương mới thành thư mục, không thành file rời.} Mỗi chủ đề mới là một thư mục \code{NN-ten-chu-de} trong phần phù hợp, với một file \code{.tex} cùng tên. Khi một mục trong chương phình to tới mức có nhánh con riêng, hãy nâng nó thành thư mục con có \code{00-map.tex} của chính nó.
+
+\emph{Giữ nguyên khuôn của chương.} Tóm tắt, kiến thức nền, câu hỏi mở đầu, thân bài, gốc rễ, liên hệ ngang, trả lời câu hỏi, nói lại thật đơn giản, active recall, hỏi đáp, bài tập, kết chương. Khuôn này không phải nghi thức: mỗi khối phục vụ một chức năng học tập cụ thể, và bỏ khối nào thì mất chức năng đó.
+
+\emph{Cập nhật bản đồ khi thêm nội dung.} Mỗi \code{00-map.tex} nói nhánh gồm gì, vì sao chia như vậy, phụ thuộc ra sao, và phần nào cốt lõi. Thêm chương mà không cập nhật bản đồ thì cây trở lại thành một thư mục.
+
+\emph{Ghi ngày ôn gần nhất ở đầu file.} Dòng metadata ở đầu mỗi file có trường ``Ôn gần nhất'' vì một lý do thực dụng: sau một năm, bạn cần biết chương nào lâu chưa quay lại. Đó cũng là cách rẻ nhất để vận hành lịch ôn ngắt quãng ở \ptr{E/28}.
+
+\section*{Một câu cuối}
+
+Quyển sách này mở đầu bằng nhận xét rằng khi bí, cái thiếu hầu như không bao giờ là một thuật toán chưa từng nghe tên. Sau 28 chương, nhận xét đó vẫn đúng --- chỉ là bây giờ bạn có công cụ cụ thể để thay thế: một quy trình để chạy khi chưa biết làm gì, hai thước đo để tự chấm ý tưởng trước khi gõ code, một bộ khuôn tư duy để sinh lời giải, và một vòng phản hồi để mỗi lần sai đều đổi được thành một thứ dùng lại được.
+
+Phần còn lại không nằm trong sách. Nó nằm ở việc sáng mai bạn có mở một bài ra hay không.
+\end{document}

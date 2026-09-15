@@ -1,0 +1,234 @@
+% ---------------------------------------------------------------------------
+% Chương 12, mục 3 — Tối ưu hoá và siêu tham số
+% Tạo: 2026-09-03  |  Sửa gần nhất: 2026-09-03  |  Ôn gần nhất: —
+% Phụ thuộc: C/12/01, C/12/02
+% Mức độ: cốt lõi — mục quan trọng nhất của chương về mặt kỹ năng thực hành.
+% ---------------------------------------------------------------------------
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Tối ưu hoá và siêu tham số (Optimization and Hyperparameters)}
+\ptrtarget{C/12-co-che-huan-luyen/03}\ptrtarget{C/12-co-che-huan-luyen/03-toi-uu-hoa}\ptrtarget{C/12/03}\ptrtarget{C/12/03-toi-uu-hoa}
+\dependency{\ptr{C/12/02-lam-cho-training-chay-duoc} (gradient phải lành mạnh trước khi bàn tới bước đi); \ptr{A/01-toan-toi-thieu} (số điều kiện, hội tụ của gradient descent).}
+
+\begin{tomtat}
+Mục này đọc bảy \en{optimizer} quen thuộc như một chuỗi vá lỗi liên tiếp chứ không như một menu lựa chọn, rồi chỉ ra siêu tham số nào thật sự quyết định kết quả. Đọc xong bạn nhìn một đường cong học và đoán được đang sai ở đâu, đặt được \en{learning rate} và lịch của nó có căn cứ thay vì mò, và giải thích được vì sao \en{mixed precision} cần \en{loss scaling}. Nếu chỉ nhớ một điều: optimizer chỉ định hình lại bước đi, nó không cứu được một learning rate sai --- nên hãy tune learning rate trước, batch size sau, và chọn optimizer cuối cùng.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mô hình (model)}{một hàm có tham số, nhận đầu vào và trả về dự đoán; huấn luyện là đi tìm bộ tham số làm dự đoán sát nhãn nhất.}
+\kn{gradient}{vectơ đạo hàm riêng của hàm mất mát theo từng tham số; nó chỉ hướng làm mất mát TĂNG nhanh nhất, nên mọi thuật toán ở đây đi ngược lại nó.}
+\kn{learning rate}{độ dài bước mà thuật toán tối ưu đi theo hướng ngược gradient ở mỗi lần cập nhật; quá lớn thì nghiệm bật ra ngoài, quá nhỏ thì hội tụ chậm tới mức vô dụng.}
+\kn{optimizer (thuật toán tối ưu)}{quy tắc biến gradient thành bước cập nhật thực tế; toàn bộ mục này là lịch sử bảy quy tắc như vậy và lý do từng cái ra đời.}
+\kn{siêu tham số (hyperparameter)}{con số do người đặt trước khi huấn luyện chứ không được học từ dữ liệu --- learning rate, batch size, cường độ weight decay.}
+\kn{bước và epoch (step / epoch)}{một ``bước'' là một lần cập nhật tham số dựa trên một lô dữ liệu; một ``epoch'' là khi mô hình đã đi hết toàn bộ tập huấn luyện một lượt.}
+\kn{weight decay}{cơ chế kéo các trọng số về gần \(0\) sau mỗi bước, nhằm hạn chế mô hình bám quá sát dữ liệu huấn luyện; cách nó được cài đặt là toàn bộ khác biệt giữa Adam và AdamW.}
+\kn{fp32, fp16, bf16}{ba định dạng số thực với số bit khác nhau. Điều quan trọng không phải ``bao nhiêu bit'' mà là bit đó chia thế nào giữa \emph{mũ} (quyết định dải giá trị biểu diễn được) và \emph{định trị} (quyết định độ chính xác).}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Giả sử gradient đã tính đúng và không còn chết hay nổ. Câu hỏi còn lại nghe rất đơn giản: biết hướng dốc rồi thì đi bao xa? Nhưng nó khó vì ba lý do chồng lên nhau. Thứ nhất, mặt mất mát bị điều kiện xấu --- có hướng dốc gấp trăm lần hướng khác, nên một bước dài theo hướng này là bước ngắn vô vọng theo hướng kia. Thứ hai, gradient bạn có không phải gradient thật mà là ước lượng từ một minibatch, nên nó nhiễu. Thứ ba, mọi thứ phi lồi, nên không có lý thuyết nào nói cho bạn bước đi tối ưu.
+
+Toàn bộ lịch sử \en{optimizer} trong deep learning là câu trả lời cho ba khó khăn ấy, và nó là ví dụ tốt nhất trong tài liệu này về việc \emph{một danh sách thực ra là một mạch lập luận}. Bảy cái tên dưới đây thường được dạy như bảy lựa chọn ngang hàng trong một menu. Chúng không ngang hàng: mỗi cái ra đời để sửa một khiếm khuyết cụ thể của cái trước, và mỗi cái tạo ra một khiếm khuyết mới cho cái sau. Nếu bạn đọc được mạch đó thì bạn không cần nhớ công thức, vì bạn suy lại được chúng; nếu bạn chỉ nhớ danh sách thì bạn sẽ chọn optimizer theo thói quen và không bao giờ biết mình đang trả giá gì.
+
+\begin{trucgiac}
+Momentum thường được kể bằng ẩn dụ hòn bi lăn xuống dốc, nhưng ẩn dụ đó không nói cho bạn biết \emph{vì sao} nó hiệu quả. Cách nhìn đúng hơn với người đã lọc tín hiệu IMU: chuỗi gradient theo thời gian là một tín hiệu, và momentum là một bộ lọc thông thấp một cực đặt lên tín hiệu đó. Trong một rãnh hẹp, thành phần vuông góc với rãnh đổi dấu mỗi bước --- đó là thành phần tần số cao, và bộ lọc dập nó. Thành phần dọc theo rãnh giữ nguyên dấu qua nhiều bước --- đó là thành phần một chiều, và bộ lọc để nó cộng dồn tới hệ số \(1/(1-\mu)\). Momentum không ``thêm quán tính''; nó tách tín hiệu khỏi dao động, đúng như khi bạn lọc bias con quay ra khỏi rung động khung máy.
+\end{trucgiac}
+
+\subsection{B. Bảy bước của một mạch lập luận duy nhất (SGD \(\rightarrow\) AdamW)}
+Trước khi vào mạch, hãy cố định một con số để có cảm giác về mức độ nghiêm trọng. Với một mặt bậc hai có số điều kiện \(\kappa\), gradient descent hội tụ với hệ số \(\left(\frac{\kappa-1}{\kappa+1}\right)\) mỗi bước. Với \(\kappa = 1000\), hệ số đó là \(0{,}998\), nên cần khoảng \(350\) bước chỉ để giảm sai số một nửa. Mọi thứ trong mạch dưới đây là những cách khác nhau để không phải trả cái giá đó.
+\lk{A/01}{tiền đề}{số điều kiện và hệ số hội tụ của gradient descent trên mặt bậc hai là kết quả chuẩn của giải tích số}
+
+\begin{mach}[Mạch 1 --- tiến hoá của optimizer]
+\item \vd{gradient descent ngẫu nhiên đi zigzag trong rãnh hẹp và bò rất chậm theo hướng thoải.} \gp \vn{hạ gradient ngẫu nhiên}{stochastic gradient descent, SGD}, \(\theta \leftarrow \theta - \eta g\), là khởi điểm và cũng là chuẩn so sánh; ưu điểm thật của nó là nhiễu \en{minibatch} đóng vai trò \vn{chính quy hoá ngầm}{implicit regularization}. \gia bước học \(\eta\) phải nhỏ hơn nghịch đảo độ cong lớn nhất để không phân kỳ, nên nó tự động quá nhỏ cho mọi hướng còn lại. \vdm tốc độ bị khoá vào \(\kappa\), và một giá trị \(\eta\) duy nhất phải phục vụ mọi tham số trong mạng.
+\item \vd{dao động vuông góc với rãnh làm phí gần hết công.} \gp \en{momentum}: \(v \leftarrow \mu v + g\), \(\theta \leftarrow \theta - \eta v\). Thành phần đổi dấu triệt tiêu trong tổng trượt, thành phần cùng dấu cộng dồn tới hệ số \(1/(1-\mu)\), tức gấp \(10\) lần khi \(\mu = 0{,}9\). \hq tốc độ hội tụ chuyển từ phụ thuộc \(\kappa\) sang phụ thuộc \(\sqrt{\kappa}\), một cải thiện có chứng minh cho trường hợp bậc hai. \vdm momentum đã tích luỹ không dừng lại được ngay: nghiệm bị vọt lố qua điểm cực tiểu, và trong một rãnh cong thì vọt lố nghĩa là văng ra thành.
+\item \vd{vọt lố vì gradient được đo ở nơi ta \emph{đang} đứng chứ không phải nơi ta \emph{sắp} tới.} \gp \en{Nesterov}: tính gradient tại điểm nhìn trước \(\theta - \eta\mu v\). Hiệu giữa gradient ở điểm nhìn trước và gradient tại chỗ là một xấp xỉ của số hạng bậc hai. Nó hoạt động như lực hãm tỉ lệ với tốc độ thay đổi của gradient, tức phanh trước khi đâm vào thành chứ không sau. \gia thêm một lần bookkeeping, thường được cài bằng phép đổi biến nên chi phí thực tế bằng không. \vdm vẫn còn nguyên vấn đề gốc: một \(\eta\) chung cho tất cả tham số.
+\item \vd{các tham số có độ lớn gradient lệch nhau hàng bậc, nên không tồn tại một \(\eta\) đúng cho tất cả.} \gp \en{AdaGrad}: tích luỹ \(G \leftarrow G + g^2\) theo từng toạ độ và bước theo \(\eta\, g/(\sqrt{G}+\varepsilon)\). Tham số hiếm được cập nhật nhận bước lớn, tham số hay được cập nhật nhận bước nhỏ; ý tưởng sinh ra từ các bài toán lồi thưa và rất hợp lý ở đó. \vdm \(G\) là một tổng đơn điệu tăng, nên bước học hiệu dụng tắt dần về \(0\). Trong một bài toán lồi thì đó là tính năng; trong một mạng sâu chạy hàng trăm nghìn bước thì đó là cái chết: mô hình ngừng học trong khi loss còn cao.
+\item \vd{mẫu số của AdaGrad nhớ quá lâu.} \gp \en{RMSProp}: thay tổng bằng trung bình trượt phân rã, \(G \leftarrow \beta G + (1-\beta)g^2\). Bộ nhớ trở thành hữu hạn với chân trời khoảng \(1/(1-\beta)\) bước, tức chừng \(1000\) bước khi \(\beta = 0{,}999\), nên bước học hiệu dụng không tắt. \vdm hướng đi vẫn là gradient thô nên vẫn nhiễu; và trung bình trượt khởi tạo từ \(0\) nên trong những bước đầu \(G\) bị đánh giá thấp, mẫu số quá nhỏ, bước đi quá dài đúng vào lúc mô hình dễ tổn thương nhất.
+\item \vd{cần cả hai: hướng đã lọc nhiễu \emph{và} thang bước riêng cho từng tham số.} \gp \en{Adam} \cite{kingma2015adam} giữ hai trung bình trượt: \(m\) cho gradient và \(v\) cho bình phương gradient. Nó hiệu chỉnh độ chệch bằng \(\hat m = m/(1-\beta_1^t)\) và \(\hat v = v/(1-\beta_2^t)\), rồi bước theo \(\eta\,\hat m/(\sqrt{\hat v}+\varepsilon)\). Hiệu chỉnh độ chệch không phải chi tiết trang trí. Ở bước \(t=1\) với \(\beta_1 = 0{,}9\) và \(\beta_2 = 0{,}999\), ta có \(m = 0{,}1g\) và \(\sqrt{v} = 0{,}0316|g|\). Bước chưa hiệu chỉnh vì thế dài gấp khoảng \(3{,}2\) lần bước mong muốn. \gia hai trạng thái phụ cho mỗi tham số: với mô hình \(100\) triệu tham số ở fp32, tổng bộ nhớ là \(4P\) cho trọng số, \(4P\) cho gradient và \(8P\) cho trạng thái, tức \(1{,}6\) GB trước khi tính một byte kích hoạt nào. \vdm hình phạt L2 cộng vào gradient bị chia cho \(\sqrt{\hat v}\) giống hệt phần còn lại, nên tham số nào có lịch sử gradient lớn thì bị suy giảm ít đi --- nó không còn là weight decay theo nghĩa ban đầu nữa.
+\item \vd{weight decay trong Adam không phải weight decay.} \gp \en{AdamW} \cite{loshchilov2019adamw} tách hẳn hai thứ: \(\theta \leftarrow \theta - \eta\big(\hat m/(\sqrt{\hat v}+\varepsilon) + \lambda\theta\big)\), tức phần suy giảm đi thẳng vào trọng số, không qua mẫu số thích nghi. \hq suy giảm trở lại thành một phép co đều, độc lập với độ lớn gradient, và đây là lý do AdamW là mặc định thực tế cho transformer lẫn cho các recipe CNN hiện đại. \gia \(\lambda\) không còn so sánh được với \(\lambda\) của Adam cũ, nên mọi giá trị chép từ code cũ đều sai thang. \vdm phần suy giảm nay tỉ lệ với \(\eta\), nên nó tương tác với lịch học: giảm \(\eta\) theo cosine thì cũng đang giảm dần cường độ chính quy hoá, một hiệu ứng ít người nói ra.
+\end{mach}
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  bx/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=5pt,font=\small,align=center},
+  bh/.style={draw=violetdark,fill=violetbg,rounded corners=2pt,inner sep=5pt,font=\small\bfseries,align=center},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center}]
+\node[bx] (sgd)  at (0,1.35)   {SGD};
+\node[bx] (mom)  at (3.2,1.35) {Momentum};
+\node[bx] (nes)  at (6.0,2.7)  {Nesterov};
+\node[bx] (ada)  at (3.2,-0.2) {AdaGrad};
+\node[bx] (rms)  at (6.0,-0.2) {RMSProp};
+\node[bh] (adam) at (9.2,0.9)  {Adam};
+\node[bh] (adaw) at (12.2,0.9) {AdamW};
+\draw[ar] (sgd) -- node[lb,above]{dập dao động\\ngang rãnh} (mom);
+\draw[ar] (mom) -- node[lb,above left=-2pt]{phanh sớm,\\bớt vọt lố} (nes);
+\draw[ar] (sgd.south) |- node[lb,below left=-2pt]{mỗi tham số\\một bước riêng} (ada.west);
+\draw[ar] (ada) -- node[lb,below]{mẫu số quên dần,\\LR không tắt về \(0\)} (rms);
+\draw[ar] (mom.east) to[out=-20,in=160] node[lb,above right=-1pt]{hướng đã lọc nhiễu} (adam.north west);
+\draw[ar] (rms.east) to[out=20,in=200] node[lb,below right=-1pt]{thang bước thích nghi} (adam.south west);
+\draw[ar] (adam) -- node[lb,above]{tách weight decay\\khỏi mẫu số} (adaw);
+\node[font=\scriptsize,color=steel,align=left,anchor=west] at (-1.2,3.0) {\textbf{Nhánh trên: sửa \emph{hướng đi}}};
+\node[font=\scriptsize,color=steel,align=left,anchor=west] at (-1.2,-1.1) {\textbf{Nhánh dưới: sửa \emph{độ dài bước}}};
+\end{tikzpicture}}
+\caption{Tiến hoá của optimizer không phải một chuỗi thẳng mà là hai nhánh độc lập rồi hợp lại. Nhánh trên sửa \emph{hướng} của bước đi bằng cách lọc nhiễu theo thời gian; nhánh dưới sửa \emph{độ dài} bước riêng cho từng tham số. Adam là chỗ hai nhánh gặp nhau, và AdamW là bản vá cho khiếm khuyết mà chính phép hợp nhất đó sinh ra. Mỗi mũi tên ghi đúng khiếm khuyết mà bước sau gỡ được.}
+\label{fig:tien-hoa-optimizer}
+\end{figure}
+
+Hình~\ref{fig:tien-hoa-optimizer} nên được nhìn trước khi đọc mạch bảy bước, vì nó cho thấy ngay điều mà đọc tuần tự khó thấy: Adam không phải ``bước tiến thứ sáu'' mà là phép hợp nhất hai dòng giải quyết hai vấn đề khác nhau, và đó cũng là lý do nó thừa hưởng nhược điểm của cả hai.
+
+Hai nhận xét khép lại mạch. Thứ nhất, hãy để ý rằng không bước nào trong bảy bước trên giải quyết vấn đề phi lồi; tất cả đều xử lý điều kiện xấu và nhiễu. Optimizer không tìm cực tiểu toàn cục và không hứa điều đó. Thứ hai, cả họ thích nghi có một cái giá chung ít được nêu: chúng \emph{che giấu} một learning rate sai. Adam với \(\eta\) lệch một bậc vẫn cho đường cong loss trông chấp nhận được, trong khi SGD với sai lệch tương tự thì phân kỳ ngay và bạn biết mình sai. Đây là lý do đáng giữ SGD với momentum làm phép thử chẩn đoán, ngay cả khi bản chạy cuối dùng AdamW.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[scale=1.12]
+\foreach \k in {0.30,0.55,0.78,1.0}{\draw[rulecol,thick] (0,0) ellipse ({4.3*\k} and {0.95*\k});}
+\draw[reddark,thick] (-3.8,0.20) -- (-3.45,-0.50) -- (-3.05,0.56) -- (-2.65,-0.56) -- (-2.25,0.58)
+  -- (-1.85,-0.55) -- (-1.45,0.52) -- (-1.10,-0.46) -- (-0.78,0.40) -- (-0.50,-0.30)
+  -- (-0.26,0.20) -- (-0.10,-0.09) -- (0,0);
+\draw[violetdark,thick,dashed] plot[smooth,tension=0.75] coordinates
+  {(-3.8,0.30) (-3.0,-0.30) (-2.0,0.16) (-1.1,-0.07) (-0.4,0.03) (0,0)};
+\fill[inkblue] (0,0) circle (1.6pt);
+\node[font=\scriptsize,color=inkblue,anchor=west] at (0.15,-0.18) {cực tiểu};
+\draw[reddark,thick] (-4.3,-1.55) -- (-3.8,-1.55);
+\node[font=\scriptsize,color=reddark,anchor=west] at (-3.7,-1.55) {SGD --- mỗi bước băng ngang rãnh, tiến rất chậm dọc rãnh};
+\draw[violetdark,thick,dashed] (-4.3,-1.95) -- (-3.8,-1.95);
+\node[font=\scriptsize,color=violetdark,anchor=west] at (-3.7,-1.95) {Momentum --- thành phần ngang triệt tiêu, thành phần dọc cộng dồn};
+\node[font=\scriptsize,color=steel,anchor=west] at (-4.3,-2.35) {Đường đồng mức của một mặt bậc hai điều kiện xấu, tỉ lệ trục khoảng \(4{:}1\)};
+\end{tikzpicture}
+\caption{Vì sao momentum thắng trong rãnh hẹp. Thành phần vuông góc với rãnh đổi dấu mỗi bước nên triệt tiêu trong tổng trượt; thành phần dọc rãnh giữ nguyên dấu nên cộng dồn. Tỉ lệ trục trong hình chỉ khoảng \(4{:}1\) cho dễ nhìn; trong mạng thật số điều kiện lớn hơn hai tới ba bậc, nên hiệu ứng mạnh hơn nhiều.}
+\label{fig:ranh-hep}
+\end{figure}
+
+Hình~\ref{fig:ranh-hep} là toàn bộ trực giác hình học của bước hai trong mạch, và cũng cho thấy vì sao Nesterov cần thiết: đường đứt nét vẫn vọt qua tâm ở lần tiếp cận đầu tiên nếu \(\mu\) đủ lớn.
+
+\subsection{C. Learning rate là siêu tham số quan trọng nhất, không có đối thủ}
+Nếu chỉ được tune một thứ, tune learning rate. Điều này nghe như khẩu hiệu, nhưng nó có cơ sở. \(\eta\) là đại lượng duy nhất nhân trực tiếp vào mọi bước cập nhật. Sai một bậc ở \(\eta\) đổi hẳn bản chất của quá trình; sai một bậc ở weight decay chỉ làm kết quả kém đi vài phần trăm. Kỹ năng đáng đầu tư nhất là nhận dạng \emph{hình dạng} đường cong học, vì nó tiết kiệm hàng tuần chạy thử: loss tăng vọt hoặc thành NaN trong vài chục bước là \(\eta\) quá cao rõ ràng; loss tụt rất nhanh rồi phẳng ở mức cao và nhiễu mạnh là \(\eta\) hơi cao, hệ đang nảy quanh một lòng chảo mà không xuống được; loss giảm gần như tuyến tính và không có dấu hiệu bão hoà sau nhiều epoch là \(\eta\) quá thấp. Cách rẻ nhất để định vị là chạy một lượt quét: tăng \(\eta\) theo cấp số nhân trong vài trăm bước và vẽ loss theo \(\eta\); vùng dốc nhất trước điểm nổ là vùng đáng dùng.
+
+\en{warmup} tăng \(\eta\) tuyến tính từ gần \(0\) lên giá trị đích, trong vài trăm tới vài nghìn bước. Thoạt nhìn nó là một thủ thuật tuỳ tiện. Thực ra nó có ít nhất hai lý do rõ ràng, và cả hai đều đã xuất hiện ở trên. Thứ nhất, mẫu số thích nghi của Adam ở những bước đầu được ước lượng từ rất ít mẫu, nên phương sai của \(\hat v\) rất lớn; một toạ độ vô tình có \(\hat v\) nhỏ sẽ nhận một bước khổng lồ và phá trọng số ngay khi chưa có gì để cứu. Thứ hai, thống kê chạy của BatchNorm chưa hội tụ trong vài trăm bước đầu, nên hàm mà bạn đang tối ưu vẫn còn đang thay đổi dưới chân. Warmup mua thời gian cho cả hai bộ ước lượng đó. \en{Lịch learning rate} thì giải quyết một vấn đề khác: SGD với \(\eta\) cố định không hội tụ về một điểm mà tiến tới một phân bố dừng có phương sai tỉ lệ với \(\eta\); giảm \(\eta\) là thu nhỏ bán kính quả cầu mà nghiệm đang lang thang trong đó. Ba lịch phổ biến là step decay, cosine annealing \cite{loshchilov2017sgdr} và one-cycle; khác biệt giữa chúng nhỏ hơn nhiều so với khác biệt giữa ``có lịch'' và ``không có lịch''.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.86\linewidth,height=5.2cm,
+  xlabel={tiến trình huấn luyện (tỉ lệ số bước đã chạy)}, ylabel={learning rate (tỉ lệ so với đỉnh)},
+  xmin=0,xmax=1.0, ymin=0, ymax=1.15,
+  legend style={font=\scriptsize,at={(0.98,0.97)},anchor=north east,draw=rulecol},
+  tick label style={font=\scriptsize}, label style={font=\scriptsize},
+  grid=major, grid style={rulecol,very thin}]
+\addplot[steel,thick] coordinates
+ {(0,0.03)(0.05,1.0)(0.10,0.98)(0.20,0.91)(0.30,0.80)(0.40,0.66)(0.50,0.51)
+  (0.60,0.36)(0.70,0.22)(0.80,0.11)(0.90,0.03)(1.0,0.0)};
+\addlegendentry{warmup \(+\) cosine annealing}
+\addplot[reddark,thick,const plot] coordinates
+ {(0,1.0)(0.4,1.0)(0.4,0.3)(0.7,0.3)(0.7,0.09)(1.0,0.09)};
+\addlegendentry{step decay}
+\addplot[violetdark,thick,dashed] coordinates
+ {(0,0.10)(0.35,1.0)(0.70,0.10)(0.85,0.02)(1.0,0.005)};
+\addlegendentry{one-cycle}
+\draw[tiercol,dashed] (axis cs:0.05,0) -- (axis cs:0.05,1.0);
+\node[font=\scriptsize,color=tiercol,anchor=west,rotate=90] at (axis cs:0.058,0.30) {hết warmup};
+\end{axis}
+\end{tikzpicture}
+\caption{Ba lịch learning rate trên cùng một trục. Điều hình cho thấy mà lời văn khó nói: chúng khác nhau ở \emph{chỗ} tiêu tiền, không ở tổng lượng. Step decay giữ nguyên bước dài rất lâu rồi cắt đột ngột. Cosine hạ liên tục nên tránh được cú sốc ở mỗi mốc cắt. One-cycle thì cố tình bắt đầu thấp và \emph{tăng} lên đỉnh ở giữa, để đi qua vùng nhiễu nhanh hơn. Đoạn dốc đứng ở đầu đường cosine là warmup: nó tồn tại vì bộ ước lượng \(\hat v\) của Adam và thống kê BatchNorm đều chưa đáng tin ở vài trăm bước đầu.}
+\label{fig:lich-learning-rate}
+\end{figure}
+
+Hình~\ref{fig:lich-learning-rate} cũng cho thấy vì sao so sánh hai bài báo dùng hai lịch khác nhau là việc rất dễ sai: hai mô hình cùng số epoch có thể đã trải qua hai quá trình rất khác nhau.
+
+
+
+\subsection{D. Đổi batch size thì đổi gì theo (linear scaling rule)}
+\vn{quy tắc tỉ lệ tuyến tính}{linear scaling rule} nói rằng nhân batch size lên \(k\) lần thì nhân learning rate lên \(k\) lần. Quy tắc này đã được kiểm chứng trên ImageNet với warmup đủ dài, tới batch \(8192\) \cite{goyal2017accurate}. Lập luận đơn giản: một bước với batch \(kB\) nên tiến xa bằng \(k\) bước với batch \(B\), và trung bình của \(k\) gradient liên tiếp xấp xỉ gradient của batch gộp khi trọng số chưa đổi nhiều.
+
+Nhưng nguyên nhân sâu hơn mới đáng nhớ, vì nó nói rằng đây không chỉ là chuyện tốc độ. Phương sai của gradient minibatch tỉ lệ nghịch với batch size, nên batch lớn cho gradient sạch hơn --- và nhiễu gradient chính là một dạng chính quy hoá ngầm. Batch quá lớn không chỉ ``khó tune hơn'': nó \emph{lấy đi} một nguồn chính quy hoá, và các quan sát trên ImageNet cho thấy vượt một ngưỡng nhất định thì độ chính xác kiểm thử tụt dù loss huấn luyện vẫn tốt \cite{keskar2017large}. Smith và Le đưa ra một cách nhìn thống nhất: giảm \(\eta\) và tăng batch size là hai cách làm cùng một việc, đều là giảm mức nhiễu \(\eta/B\) \cite{smith2018dont}. Cách nhìn đó giải thích cả linh cảm ``tăng batch thì phải tăng LR'', lẫn lý do quy tắc vỡ. Khi \(\eta\) đã lớn tới mức không tăng được nữa vì lý do ổn định, mối liên hệ đứt.
+\lk{C/12/04}{đối lập với}{nhiễu gradient vừa là thứ quy tắc tỉ lệ tuyến tính muốn bảo toàn, vừa là nguồn chính quy hoá ngầm mà batch lớn xoá mất}
+
+\subsection{E. Theo dõi sức khoẻ huấn luyện (training health), vì loss là chỉ báo quá chậm}
+Đường cong loss cho biết \emph{đã} có vấn đề, thường sau hàng nghìn bước. Ba phép đo dưới đây rẻ như nhau nhưng phát hiện sớm hơn nhiều, vì chúng đo trạng thái bên trong chứ không đo kết quả.
+
+\begin{itemize}
+\item \textbf{Tỉ lệ cập nhật trên trọng số} (\emph{update-to-weight ratio}), theo từng tầng: \(\|\eta\,\Delta\theta\|/\|\theta\|\).
+  \begin{itemize}
+  \item Kinh nghiệm thực hành phổ biến: khoảng \(10^{-3}\) là lành mạnh; trên \(10^{-2}\) là mỗi bước làm đổi trọng số vài phần trăm, tức quá lớn; dưới \(10^{-4}\) là tầng đó thực chất đang đứng yên.
+  \item Vì sao dùng nó thay cho chuẩn gradient thô: nó không thứ nguyên, nên so sánh được giữa các tầng có thang hoàn toàn khác nhau.
+  \end{itemize}
+\item \textbf{Phân bố kích hoạt theo chiều sâu} --- vẽ độ lệch chuẩn của kích hoạt từng tầng. Co dần theo chiều sâu là vanishing đang hình thành; phình lên là exploding. Đây chính là đại lượng \(\rho^{L}\) của mục trước, quan sát trực tiếp.
+\item \textbf{Tỉ lệ ReLU chết} --- phần trăm nơ-ron cho \(0\) trên toàn bộ một batch xác thực. Vài phần trăm là bình thường; ba mươi phần trăm ở một tầng nghĩa là \(\eta\) đã có lúc quá cao, kể cả khi hiện tại nó đã ổn.
+\end{itemize}
+
+Cả ba chỉ báo chỉ tốn vài dòng hook và nên được ghi lại mặc định, vì giá trị của chúng nằm ở chỗ chúng \emph{đi trước} loss chứ không đi sau.
+
+\subsection{F. Mixed precision: chuyện của dải động, không phải của độ chính xác}
+Chuyển sang \en{fp16} làm training ra NaN, và nguyên nhân thường bị hiểu nhầm là ``thiếu độ chính xác''. Thủ phạm thật là \emph{dải động}. fp16 có \(5\) bit mũ và \(10\) bit định trị, nên số chuẩn hoá nhỏ nhất là khoảng \(6{,}1\cdot 10^{-5}\) và số lớn nhất là \(65\,504\). Gradient trong mạng thị giác thường nằm quanh \(10^{-7}\) tới \(10^{-4}\); phần lớn phổ đó rơi xuống dưới ngưỡng chuẩn hoá của fp16 và bị làm tròn về \(0\). Mạng không nổ, nó \emph{tê liệt}: một phần các tầng đơn giản là không nhận được tín hiệu nào.
+
+Lời sửa của \en{loss scaling} \cite{micikevicius2018mixed} tinh tế ở chỗ nó không đụng vào định dạng số. Nhân loss với một hệ số \(S\) cỡ \(2^{16}\) trước khi gọi backward; vì backward tuyến tính theo adjoint đầu vào, mọi gradient bị nhân đúng \(S\) lần và cả phổ dịch lên vùng biểu diễn được; trước khi optimizer bước, chia gradient lại cho \(S\). Bản động của kỹ thuật này nhân \(S\) lên gấp đôi sau mỗi vài nghìn bước sạch và chia đôi ngay khi phát hiện inf hoặc NaN, bỏ luôn bước đó --- tức là nó tự dò biên trên của dải động. 
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[xscale=1.08,
+  lb/.style={font=\scriptsize,align=center},
+  tk/.style={font=\scriptsize,color=tiercol}]
+\draw[-{Latex[length=2mm]},thick,draw=inkblue] (-8.4,0) -- (5.4,0);
+\foreach \x/\t in {-8/{10^{-8}},-6/{10^{-6}},-4/{10^{-4}},-2/{10^{-2}},0/{10^{0}},2/{10^{2}},4/{10^{4}}}{
+  \draw[inkblue] (\x,0.08) -- (\x,-0.08);
+  \node[tk,below] at (\x,-0.12) {\(\t\)};}
+\node[font=\scriptsize,color=inkblue,anchor=west] at (4.6,-0.45) {độ lớn giá trị};
+% fp16 band
+\fill[bluebg,draw=steel,thick] (-4.21,0.32) rectangle (4.82,0.86);
+\node[lb,color=steel] at (0.3,0.59) {fp16 biểu diễn được: \(6{,}1\cdot10^{-5}\) tới \(65\,504\)};
+\draw[reddark,dashed,thick] (-4.21,0.2) -- (-4.21,2.6);
+\node[lb,color=reddark,anchor=east] at (-4.3,2.35) {dưới ngưỡng này\\fp16 làm tròn về \(0\)};
+% gradient band
+\fill[redbg,draw=reddark,thick] (-7.0,1.10) rectangle (-4.0,1.62);
+\fill[pattern=north east lines,pattern color=reddark] (-7.0,1.10) rectangle (-4.21,1.62);
+\node[lb,color=reddark,anchor=west] at (-3.85,1.36) {phổ gradient điển hình --- phần gạch chéo bị mất trắng};
+% scaled band
+\fill[redbg,draw=reddark,thick] (-2.18,1.95) rectangle (0.82,2.47);
+\node[lb,color=reddark,anchor=west] at (0.95,2.21) {sau khi nhân loss với \(2^{16}\): cả phổ nằm gọn trong dải fp16};
+\draw[-{Latex[length=2mm]},violetdark,very thick] (-5.4,1.70) to[out=70,in=180] (-2.3,2.21);
+\node[lb,color=violetdark] at (-5.0,2.30) {\(\times\,2^{16}\)};
+% bf16 / fp32
+\draw[{Latex[length=2mm]}-{Latex[length=2mm]},thick,draw=tiercol] (-8.3,3.0) -- (5.3,3.0);
+\node[lb,color=tiercol,anchor=south] at (-1.5,3.08) {bf16 và fp32 --- cùng \(8\) bit mũ, dải rộng hơn fp16 rất nhiều bậc về cả hai phía};
+\end{tikzpicture}}
+\caption{Vì sao fp16 làm huấn luyện ra NaN, và vì sao loss scaling chữa được. Trục là độ lớn giá trị theo thang log. Dải fp16 (nền xanh) không bao phủ phần dưới của phổ gradient điển hình, nên phần gạch chéo bị làm tròn về \(0\) --- mạng không nổ mà \emph{tê liệt}. Nhân loss với \(2^{16}\) dịch toàn bộ phổ sang phải mà không đổi hình dạng của nó, đưa cả phổ vào vùng biểu diễn được; chia lại trước bước cập nhật thì không mất gì. bf16 giải bài toán theo hướng khác: nó giữ nguyên số bit mũ của fp32 nên dải đủ rộng từ đầu, đổi lại chỉ còn \(7\) bit định trị.}
+\label{fig:dai-dong-fp16}
+\end{figure}
+
+Hình~\ref{fig:dai-dong-fp16} làm rõ một điểm mà hai chữ ``mixed precision'' che mất: vấn đề nằm ở \emph{vị trí} của phổ gradient so với dải biểu diễn được, không nằm ở số chữ số có nghĩa. Đó cũng là lý do lời sửa là một phép nhân vô hướng chứ không phải một thuật toán mới.
+
+\en{bf16} giải bài toán theo hướng khác: giữ \(8\) bit mũ như fp32 nên dải động y hệt fp32 và không cần loss scaling, đổi lại chỉ còn \(7\) bit định trị.
+
+Chính \(7\) bit định trị đó dẫn tới điểm kỹ thuật đáng nhớ nhất của cả mục. Độ chính xác tương đối của bf16 là khoảng \(2^{-8} \approx 4\cdot 10^{-3}\). Nhưng ta vừa nói tỉ lệ cập nhật trên trọng số lành mạnh là khoảng \(10^{-3}\). Nghĩa là bước cập nhật \emph{nhỏ hơn một đơn vị cuối cùng của trọng số}: nếu bạn cộng nó vào một trọng số lưu ở bf16, phép cộng làm tròn về đúng giá trị cũ và bước đi biến mất hoàn toàn. Đây là lý do mọi cài đặt mixed precision nghiêm túc giữ một bản \en{master weights} ở fp32 cho optimizer, dù forward và backward chạy ở nửa độ chính xác; và cũng là lý do bảng kế toán bộ nhớ không giảm một nửa như người ta hy vọng.
+\lk{D/20}{cùng nguyên lý với}{lượng tử hoá lúc suy luận hỏi đúng câu này: bit chia thế nào giữa mũ và định trị.} Cuối cùng, \vn{cắt ngưỡng gradient}{gradient clipping} theo chuẩn toàn cục là bắt buộc với RNN và thường cần với transformer: nó chặn bước đi khi mặt mất mát có vách dựng đứng, nơi gradient tại một điểm không còn nói gì đúng về hàm ở khoảng cách một bước.
+
+\subsection{G. Giới hạn và trường hợp hỏng}
+Linear scaling rule vỡ ở batch lớn, và nó vỡ theo kiểu khó phát hiện: loss huấn luyện vẫn đẹp, chỉ có độ chính xác kiểm thử tụt. Nếu bạn chỉ theo dõi loss huấn luyện, bạn sẽ kết luận rằng batch lớn hoạt động tốt.
+
+Loss scaling che giấu NaN thật. Bộ chia tỉ lệ động bỏ qua mọi bước có tràn số. Giả sử mô hình của bạn sinh NaN vì một lỗi thật, chẳng hạn chia cho \(0\) hoặc lấy \(\log\) của số âm. Bạn sẽ thấy một quá trình huấn luyện tưởng như bình thường, nhưng thực chất nó bỏ một tỉ lệ lớn số bước. Đáng ghi lại số bước bị bỏ như một chỉ báo riêng.
+
+Weight decay áp nhầm chỗ là lỗi phổ biến và tốn kém: các tham số \(\gamma, \beta\) của normalization và các bias không nên bị suy giảm, vì chúng không phải ``độ phức tạp'' theo nghĩa mà weight decay muốn phạt, và co chúng về \(0\) làm hỏng chính phép chuẩn hoá. Phần lớn recipe tốt loại các nhóm này ra khỏi decay một cách tường minh.
+
+Cuối cùng, những con số trong mục này thuộc ba mức tin cậy khác nhau và nên được đối xử khác nhau. Hệ số \(1/(1-\mu)\), tỉ lệ \(3{,}2\) của bước Adam đầu tiên, và các ngưỡng của fp16 là suy dẫn hoặc tra cứu, nên chắc chắn. Kết quả linear scaling tới batch \(8192\) là một phép đo đã công bố trên một cấu hình cụ thể, không phải một định luật. Còn ngưỡng \(10^{-3}\) cho tỉ lệ cập nhật trên trọng số chỉ là kinh nghiệm thực hành, được truyền lại rộng rãi. Tôi chưa thấy nghiên cứu hệ thống nào xác định lại nó cho các kiến trúc hiện đại. Hãy dùng nó như một cờ báo động, đừng dùng như mục tiêu để tối ưu.
+
+\begin{cambay}
+\code{torch.optim.Adam(..., weight\_decay=λ)} \emph{không} phải AdamW: nó cộng \(\lambda\theta\) vào gradient rồi cho cả cục đi qua mẫu số thích nghi, đúng cái lỗi mà AdamW sinh ra để sửa. Muốn weight decay tách rời thì phải dùng \code{AdamW}. Đây là lỗi mà rất nhiều code cũ vẫn mắc, và nó đặc biệt khó phát hiện. Hậu quả không phải một exception mà là điểm số thấp hơn vài phần trăm. Mức đó vừa đủ nhỏ để bạn đổ cho kiến trúc, vừa đủ lớn để mất một vị trí trên bảng xếp hạng.
+\end{cambay}
+
+\begin{cannho}
+Optimizer chỉ định hình lại bước đi; nó không cứu được một learning rate sai. Thứ tự đầu tư công sức: learning rate và lịch của nó trước, batch size cùng quy tắc tỉ lệ sau, chọn optimizer cuối cùng. Bảy cái tên trong mạch không phải bảy lựa chọn, mà là bảy lần vá liên tiếp trên cùng một vấn đề. \T{2}
+\end{cannho}
+
+\subsection{H. Kết nối}
+Mục này giả định gradient đã lành mạnh, tức giả định toàn bộ \ptr{C/12/02-lam-cho-training-chay-duoc}. Nó chuyển tiếp sang \ptr{C/12/04-tong-quat-hoa-va-chan-doan}. Ở đó, nhiễu gradient của quy tắc tỉ lệ tuyến tính được nhìn lại như một công cụ chính quy hoá. Cũng ở đó, bảng kế toán bộ nhớ của trạng thái Adam trở thành lý do tồn tại của ZeRO. Phần dải động của fp16 và bf16 là tiền đề trực tiếp cho \ptr{D/20-toi-uu-va-nen-mo-hinh} (lượng tử hoá), nơi cùng một câu hỏi được đặt cho suy luận thay vì cho huấn luyện, và cho \ptr{B/11-gioi-han-tinh-toan} về phía băng thông. Nếu bạn muốn thấy các lựa chọn trong mục này ảnh hưởng thế nào tới kết luận của một paper, \ptr{E/24-thi-nghiem-va-ablation} là chương nói rằng phần lớn ``cải tiến kiến trúc'' hoá ra là cải tiến lịch học.
+
+\begin{tukiem}
+\item Momentum sửa được gì mà SGD không làm được, và nó tạo ra vấn đề mới nào buộc Nesterov phải ra đời?
+\item AdaGrad và RMSProp khác nhau đúng một phép toán. Phép toán đó là gì, và vì sao khác biệt nhỏ ấy lại là ranh giới giữa ``dùng được cho mạng sâu'' và ``không dùng được''?
+\item Vì sao AdamW khác Adam cộng L2, và bạn kỳ vọng khác biệt thể hiện ở đại lượng đo được nào?
+\item Vì sao warmup cần thiết với Adam hơn là với SGD, nếu trả lời bằng tính chất của bộ ước lượng \(\hat v\)?
+\item Bạn tăng batch size gấp \(8\) và nhân learning rate lên \(8\); loss huấn luyện tốt hơn nhưng accuracy kiểm thử tụt \(1\) phần trăm --- hai cách giải thích là gì, và phép đo nào phân biệt chúng?
+\item Vì sao huấn luyện ở bf16 vẫn cần giữ trọng số fp32, dù bf16 có dải động bằng fp32?
+\item Đường cong học giảm nhanh rồi phẳng ở mức cao --- ba nguyên nhân khả dĩ là gì, và ba phép đo nào phân biệt chúng?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

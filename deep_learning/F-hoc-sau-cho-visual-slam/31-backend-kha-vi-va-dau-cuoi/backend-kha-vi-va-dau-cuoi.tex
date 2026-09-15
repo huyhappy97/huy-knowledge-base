@@ -1,0 +1,873 @@
+% ---------------------------------------------------------------------------
+% Chương 31 — Backend khả vi và hệ VO/SLAM đầu-cuối
+% Tạo: 2026-09-03  |  Sửa gần nhất: 2026-09-03  |  Ôn gần nhất: —
+% Phụ thuộc: F/27 (khung bốn cổng), A/01/02 (vi phân và tối ưu), C/15/03 (dòng quang)
+% Mức độ: CỐT LÕI cho ai muốn động vào backend; đọc lướt nếu chỉ quan tâm frontend.
+% Nỗi đau chạm tới: backend, trọng số đo lường, ảnh mờ (gián tiếp qua trọng số học được)
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Backend khả vi và hệ VO/SLAM đầu-cuối (Differentiable Backends and End-to-End Systems)}
+\ptrtarget{F/31}\ptrtarget{F/31-backend-kha-vi-va-dau-cuoi}
+\dependency{\ptr{F/27-dat-hoc-sau-vao-dau} (khung bốn cổng để quyết định có nên thay một khối); \ptr{A/01-toan-toi-thieu/02-vi-phan-va-toi-uu} (Gauss-Newton, Levenberg-Marquardt, quy tắc chuỗi); \ptr{C/15-thi-giac-khong-thoi-gian/03-flow-tracking-va-rang-buoc} (dòng quang và toán tử cập nhật hồi quy); \ptr{F/28-dac-trung-va-ghep-cap} là nửa frontend của cùng câu chuyện.}
+
+\begin{tomtat}
+Bạn đã thạo Gauss-Newton, Levenberg-Marquardt và đồ thị nhân tử. Chương này không dạy lại chúng. Nó nói về đúng một thứ mà chữ ``khả vi'' thêm vào: cho \en{gradient} chạy \emph{xuyên qua} lời giải của bài toán tối ưu, để những con số bạn đang đặt bằng tay được huấn luyện theo lỗi quỹ đạo cuối cùng. Đọc xong bạn viết được đạo hàm của một nghiệm \(\arg\min\) bằng định lý hàm ẩn, viết ra được công thức chi phí bộ nhớ của lượt ngược qua một lớp tối ưu, và đọc DROID-SLAM hay CodeSLAM mà biết ngay chỗ nào là hình học cũ, chỗ nào là phần học được. Nếu chỉ nhớ một điều: khả vi \emph{không} làm bộ giải tốt lên, nó chỉ biến các nút vặn thủ công thành tham số học được --- và cái giá là bộ nhớ lượt ngược, độ ổn định số ở đúng những khung hình khó, cùng gần hết khả năng chẩn đoán khi hệ hỏng.
+\end{tomtat}
+
+\begin{nentang}
+\kn{bài toán bình phương tối thiểu phi tuyến}{tìm \(x\) làm nhỏ nhất tổng bình phương của các phần dư \(r_i(x)\). Trong SLAM, \(x\) là tư thế và điểm bản đồ, còn \(r_i\) là sai lệch chiếu lại của một quan sát.}
+\kn{ma trận thông tin (information matrix)}{nghịch đảo hiệp phương sai của một phép đo, và cũng là trọng số của cạnh đó trong bài toán bình phương tối thiểu. Đặt lớn nghĩa là ``tôi tin phép đo này''.}
+\kn{Hessian \(H\)}{ma trận hệ phương trình chuẩn của Gauss-Newton, \(H=J^\top\!\Sigma^{-1}J\). Nghịch đảo của nó xấp xỉ hiệp phương sai của nghiệm, tức thứ bạn dùng khi biên hoá một khung hình.}
+\kn{tự do đo (gauge freedom)}{các hướng mà bài toán không xác định được. Dịch cả quỹ đạo đi một khoảng thì lỗi không đổi. Theo những hướng đó \(H\) suy biến, nên phải neo gốc toạ độ hoặc thêm damping.}
+\kn{damping \(\lambda\)}{số cộng vào đường chéo của \(H\) trong Levenberg-Marquardt. Nó vừa làm hệ khả nghịch, vừa rút ngắn bước đi khi mô hình tuyến tính hoá không đáng tin.}
+\kn{đạo hàm tự động (autodiff)}{kỹ thuật để máy tính đạo hàm của một chương trình bằng cách áp quy tắc chuỗi lên từng phép toán. \vn{lan truyền ngược}{backpropagation} là autodiff chạy theo chiều ngược.}
+\kn{lượt xuôi và lượt ngược}{lượt xuôi là một lần chạy mạng để ra kết quả; lượt ngược là một lần đi ngược để tính đạo hàm. Lượt ngược cần các giá trị trung gian của lượt xuôi, nên phải giữ chúng trong bộ nhớ.}
+\kn{tự giám sát (self-supervised)}{huấn luyện không cần nhãn do người tạo. Tín hiệu dạy đến từ chính dữ liệu, ví dụ ``dựng lại ảnh này từ ảnh kia thì phải khớp''.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Backend của bạn đã tối ưu tốt rồi. Vậy chữ ``khả vi'' còn thêm được gì, và nếu nó không làm Gauss-Newton hội tụ nhanh hơn thì nó bán cái gì?}
+\h{Đạo hàm của một nghiệm \(\arg\min\) theo tham số đầu vào tính được mà không cần lưu bước lặp nào. Vì sao lại có chuyện đó, và điều kiện nào phải đúng để nó không sai?}
+\h{Quyết định inlier hay outlier là một phép so sánh với ngưỡng, nên đạo hàm của nó bằng 0 gần như ở mọi nơi. Vậy một hệ đầu-cuối học cách loại điểm sai bằng cách nào?}
+\h{DROID-SLAM chính xác hơn hẳn nhiều hệ cổ điển trên \en{benchmark} công khai. Vì sao nó vẫn không phải lựa chọn cho một robot chạy Jetson Orin, và cái gì chặn nó?}
+\h{Nén cả bản đồ độ sâu vào 32 con số rồi tối ưu chung với tư thế nghe rất gọn. Ý tưởng đó ra đời năm 2018 và tới nay vẫn chưa thắng. Nó hỏng ở chỗ nào?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{F/31/01}
+Backend của bạn không hỏng. Nó tuyến tính hoá, nó dùng phần bù Schur, nó chạy nhân Huber, nó biên hoá khung hình cũ. Đưa cho nó các phần dư đúng và các trọng số đúng thì nó trả về nghiệm tốt nhất theo nghĩa bình phương tối thiểu. Vấn đề nằm ở chỗ khác: \textbf{ai quyết định các trọng số đó}.
+
+Hãy liệt kê thật cụ thể, trong một hệ kiểu ORB-SLAM3 \cite{campos2021orbslam3}:
+
+\begin{itemize}
+\item \textbf{Trọng số cạnh chiếu lại} --- ma trận thông tin là \(\sigma_\ell^{-2}I\), với \(\sigma_\ell\) suy từ hệ số tỉ lệ của kim tự tháp ORB. Nó chỉ phụ thuộc vào \emph{tầng} mà điểm được phát hiện. Nó không biết mảnh ảnh đó có bị mờ không, có nằm trên vệt loá không, có nằm trên một hoa văn lặp không.
+\item \textbf{Bề rộng nhân robust} --- ngưỡng \(\chi^2\) 5,991 cho cạnh hai bậc tự do và 7,815 cho cạnh ba bậc. Đây là phân vị 95\% của một giả định phân phối chuẩn, và giả định ấy hiếm khi được kiểm lại trên dữ liệu thật.
+\item \textbf{Nhiễu IMU} --- lấy từ tờ thông số cảm biến, cộng thêm một bước ngẫu nhiên cho độ trôi. Cùng một con số cho lúc đứng yên và lúc quay đầu 200 độ mỗi giây.
+\item \textbf{Các ngưỡng rời rạc} --- tỉ lệ khoảng cách mô tả, ngưỡng inlier của RANSAC, chính sách chèn khung then chốt.
+\end{itemize}
+
+Mọi con số trên đều trả lời cùng một câu hỏi: \emph{tôi nên tin phép đo này bao nhiêu}. Và mọi con số trên đều được đặt một lần, toàn cục, từ một tờ thông số hoặc một bài báo. Trong khi đó bạn có một đại lượng thật sự quan tâm ở cuối đường ống, là sai số quỹ đạo tuyệt đối. Giữa các nút vặn và đại lượng đó \textbf{không có đạo hàm nào}. Nên bạn đóng khoảng trống ấy bằng cách duy nhất còn lại: quét lưới, chạy lặp nhiều lần, đọc bảng. Đó chính là lý do tồn tại của mọi \en{benchmark} harness.
+
+Chữ \vn{khả vi}{differentiable} trong chương này là lời hứa rằng đạo hàm ấy tồn tại được. Nếu toàn bộ đường đi từ điểm ảnh tới quỹ đạo là một đồ thị phép tính khả vi, thì đạo hàm của APE theo trọng số cạnh là một đại lượng tính được. Khi đó các trọng số trở thành tham số học được. Hình~\ref{fig:f31-luong-gradient} vẽ đúng sự khác biệt: mũi tên xuôi giống nhau ở hai phía, mũi tên ngược chỉ tồn tại ở phía dưới.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.55cm,
+  bx/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\small,text width=2.15cm,minimum height=1.0cm},
+  fix/.style={bx,draw=tiercol,fill=white},
+  net/.style={bx,draw=violetdark,fill=violetbg},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  br/.style={-{Latex[length=2.2mm]},draw=reddark,thick,densely dashed},
+  lb/.style={font=\scriptsize,color=tiercol},
+  ti/.style={font=\small\sffamily\bfseries,color=inkblue}]
+
+\node[ti] at (0,1.55) {Hệ cổ điển};
+\node[bx] (a1) at (0,0) {ảnh};
+\node[bx,right=of a1] (b1) {ORB\\+ ghép cặp};
+\node[fix,right=of b1] (c1) {trọng số\\\(\sigma_\ell^{-2}\), Huber};
+\node[bx,right=of c1] (d1) {Gauss-Newton\\+ Schur};
+\node[bx,right=of d1] (e1) {quỹ đạo};
+\draw[ar] (a1)--(b1); \draw[ar] (b1)--(d1); \draw[ar] (c1)--(d1); \draw[ar] (d1)--(e1);
+\node[lb,below=0.16cm of c1,text width=2.4cm,align=center] {đặt bằng tay,\\quét lưới};
+
+\node[ti] at (0,-3.1) {Hệ khả vi};
+\node[bx] (a2) at (0,-4.65) {ảnh};
+\node[net,right=of a2] (b2) {mạng\\đặc trưng};
+\node[net,right=of b2] (c2) {trọng số\\\(w_{ij}\) mỗi cặp};
+\node[bx,right=of c2] (d2) {lớp tối ưu\\GN / LM};
+\node[bx,right=of d2] (e2) {quỹ đạo};
+\node[bx,right=of e2] (f2) {mất mát so\\với chân trị};
+\draw[ar] (a2)--(b2); \draw[ar] (b2)--(d2); \draw[ar] (c2)--(d2); \draw[ar] (d2)--(e2); \draw[ar] (e2)--(f2);
+\draw[br] (f2.south) to[out=-140,in=-40] node[lb,below,pos=0.5,color=reddark]{\(\partial L/\partial w\) --- đi xuyên qua nghiệm} (c2.south);
+\draw[br] (c2.north) to[out=140,in=40] (b2.north);
+\end{tikzpicture}}
+\caption{Cái mà chữ ``khả vi'' thêm vào. Chiều xuôi, vẽ bằng mũi tên liền, giống hệt nhau ở hai hệ: đặc trưng, trọng số, bộ giải, quỹ đạo. Khác biệt duy nhất là mũi tên đứt màu đỏ. Nó đi ngược \emph{xuyên qua} lời giải của bài toán tối ưu, nhờ đó các trọng số \(w_{ij}\) và mạng sinh ra chúng được huấn luyện theo lỗi quỹ đạo cuối cùng, thay vì được đặt bằng tay từ tờ thông số cảm biến.}
+\label{fig:f31-luong-gradient}
+\end{figure}
+
+Nói gọn giá trị của chương: học xong bạn phân biệt được ba nhóm hay bị gộp làm một. Nhóm thứ nhất là \emph{lớp tối ưu khả vi}, một mảnh hạ tầng có thể lấy riêng. Nhóm thứ hai là \emph{hệ đầu-cuối} kiểu DROID-SLAM, một kiến trúc trọn gói và đắt. Nhóm thứ ba là \emph{VO tự giám sát}, vốn là một cách huấn luyện chứ không phải một hệ SLAM. Ba thứ đó có chi phí và rủi ro rất khác nhau. Trộn chúng lại là cách nhanh nhất để đánh giá sai cả ba.
+
+Hình~\ref{fig:f31-dong-thoi-gian} xếp các công trình của chương lên một trục thời gian, và ghi cạnh mỗi mốc \emph{nút thắt mà nó gỡ}. Đọc hình đó trước sẽ nhanh hơn đọc tuần tự, vì cả chương chỉ là một chuỗi lời đáp cho những nút thắt liên tiếp nhau.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  ev/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=3pt,align=center,font=\scriptsize,text width=2.15cm},
+  inf/.style={ev,draw=violetdark,fill=violetbg},
+  hot/.style={ev,draw=accent,fill=amberbg},
+  tick/.style={circle,fill=inkblue,inner sep=1.35pt},
+  lb/.style={font=\scriptsize,color=tiercol},
+  yr/.style={font=\scriptsize\sffamily\bfseries,color=inkblue}]
+\draw[-{Latex[length=2.5mm]},draw=tiercol,thick] (-0.4,0) -- (16.4,0);
+\foreach \x/\y in {0/2017,2/2018,4/2019,6/2020,8/2021,10/2022,12/2023,14/2024,16/2025}{
+  \node[tick] at (\x,0) {}; \node[yr,below=0.14cm] at (\x,0) {\y};}
+
+\node[ev]  (a) at (0,1.6)  {SfM-Learner\\\emph{bỏ nhu cầu chân trị}};
+\node[ev]  (b) at (2,-1.8) {CodeSLAM\\\emph{nén hình học dày đặc thành 32 số}};
+\node[ev]  (c) at (4,1.6)  {BA-Net\\\emph{đưa cả lớp BA vào trong mạng}};
+\node[ev]  (d) at (6,-1.8) {TartanVO, gradSLAM\\\emph{tổng quát hoá qua nhiều camera}};
+\node[inf] (e) at (8,1.6)  {LieTorch\\\emph{gradient đúng trên nhóm Lie}};
+\node[hot] (f) at (8,-3.6) {DROID-SLAM\\\emph{BA dày đặc trong vòng lặp}};
+\node[inf] (g) at (10,3.5) {Theseus\\\emph{lớp tối ưu thành hạ tầng}};
+\node[hot] (h) at (12,-1.8){DPVO\\\emph{bỏ dòng quang dày đặc, chỉ theo vết mảnh ảnh}};
+\node[hot] (i) at (14,1.6) {DPV-SLAM\\\emph{đóng vòng cổ điển quay lại}};
+\node[hot] (j) at (16,-1.8){MAC-VO\\\emph{học chính ma trận thông tin}};
+\foreach \n in {a,c,e,g,i}{\draw[draw=tiercol] (\n.south) -- (\n.south |- 0,0);}
+\foreach \n in {b,d,f,h,j}{\draw[draw=tiercol] (\n.north) -- (\n.north |- 0,0);}
+\end{tikzpicture}}
+\caption{Dòng thời gian của chương, mỗi mốc ghi kèm nút thắt mà nó gỡ. Hộp tím là hạ tầng, tức thứ dùng lại được ở mọi hệ. Hộp cam là các hệ đầu-cuối, và ba mốc cuối cho thấy hướng đi chung của chúng: bớt dày đặc, mượn lại đóng vòng cổ điển, rồi chuyển mục tiêu học từ đặc trưng sang ma trận thông tin --- tức là càng ngày càng gần với một backend cổ điển được cấp trọng số tốt hơn.}
+\label{fig:f31-dong-thoi-gian}
+\end{figure}
+
+\section{Đạo hàm xuyên qua một nghiệm tối ưu (Differentiating Through an Argmin)}
+\ptrtarget{F/31/02}
+
+\subsection{A. Bài toán phát biểu chính xác}
+Gọi \(\theta\) là mọi thứ mạng sinh ra: trọng số cạnh, mục tiêu dòng quang, hệ số damping. Gọi
+\[
+x^\star(\theta) \;=\; \arg\min_x\, E(x,\theta)
+\]
+là nghiệm mà bộ giải trả về, với \(x\) là tư thế và hình học. Ở cuối có một hàm mất mát \(L\big(x^\star(\theta)\big)\), thường là sai lệch so với quỹ đạo chân trị. Ta cần \(\partial L/\partial\theta\).
+
+Chỗ khó là \(x^\star\) không có công thức đóng. Nó là kết quả của một vòng lặp. Có đúng hai cách lấy đạo hàm qua nó, và hai cách đánh đổi ngược nhau.
+
+\subsection{B. Cách thứ nhất: trải phẳng vòng lặp}
+Cách thô là coi \(K\) bước lặp như một mạng \(K\) tầng rồi để autodiff làm việc:
+\[
+x_{k+1} \;=\; x_k - (H_k+\lambda I)^{-1} g_k .
+\]
+Mỗi bước là một biểu thức khả vi, nên cả vòng lặp cũng vậy. Cách này gọi là \vn{trải phẳng}{unrolling}.
+
+Ưu điểm của nó là tính trung thực. Đạo hàm thu được là đạo hàm của \emph{thuật toán thật sự đã chạy}, kể cả khi thuật toán đó mới chạy năm bước và chưa hội tụ. Nhược điểm là bộ nhớ. Lượt ngược cần mọi giá trị trung gian của lượt xuôi. Bạn phải giữ cả \(K\) bộ Jacobian, \(K\) bản phân tích Cholesky, và mọi bản đồ đặc trưng đã sinh ra chúng.
+
+Chi phí ấy nên nhớ dưới dạng công thức, vì công thức mới là thứ dùng lại được. Gọi \(K\) là số bước lặp, \(N\) là số khung trong cửa sổ, \(C\) là số kênh của bản đồ đặc trưng, và \(HW\) là số vị trí ở độ phân giải đang chạy. Bộ nhớ lượt ngược tỉ lệ với tích \(K\,N\,C\,HW\) --- tuyến tính theo \emph{cả bốn} thừa số cùng lúc, và một bước lặp hồi quy còn giữ vài tensor cùng cỡ nên hằng số nhân phía trước cũng không nhỏ. Đó là lý do các hệ trải phẳng thật đều huấn luyện với cửa sổ ngắn và độ phân giải thấp: \(N\) và \(HW\) là hai thừa số duy nhất người dùng cắt được mà không phải đổi kiến trúc. Nếu bạn muốn một con số gigabyte cho hệ của mình thì phải tự đo; công thức chỉ nói hình dạng, không nói độ lớn.
+
+\subsection{C. Cách thứ hai: định lý hàm ẩn}
+Cách thứ hai không lưu bước lặp nào. Nó dùng đúng một sự kiện: tại nghiệm, \vn{gradient}{gradient} theo \(x\) bằng không.
+\[
+g(x^\star,\theta) \;=\; \frac{\partial E}{\partial x}\Big|_{x^\star} \;=\; 0 .
+\]
+Đây là một hệ phương trình ràng buộc \(x^\star\) với \(\theta\). Lấy vi phân toàn phần hai vế theo \(\theta\):
+\[
+\underbrace{\frac{\partial^2 E}{\partial x^2}}_{H}\,\frac{\partial x^\star}{\partial\theta}
+\;+\; \underbrace{\frac{\partial^2 E}{\partial x\,\partial\theta}}_{B} \;=\; 0
+\qquad\Longrightarrow\qquad
+\frac{\partial x^\star}{\partial\theta} \;=\; -H^{-1}B .
+\]
+Đây là \vn{định lý hàm ẩn}{implicit function theorem} áp cho điều kiện tối ưu. Nó nói rằng nghiệm trượt đi theo hướng nào khi ta đẩy tham số, và câu trả lời chỉ phụ thuộc hai thứ: độ cong \(H\) tại nghiệm, và mức độ tham số đẩy vào gradient qua \(B\).
+
+Với hàm mất mát cuối, ta không cần cả ma trận \(\partial x^\star/\partial\theta\). Chỉ cần một tích vectơ:
+\[
+\frac{\partial L}{\partial\theta} \;=\; -\Big(\frac{\partial L}{\partial x}\Big)^{\!\top} H^{-1} B \;=\; -v^\top B,
+\qquad\text{với}\quad H v \;=\; \frac{\partial L}{\partial x}.
+\]
+Đọc dòng cuối cho kỹ, vì đó là điểm mấu chốt của cả chương. \textbf{Lượt ngược chỉ tốn thêm đúng một lần giải hệ, với chính ma trận \(H\) mà lượt xuôi đã phân tích rồi.} Với cửa sổ 8 khung, hệ camera rút gọn chỉ là \(48\times48\), tức nhỏ hơn nhiều bậc so với chính lượt xuôi vừa chạy, nên lượt ngược không thêm khoản chi phí nào đáng kể. Bộ nhớ cho vòng lặp bằng không, vì không bước lặp nào được lưu.
+
+Còn một cách đọc nữa mà kỹ sư SLAM sẽ thấy quen ngay. \(H^{-1}\) chính là hiệp phương sai của nghiệm, đúng đại lượng bạn đã tính khi biên hoá một khung hình. Cỗ máy cần cho lượt ngược đã nằm sẵn trong mã nguồn của bạn. Ý tưởng lấy đạo hàm qua một bài toán tối ưu không sinh ra từ thị giác; nó đến từ dòng lớp tối ưu khả vi trong học máy \cite{amos2017optnet,agrawal2019cvxpylayers}, và cùng một thủ thuật cũng là thứ làm cho mô hình cân bằng sâu chạy được \cite{bai2019deq}.
+
+\begin{trucgiac}
+Hãy hình dung nghiệm là một hòn bi nằm dưới đáy một cái bát. Bạn không quan tâm nó lăn xuống đáy bằng đường nào. Bạn chỉ quan tâm một việc: nghiêng cái bát đi một chút thì hòn bi dịch bao nhiêu. Trả lời câu đó chỉ cần biết \emph{độ cong của cái bát tại đáy} và \emph{lực nghiêng đẩy vào đâu}. Đó đúng là \(H^{-1}\) và \(B\). Cách trải phẳng thì ngược lại: nó quay phim toàn bộ đường lăn rồi tua ngược. Tốn băng --- nhưng nếu hòn bi chưa lăn tới đáy thì đoạn phim vẫn dùng được, còn cái bát thì không.
+\end{trucgiac}
+
+\subsection{D. Ví dụ tính tay được}
+Lấy bài toán nhỏ nhất còn giữ nguyên bản chất: một ẩn, hai phép đo, một trọng số.
+\[
+E(x,w) \;=\; w\,(x-a)^2 \;+\; (x-b)^2 .
+\]
+Nghiệm có công thức đóng, \(x^\star = (wa+b)/(w+1)\). Bây giờ tính lại bằng định lý hàm ẩn. Ta có \(H = 2(w+1)\) và \(B = \partial^2E/\partial x\,\partial w = 2(x-a)\), nên
+\[
+\frac{\partial x^\star}{\partial w} \;=\; -\frac{2(x^\star-a)}{2(w+1)} \;=\; -\frac{x^\star-a}{w+1}.
+\]
+Thay \(a=0\), \(b=1\), \(w=1\). Khi đó \(x^\star = 0{,}5\) và đạo hàm bằng \(-0{,}25\). Kiểm tra trực tiếp: \(x^\star = 1/(w+1)\), đạo hàm là \(-1/(w+1)^2 = -1/4\). Khớp.
+
+Con số \(-0{,}25\) nói điều gì bằng lời thường? Tăng trọng số của phép đo \(a\) lên \(0{,}1\) thì nghiệm dịch về phía \(a\) khoảng \(0{,}025\). Nếu hàm mất mát cuối muốn nghiệm nhỏ đi, \en{gradient} sẽ bảo mạng ``hãy tin phép đo \(a\) hơn''. Đó chính xác là thứ một hệ đầu-cuối học, chỉ khác là với hàng chục nghìn phép đo cùng lúc. Hình~\ref{fig:f31-ham-an} vẽ lại cùng ý đó bằng hình học.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=11.5cm,height=5.0cm,domain=-0.35:1.35,samples=140,
+  xlabel={\(x\)}, ylabel={\(E(x,w)\)},
+  xlabel style={font=\small}, ylabel style={font=\small},
+  tick label style={font=\footnotesize},
+  legend style={font=\footnotesize,draw=none,fill=none,at={(1.02,1)},anchor=north west},
+  axis lines=left, ymin=0, ymax=2.2]
+\addplot[thick,steel]{1*(x)^2+(x-1)^2};
+\addlegendentry{\(w=1\)}
+\addplot[thick,violetdark,dashed]{3*(x)^2+(x-1)^2};
+\addlegendentry{\(w=3\)}
+\addplot[only marks,mark=*,mark size=1.9pt,steel] coordinates {(0.5,0.5)};
+\addplot[only marks,mark=*,mark size=1.9pt,violetdark] coordinates {(0.25,0.75)};
+\draw[-{Latex[length=2mm]},reddark,thick] (axis cs:0.5,0.28) -- (axis cs:0.25,0.28);
+\node[font=\scriptsize,color=reddark,anchor=north] at (axis cs:0.375,0.26) {\(\partial x^\star/\partial w<0\)};
+\end{axis}
+\end{tikzpicture}
+\caption{Định lý hàm ẩn nhìn bằng mắt, cho \(E=w x^2+(x-1)^2\). Tăng trọng số \(w\) của phép đo tại \(x=0\) làm đường cong dốc hơn về phía trái, nên đáy trượt từ \(x^\star=0{,}5\) sang \(x^\star=0{,}25\). Đạo hàm \(-H^{-1}B\) chính là độ dốc của đường trượt ấy. Nó chỉ cần độ cong tại đáy, chứ không cần biết bộ giải đã đi đường nào tới đó.}
+\label{fig:f31-ham-an}
+\end{figure}
+
+\subsection{E. Ba điều kiện, và cả ba đều bị vi phạm trong SLAM}
+Định lý hàm ẩn đẹp nhưng có điều kiện. Nó cần \(x^\star\) là điểm dừng thật, cần \(H\) khả nghịch, và cần \(E\) đủ trơn quanh nghiệm. Trong SLAM cả ba đều lung lay.
+
+\begin{itemize}
+\item \textbf{\(H\) suy biến theo cấu tạo.} Bài toán đơn ảnh có bảy hướng tự do đo. Ngay cả stereo-inertial vẫn còn vài hướng nếu chưa neo gốc. Theo những hướng đó \(H\) không khả nghịch. Cách chữa duy nhất là neo gốc hoặc cộng damping, và \emph{giá trị damping đổi thì đạo hàm cũng đổi}. Bạn đang huấn luyện theo một \en{gradient} phụ thuộc vào một lựa chọn số học, không phải vào vật lý.
+\item \textbf{Bộ giải bị cắt ngắn.} Năm bước LM từ một khởi tạo tồi không cho một điểm dừng. Khi đó định lý hàm ẩn trả về đạo hàm của một bài toán mà bạn \emph{chưa} giải. Sai lệch này hiếm khi được đo, và nó lớn nhất đúng ở những khung khó.
+\item \textbf{Có những quyết định không khả vi.} Đây là điều sâu nhất trong chương. So sánh \(\chi^2\) với ngưỡng, chọn inlier trong RANSAC, quyết định chèn khung then chốt --- tất cả đều là hàm bậc thang. Đạo hàm của chúng bằng 0 hầu khắp nơi và không tồn tại tại chỗ nhảy. \en{Gradient} không nhìn thấy chúng.
+\end{itemize}
+
+Gạch đầu dòng cuối giải thích được toàn bộ thiết kế của các hệ trong chương này. Vì \textbf{không thể học một quyết định cứng}, mọi hệ đầu-cuối đều thay quyết định cứng bằng một \emph{trọng số mềm liên tục}. DROID-SLAM không xuất ra mặt nạ inlier; nó xuất ra một con số tin cậy cho từng điểm ảnh. MAC-VO không xuất ra nhãn ``điểm này tốt''; nó xuất ra một hiệp phương sai. Đó không phải một lựa chọn thẩm mỹ mà là hệ quả bắt buộc của việc muốn có đạo hàm.
+
+\lk{B/09-thiet-ke-ham-mat-mat}{cùng nguyên lý với}{lại là quy tắc ``muốn học được thì phải làm cho trơn'', cùng lý do focal loss thay cho việc chọn cứng mẫu khó}
+
+\subsection{F. Vì sao gradient nổ đúng ở khung khó --- một phép tính EuRoC}
+Điều kiện ``\(H\) khả nghịch'' nghe như một chi tiết kỹ thuật. Thực ra nó là chế độ hỏng nặng nhất trong huấn luyện, và nó tính ra được bằng số liệu bạn đã quen.
+
+Xét một điểm bản đồ quan sát bằng stereo. Bỏ qua các hướng khác, giữ hai bậc tự do: dịch ngang và độ sâu. Với tiêu cự \(f\) và đường cơ sở \(b\), độ bất định của hai hướng là
+\[
+\sigma_x \;=\; \frac{Z}{f}\,\sigma_u, \qquad
+\sigma_Z \;=\; \frac{Z^2}{f\,b}\,\sigma_d ,
+\]
+với \(\sigma_u\) là sai số định vị điểm ảnh và \(\sigma_d\) là sai số disparity. Lấy \(\sigma_d = \sigma_u\) cho gọn, tỉ số rút lại còn một biểu thức rất sạch:
+\[
+\frac{\sigma_Z}{\sigma_x} \;=\; \frac{Z}{b}.
+\]
+Bây giờ thay số vào công thức --- đây là phép thay số, không phải phép đo trên máy nào. Lấy thông số công khai của EuRoC, \(b = 0{,}11\) m và \(f \approx 460\) px, rồi \emph{giả sử} \(\sigma_u = 0{,}5\) px và một điểm ở \(Z = 10\) m. Khi đó \(\sigma_Z/\sigma_x = Z/b\) cho tỉ số cỡ chín chục lần: bất định theo hướng độ sâu lớn hơn bất định theo hướng ngang gần hai bậc độ lớn.
+
+Ma trận thông tin là nghịch đảo bình phương của các độ lệch đó, nên khối \(2\times2\) của \(H\) có số điều kiện khoảng \((Z/b)^2 \approx 8\,300\). Đây là con số quyết định. Trong công thức \(v = H^{-1}\,\partial L/\partial x\), thành phần \en{gradient} theo hướng độ sâu bị nhân lên khoảng tám nghìn lần so với thành phần theo hướng ngang. Nói bằng lời: \textbf{ước lượng càng ít ràng buộc một hướng, thì đạo hàm theo hướng đó càng lớn}, vì một thay đổi nhỏ ở trọng số làm nghiệm trượt rất xa theo hướng yếu.
+
+Hệ quả cho huấn luyện thì cụ thể và khó chịu. Các khung thị sai thấp, chuyển động gần như quay thuần tuý, và ảnh mờ đều làm \(Z/b\) hiệu dụng lớn lên. Đó lại đúng là những khung bạn muốn mạng học từ chúng. Nên \en{gradient} từ mẫu quý nhất cũng là \en{gradient} nhiễu nhất và dễ nổ nhất. Mọi cách chữa thông dụng --- cắt chuẩn \en{gradient}, tăng damping, bỏ qua mẫu có \(H\) xấu --- đều làm giảm ảnh hưởng của đúng nhóm mẫu ấy. Hình~\ref{fig:f31-so-dieu-kien} cho thấy số điều kiện tăng theo bình phương độ sâu.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=11.2cm,height=4.6cm,domain=1:20,samples=80,ymode=log,
+  xlabel={độ sâu của điểm \(Z\) (m), với đường cơ sở \(b=0{,}11\) m},
+  ylabel={số điều kiện \((Z/b)^2\)},
+  xlabel style={font=\small}, ylabel style={font=\small},
+  tick label style={font=\footnotesize}, axis lines=left]
+\addplot[thick,steel]{(x/0.11)^2};
+\addplot[only marks,mark=*,mark size=1.9pt,reddark] coordinates {(10,8264)};
+\node[font=\scriptsize,color=reddark,anchor=south east] at (axis cs:10,8264) {\(Z=10\) m};
+\end{axis}
+\end{tikzpicture}
+\caption{Số điều kiện của khối hai bậc tự do (ngang, sâu) cho một điểm stereo trên cấu hình EuRoC. Đây là \emph{đường của công thức} \((Z/b)^2\), không phải một tập điểm đo. Nó chính là hệ số khuếch đại mà \(H^{-1}\) áp lên \en{gradient} theo hướng độ sâu trong lượt ngược. Điều đáng nhớ là hình dạng: hệ số tăng theo \emph{bình phương} độ sâu, nên tăng độ sâu gấp đôi thì nó tăng gấp bốn. Đây là lý do định lượng khiến huấn luyện qua một lớp tối ưu mất ổn định trên đúng những khung ít thị sai.}
+\label{fig:f31-so-dieu-kien}
+\end{figure}
+
+\subsection{G. Khối nào trong hệ của bạn học được, khối nào không}
+Gộp hai kết luận vừa rồi --- \en{gradient} chỉ chảy qua thứ liên tục, và nó nổ ở chỗ \(H\) xấu --- ta có một bản kiểm kê rất cụ thể cho một hệ kiểu ORB-SLAM3. Bảng~\ref{tab:f31-khoi-hoc-duoc} là bảng đáng dán lên tường trước khi bắt đầu bất cứ thí nghiệm nào trong chương này.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Kiểm kê các khối của một hệ stereo-inertial cổ điển theo tiêu chí ``\en{gradient} có chảy qua được không''. Hai dòng in đậm là hai chỗ rẻ nhất để bắt đầu, vì chúng đã liên tục sẵn và không đòi thay kiến trúc.}
+\label{tab:f31-khoi-hoc-duoc}
+\begin{tabularx}{\linewidth}{@{}L{3.5cm}L{3.1cm}L{1.9cm}Y@{}}
+\toprule
+\textbf{Khối} & \textbf{Đầu ra} & \textbf{Liên tục?} & \textbf{Học được thế nào}\\
+\midrule
+Trích đặc trưng ORB & vị trí + mô tả nhị phân & không & Phải thay bằng bản đồ nhiệt và mô tả số thực; đó là chương 28\\
+Ghép cặp + kiểm tra tỉ lệ & tập cặp khớp & không & Thay bằng ma trận gán mềm rồi mới lấy \en{gradient} qua nó\\
+RANSAC và cổng \(\chi^2\) & mặt nạ inlier & không & Thay hẳn bằng trọng số liên tục; không có cách nào khác\\
+\textbf{Ma trận thông tin cạnh} & \textbf{số thực dương} & \textbf{có} & \textbf{Học trực tiếp; đây là điểm vào rẻ nhất của cả chương}\\
+Bề rộng nhân robust & số thực dương & có & Học được, nhưng \en{gradient} yếu vì nhân robust bão hoà ở phần đuôi\\
+\textbf{Hiệu chỉnh chùm tia} & \textbf{nghiệm} & \textbf{có} & \textbf{Đi xuyên qua bằng định lý hàm ẩn, với điều kiện đã neo gốc}\\
+Chính sách chèn khung then chốt & quyết định đúng/sai & không & Không; phải giữ luật viết tay hoặc học bằng cách khác hẳn\\
+Lấy ứng viên đóng vòng & xếp hạng + ngưỡng & một nửa & Học được phần \en{embedding}, không học được phần ngưỡng; chương 29\\
+Kiểm chứng Sim3 + RANSAC & quyết định đúng/sai & không & Không\\
+Tối ưu đồ thị tư thế & nghiệm & có & Đi xuyên qua được, nhưng đồ thị lớn nên lượt ngược đắt\\
+Khởi tạo IMU & nghiệm + cổng chấp nhận & một nửa & Chỉ phần nghiệm; cổng chấp nhận vẫn rời rạc\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng này trả lời luôn câu hỏi ``đầu-cuối tới mức nào''. Sáu trên mười một khối không cho \en{gradient} đi qua, và trong sáu khối đó có cả đóng vòng lẫn chèn khung then chốt --- hai thứ chi phối sai số dài hạn của bạn. Nên không có hệ nào trong chương thật sự đầu-cuối theo nghĩa đen. Chúng chỉ đầu-cuối trên phần vốn đã trơn.
+
+\subsection{H. Ba cái giá, nói thẳng}
+Bảng~\ref{tab:f31-gia-kha-vi} tổng kết cái được và cái mất. Cột cuối là cột đáng đọc nhất.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Khả vi mua được gì và trả bằng gì. Cột ``hỏng khi nào'' là cột quyết định: nó cho biết trong hoàn cảnh nào một hệ khả vi trở nên tệ hơn hệ cổ điển, chứ không chỉ đắt hơn.}
+\label{tab:f31-gia-kha-vi}
+\begin{tabularx}{\linewidth}{@{}L{2.4cm}YL{3.0cm}L{4.0cm}@{}}
+\toprule
+\textbf{Chiều} & \textbf{Được gì} & \textbf{Trả bằng gì} & \textbf{Hỏng khi nào}\\
+\midrule
+Trọng số đo lường & Trọng số theo từng cặp khớp, biết mảnh ảnh này mờ hay sắc & Phải huấn luyện; cần chân trị quỹ đạo & Ra ngoài phân phối huấn luyện: trọng số vẫn tự tin, chỉ là sai\\
+Bộ nhớ lượt ngược & --- & Trải phẳng: tỉ lệ với tích của số bước, số khung, số kênh và số vị trí. Hàm ẩn: không phụ thuộc số bước & Trải phẳng buộc cửa sổ huấn luyện ngắn, nên không học được hành vi dài hạn\\
+Ổn định số & --- & Phải damping, cắt \en{gradient}, giới hạn số bước & \(H\) gần suy biến: thị sai thấp, quay thuần tuý, ảnh mờ --- đúng các khung cần học nhất\\
+Chẩn đoán & --- & Mất phần lớn & Quỹ đạo lệch mà không có \(\chi^2\), không có số inlier, không có cạnh nào để đổ lỗi\\
+Tính lặp lại & --- & Phi tất định của thư viện lọt vào trong bộ ước lượng & Hai lần chạy cho hai quỹ đạo; hết phân biệt được lỗi thuật toán với nhiễu\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Chiều thứ tư đáng nói rõ hơn, vì với một người bảo trì hệ thống nó thường là chiều đắt nhất. Trong backend cổ điển, khi quỹ đạo lệch bạn có một chuỗi câu hỏi rất cụ thể để hỏi. Chi bình phương của cạnh nào lớn bất thường? Bao nhiêu cạnh bị nhân robust ép xuống? Hiệp phương sai biên của khung nào nở ra? Mỗi câu đều có một con số trả lời, và con số đó trỏ vào một dòng mã. Khi trọng số do một mạng sinh ra, câu hỏi ``vì sao nó ra tư thế này'' không còn câu trả lời ở mức đồ thị. Bạn vẫn in được phần dư. Bạn không truy được trọng số về nguyên nhân. Và điều tệ nhất là: với bộ giải, một trọng số sai trông y hệt một trọng số đúng.
+
+\begin{figure}[H]\centering
+\resizebox{0.94\linewidth}{!}{%
+\begin{tikzpicture}[
+  it/.style={draw=steel,fill=bluebg,rounded corners=2pt,minimum width=1.3cm,minimum height=0.6cm,font=\scriptsize,inner sep=2pt},
+  mem/.style={draw=reddark,fill=redbg,rounded corners=2pt,minimum width=1.3cm,minimum height=0.42cm,font=\scriptsize,inner sep=2pt},
+  ar/.style={-{Latex[length=1.8mm]},draw=steel},
+  br/.style={-{Latex[length=1.8mm]},draw=reddark,densely dashed},
+  ti/.style={font=\small\sffamily\bfseries,color=inkblue},
+  lb/.style={font=\scriptsize,color=tiercol}]
+
+\node[ti] at (-2.4,0.55) {Trải phẳng};
+\foreach \i/\x in {0/0,1/1.85,2/3.7,3/5.55}{
+  \node[it] (u\i) at (\x,0.55) {bước \i};
+  \node[mem] (m\i) at (\x,-0.3) {lưu \(J_\i, H_\i\)};
+  \draw[ar] (u\i) -- (m\i);
+}
+\foreach \i/\j in {0/1,1/2,2/3}{\draw[ar] (u\i)--(u\j);}
+\node[it,right=0.55cm of u3] (uL) {\(L\)};
+\draw[ar] (u3)--(uL);
+\draw[br] (uL.south) to[out=-150,in=-30] (m0.south east);
+\node[lb,anchor=west] at (7.5,0.15) {bộ nhớ \(\propto K\)};
+
+\node[ti] at (-2.4,-2.3) {Hàm ẩn};
+\foreach \i/\x in {0/0,1/1.85,2/3.7,3/5.55}{
+  \node[it] (v\i) at (\x,-2.3) {bước \i};
+}
+\foreach \i/\j in {0/1,1/2,2/3}{\draw[ar] (v\i)--(v\j);}
+\node[it,right=0.55cm of v3] (vL) {\(L\)};
+\draw[ar] (v3)--(vL);
+\node[mem,below=0.6cm of v3] (hh) {chỉ \(H\) cuối};
+\draw[ar] (v3)--(hh);
+\draw[br] (vL.south) to[out=-120,in=0] (hh.east);
+\node[lb,anchor=west] at (7.5,-2.65) {bộ nhớ \(\propto 1\)};
+\end{tikzpicture}}
+\caption{Hai lối đi ngược qua một bộ giải lặp. Trải phẳng giữ mọi đại lượng trung gian, nên bộ nhớ tăng tuyến tính theo số bước lặp \(K\); đổi lại đạo hàm đúng với thuật toán đã chạy, kể cả khi nó chưa hội tụ. Định lý hàm ẩn chỉ cần ma trận \(H\) ở bước cuối, nên bộ nhớ không phụ thuộc \(K\); đổi lại đạo hàm chỉ đúng nếu bước cuối thật sự là một điểm dừng.}
+\label{fig:f31-hai-loi-nguoc}
+\end{figure}
+
+\section{Hạ tầng khả vi: LieTorch, Theseus và BA-Net (Differentiable Infrastructure)}
+\ptrtarget{F/31/03}
+
+\subsection{A. LieTorch: gradient sống trong không gian tiếp tuyến}
+Có một trục trặc rất cụ thể khi ghép autodiff với hình học. PyTorch chỉ biết tensor. Một phép biến đổi \(SE(3)\) lưu dưới dạng ma trận \(4\times4\) là 16 số; lưu dưới dạng quaternion cộng tịnh tiến là 7 số. Nhưng nhóm chỉ có 6 bậc tự do. Nếu để autodiff chạy trên biểu diễn nhúng, \en{gradient} có 16 hoặc 7 thành phần, và phần lớn trong đó trỏ ra ngoài đa tạp. Người ta chữa bằng cách chuẩn hoá lại quaternion sau mỗi bước, hoặc phạt độ lệch trực giao. Cả hai đều là vá víu, và cả hai đều làm \en{gradient} sai một lượng không kiểm soát được.
+
+LieTorch \cite{teed2021lietorch} sửa từ gốc. Nó lưu và lan truyền \en{gradient} trong \emph{không gian tiếp tuyến}, tức đại số Lie. Một phép biến đổi vẫn được lưu bằng 7 số, nhưng đạo hàm của nó là một vectơ 6 chiều, và quy tắc chuỗi được viết lại bằng các Jacobian trái và phải của nhóm. Đó đúng là những Jacobian bạn đã gặp ở Barfoot \cite{barfoot2017}. Hệ quả thực dụng: không còn chuẩn hoá giữa đồ thị, số chiều \en{gradient} đúng bằng số bậc tự do, và bước cập nhật là một phép \(\exp\) chứ không phải một phép cộng.
+
+Bài học thiết kế lấy được ngay cả khi không dùng thư viện: \textbf{ghép một mạng vào một khối hình học thì hãy kiểm tra ngay số chiều của \en{gradient}}. Nếu nó lớn hơn số bậc tự do thì có một phần \en{gradient} đang chảy vào các hướng vô nghĩa. Phần đó sẽ hiện ra dưới dạng huấn luyện chậm hoặc không ổn định.
+
+\subsection{B. Theseus: bắt bạn phải chọn kiểu lượt ngược}
+Theseus \cite{pineda2022theseus} đóng gói cả một bộ giải phi tuyến thành một tầng PyTorch. Bạn khai báo biến và hàm chi phí, nó chạy Gauss-Newton hoặc Levenberg-Marquardt với bộ giải thưa, và nó khả vi. Điều đáng học không nằm ở sự tiện lợi mà ở chỗ nó \emph{bắt người dùng khai báo kiểu lượt ngược}: trải phẳng đầy đủ, trải phẳng cắt ngắn, hay hàm ẩn. Thư viện không chọn hộ, vì không lựa chọn nào đúng cho mọi bài toán.
+
+Đó là một tín hiệu trung thực đáng quý. Nó nói thẳng rằng đạo hàm qua một bộ giải là một \emph{xấp xỉ có thiên lệch}, và bạn phải chọn nhận thiên lệch nào. Trước Theseus, gradSLAM \cite{jatavallabhula2020gradslam} đã viết lại cả một đường ống SLAM dày đặc dưới dạng khả vi, chủ yếu để chứng minh rằng việc đó làm được.
+
+Khác biệt giữa hai kiểu lượt ngược gọn tới mức viết ra được trong mười lăm dòng giả mã.
+
+\begin{lstlisting}[style=py]
+# Kieu 1: trai phang. Autodiff tu lo, nhung giu moi buoc trong bo nho.
+x = x0
+for k in range(K):
+    H, g = build_normal_equations(x, theta)   # do thi phep tinh lon dan
+    x = x - solve(H + lam*I, g)
+L = loss(x); L.backward()                     # bo nho ~ K
+
+# Kieu 2: ham an. Chay bo giai KHONG ghi do thi, roi noi lai bang mot lop tu viet.
+with torch.no_grad():
+    x = newton_solve(x0, theta, K)            # bo nho ~ 1
+H, B = hessian_and_cross(x, theta)            # chi tinh tai nghiem cuoi
+v = solve(H, grad_of_loss_wrt_x(x))           # dung lai phan tich cua luot xuoi
+grad_theta = -(B.t() @ v)                     # dinh ly ham an
+\end{lstlisting}
+
+Dòng \code{torch.no\_grad()} chính là chỗ đánh đổi. Nó xoá đồ thị phép tính của vòng lặp, nên bộ nhớ tụt về hằng số. Đổi lại, mọi thứ đã xảy ra bên trong vòng lặp trở nên vô hình với \en{gradient}: bao nhiêu bước đã chạy, damping đã đổi thế nào, có bước nào bị từ chối không. Bảng~\ref{tab:f31-kieu-nguoc} nói rõ ba lựa chọn và chỗ hỏng của từng cái.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Ba kiểu lượt ngược qua một bộ giải lặp. Không kiểu nào đúng cho mọi bài toán, nên thư viện bắt bạn chọn --- và lựa chọn đó phải được ghi lại cùng kết quả, giống như số seed.}
+\label{tab:f31-kieu-nguoc}
+\begin{tabularx}{\linewidth}{@{}L{2.7cm}L{3.0cm}L{2.9cm}Y@{}}
+\toprule
+\textbf{Kiểu} & \textbf{Bộ nhớ} & \textbf{Đạo hàm là của cái gì} & \textbf{Hỏng khi nào}\\
+\midrule
+Trải phẳng đầy đủ & Tỉ lệ với số bước \(K\) & Đúng thuật toán đã chạy & \(K\) lớn hoặc bài toán lớn: hết bộ nhớ, và \en{gradient} nhân dồn qua \(K\) tầng nên tắt hoặc nổ\\
+Trải phẳng cắt ngắn & Tỉ lệ với vài bước cuối & Xấp xỉ, thiên về hành vi cuối vòng lặp & Khởi tạo tồi: phần quan trọng của quỹ đạo tối ưu nằm ở các bước đầu, và bạn vừa cắt bỏ nó\\
+Hàm ẩn & Hằng số & Nghiệm của bài toán \emph{giả sử đã hội tụ} & Bộ giải bị cắt ngắn, hoặc \(H\) suy biến vì chưa neo gốc toạ độ\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Một quy tắc thực dụng rút ra từ bảng trên. Nếu bộ giải của bạn hội tụ tốt và bạn neo gốc tử tế thì dùng hàm ẩn, vì nó rẻ hơn hẳn. Nếu bộ giải bị ngân sách thời gian ép dừng sớm --- trường hợp thường gặp trong hệ thời gian thực --- thì trải phẳng cắt ngắn trung thực hơn, dù đắt. Và dù chọn cái nào, hãy ghi lựa chọn ấy vào cấu hình thí nghiệm. Nó ảnh hưởng tới kết quả ngang một siêu tham số.
+
+\subsection{C. BA-Net: học hệ số damping thay vì tự chỉnh}
+BA-Net \cite{tang2019banet} là công trình đầu tiên đặt nguyên một lớp \vn{hiệu chỉnh chùm tia}{bundle adjustment} vào trong mạng và huấn luyện xuyên qua nó. Nó có ba ý tưởng, và giá trị của ba ý rất khác nhau.
+
+\begin{itemize}
+\item \textbf{Sai lệch trên đặc trưng thay vì trên độ sáng.} Phương pháp trực tiếp cổ điển tối ưu sai khác độ sáng, nên nó thừa hưởng giả định độ sáng không đổi và có lòng chảo hội tụ rất hẹp. BA-Net tối ưu trên các bản đồ đặc trưng học được. Bề mặt lỗi trơn hơn, lòng chảo rộng hơn, và kết quả bất biến với đổi sáng. Đây là ý tưởng bền nhất trong ba ý.
+\item \textbf{Damping học được.} Levenberg-Marquardt cổ điển chỉnh \(\lambda\) bằng luật kinh nghiệm: bước tốt thì chia mười, bước xấu thì nhân mười. BA-Net thay luật đó bằng một mạng nhỏ, đọc phần dư hiện tại rồi xuất ra một vectơ \(\lambda\) cho từng tham số. Vì \(\lambda\) vào bước cập nhật một cách trơn, cả bước LM vẫn khả vi, nên chính sách damping được huấn luyện theo lỗi tư thế cuối.
+\item \textbf{Độ sâu theo cơ sở.} Thay vì coi mỗi điểm ảnh là một ẩn, một mạng sinh ra khoảng một trăm bản đồ độ sâu cơ sở, và ẩn thật sự là các hệ số tổ hợp. Ý này là tổ tiên trực tiếp của CodeSLAM ở mục 6. Số phận của nó cũng báo trước số phận của CodeSLAM: cơ sở độ sâu là một tiên nghiệm học được về hình dạng cảnh, nên nó tốt đúng trong phân phối huấn luyện và bịa ra bề mặt ở ngoài đó.
+\end{itemize}
+
+Có đáng không? Ý thứ nhất đáng, và quan trọng hơn là nó tách rời được: bạn có thể dùng đặc trưng học được làm mục tiêu căn chỉnh cho một phương pháp trực tiếp mà không cần bất cứ thứ gì khác của BA-Net. Dòng GN-Net đi đúng hướng này, huấn luyện đặc trưng sao cho bề mặt Gauss-Newton quanh nghiệm đúng là một lòng chảo sạch.
+
+Ý thứ hai thì phải nghi ngờ. Một chính sách damping học được vẫn là \emph{chỉnh tay}, chỉ khác ở chỗ hằng số bây giờ được học từ một tập dữ liệu thay vì được gõ vào file cấu hình. Câu hỏi kiểm chứng đúng đắn không phải ``nó có tốt hơn trên tập này không''. Câu hỏi đúng là ``nó có còn tốt hơn trên một chuỗi có động lực khác hẳn không''. Mình chưa thấy bằng chứng mạnh cho vế sau.
+
+\begin{cambay}
+Đừng nhầm \emph{bộ giải khả vi} với \emph{bộ giải tốt hơn}. Một lớp Gauss-Newton khả vi hội tụ đúng bằng tốc độ của Gauss-Newton thường, vì ở lượt xuôi nó \emph{chính là} Gauss-Newton thường. Toàn bộ giá trị nằm ở lượt ngược, và lượt ngược chỉ có ý nghĩa nếu bạn thật sự huấn luyện một thứ gì đó bằng nó. Cắm một lớp tối ưu khả vi vào hệ thống rồi không huấn luyện gì cả thì bạn vừa đổi một bộ giải C++ đã tối ưu lấy một bộ giải Python chậm hơn, mà không nhận lại gì.
+\end{cambay}
+
+\section{DROID-SLAM và cuộc thưa hoá sau nó (DROID-SLAM and the Sparsification Line)}
+\ptrtarget{F/31/04}
+
+\subsection{A. Cơ chế của DROID-SLAM}
+DROID-SLAM \cite{teed2021droid} là hệ đầu-cuối thuyết phục nhất tính tới nay, và cấu tạo của nó đáng vẽ ra. Nó ghép hai thứ đã có: toán tử cập nhật hồi quy của RAFT \cite{teed2020raft} và một lớp hiệu chỉnh chùm tia dày đặc.
+
+Vòng lặp chạy như sau. Hệ giữ một \emph{đồ thị khung}, với nút là khung then chốt và cạnh là các cặp có chồng lấn thị giác. Với mỗi cạnh, một khối tương quan được dựng từ hai bản đồ đặc trưng. Một đơn vị hồi quy đọc khối tương quan cùng dòng quang hiện tại rồi xuất ra hai thứ: một mục tiêu dòng quang đã hiệu chỉnh cho từng điểm ảnh, và một trọng số tin cậy cho từng điểm ảnh. Lớp hiệu chỉnh chùm tia dày đặc nhận hai thứ đó làm phép đo, rồi giải bài toán bình phương tối thiểu theo tư thế và theo nghịch đảo độ sâu từng điểm ảnh. Vì khối độ sâu là ma trận đường chéo, phần bù Schur cho ra một hệ camera rút gọn rất nhỏ. Nghiệm mới được đưa ngược lại cho đơn vị hồi quy, và vòng lặp tiếp tục.
+
+Huấn luyện chạy trên TartanAir \cite{wang2020tartanair} với chân trị tư thế. \en{Gradient} đi xuyên qua lớp hiệu chỉnh chùm tia, về tới tận mạng đặc trưng.
+
+\begin{figure}[H]\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.6cm,
+  bx/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\small,text width=2.3cm,minimum height=1.0cm},
+  net/.style={bx,draw=violetdark,fill=violetbg},
+  sol/.style={bx,draw=accent,fill=amberbg,text width=2.6cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  fb/.style={-{Latex[length=2.2mm]},draw=accent,thick},
+  br/.style={-{Latex[length=2.2mm]},draw=reddark,thick,densely dashed},
+  lb/.style={font=\scriptsize,color=tiercol}]
+\node[bx] (im) {ảnh\\+ đồ thị khung};
+\node[net,right=of im] (cor) {khối tương quan\\theo từng cạnh};
+\node[net,right=of cor] (gru) {đơn vị hồi quy};
+\node[sol,right=of gru] (ba) {lớp BA dày đặc\\Schur, khối độ sâu\\đường chéo};
+\node[bx,right=of ba] (out) {tư thế\\+ độ sâu mỗi pixel};
+\draw[ar] (im)--(cor); \draw[ar] (cor)--(gru); \draw[ar] (gru)--(ba); \draw[ar] (ba)--(out);
+\node[lb,above=0.16cm of gru,text width=2.3cm,align=center] {xuất dòng quang hiệu chỉnh \emph{và} trọng số \(w_{ij}\) mỗi pixel};
+\draw[fb] (ba.south) to[out=-120,in=-60] node[lb,below,pos=0.5]{lặp lại 3--15 lần} (gru.south);
+\draw[br] (out.north) to[out=140,in=40] node[lb,above,pos=0.5,color=reddark]{\en{gradient} lúc huấn luyện} (cor.north);
+\end{tikzpicture}}
+\caption{Vòng lặp của DROID-SLAM. Điểm cốt lõi không phải mạng hồi quy, cũng không phải bộ giải, mà là \emph{vòng phản hồi màu cam} giữa hai cái đó: mạng nhìn thấy nghiệm mà bộ giải vừa trả về rồi sửa phép đo cho lần sau. Mũi tên đứt là đường \en{gradient} lúc huấn luyện. Nhờ nó, mạng học cách xuất ra dòng quang và trọng số mà bộ giải \emph{dùng được}, chứ không phải dòng quang trông đẹp mắt.}
+\label{fig:f31-droid-vong}
+\end{figure}
+
+\subsection{B. Vì sao một hệ 144 nghìn ẩn vẫn giải được}
+Với cửa sổ 30 khung then chốt ở 1/8 độ phân giải, lớp hiệu chỉnh chùm tia này có khoảng 144 nghìn ẩn hình học. Con số đó nghe như một hệ không giải nổi trong thời gian thực. Lý do nó vẫn giải được là một tính chất cấu trúc bạn đã quen, chỉ khác quy mô.
+
+Trong hiệu chỉnh chùm tia cổ điển, mỗi điểm bản đồ đóng góp một khối \(3\times3\) trên đường chéo của khối cấu trúc, nên khử chúng bằng phần bù Schur là rẻ. Ở đây còn dễ hơn. Mỗi ẩn là \emph{một} nghịch đảo độ sâu của \emph{một} điểm ảnh, và nó không nối trực tiếp với điểm ảnh nào khác. Khối cấu trúc vì thế là một ma trận đường chéo thật sự, không phải khối đường chéo. Nghịch đảo nó là 144 nghìn phép chia.
+
+Sau khi khử, hệ còn lại chỉ là hệ camera rút gọn cỡ \(6N\times6N\). Với \(N=30\) khung then chốt thì đó là ma trận \(180\times180\). Phân tích Cholesky một ma trận cỡ đó là chuyện vặt so với phần còn lại của vòng lặp. Nói cách khác, \textbf{phần đắt của DROID-SLAM không nằm ở bộ giải}. Nó nằm ở việc dựng khối tương quan rồi chạy mạng hồi quy để sinh ra 144 nghìn phép đo cùng 144 nghìn trọng số, lặp lại tới mười lăm lần cho mỗi khung.
+
+Kết luận thực dụng rút ra khá rõ: nếu định thử một ý tưởng theo hướng này thì đừng tối ưu bộ giải. Ba chỗ cắt được là độ phân giải, số bước lặp, và số cạnh trong đồ thị khung. Cả ba đều là tham số cấu hình chứ không phải kiến trúc, nên thử rất nhanh.
+
+\subsection{C. Vì sao nó chính xác}
+Bốn cơ chế cộng lại, và chỉ một trong bốn liên quan tới chữ ``khả vi''.
+
+\begin{itemize}
+\item \textbf{Dày đặc là dư thừa.} Mỗi điểm ảnh bỏ một lá phiếu, nên vài nghìn phiếu sai không lay chuyển được nghiệm. Một hệ thưa chỉ có vài trăm cặp khớp thì có.
+\item \textbf{Trọng số theo từng điểm ảnh.} Mạng hạ trọng số vùng trời, vật thể chuyển động, bề mặt phản chiếu. Kiểm tra tỉ lệ khoảng cách mô tả không làm được việc đó, vì nó không nhìn ngữ cảnh.
+\item \textbf{Sửa lặp lại.} Đơn vị hồi quy thấy nghiệm hiện tại rồi sửa phép đo, nên hệ tự gỡ được khởi tạo tồi. Một đường ống một chiều không có cơ chế này.
+\item \textbf{Hình học vẫn được ép.} Đầu ra đi qua một bộ giải thật, nên nó nhất quán đa khung. Nó không trôi theo kiểu một mạng hồi quy tư thế.
+\end{itemize}
+
+Cơ chế thứ ba mới là chỗ tính khả vi trả tiền. Không có \en{gradient} xuyên qua bộ giải thì mạng sẽ được huấn luyện để dự đoán dòng quang khớp với chân trị dòng quang. Có \en{gradient}, nó được huấn luyện để dự đoán dòng quang làm cho \emph{tư thế} đúng. Hai mục tiêu đó khác nhau, và khác biệt nằm đúng ở các điểm ảnh có hình học xấu.
+
+\subsection{D. Vì sao nó đắt}
+Đếm ẩn số trước. Ảnh 640\(\times\)480 ở 1/8 độ phân giải cho 4\,800 ẩn nghịch đảo độ sâu cho mỗi khung then chốt. Với 30 khung trong cửa sổ là 144\,000 ẩn hình học, so với 6 ẩn tư thế mỗi khung. Bài toán vẫn giải được vì khối độ sâu là đường chéo, nhưng mọi tensor đều mang kích thước đó.
+
+Đếm bộ nhớ sau, và đếm bằng công thức chứ không quy ra một con số. Một khối tương quan toàn phần giữa hai khung giữ một mục cho \emph{mỗi cặp} vị trí, tức bình phương số vị trí ở độ phân giải đang chạy --- và đó mới là một cạnh, một mức. Đồ thị khung có nhiều cạnh cho mỗi nút, nên tổng bộ nhớ tỉ lệ với số cạnh nhân bình phương số vị trí. Chữ ``bình phương'' đó giải thích vì sao bộ nhớ tăng rất nhanh theo độ phân giải, vì sao nó tăng theo độ dài chuỗi, và vì sao các công trình sau phải thêm cơ chế quản lý bộ nhớ.
+
+Còn phần cứng. Các tác giả công bố hệ trên GPU để bàn cao cấp, không phải trên máy nhúng. Một Jetson Orin có ngân sách tính toán và băng thông bộ nhớ thấp hơn hẳn một GPU để bàn cùng thế hệ, và khoảng cách ấy thuộc loại bậc độ lớn chứ không phải vài chục phần trăm. Đây là hướng, không phải số đo: mình không có phép đo nào cho phát biểu này, và muốn một con số thì phải tự chạy. Thêm nữa, DROID-SLAM không dùng IMU, tức là bỏ đi tài sản mạnh nhất của một hệ stereo-inertial.
+
+\subsection{E. Một bảng tính ngân sách Orin, làm trong mười phút}
+Trước khi tải bất cứ mã nguồn nào về, có một việc rẻ hơn nhiều: đếm phép tính trên giấy. Nó không cho bạn con số đúng, nhưng nó cho bạn biết bạn đang hụt \emph{hai lần} hay \emph{hai mươi lần}. Hai kết luận đó dẫn tới hai quyết định hoàn toàn khác nhau.
+
+Giả sử mục tiêu là vài chục khung mỗi giây, và frontend cổ điển của bạn đã ăn một phần đáng kể ngân sách mỗi khung. Bảng~\ref{tab:f31-ngan-sach} liệt kê các khoản mục, cách tính từng khoản, và mức nặng nhẹ tương đối giữa chúng.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Các khoản mục ngân sách của một hệ đầu-cuối kiểu DROID trên phần cứng nhúng. Cột giữa là công thức đếm; cột cuối là \emph{xếp hạng định tính} giữa các khoản, kèm lý do của thứ hạng đó. Bảng này cố tình không có con số: nó dùng để biết nên cắt ở đâu, còn độ lớn thật thì chỉ phép đo trên chính thiết bị của bạn mới nói được.}
+\label{tab:f31-ngan-sach}
+\begin{tabularx}{\linewidth}{@{}L{3.2cm}YL{4.6cm}@{}}
+\toprule
+\textbf{Khoản mục} & \textbf{Cách tính} & \textbf{Thứ hạng, và vì sao}\\
+\midrule
+Mạng trích đặc trưng & Đếm phép nhân cộng của backbone ở độ phân giải đầu vào thật, không phải ở \(224\times224\) & Nặng. Chi phí tỉ lệ thẳng với số điểm ảnh, nên đo ở độ phân giải trong bài rồi suy ra độ phân giải thật là cách hụt nhiều lần\\
+Khối tương quan & \((H/8)(W/8)\) nhân \((H/8)(W/8)\) cho mỗi cạnh, nhân số byte & Nặng nhất về bộ nhớ. Đây là khoản duy nhất tăng theo \emph{bình phương} số vị trí, lại còn nhân với số cạnh của đồ thị khung\\
+Vòng lặp hồi quy & Nhân chi phí một bước với số bước, thường 3 tới 15 & Khoản đội chi phí lớn nhất, vì nó nhân thẳng mọi khoản phía trên lên vài lần tới hơn chục lần\\
+Giải hệ BA & Hệ camera rút gọn \(6N\times6N\), với \(N\) là số khung trong cửa sổ & Nhẹ nhất, và hay bị đổ oan. Nó nhỏ hơn phần sinh phép đo nhiều bậc, nên tối ưu nó gần như không đổi được gì\\
+Chuyển dữ liệu & Tổng byte đi qua bộ nhớ chia cho băng thông thật của thiết bị & Thường mới là nút cổ chai thật, và chỉ lộ ra khi bạn đếm byte thay vì đếm phép tính\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Cách dùng bảng quan trọng ngang bản thân bảng. Nhân các khoản theo đúng công thức ở cột giữa, chia cho thông lượng \emph{đo được} của thiết bị --- không phải con số đỉnh trên tờ thông số, vốn luôn cao hơn nhiều --- rồi so với ngân sách mỗi khung. Thứ bạn cần lấy ra từ phép tính đó không phải một con số mili-giây, mà đúng một bit thông tin: bạn đang hụt \emph{một chút} hay hụt \emph{một bậc độ lớn}. Hụt một chút thì đi đo thật, vì phép tính trên giấy không đủ chính xác để kết luận. Hụt một bậc thì đừng đo vội, vì kết luận đã rõ rồi: phải cắt hẳn một thừa số trước đã. Và đúng ba chỗ cắt được là: hạ độ phân giải, giảm số bước lặp, hoặc giảm mật độ. Mục kế tiếp là câu chuyện của lựa chọn thứ ba.
+
+\lk{B/11-gioi-han-tinh-toan}{cùng nguyên lý với}{đây chính là bài toán roofline của chương 11 áp cho một hệ SLAM: đếm phép tính và đếm byte trước, đo sau}
+
+\subsection{F. Thưa hoá: DPVO, DPV-SLAM và MAC-VO}
+Nếu chỗ đắt là mật độ, thì câu hỏi tự nhiên là mật độ có cần thiết không.
+
+\begin{mach}[Mạch --- từ dày đặc về thưa]
+\item \vd{DROID-SLAM chính xác nhưng cần phần cứng GPU để bàn cao cấp và một lượng bộ nhớ vượt xa máy nhúng, nên không đưa lên robot được.}
+\gp DPVO \cite{teed2023dpvo} bỏ trường dòng quang dày đặc. Thay vào đó nó theo vết một tập nhỏ các \emph{mảnh ảnh} vuông, mỗi khung khoảng một trăm mảnh, mỗi mảnh mang đúng một ẩn nghịch đảo độ sâu. Vẫn cùng toán tử hồi quy và cùng lớp hiệu chỉnh chùm tia, chỉ khác là chạy trên đồ thị mảnh.
+\gd Ích lợi thống kê của việc dày đặc bão hoà rất sớm, vì bản thân một mảnh đã là một phép trung bình trên nhiều điểm ảnh.
+\hq Số ẩn hình học mỗi khung giảm vài bậc độ lớn, và theo báo cáo của chính các tác giả thì hệ nhẹ đi đủ nhiều để chạy trên một GPU để bàn duy nhất thay vì nhiều card. Mình không kiểm chứng được các con số tốc độ và bộ nhớ họ đưa ra, nên ở đây chỉ giữ lại hướng của thay đổi.
+\gia Mất khả năng tự nhiên cho ra bản đồ dày đặc, và mất một phần sức chống chịu khi cảnh có rất ít vân.
+
+\item \vd{DPVO là odometry: không có bản đồ toàn cục, nên nó trôi và không bao giờ đóng vòng được.}
+\gp DPV-SLAM \cite{lipson2024dpvslam} thêm hai cơ chế đóng vòng. Một cơ chế dựa trên chính đồ thị mảnh cho các vòng gần, và một cơ chế truy hồi ảnh kiểu cổ điển cho các vòng xa. Sau đó chạy tối ưu đồ thị tư thế toàn cục.
+\hq Thành một hệ SLAM đầy đủ, vẫn gần thời gian thực trên một GPU.
+\gd Bài học còn quan trọng hơn kết quả: \emph{chưa ai học được cách thay thế đóng vòng và tối ưu đồ thị tư thế}. Ngay cả một hệ đầu-cuối cũng phải mượn lại đúng hai khối cổ điển đó.
+
+\item \vd{Trọng số vô hướng cho mỗi cặp khớp vẫn quá thô. Bất định của một cặp khớp stereo có hình dạng rất dẹt: dài theo tia nhìn và ngắn theo phương ngang.}
+\gp MAC-VO \cite{qiu2025macvo} dự đoán cả một hiệp phương sai cho từng cặp khớp. Quan trọng là hiệp phương sai ấy \emph{có đơn vị mét}, tức nó tính tới việc sai số độ sâu nở ra khi disparity nhỏ. Con số đó được dùng hai lần: để chọn điểm nào đáng giữ, và để làm ma trận thông tin trong bài toán tư thế.
+\hq Đây là cầu nối trực tiếp sang \ptr{F/34-imu-bat-dinh-va-trien-khai}. Thứ được học không còn là đặc trưng hay dòng quang, mà chính là \emph{ma trận thông tin} --- đúng đại lượng bạn đang đặt bằng tay.
+\gia Vẫn cần huấn luyện có chân trị, và bất định học được kế thừa mọi giới hạn phân phối ở mục 5. Chi tiết số của công trình này mình chưa tự kiểm chứng, nên chỉ nêu ý tưởng.
+\end{mach}
+
+Hình~\ref{fig:f31-mat-do} đặt ba mức mật độ cạnh nhau để thấy khoảng cách thật sự lớn tới đâu.
+
+\begin{figure}[H]\centering
+\resizebox{0.97\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  bx/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=5pt,align=center,font=\scriptsize,text width=3.4cm,minimum height=1.6cm},
+  hi/.style={bx,draw=accent,fill=amberbg},
+  ar/.style={-{Latex[length=2.6mm]},draw=tiercol,thick},
+  lb/.style={font=\scriptsize,color=tiercol,align=center,text width=3.5cm}]
+\node[bx] (a) at (0,0) {\textbf{Thưa}\\một ẩn cho mỗi\\\emph{điểm bản đồ} mới};
+\node[bx] (b) at (5.0,0) {\textbf{Mảnh}\\một ẩn cho mỗi\\\emph{mảnh ảnh} được theo vết};
+\node[hi] (c) at (10.0,0) {\textbf{Dày đặc}\\một ẩn cho mỗi\\\emph{điểm ảnh} ở 1/8 độ phân giải};
+\draw[ar] (a)--(b); \draw[ar] (b)--(c);
+\node[lb,below=0.3cm of a] {đơn vị đếm là đặc trưng nhận lại được, nên nó hiếm theo bản chất};
+\node[lb,below=0.3cm of b] {mỗi mảnh đã là một phép trung bình trên nhiều điểm ảnh};
+\node[lb,below=0.3cm of c] {không lọc gì cả: mọi điểm ảnh đều thành một ẩn};
+\node[font=\scriptsize,color=reddark,align=center,text width=10.5cm] at (5.0,-2.9)
+  {đi từ trái sang phải, số ẩn hình học mỗi khung then chốt tăng vài bậc độ lớn --- và gần hết chênh lệch bộ nhớ giữa hai họ nằm đúng ở đây};
+\end{tikzpicture}}
+\caption{Ba mức mật độ, đọc theo \emph{đơn vị đếm} chứ không theo con số. Điều đáng nhớ không phải mỗi họ giữ bao nhiêu ẩn, mà là mỗi họ lấy gì làm đơn vị: một hệ thưa đếm theo điểm bản đồ nhận lại được, DPVO đếm theo mảnh ảnh, DROID đếm theo điểm ảnh. Vì mỗi bậc trong ba bậc đó cách nhau vài bậc độ lớn về số lượng, thứ tự này quyết định gần như toàn bộ chênh lệch bộ nhớ giữa hai họ --- nhiều hơn hẳn mọi khác biệt về cài đặt.}
+\label{fig:f31-mat-do}
+\end{figure}
+
+\subsection{G. Đánh giá theo bốn câu hỏi}
+\textbf{Nó giải quyết việc gì.} Đóng góp thật của dòng này là trọng số theo từng cặp khớp và vòng sửa lặp lại. Hai thứ đó chạm đúng vào chuyển động nhanh và ảnh mờ. Đó là các trường hợp mà kiểm tra tỉ lệ khoảng cách mô tả cho ra hoặc quá ít cặp, hoặc quá nhiều cặp sai.
+
+\textbf{Có đáng làm không.} Với một hệ stereo-inertial đã tinh chỉnh chạy trên Orin thì chưa. Ba lý do, theo thứ tự nặng dần. Ngân sách tính toán chênh một bậc độ lớn. Toàn bộ dòng này bỏ IMU, nên bạn sẽ đánh đổi thứ đang cứu bạn ở những khung mờ để lấy thứ hứa cứu bạn ở những khung mờ. Và tính lặp lại sụt --- một hệ bạn không chẩn đoán được là một hệ bạn không bảo trì được.
+
+\textbf{Học gì từ thiết kế.} Ba bài học tách rời được, xếp theo mức dễ áp dụng. Dùng trọng số liên tục thay cho quyết định inlier nhị phân. Đưa nghiệm hiện tại quay lại cho tầng sinh phép đo, thay vì chạy một chiều. Và giữ đồ thị khung như một cấu trúc dữ liệu tường minh, thay vì để nó ẩn trong danh sách kề của bản đồ.
+
+\lk{F/30-do-sau-dong-quang-va-mo-hinh-nen}{tiền đề}{chất lượng của cả họ này bị chặn trên bởi chất lượng dòng quang, tức bởi đúng dòng RAFT mà chương 30 bàn}
+
+\section{VO tự giám sát và giới hạn thật của nó (Self-Supervised VO)}
+\ptrtarget{F/31/05}
+
+\subsection{A. Bài toán và cơ chế của SfM-Learner}
+Chân trị tư thế đắt. Cần một hệ đo động ngoài, hoặc một buổi chạy COLMAP dài. Câu hỏi của SfM-Learner \cite{zhou2017sfmlearner} là: có thể huấn luyện chỉ bằng video thô không?
+
+Cơ chế gọn và đẹp. Hai mạng cùng học. Mạng độ sâu nhận một khung và xuất bản đồ độ sâu. Mạng tư thế nhận một cặp khung và xuất phép biến đổi giữa chúng. Có độ sâu, có tư thế, có nội tham số camera thì \emph{dựng lại} được khung đích từ khung nguồn bằng phép cong ảnh. \vn{Hàm mất mát}{loss function} là chênh lệch giữa ảnh dựng lại và ảnh thật. Không cần nhãn nào.
+
+Chi tiết cứu cả ý tưởng là \emph{mặt nạ giải thích được}. Đó là một đầu ra thứ ba, một con số mỗi điểm ảnh, cho phép mạng nói ``điểm này tôi không giải thích được, đừng phạt tôi''. Nó xử lý vật thể chuyển động, vùng bị che, vùng ra ngoài khung. Nhưng nó có một nghiệm suy biến hiển nhiên: đặt mặt nạ bằng 0 ở mọi nơi thì mất mát bằng 0. Nên phải cộng một số hạng chính quy kéo mặt nạ về 1. Điểm này đáng ghi nhớ, vì nó là mẫu chung của mọi thiết kế tự giám sát: \textbf{cho mô hình quyền bỏ qua dữ liệu thì phải bắt nó trả tiền cho quyền đó}.
+
+\begin{figure}[H]\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.55cm,
+  bx/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\small,text width=2.05cm,minimum height=0.92cm},
+  net/.style={bx,draw=violetdark,fill=violetbg},
+  ls/.style={bx,draw=accent,fill=amberbg},
+  bad/.style={draw=reddark,fill=redbg,rounded corners=2pt,inner sep=3pt,align=center,font=\scriptsize,text width=2.6cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  br/.style={-{Latex[length=2mm]},draw=reddark,thick,densely dashed},
+  lb/.style={font=\scriptsize,color=tiercol}]
+\node[bx] (it) at (0,0) {khung \(t\)};
+\node[bx] (is) at (0,-1.5) {khung \(t{+}1\)};
+\node[net] (dn) at (3.0,0) {mạng độ sâu\\\(d_t\)};
+\node[net] (pn) at (3.0,-1.5) {mạng tư thế\\\(T_{t\to t+1}\)};
+\node[bx] (wp) at (6.0,-0.75) {cong ảnh\\\(\hat I_t\)};
+\node[ls] (lo) at (9.0,-0.75) {mất mát\\dựng lại ảnh};
+\node[net] (mk) at (9.0,1.55) {mặt nạ\\giải thích được};
+\draw[ar] (it)--(dn); \draw[ar] (is)--(pn);
+\draw[ar] (dn)--(wp); \draw[ar] (pn)--(wp); \draw[ar] (wp)--(lo); \draw[ar] (mk)--(lo);
+\draw[ar] (is.south) to[out=-30,in=-140] (wp.south west);
+\draw[br] (lo.north) to[out=128,in=48] (dn.north east);
+
+\node[bad] (b2) at (1.7,-3.4) {tỉ lệ tự do: nhân độ sâu và tịnh tiến cùng một hằng số thì mất mát không đổi};
+\node[bad] (b1) at (5.4,-3.4) {vật chuyển động: mặt nạ che, nên tư thế mất dữ liệu ở đúng chỗ đó};
+\node[bad] (b3) at (9.1,-3.4) {không có bản đồ: sai số cộng dồn, không cơ chế nào sửa được quá khứ};
+\draw[br] (lo.south) -- (b3.north);
+\end{tikzpicture}}
+\caption{Vòng huấn luyện tự giám sát kiểu SfM-Learner, và ba chỗ hỏng gắn liền với nó. Tín hiệu dạy duy nhất là ``dựng lại khung \(t\) từ khung \(t{+}1\) thì phải khớp''. Ba hộp đỏ không phải lỗi cài đặt mà là hệ quả trực tiếp của chính hàm mất mát đó: mặt nạ mua sự bền vững bằng cách vứt dữ liệu, tỉ lệ không quan sát được từ ảnh đơn, và không có trạng thái nào để một lần quan sát lại có thể sửa quá khứ.}
+\label{fig:f31-tugiamsat}
+\end{figure}
+
+\subsection{B. Bốn giới hạn, nói thẳng}
+Đây là mục một kỹ sư SLAM cần đọc kỹ nhất, vì các bảng kết quả trong dòng này rất dễ đọc nhầm.
+
+\begin{itemize}
+\item \textbf{Mơ hồ tỉ lệ.} Với ảnh đơn, nhân độ sâu với \(s\) và nhân tịnh tiến với \(s\) cho ra đúng cùng một ảnh dựng lại. Mất mát không phân biệt được hai trường hợp. Nên đầu ra chỉ đúng tới một hằng số chưa biết, và hằng số đó còn trôi giữa các cảnh. Nhiều bảng KITTI trong dòng này căn tỉ lệ với chân trị \emph{theo từng chuỗi} trước khi tính lỗi. Một robot không làm được việc đó, nên con số ấy không phải con số odometry dùng được. UnDeepVO \cite{li2018undeepvo} chữa bằng cách huấn luyện trên cặp stereo --- đường cơ sở đã biết bơm tỉ lệ mét vào --- rồi chạy đơn ảnh lúc suy luận.
+\item \textbf{Không có bản đồ, nên không có đóng vòng.} Mạng tư thế là phép ước lượng chết theo từng cặp khung. Sai số cộng dồn và không gì kéo nó về được. Toàn bộ độ chính xác của hệ thống của bạn đến từ việc quan sát lại cùng một điểm bản đồ qua nhiều khung then chốt. Ở đây cơ chế đó không tồn tại.
+\item \textbf{Không có bảo đảm, và hỏng êm.} Không hiệp phương sai, không phần dư để kiểm, không cổng \(\chi^2\). Khi sai, nó sai một cách mượt mà và tự tin. So sánh với hệ của bạn: khi sắp mất bám, số inlier tụt trước, và bạn thấy được.
+\item \textbf{Phụ thuộc phân phối huấn luyện.} DeepVO \cite{wang2017deepvo} hồi quy tư thế trực tiếp và rất tốt trên KITTI. Một phần lý do là nó học luôn \emph{tiên nghiệm chuyển động của một chiếc ô tô}: đi thẳng, tốc độ trong một dải hẹp, góc lệch nhỏ. Đó là một cơ chế thật chứ không phải lời chê. Đưa mô hình sang camera cầm tay hoặc drone thì tiên nghiệm ấy sai, và nó sai theo hướng có hệ thống.
+\end{itemize}
+
+\subsection{C. Mơ hồ tỉ lệ, nhìn bằng một phép tính}
+Giới hạn thứ nhất đáng được làm cho cụ thể, vì nó là chỗ nhiều người đọc bảng kết quả bị lừa.
+
+Phép cong ảnh dùng đúng một biểu thức. Điểm ảnh \(u\) ở khung nguồn được đưa về khung đích qua độ sâu \(d(u)\) và phép biến đổi \((R, t)\). Bây giờ thay \(d \to s\,d\) và \(t \to s\,t\) với cùng một hằng số \(s>0\). Toạ độ chiếu ra không đổi, vì \(s\) rút gọn giữa tử và mẫu. Ảnh dựng lại giống hệt, nên mất mát giống hệt. Kết luận: hàm mất mát \emph{không chứa thông tin nào} về \(s\).
+
+Sự kiện nhỏ này dẫn tới một hệ quả lớn khi đọc bảng. Giả sử --- đây là một phép tính giả định, không trích từ bài nào --- một hệ báo lỗi tịnh tiến vài phần trăm chiều dài quỹ đạo, sau khi đã căn tỉ lệ theo từng chuỗi. Nếu bạn không được căn tỉ lệ, và tỉ lệ ước lượng lệch mười phần trăm, thì riêng sai lệch tỉ lệ đã sinh ra lỗi bằng mười phần trăm chiều dài quỹ đạo --- lớn hơn hẳn con số được báo cáo, và lớn dần theo quãng đường đi. Con số trong bảng khi đó nói về \emph{hình dạng} quỹ đạo, không nói về \emph{vị trí}. Với một robot cần biết mình đang ở đâu, hai đại lượng đó không thay thế nhau được.
+
+Cách kiểm nhanh khi đọc một bài báo trong dòng này chỉ có hai câu hỏi. Tỉ lệ được lấy từ đâu: từ stereo, từ IMU, hay từ chân trị? Và nếu từ chân trị thì căn một lần cho cả chuỗi hay căn lại theo từng đoạn? Căn theo từng đoạn là dấu hiệu tỉ lệ đang trôi, và độ trôi đó chính là thứ bị giấu đi.
+
+\subsection{D. TartanVO và cách chữa đúng chỗ}
+TartanVO \cite{wang2021tartanvo} là câu trả lời có kỷ luật cho gạch đầu dòng cuối. Hai thủ thuật của nó đáng học kể cả khi bạn không dùng mô hình.
+
+Thứ nhất, \textbf{bỏ tỉ lệ ra khỏi hàm mất mát}. Ép mạng học tỉ lệ tuyệt đối từ ảnh đơn thì nó buộc phải học tỉ lệ đặc thù của tập dữ liệu. Chuẩn hoá vectơ tịnh tiến trong hàm mất mát thì mạng chỉ còn phải học hướng, và hướng thì tổng quát hoá được.
+
+Thứ hai, \textbf{đưa mô hình camera vào đầu vào}. Nối thêm vài kênh mã hoá nội tham số đã chuẩn hoá vào tensor đầu vào. Nhờ đó một mô hình duy nhất phục vụ nhiều camera có tiêu cự và độ méo khác nhau, thay vì phải huấn luyện lại cho từng camera.
+
+Kết quả là một mô hình chạy qua nhiều tập dữ liệu mà không tinh chỉnh lại. Độ chính xác khiêm tốn, nhưng tính tổng quát là thật. Bài học chung: muốn tổng quát hoá thì lấy đại lượng đặc thù tập dữ liệu ra khỏi hàm mất mát, và đưa thông tin thiết bị vào đầu vào.
+
+\subsection{E. Nhánh giữ lại bộ giải cổ điển}
+Bốn công trình còn lại trong mục này đáng nhắc vì chúng chọn một kiến trúc khác hẳn. Với người đọc này, đó mới là kiến trúc đáng dùng.
+
+\begin{itemize}
+\item \textbf{DeepTAM} \cite{zhou2018deeptam} tách tracking và mapping đúng như một hệ cổ điển rồi học từng phần, thay vì trộn cả hai vào một mạng.
+\item \textbf{DeepV2D} \cite{teed2020deepv2d} luân phiên một khối độ sâu và một khối chuyển động, trong đó khối chuyển động là một bước Gauss-Newton khả vi. Nó là cầu nối giữa mục này và mục 4.
+\item \textbf{MonoRec} \cite{wimbauer2021monorec} học độ sâu đa khung có xử lý vật chuyển động, nhưng \emph{lấy tư thế từ một hệ SLAM cổ điển}. Nó không cố thay bộ ước lượng tư thế.
+\item \textbf{TANDEM} \cite{koestler2021tandem} đi xa nhất theo hướng đó. Tracking bằng phương pháp trực tiếp cổ điển, còn phần học được chỉ lo dựng bản đồ dày đặc, rồi hợp nhất vào một trường TSDF.
+\end{itemize}
+
+Bốn công trình trên vẽ ra một mẫu thiết kế rõ ràng: \textbf{giữ bộ ước lượng tư thế cổ điển, học phần dày đặc}. Với một hệ stereo-inertial đã chạy tốt, đây là mẫu duy nhất trong cả mục 5 mà mình cho là đáng thử, vì nó không đặt cược thứ đang hoạt động.
+
+\section{Biểu diễn ẩn: nén hình học vào một mã ngắn (Latent Scene Representations)}
+\ptrtarget{F/31/06}
+
+\subsection{A. Vấn đề mà mã ngắn định giải}
+Bản đồ độ sâu dày đặc của một khung có cỡ \(10^5\) ẩn. Đưa từng ấy ẩn vào một bài toán bình phương tối thiểu thì hoặc phải chính quy hoá bằng luật kinh nghiệm, hoặc phải có GPU. Nhưng hình học của một căn phòng thật không có \(10^5\) bậc tự do. Tường phẳng, sàn phẳng, vật thể có hình dạng quen thuộc. Hình học ấy nằm gần một đa tạp số chiều thấp.
+
+CodeSLAM \cite{bloesch2018codeslam} rút ra kết luận trực tiếp. Học một bộ mã hoá đưa ảnh về một \emph{mã} ngắn \(c\) cỡ vài chục chiều, cùng một bộ giải mã \(D(c, I)\) trả về bản đồ độ sâu. Rồi đặt \(c\) vào đồ thị nhân tử \emph{ngay cạnh các nút tư thế}, và tối ưu chung.
+
+Chi tiết kỹ thuật làm ý tưởng chạy được ít khi được nhắc, nhưng nó là mấu chốt. Bộ giải mã được thiết kế để \emph{gần tuyến tính theo \(c\)} khi đã cố định ảnh. Nhờ đó \(\partial D/\partial c\) tính một lần cho mỗi khung then chốt rồi dùng lại cho mọi bước Gauss-Newton. Không có tính chất đó thì mỗi lần tuyến tính hoá tốn một lượt ngược qua mạng, và bài toán hết khả thi thời gian thực.
+
+\begin{figure}[H]\centering
+\resizebox{0.96\linewidth}{!}{%
+\begin{tikzpicture}[
+  bx/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\small,text width=2.0cm,minimum height=0.9cm},
+  net/.style={bx,draw=violetdark,fill=violetbg},
+  pose/.style={circle,draw=inkblue,fill=bluebg,minimum size=0.75cm,font=\scriptsize},
+  code/.style={circle,draw=violetdark,fill=violetbg,minimum size=0.75cm,font=\scriptsize},
+  fac/.style={rectangle,draw=accent,fill=accent,minimum size=0.17cm,inner sep=0pt},
+  ar/.style={-{Latex[length=2mm]},draw=steel,thick},
+  ln/.style={draw=tiercol},
+  lb/.style={font=\scriptsize,color=tiercol},
+  ti/.style={font=\small\sffamily\bfseries,color=inkblue}]
+
+\node[ti] at (1.6,1.45) {Bộ mã hoá và bộ giải mã};
+\node[bx] (im) at (0,0) {ảnh \(I\)};
+\node[net] (enc) at (2.6,0) {mã hoá};
+\node[code] (c) at (5.0,0) {\(c\)};
+\node[net] (dec) at (7.4,0) {giải mã\\gần tuyến tính};
+\node[bx] (d) at (10.0,0) {độ sâu\\\(4\,800\) số};
+\draw[ar] (im)--(enc); \draw[ar] (enc)--(c); \draw[ar] (c)--(dec); \draw[ar] (dec)--(d);
+\draw[ar] (im.south) to[out=-35,in=-145] (dec.south);
+\node[lb,above=0.05cm of c] {32 số};
+
+\node[ti] at (1.6,-2.3) {Đồ thị nhân tử};
+\node[pose] (p1) at (0,-3.5) {\(T_1\)};
+\node[pose] (p2) at (2.6,-3.5) {\(T_2\)};
+\node[pose] (p3) at (5.2,-3.5) {\(T_3\)};
+\node[code] (c1) at (1.3,-4.9) {\(c_1\)};
+\node[code] (c2) at (3.9,-4.9) {\(c_2\)};
+\node[fac] at ($(p1)!0.5!(c1)$) {};
+\node[fac] at ($(p2)!0.5!(c1)$) {};
+\node[fac] at ($(p2)!0.5!(c2)$) {};
+\node[fac] at ($(p3)!0.5!(c2)$) {};
+\draw[ln] (p1)--(c1); \draw[ln] (p2)--(c1); \draw[ln] (p2)--(c2); \draw[ln] (p3)--(c2);
+\draw[ln] (p1)--(p2); \draw[ln] (p2)--(p3);
+\node[lb,anchor=west,text width=5.0cm] at (6.2,-4.2) {mỗi nút mã thay cho \(4\,800\) ẩn độ sâu, nhưng nó nối tới \emph{mọi} tư thế cùng quan sát khung đó};
+\end{tikzpicture}}
+\caption{Ý tưởng của CodeSLAM. Bộ giải mã được thiết kế gần tuyến tính theo mã \(c\), nên \(\partial D/\partial c\) là một ma trận cố định, tính một lần cho mỗi khung then chốt. Nhờ đó mã trở thành một biến bình thường trong đồ thị nhân tử, đứng ngang hàng với tư thế, và hình học dày đặc được tối ưu chung với quỹ đạo bằng đúng bộ giải bạn đã có.}
+\label{fig:f31-ma-ngan}
+\end{figure}
+
+\subsection{B. Đếm ẩn và đếm chi phí tuyến tính hoá}
+Ba con số cho thấy vì sao mã ngắn hấp dẫn tới vậy, và cũng cho thấy chỗ nó âm thầm đắt.
+
+\emph{Số ẩn.} Một bản đồ độ sâu ở 1/8 của ảnh 640\(\times\)480 có 4\,800 ẩn. Một mã 32 chiều thay thế cả từng ấy. Tỉ số nén là 150 lần. Khối cấu trúc trong hệ phương trình chuẩn co từ \(4800\times4800\) đường chéo xuống \(32\times32\) đặc, và biên hoá một khối \(32\times32\) là chuyện vặt.
+
+\emph{Chi phí Jacobian.} Đây mới là chỗ ẩn chi phí. Ma trận \(\partial D/\partial c\) có kích thước \(4800\times32\), tức khoảng 154 nghìn số. Nếu bộ giải mã \emph{không} gần tuyến tính theo \(c\) thì ma trận đó phải tính lại ở mỗi lần tuyến tính hoá, và mỗi lần tính là 32 lượt ngược qua bộ giải mã. Với năm bước Gauss-Newton là 160 lượt ngược cho mỗi khung then chốt. Không hệ thời gian thực nào chịu nổi.
+
+\emph{Vì sao gần tuyến tính lại cứu được.} Nếu \(D(c,I) \approx D_0(I) + J(I)\,c\) thì \(J\) chỉ phụ thuộc ảnh, nên tính một lần khi khung then chốt được tạo rồi dùng lại mãi. Chi phí mỗi bước Gauss-Newton trở về đúng một phép nhân ma trận, y như một cạnh chiếu lại thông thường. Toàn bộ tính khả thi của CodeSLAM nằm ở dòng vừa rồi. Và giá của nó là điều kiện gần tuyến tính chỉ đúng trong một lân cận nhỏ, tức lý do thứ hai ở mục C bên dưới.
+
+\subsection{C. Dòng công trình}
+SceneCode \cite{zhi2019scenecode} mở rộng mã sang cả nhãn ngữ nghĩa, để hình học và ngữ nghĩa cùng được tinh chỉnh. DeepFactors \cite{czarnowski2020deepfactors} đưa mã vào một đồ thị nhân tử thật với ba loại nhân tử --- quang trắc, chiếu lại, và hình học thưa --- rồi chạy được thời gian thực. NodeSLAM \cite{sucar2020nodeslam} đổi phạm vi: mỗi \emph{vật thể} có một mã hình dạng riêng, và tối ưu chạy trên tư thế cộng hình dạng của từng vật. CodeMapping \cite{matsuki2021codemapping} thực dụng nhất: giữ nguyên ORB-SLAM3 làm xương sống thưa, rồi chạy một tầng bản đồ dày đặc bằng mã ở bên cạnh, có điều kiện trên chính các điểm thưa đó.
+
+\subsection{D. Vì sao hướng này chưa thắng}
+Câu hỏi này giá trị hơn danh sách trên. Ý tưởng đẹp, cài đặt chạy được, người làm giỏi. Vậy tại sao tám năm sau nó vẫn không nằm trong hệ sản xuất nào? Bốn lý do, xếp theo mức nền tảng.
+
+\textbf{Thứ nhất, sai số của tiên nghiệm có tương quan chứ không thưa.} Toàn bộ phòng thủ của ước lượng robust dựa trên một giả định: điểm ngoại lai thì ít và độc lập với nhau. Một bộ giải mã huấn luyện trên ảnh RGB-D trong nhà không sinh ra sai số như vậy. Nó sinh ra những bề mặt trơn, hợp lý, sai một cách có hệ thống, và \emph{nhất quán giữa các khung} vì cùng một bộ giải mã tạo ra chúng. Với một cổng \(\chi^2\), thứ đó trông y hệt một bức tường thật. Đây là lý do sâu nhất, và nó áp cho mọi tiên nghiệm học được chứ không riêng mã hình học.
+
+Để thấy điều đó, hãy so hai kiểu lỗi trên cùng một cổng \(\chi^2\), bằng một ví dụ \emph{giả định} --- không phải số đo trên hệ nào. Một cặp khớp sai lệch cỡ vài chục điểm ảnh cho \(\chi^2\) vọt lên hàng trăm, nên cổng 5,991 loại nó ngay ở khung đầu tiên. Bây giờ giả sử bộ giải mã dựng một bề mặt lệch \(\Delta Z\) vài chục centimét ở khoảng cách vài mét. Đưa độ lệch ấy qua công thức chiếu \(\Delta u = f\,b\,\Delta Z/Z^2\), với \(f\) và \(b\) của một cấu hình stereo cỡ EuRoC, phần dư thu được nhỏ hơn một điểm ảnh --- vì \(Z^2\) ở mẫu số nuốt gần hết độ lệch. Nó lọt qua mọi cổng. Tệ hơn, nó lọt qua ở \emph{mọi} khung cùng một kiểu, nên các khung củng cố lẫn nhau và bộ ước lượng càng lúc càng tự tin vào một bức tường không có thật.
+
+\textbf{Thứ hai, bán kính hiệu lực của phép tuyến tính hoá rất nhỏ.} Bộ giải mã chỉ gần tuyến tính \emph{quanh mã mà bộ mã hoá vừa xuất ra}. Một hiệu chỉnh lớn sẽ đi ra ngoài vùng đó, và \(\partial D/\partial c\) không còn đúng. Nói cách khác, tối ưu chỉ sửa được những sai lệch nhỏ --- đúng trường hợp mà dự đoán ban đầu vốn đã tốt.
+
+\textbf{Thứ ba, độ phủ.} Ba mươi hai chiều đủ cho phân phối huấn luyện và không đủ cho thứ khác. Ngoài trời, ban đêm, một sàn nhà máy đầy kim loại phản chiếu --- bộ giải mã không có cơ sở nào để dựng bề mặt ở đó, nhưng nó vẫn dựng ra một bề mặt.
+
+\textbf{Thứ tư, phần thưởng đã dời chỗ.} Năm 2018, đây gần như là con đường duy nhất để có bản đồ dày đặc tối ưu được. Tới 2023, 3D Gaussian Splatting \cite{kerbl20233dgs} cho một bản đồ dày đặc, tinh chỉnh tăng dần được, chất lượng ảnh cao hơn hẳn, mà không cần bất cứ tiên nghiệm học được nào về hình dạng. Đó là nội dung của \ptr{F/32-ban-do-neural}. Thêm nữa, xét riêng độ chính xác quỹ đạo, dòng mã ngắn chưa bao giờ vượt được SLAM đặc trưng thưa. Bản đồ mới là sản phẩm, còn tư thế chỉ là sản phẩm phụ.
+
+\subsection{E. Cái còn lại}
+Trước khi rời mục này, đáng chốt lại một bài kiểm tra hai câu, dùng được cho \emph{mọi} tiên nghiệm học được mà bạn định cắm vào backend --- mã hình học, độ sâu đơn ảnh, hay pháp tuyến bề mặt.
+
+\textbf{Câu thứ nhất: sai số của nó có độc lập giữa các khung không?} Nếu cùng một mạng sinh ra dự đoán cho mọi khung thì câu trả lời gần như luôn là không. Khi đó nhân robust và cổng \(\chi^2\) mất tác dụng, và bạn phải hạ trọng số của cả nhóm phép đo ấy bằng tay, chứ không thể trông vào bộ ước lượng tự loại.
+
+\textbf{Câu thứ hai: sai số của nó có biểu hiện thành phần dư lớn không?} Đây là câu hỏi định lượng, và mục trước đã cho cách tính: đổi độ lệch hình học ra phần dư điểm ảnh bằng công thức chiếu. Nếu một sai lệch nguy hiểm chỉ tạo ra phần dư dưới một điểm ảnh thì không cổng nào bắt được nó, và tiên nghiệm ấy phải được cấp một hiệp phương sai lớn ngay từ đầu.
+
+Hai câu đó không cần thí nghiệm nào. Chúng trả lời được trên giấy trong mười phút, và chúng loại đi phần lớn ý tưởng nghe hay.
+
+Dù vậy có một mảnh đáng giữ, và nó không phải cái mã. Đó là ý tưởng đặt một biến ẩn số chiều thấp vào đồ thị nhân tử rồi ước lượng luôn hiệp phương sai của nó. Dạng khoẻ mạnh nhất của ý tưởng ấy là NodeSLAM. Một mã hình dạng cho \emph{một loại vật thể cụ thể} là tiên nghiệm được xác định rõ hơn nhiều so với một mã cho ``một căn phòng''. Tiên nghiệm càng hẹp thì càng ít cơ hội bịa ra bề mặt.
+
+\begin{cannho}
+Trong một bộ ước lượng bình phương tối thiểu, thứ nguy hiểm không phải là tiên nghiệm học được \emph{sai}, mà là nó sai \emph{một cách trơn tru và nhất quán giữa các khung}. Nhân robust, cổng \(\chi^2\) và RANSAC đều được thiết kế cho ngoại lai thưa và độc lập. Không cái nào bắt được một bề mặt bịa ra mà mọi khung đều đồng ý. Trước khi cắm bất cứ đầu ra học được nào vào backend, hãy hỏi đúng một câu: \emph{sai số của nó có độc lập giữa các khung không}. \T{1}
+\end{cannho}
+
+\section{Giới hạn và trường hợp hỏng}
+\ptrtarget{F/31/07}
+
+\subsection{A. Giới hạn của chính ý tưởng khả vi}
+Chế độ hỏng nền tảng nhất đã nêu ở mục 2 và đáng nhắc lại thành một câu: \textbf{\en{gradient} chỉ chảy qua những thứ vốn đã liên tục}. Trong một hệ SLAM đầy đủ, các quyết định đắt giá nhất lại rời rạc. Chèn hay không chèn khung then chốt. Chấp nhận hay từ chối một ứng viên đóng vòng. Gộp hay không gộp hai bản đồ. Không cái nào có đạo hàm. Nên cụm từ ``đầu-cuối'' luôn hẹp hơn nghĩa đen của nó. Phần được học chính là phần vốn đã trơn, còn xương sống rời rạc vẫn do luật viết tay quyết định --- và đó thường là phần gây ra các lần hỏng nặng nhất.
+
+Chế độ hỏng thứ hai nằm ở ổn định số. \(H^{-1}\) nở ra khi \(H\) gần suy biến, tức khi thị sai thấp, khi camera quay gần như thuần tuý, khi ảnh mờ. Đó chính xác là những khung bạn muốn mạng học từ chúng. Nên \en{gradient} lớn nhất và nhiễu nhất lại đến từ các mẫu quý nhất. Mọi cách chữa --- tăng damping, cắt \en{gradient}, giảm số bước lặp --- đều làm thiên lệch đạo hàm theo hướng làm nhẹ đúng các mẫu đó.
+
+Chế độ hỏng thứ ba là hàm mất mát. \en{Gradient} chỉ tốt bằng đại lượng bạn đặt ở cuối. Huấn luyện trên các đoạn video ngắn với lỗi tư thế theo cặp khung thì chỉ tối ưu tính nhất quán ngắn hạn. Nó không tối ưu độ trôi sau ba trăm mét, cũng không tối ưu xác suất đóng vòng đúng. Hai thứ đó lại chiếm phần lớn sai số thật của bạn. Đây là biến thể của bài học đo lường ở \ptr{E/24-thi-nghiem-va-ablation}: tối ưu cái bạn đo được thay vì cái bạn quan tâm là một cái bẫy, không phải một chiến lược.
+
+\subsection{B. Giới hạn của các hệ cụ thể}
+Ba giới hạn dùng chung cho cả bốn họ trong chương. \emph{Dữ liệu huấn luyện} gần như luôn là TartanAir, KITTI hoặc ScanNet, nên phân phối chuyển động và phân phối cảnh đều hẹp hơn hiện trường. \emph{Vắng IMU}: dòng đầu-cuối hầu như không dùng IMU, nên nó vứt đi thứ duy nhất còn tin được khi ảnh mờ. \emph{Ngân sách nhúng}: các con số ấn tượng đều đo trên GPU để bàn, và khoảng cách tới Orin là bậc độ lớn.
+
+Còn một giới hạn ít được nói mà bạn sẽ gặp ngay ngày đầu, đó là \textbf{tính lặp lại}. Bạn đã tốn công truy các nguồn phi tất định trong hệ hiện tại --- thứ tự duyệt container, tranh chấp luồng --- để mỗi cấu hình chạy ba lần cho ra số dùng được. Đưa một mạng vào giữa bộ ước lượng là đưa thêm phi tất định của thư viện GPU vào đúng chỗ đó, và lần này không có bug nào để sửa. Sàn nhiễu của harness sẽ dâng lên, và mọi kết luận cũ phải đo lại.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Bốn họ trong chương, đọc theo cùng bốn câu hỏi. Cột cuối là cột quyết định với một hệ stereo-inertial đã tinh chỉnh kỹ, chạy trên phần cứng nhúng.}
+\label{tab:f31-bon-ho}
+\begin{tabularx}{\linewidth}{@{}L{2.3cm}L{3.4cm}YL{3.5cm}@{}}
+\toprule
+\textbf{Họ} & \textbf{Cơ chế cốt lõi} & \textbf{Hỏng khi nào} & \textbf{Lấy riêng được phần nào}\\
+\midrule
+Lớp tối ưu khả vi & Đạo hàm qua nghiệm \(\arg\min\), bằng hàm ẩn hoặc trải phẳng & \(H\) suy biến; bộ giải bị cắt ngắn; hoặc không có gì để huấn luyện & Gần như toàn bộ: nó là hạ tầng, không phải một hệ SLAM\\
+Đầu-cuối dày đặc & Dòng quang dày, trọng số học được, BA trong vòng lặp & Ngân sách nhúng; không dùng IMU; bộ nhớ tăng theo độ dài chuỗi & Trọng số liên tục thay quyết định inlier; vòng phản hồi nghiệm về phép đo\\
+Đầu-cuối thưa & Theo vết mảnh ảnh; hiệp phương sai theo từng cặp khớp & Cảnh rất ít vân; vẫn cần GPU; vẫn phụ thuộc phân phối & Hiệp phương sai học được có đơn vị mét --- mảnh đáng lấy nhất chương\\
+Tự giám sát và mã ẩn & Mất mát dựng lại ảnh; nén hình học vào mã ngắn & Mơ hồ tỉ lệ; không đóng vòng; tiên nghiệm bịa bề mặt nhất quán & Mẫu ``giữ bộ giải cổ điển, học phần dày đặc'' kiểu TANDEM\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{C. Kết luận thẳng thắn}
+Với một hệ stereo-inertial đã tinh chỉnh kỹ, chạy thời gian thực trên Orin, có harness đo được và có kỷ luật ablation: \textbf{hệ đầu-cuối hiện chưa phải lựa chọn thay thế}. Không phải vì ý tưởng sai, mà vì bảng cân đối không có lợi. Bạn sẽ đổi tính chẩn đoán, tính lặp lại và một bậc độ lớn ngân sách tính toán, để lấy một cải thiện chỉ hiện ra trên một phần các cảnh, và mất luôn IMU trên đường đi.
+
+Nhưng kết luận đó không kéo theo ``cả chương này vô dụng''. Có hai mảnh tách rời được, và cả hai đều nhỏ hơn nhiều so với việc thay cả hệ.
+
+\begin{itemize}
+\item \textbf{Lớp bất định học được.} Thay ma trận thông tin hằng số \(\sigma_\ell^{-2}I\) bằng một hiệp phương sai dự đoán theo từng cặp khớp. Nó cắm vào đúng chỗ backend hiện có đang đọc trọng số, không đụng tới bộ giải, và tắt được bằng một cờ. Đây là mảnh đáng thử trước tiên, và \ptr{F/34-imu-bat-dinh-va-trien-khai} là chỗ bàn nó cho cả camera lẫn IMU.
+\item \textbf{Lớp tối ưu khả vi như một công cụ chẩn đoán ngoại tuyến.} Bạn không cần chạy nó lúc suy luận. Bạn có thể dựng lại bài toán backend của mình trong một lớp khả vi, chạy ngoại tuyến trên dữ liệu đã có chân trị, rồi lấy \en{gradient} của APE theo các nút vặn để biết nút nào thật sự quan trọng. Đó là một công cụ \emph{phân tích độ nhạy}, rẻ hơn quét lưới rất nhiều, và nó không thêm rủi ro nào vào hệ đang chạy.
+\end{itemize}
+
+Hình~\ref{fig:f31-cay-quyet-dinh} gói cả kết luận đó thành một cây quyết định bốn câu hỏi. Nó cố tình bắt đầu bằng câu hỏi về dữ liệu chứ không phải về phương pháp, vì thiếu chân trị thì mọi nhánh còn lại đều vô nghĩa.
+
+\begin{figure}[H]\centering
+\resizebox{0.99\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.75cm and 0.5cm,
+  q/.style={draw=reddark,fill=redbg,diamond,aspect=2.1,inner sep=1pt,align=center,font=\scriptsize,text width=2.1cm},
+  a/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\scriptsize,text width=2.9cm,minimum height=1.0cm},
+  go/.style={a,draw=accent,fill=amberbg},
+  ar/.style={-{Latex[length=2mm]},draw=steel},
+  lb/.style={font=\scriptsize\itshape,color=reddark}]
+\node[q] (q1) at (0,0) {Có chân trị quỹ đạo cho dữ liệu của bạn không?};
+\node[a] (n1) at (0,-2.4) {Dừng. Dựng khả năng đo trước, xem \ptr{E/24}};
+\node[q] (q2) at (6.0,0) {Hệ hiện tại đã đạt yêu cầu chưa?};
+\node[go] (n2) at (6.0,-2.4) {Chỉ dùng lớp khả vi \emph{ngoại tuyến} để xếp hạng độ nhạy};
+\node[q] (q3) at (11.8,0) {Chỗ hỏng nằm ở đâu?};
+\node[go] (n3) at (16.0,1.6) {Trọng số sai \(\rightarrow\) hiệp phương sai học được, \ptr{F/34}};
+\node[a] (n4) at (16.0,-0.25) {Ghép cặp gãy \(\rightarrow\) đặc trưng học được, \ptr{F/28}};
+\node[a] (n5) at (16.0,-2.1) {Cần bản đồ dày đặc \(\rightarrow\) mẫu TANDEM, hoặc \ptr{F/32}};
+\node[a] (n6) at (16.0,-3.95) {Chưa có hệ nào \(\rightarrow\) khởi đầu bằng DPVO / DPV-SLAM};
+\draw[ar] (q1) -- node[lb,left]{không} (n1);
+\draw[ar] (q1) -- node[lb,above]{có} (q2);
+\draw[ar] (q2) -- node[lb,left]{rồi} (n2);
+\draw[ar] (q2) -- node[lb,above]{chưa} (q3);
+\draw[ar] (q3) -- (n3); \draw[ar] (q3) -- (n4); \draw[ar] (q3) -- (n5); \draw[ar] (q3) -- (n6);
+\end{tikzpicture}}
+\caption{Cây quyết định cho cả chương. Câu hỏi đầu tiên cố tình không phải về phương pháp mà về dữ liệu: không có chân trị thì không có \en{gradient} nào để lấy, nên mọi nhánh phía sau đều vô nghĩa. Hai ô màu cam là hai kết luận ``đáng làm'' duy nhất cho một hệ stereo-inertial đã tinh chỉnh kỹ; ba ô còn lại chỉ dùng cho các tình huống khác hẳn.}
+\label{fig:f31-cay-quyet-dinh}
+\end{figure}
+
+\section{Thực hành}
+\ptrtarget{F/31/08}
+\begin{description}
+\item[Repo và tài nguyên.] \repo{princeton-vl/lietorch} cho phép toán nhóm Lie có \en{gradient}. \repo{facebookresearch/theseus} cho lớp tối ưu phi tuyến khả vi; nên đọc phần tài liệu về các kiểu lượt ngược trước khi đọc mã. \repo{princeton-vl/DROID-SLAM} và \repo{princeton-vl/DPVO} để so hai đầu của trục mật độ trên cùng một chuỗi. \repo{nianticlabs/monodepth2} là cài đặt sạch nhất của dòng tự giám sát, và là chỗ tốt nhất để tự tay thấy hiện tượng mơ hồ tỉ lệ. \repo{castacks/tartanvo} cho ý tưởng tầng nội tham số. \repo{evo} để mọi con số bạn đo có cùng định nghĩa với phần còn lại của dự án. Danh sách này chốt tại tháng 9/2026 và sẽ cũ trong sáu đến mười hai tháng; riêng LieTorch, Theseus và \repo{evo} thuộc loại hạ tầng nên bền hơn hẳn các tên hệ thống đang dẫn đầu bảng.
+\item[Câu hỏi kiểm tra hiểu.] Viết ra công thức \(\partial L/\partial\theta\) qua một lớp \(\arg\min\) mà không nhìn lại, rồi nói rõ mỗi ký hiệu ứng với đại lượng nào trong backend của bạn. Nếu bộ giải chỉ chạy ba bước LM thì đạo hàm theo định lý hàm ẩn sai theo hướng nào, và bạn kiểm tra điều đó bằng thí nghiệm gì? Trong một hệ đầu-cuối, vì sao không có bước nào tương đương với ``loại cạnh có \(\chi^2\) vượt ngưỡng''?
+\item[Bài tập phụ.] Lấy một chuỗi EuRoC, chạy DPVO ở chế độ mặc định, rồi vẽ quỹ đạo của nó cạnh quỹ đạo hệ của bạn sau khi căn tỉ lệ. Mục đích không phải so hơn thua. Mục đích là thấy hình dạng lỗi của hai họ khác nhau ra sao: một bên lệch dần và trơn, một bên nhảy tại các khung khó.
+\end{description}
+
+\begin{onbai}
+\ar[3]{Lớp tối ưu khả vi}{Một bộ giải Gauss-Newton hoặc LM mà \en{gradient} đi ngược xuyên qua được. Lượt xuôi giống hệt bộ giải thường; toàn bộ giá trị nằm ở lượt ngược, và nó chỉ có nghĩa nếu bạn thật sự huấn luyện thứ gì đó bằng nó.}
+\ar[3]{Định lý hàm ẩn cho \(\arg\min\)}{Tại nghiệm, gradient theo \(x\) bằng không; vi phân điều kiện đó cho \(\partial x^\star/\partial\theta = -H^{-1}B\). Nhờ nó, lượt ngược chỉ tốn thêm một lần giải hệ với chính \(H\) đã phân tích ở lượt xuôi.}
+\ar[3]{Trải phẳng (unrolling)}{Coi \(K\) bước lặp như một mạng \(K\) tầng rồi để autodiff chạy. Đạo hàm đúng với thuật toán đã chạy, kể cả khi chưa hội tụ, nhưng bộ nhớ tăng tuyến tính theo \(K\).}
+\ar[2]{Khi nào định lý hàm ẩn cho đạo hàm sai?}{Khi bước cuối không phải điểm dừng thật, tức bộ giải bị cắt ngắn. Hoặc khi \(H\) suy biến vì tự do đo chưa được neo. Cả hai đều thường xuyên xảy ra trong SLAM.}
+\ar[3]{Vì sao hệ đầu-cuối không xuất mặt nạ inlier?}{Vì so sánh với ngưỡng là hàm bậc thang, đạo hàm bằng 0 hầu khắp nơi. Muốn học được thì phải thay quyết định cứng bằng một trọng số liên tục.}
+\ar[2]{LieTorch}{Thư viện lan truyền \en{gradient} trong không gian tiếp tuyến của nhóm Lie. Nó làm số chiều \en{gradient} bằng đúng số bậc tự do, sáu cho \(SE(3)\), nên bỏ được việc chuẩn hoá quaternion giữa đồ thị.}
+\ar[2]{Theseus}{Lớp tối ưu phi tuyến khả vi trong PyTorch, có bộ giải thưa. Điểm đáng học là nó bắt người dùng chọn kiểu lượt ngược, tức thừa nhận thẳng rằng đạo hàm qua bộ giải là một xấp xỉ có thiên lệch.}
+\ar[2]{BA-Net}{Đặt cả một lớp hiệu chỉnh chùm tia vào mạng. Ba ý: sai lệch trên đặc trưng thay vì trên độ sáng, damping học được, và độ sâu theo cơ sở. Ý đầu bền nhất vì căn chỉnh trên đặc trưng học được có lòng chảo hội tụ rộng hơn và bất biến với đổi sáng.}
+\ar[3]{DROID-SLAM}{Toán tử hồi quy kiểu RAFT sinh dòng quang dày và trọng số theo từng điểm ảnh; một lớp BA dày đặc giải tư thế và độ sâu; nghiệm quay lại làm đầu vào cho vòng sau, nhờ đó hệ tự gỡ được khởi tạo tồi. Chính xác, nhưng cần GPU để bàn và không dùng IMU.}
+\ar[3]{DPVO}{Thưa hoá DROID bằng cách theo vết khoảng một trăm mảnh ảnh mỗi khung, mỗi mảnh một ẩn độ sâu. Số ẩn hình học giảm vài bậc độ lớn, đủ để hệ chạy trên một GPU để bàn duy nhất thay vì nhiều card.}
+\ar[2]{DPV-SLAM}{DPVO cộng thêm đóng vòng và tối ưu đồ thị tư thế. Bài học lớn hơn kết quả: đóng vòng và tối ưu đồ thị tư thế vẫn là hai khối cổ điển mà chưa ai học thay được.}
+\ar[3]{MAC-VO}{Dự đoán hiệp phương sai có đơn vị mét cho từng cặp khớp stereo, dùng để chọn điểm và để làm ma trận thông tin. Đây là mảnh gần nhất với thứ một hệ cổ điển mượn được ngay.}
+\ar[3]{SfM-Learner}{Huấn luyện mạng độ sâu và mạng tư thế chỉ bằng video thô, tín hiệu dạy là mất mát dựng lại ảnh. Cần một mặt nạ giải thích được, và mặt nạ đó phải bị chính quy hoá vì nghiệm suy biến là tắt hết.}
+\ar[3]{Mơ hồ tỉ lệ với ảnh đơn}{Nhân độ sâu và tịnh tiến với cùng một hằng số cho ra đúng cùng ảnh dựng lại, nên mất mát không phân biệt được. Hệ quả: nhiều bảng kết quả căn tỉ lệ theo từng chuỗi, việc mà robot không làm được.}
+\ar[2]{DeepVO tốt trên KITTI mà kém chỗ khác --- nguyên nhân?}{Nó học luôn tiên nghiệm chuyển động của ô tô: đi thẳng, tốc độ trong dải hẹp, góc lệch nhỏ. Trên camera cầm tay hoặc drone, tiên nghiệm ấy sai theo hướng có hệ thống.}
+\ar[2]{TartanVO}{Chuẩn hoá tịnh tiến để bỏ tỉ lệ ra khỏi hàm mất mát, và nối nội tham số camera vào đầu vào. Nhờ hai thủ thuật đó, một mô hình chạy được qua nhiều tập dữ liệu mà không tinh chỉnh lại.}
+\ar[2]{TANDEM}{Giữ tracking trực tiếp cổ điển, chỉ học phần dựng bản đồ dày đặc rồi hợp nhất TSDF. Đây là mẫu thiết kế đáng dùng nhất trong dòng tự giám sát cho một hệ đã chạy tốt.}
+\ar[3]{CodeSLAM}{Nén bản đồ độ sâu vào một mã cỡ vài chục chiều, với bộ giải mã gần tuyến tính theo mã, để đưa mã vào đồ thị nhân tử cạnh tư thế. Tính gần tuyến tính là điều kiện sống còn, nếu không thì mỗi lần tuyến tính hoá tốn một lượt qua mạng.}
+\ar[3]{Vì sao dòng mã ngắn chưa thắng?}{Sai số của tiên nghiệm trơn và nhất quán giữa các khung nên cổng \(\chi^2\) không bắt được. Thêm nữa bán kính hiệu lực của phép tuyến tính hoá nhỏ, độ phủ hẹp, và 3DGS đã lấy mất phần thưởng ``bản đồ dày đặc''.}
+\ar[3]{Ngoại lai thưa và độc lập}{Giả định nền của mọi ước lượng robust. Tiên nghiệm học được vi phạm nó, vì cùng một bộ giải mã sinh ra sai số ở mọi khung nên chúng đồng ý với nhau và trông như hình học thật.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{LieTorch \cite{teed2021lietorch}}{Lan truyền \en{gradient} trong không gian tiếp tuyến của nhóm Lie --- hạ tầng cho gần như mọi hệ trong chương}{Hạ tầng; bền hơn tên hệ thống}
+\ud{Theseus \cite{pineda2022theseus}}{Lớp Gauss-Newton và LM khả vi, bắt người dùng khai báo kiểu lượt ngược: trải phẳng, cắt ngắn, hay hàm ẩn}{Hạ tầng; dùng được ngoại tuyến để phân tích độ nhạy}
+\ud{DROID-SLAM \cite{teed2021droid} và các nhánh dẫn xuất}{BA dày đặc trong vòng lặp, cộng trọng số học được theo từng điểm ảnh}{Vẫn là mốc chính xác tham chiếu cho nhiều bảng SLAM học sâu}
+\ud{DPVO và DPV-SLAM \cite{teed2023dpvo,lipson2024dpvslam}}{Thưa hoá bằng mảnh ảnh; và việc phải mượn lại đóng vòng cổ điển}{Ví dụ rõ nhất rằng đóng vòng chưa được học thay}
+\ud{MAC-VO \cite{qiu2025macvo}}{Hiệp phương sai học được theo từng cặp khớp, dùng làm ma trận thông tin}{Sau 2024; mình nêu ý tưởng, chưa tự kiểm chứng số liệu}
+\ud{Dòng monodepth2 và các hệ độ sâu tự giám sát}{Mất mát dựng lại ảnh và mặt nạ giải thích được của SfM-Learner \cite{zhou2017sfmlearner}}{Ý tưởng còn sống mạnh ở phía độ sâu hơn là ở phía tư thế}
+\end{ungdung}
+
+\begin{duan}{Đo độ nhạy của APE theo trọng số cạnh, bằng đạo hàm thay vì quét lưới}{1--2 ngày}
+\dmt biến câu ``trọng số cạnh đặt bằng tay'' thành một bảng số nói rõ nút vặn nào thật sự lay chuyển quỹ đạo. Đây là phiên bản rẻ nhất và không rủi ro của toàn bộ ý tưởng khả vi: bạn chỉ dùng \en{gradient} để \emph{chẩn đoán}, không đưa mạng nào vào hệ đang chạy.
+\ddl một chuỗi EuRoC có chân trị. Lấy đúng một cửa sổ 8--10 khung then chốt từ log của hệ hiện tại, kèm toàn bộ quan sát và khởi tạo của cửa sổ đó.
+\dbc dựng lại đúng bài toán bình phương tối thiểu của cửa sổ ấy trong một lớp tối ưu khả vi; kiểm tra nghiệm khớp với nghiệm của backend C++ tới cỡ \(10^{-4}\) trước khi làm bất cứ việc gì khác; đặt \(L\) là sai lệch tư thế so với chân trị; lấy \(\partial L/\partial\theta\) cho ba nhóm tham số là trọng số cạnh chiếu lại theo tầng kim tự tháp, bề rộng nhân robust, và trọng số cạnh IMU; cuối cùng đối chiếu với đạo hàm số bằng sai phân hữu hạn trên vài thành phần.
+\dxk bạn có một bảng xếp hạng độ nhạy, và kiểm chứng được nó bằng một thí nghiệm độc lập. Đổi tay đúng nút vặn đứng đầu bảng một lượng nhỏ, rồi xác nhận APE đổi theo đúng dấu mà \en{gradient} dự đoán, trên ít nhất ba lần chạy để vượt sàn nhiễu. Nếu dấu không khớp thì gần như chắc chắn cửa sổ của bạn chưa hội tụ tới điểm dừng. Đó cũng là một kết quả, và nó nói rằng định lý hàm ẩn chưa dùng được ở đây.
+\dnv \ptr{E/24-thi-nghiem-va-ablation} cho sàn nhiễu và cỡ mẫu; \ptr{F/34-imu-bat-dinh-va-trien-khai} sẽ dùng lại chính bảng độ nhạy này để quyết định có đáng học hiệp phương sai hay không; \ptr{A/01-toan-toi-thieu/02-vi-phan-va-toi-uu} cho phần kiểm tra đạo hàm bằng sai phân hữu hạn.
+\end{duan}
+
+\begin{traloi}
+\tl{Nó không làm Gauss-Newton hội tụ nhanh hơn, vì lượt xuôi y hệt. Nó bán một thứ khác: đạo hàm của lỗi quỹ đạo theo các nút vặn mà bạn đang đặt bằng tay, tức là biến việc quét lưới thành việc huấn luyện.}
+\tl{Vì tại nghiệm, gradient theo \(x\) bằng không, và điều kiện đó ràng buộc nghiệm với tham số. Vi phân nó ra \(-H^{-1}B\), chỉ cần \(H\) ở bước cuối. Điều kiện là \(H\) phải khả nghịch và bước cuối phải là điểm dừng thật; trong SLAM cả hai đều hay bị vi phạm, vì tự do đo và vì bộ giải bị cắt ngắn.}
+\tl{Không học được, nên các hệ đầu-cuối không cố học. Chúng thay quyết định cứng bằng một trọng số liên tục cho từng cặp khớp: mạng hạ trọng số điểm xấu thay vì loại nó. Đây là hệ quả bắt buộc của việc muốn có \en{gradient}, không phải một lựa chọn thẩm mỹ.}
+\tl{Thứ chặn nó là ngân sách tính toán và bộ nhớ. Nó giữ một ẩn độ sâu cho \emph{mỗi} điểm ảnh ở 1/8 độ phân giải, cộng các khối tương quan có kích thước bằng bình phương số vị trí cho mỗi cạnh của đồ thị khung. Hệ được công bố trên GPU để bàn cao cấp, còn máy nhúng thấp hơn hẳn về cả tính toán lẫn băng thông --- khoảng cách thuộc loại bậc độ lớn chứ không phải vài chục phần trăm. Thêm nữa nó không dùng IMU.}
+\tl{Hỏng ở chỗ sai số của bộ giải mã trơn và nhất quán giữa các khung, nên nó vượt qua mọi cổng robust vốn giả định ngoại lai thưa và độc lập. Cộng thêm ba điều: phép tuyến tính hoá chỉ đúng quanh mã ban đầu, độ phủ hẹp ngoài phân phối huấn luyện, và 3DGS đã cho bản đồ dày đặc tốt hơn mà không cần tiên nghiệm hình dạng.}
+\end{traloi}
+
+\begin{dongian}
+Hình dung bạn có một hội đồng gồm hai trăm người cùng đoán một con số. Bạn không lấy trung bình trơn. Bạn lấy trung bình có trọng số: ai bạn tin hơn thì tiếng nói nặng hơn. Từ trước tới nay bạn phát trọng số theo một quy tắc cứng, kiểu ``ai ngồi gần bảng thì tin hơn''. Quy tắc đó không quan tâm hôm nay ai quên kính, ai ngồi ngược sáng, ai vừa ngủ dậy.
+
+Bây giờ giả sử cuối buổi bạn biết đáp án đúng. Câu hỏi tự nhiên là: nếu cho người thứ 47 nói to hơn một chút, kết quả chung sẽ dịch về phía đáp án hay ra xa nó? Trả lời được câu đó cho cả hai trăm người thì bạn có một cách phát trọng số tốt hơn mọi quy tắc cứng. Điều bất ngờ là bạn không cần diễn lại cả buổi họp để trả lời. Chỉ cần biết kết quả chung nhạy thế nào quanh điểm cân bằng của nó, rồi làm một phép tính.
+
+Cái giá thì có ba khoản. Muốn học kiểu đó, bạn phải có nhiều buổi họp đã biết đáp án. Phép tính trên trở nên rất nhạy đúng vào những buổi mà hội đồng chia rẽ nhất, mà đó lại là những buổi bạn cần học nhất. Và khi trọng số do một cỗ máy phát ra, hôm nào kết quả sai bạn sẽ không còn chỉ được vào ai đã nói sai. Bạn chỉ biết rằng nó sai.
+
+\chuadongian{chỗ vấp thật nằm ở các quyết định bật--tắt. Nhiều thứ trong một hệ SLAM không phải chuyện tin nhiều hay tin ít, mà là chuyện có mời người đó vào phòng họp hay không: chèn khung then chốt hay không, nhận một vòng lặp hay không. Với những quyết định đó, câu hỏi ``nói to hơn một chút thì sao'' không có nghĩa, vì không có ``một chút'' nào cả. Mọi cách nói đơn giản mà mình biết đều làm mờ mất ranh giới này, trong khi chính nó mới là ranh giới thật giữa phần học được và phần không học được.}
+\motcau{Khả vi không làm bộ giải khôn hơn; nó chỉ cho phép hỏi ``tin phép đo này thêm một chút thì quỹ đạo tốt lên hay xấu đi'', và bạn trả tiền cho câu hỏi đó bằng bộ nhớ, độ ổn định và khả năng chẩn đoán.}
+\end{dongian}
+
+\section{Kết nối}
+\ptrtarget{F/31/09}
+\ptr{F/27-dat-hoc-sau-vao-dau} là bộ lọc mà chương này vừa được đưa qua: bốn cổng của nó cho ra kết luận ``chưa đáng'' với cả hệ, và ``đáng thử'' với hai mảnh nhỏ. \ptr{F/28-dac-trung-va-ghep-cap} là nửa còn lại của cùng một câu chuyện --- ở đó phần học được nằm trước bộ giải, ở đây nó nằm bên trong. \ptr{F/30-do-sau-dong-quang-va-mo-hinh-nen} là tiền đề vật liệu: dòng quang và độ sâu học được chính là đầu vào mà mọi hệ trong chương này tiêu thụ. \ptr{F/32-ban-do-neural} là nơi cuộc thi về biểu diễn bản đồ dày đặc chuyển sang, và là lý do dòng mã ngắn mất động lực. \ptr{F/34-imu-bat-dinh-va-trien-khai} là chỗ mảnh đáng lấy nhất của chương, tức hiệp phương sai học được, được bàn cho đủ, cùng với ngân sách độ trễ trên Orin.
+
+Ngoài phần F thì có bốn mối nối. \ptr{A/01/02} là nền của định lý hàm ẩn và của cả hai lối đi ngược. \ptr{C/15/03} giải thích toán tử cập nhật hồi quy mà DROID-SLAM mượn lại. \ptr{B/11-gioi-han-tinh-toan} cho khung để biến các con số ẩn số và tensor ở mục 4 thành một ngân sách bộ nhớ thật. \ptr{E/24} là kỷ luật bắt buộc nếu bạn định thử một trong hai mảnh tách rời: đo sàn nhiễu mới trước, nói về cải tiến sau.
+
+\begin{tukiem}
+\item Vì sao đạo hàm theo định lý hàm ẩn chỉ tốn thêm một lần thế ngược, trong khi trải phẳng tốn bộ nhớ tỉ lệ với số bước lặp?
+\item Bộ giải của bạn dừng sau ba bước LM vì ngân sách thời gian. Đạo hàm thu được khi đó là đạo hàm của cái gì, và bạn thiết kế thí nghiệm nào để phát hiện sai lệch ấy?
+\item Nếu quyết định inlier có đạo hàm bằng 0 hầu khắp nơi, thì cơ chế nào trong DROID-SLAM đang đóng vai trò loại điểm sai, và nó khác gì về hành vi khi gặp một cảnh ngoài phân phối huấn luyện?
+\item Vì sao \en{gradient} lại lớn và nhiễu nhất đúng ở các khung thị sai thấp hoặc quay thuần tuý, và vì sao mọi cách chữa đều làm thiên lệch việc học ở chính các khung đó?
+\item Một hệ VO tự giám sát báo lỗi quỹ đạo rất nhỏ trên KITTI. Bạn phải kiểm đúng một điều trước khi tin con số đó --- điều gì, và vì sao nó quyết định con số ấy có dùng được cho robot hay không?
+\item Vì sao một bề mặt do bộ giải mã bịa ra lại nguy hiểm hơn một cặp khớp sai, xét theo giả định mà nhân robust dựa vào?
+\item Nếu chỉ được lấy đúng một mảnh từ chương này về hệ hiện tại, bạn lấy mảnh nào, và bạn đo cái gì để biết nó có tác dụng vượt sàn nhiễu?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,39 @@
+\documentclass[../../deep_learning.tex]{subfiles}
+% Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+\begin{document}
+\section*{Bản đồ chương 15 --- Thị giác chuỗi và không-thời gian}
+
+\begin{tomtat}
+Chương 15 chia làm ba mục theo đúng ba vấn đề mà chiều thời gian sinh ra, chứ không theo thứ tự lịch sử của các kiến trúc. Ba vấn đề đó là: đầu ra có độ dài thay đổi, chi phí bộ nhớ nhân theo số khung hình, và ràng buộc nhân quả. Bản đồ này nói mục nào cốt lõi, mục nào tra khi cần, và mục nào nên đọc chen vào giữa chương 13. Nếu chỉ nhớ một điều: mục~3 là mục gần chuyên môn của một kỹ sư SLAM nhất và cũng là mục dùng được ngay nhất, còn mục~1 nên đọc \emph{trước} phần Transformer của chương 13.
+\end{tomtat}
+
+\begin{nentang}
+\kn{chương và mục}{chương là một chủ đề lớn, mỗi mục là một file đọc độc lập được. Số trong tên thư mục là thứ tự nên đọc, không phải thứ tự lịch sử.}
+\kn{trực tuyến (streaming) và ngoại tuyến}{trực tuyến là xử lý dữ liệu đến dần và trả kết quả ngay; ngoại tuyến là được xem toàn bộ video rồi mới quyết định. Phần lớn số liệu công bố là ngoại tuyến.}
+\kn{nhân quả (causal)}{chỉ dùng thông tin tới thời điểm hiện tại, không nhìn khung hình tương lai --- ràng buộc cứng của mọi hệ chạy trên robot.}
+\kn{ngân sách bộ nhớ ba chiều}{lượng bộ nhớ khi huấn luyện video tỉ lệ với độ dài clip \(\times\) độ phân giải\(^2\) \(\times\) batch size, nên tăng một chiều buộc phải giảm chiều khác.}
+\end{nentang}
+
+\subsection*{Có gì trong chương này}
+
+\begin{itemize}
+\item \textbf{Mục 1 --- Đầu ra độ dài thay đổi và sự ra đời của attention} \emph{(cốt lõi, đọc sớm)}. Sinh mô tả ảnh kiểu CNN--RNN, nghẽn cổ chai của một vector duy nhất, và ``Show, Attend and Tell''. Giá trị lớn nhất của mục không phải bài toán captioning mà là việc nó cho thấy \emph{động cơ} của attention.
+\item \textbf{Mục 2 --- Biểu diễn video và cái giá của thời gian} \emph{(cốt lõi)}. Gộp theo khung, hai luồng, tích chập 3D, bản tách (2+1)D, SlowFast, video transformer --- và ba phép tính bộ nhớ quyết định tất cả.
+\item \textbf{Mục 3 --- Flow, tracking và các ràng buộc riêng} \emph{(cốt lõi, gần chuyên môn nhất)}. Lucas--Kanade tới RAFT, định vị hành động theo khoảng thời gian, tracking như bài toán liên kết dữ liệu, bẫy của MOTA và cách HOTA sửa nó, tính nhất quán thời gian, và ràng buộc nhân quả.
+\end{itemize}
+
+\subsection*{Vì sao chia như vậy}
+Cách chia hiển nhiên sẽ là chia theo bài toán --- captioning, phân loại hành động, tracking --- nhưng cách đó che mất điều đáng học. Ba mục ở đây chia theo \emph{ba vấn đề cấu trúc} mà chiều thời gian sinh ra, và mỗi vấn đề có một dạng câu trả lời khác hẳn. Vấn đề thứ nhất được giải bằng một mẫu thiết kế, tức attention. Vấn đề thứ hai không có lời giải, chỉ có kế toán. Vấn đề thứ ba cũng không có lời giải; nó chỉ loại bỏ phương án. Nhìn theo trục này thì các kiến trúc cụ thể trở thành hệ quả, và bạn không phải nhớ chúng như một danh sách.
+
+\subsection*{Thứ tự đọc và phụ thuộc}
+\begin{enumerate}
+\item Đọc mục~1 \emph{trước} \ptr{C/13-kien-truc-backbone/02-tu-chuoi-toi-attention}: hiểu nút thắt trước thì self-attention thành hệ quả hiển nhiên thay vì một phát minh khó hiểu.
+\item Mục~2 trước mục~3: ngân sách bộ nhớ ở mục~2 là thứ quyết định cách chữa nào cho hiện tượng nhấp nháy là khả thi ở mục~3.
+\item Mục~3 giả định bạn đã đọc \ptr{C/14-bai-toan-cv-loi}, vì tracking-by-detection dựng thẳng trên một detector.
+\item Đọc \ptr{B/07-chia-du-lieu-va-danh-gia} song song với mục~3 nếu phần metric và rò rỉ dữ liệu theo clip còn mờ.
+\item \ptr{C/16-thi-giac-3d} là chương tiếp nối tự nhiên: nó nâng bài toán tương ứng điểm từ mặt phẳng ảnh lên không gian ba chiều.
+\end{enumerate}
+
+\subsection*{Nếu chỉ có một buổi}
+Đọc mục~3, và trong mục~3 đọc kỹ hai chỗ. Thứ nhất là bài toán khẩu độ với ma trận cấu trúc: nó nối thẳng vào việc chọn đặc trưng mà bạn đã làm. Thứ hai là hộp cạm bẫy về MOTA: nó thay đổi ngay cách bạn báo cáo kết quả tracking. Phần còn lại có thể đọc lướt và quay lại khi cần.
+\end{document}

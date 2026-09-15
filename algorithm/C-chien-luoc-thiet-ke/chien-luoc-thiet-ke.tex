@@ -1,0 +1,25 @@
+% ============================================================================
+%  C — file phần: Chiến lược thiết kế
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../algorithm.tex]{subfiles}
+\begin{document}
+\part{CHIẾN LƯỢC THIẾT KẾ}
+\begin{tomtat}
+Phần C là phần dày nhất và cũng là phần sinh ra nhiều lời giải nhất trong thực tế. Tám chương ứng với tám khuôn tư duy: vét cạn có cắt tỉa, chia để trị, tham lam, quy hoạch động, đồ thị, luồng và ghép đôi, tìm kiếm trên đáp án, và ngẫu nhiên hoá. Điểm chung của cả tám: mỗi khuôn khai thác một loại cấu trúc riêng --- tính con-bài-toán-lặp-lại, tính chọn-được-cục-bộ, tính đơn điệu, tính đối ngẫu --- và câu hỏi cốt lõi của phần này là ``bài toán trước mặt để lộ ra cấu trúc nào''. Nếu chỉ nhớ một điều: mọi lời giải nhanh đều bắt đầu từ một lời giải vét cạn đúng, rồi tìm cách bỏ đi phần công việc lặp lại hoặc chắc chắn vô ích.
+\end{tomtat}
+
+Trình tự tám chương phản ánh một mạch phát triển ý tưởng chứ không phải một danh sách. Chương 13 bắt đầu từ vét cạn, cách giải luôn tồn tại và luôn đúng --- và chỉ ra rằng phần lớn thuật toán hay chỉ là vét cạn cộng thêm một quan sát giúp bỏ bớt nhánh. Chương 14 lấy ý tưởng ``bỏ bớt'' đó theo hướng cấu trúc đệ quy: nếu bài chia được thành các phần độc lập thì chi phí sụp xuống theo hệ thức truy hồi. Chương 15 và 16 là hai cách khai thác con bài toán chồng lặp: tham lam khi lựa chọn cục bộ chứng minh được là an toàn, quy hoạch động khi không.
+
+Chương 17 và 18 chuyển sang một ngôn ngữ khác: khi bạn phát biểu lại bài toán thành đồ thị, rất nhiều bài tưởng khác nhau hoá ra là cùng một bài. Đây là kỹ năng \emph{mô hình hoá}, và nó đáng giá hơn việc thuộc thêm mười thuật toán. Chương 19 và 20 khép lại bằng hai công cụ có tỉ lệ hiệu quả trên độ khó cao bất thường: nhị phân trên đáp án biến bài tối ưu thành bài kiểm tra, và ngẫu nhiên hoá cho lời giải đơn giản đến bất ngờ cho những bài mà lời giải tất định rất rắc rối.
+\subfile{00-map}
+\subfile{13-vet-can-va-quay-lui/vet-can-va-quay-lui}
+\subfile{14-chia-de-tri/chia-de-tri}
+\subfile{15-tham-lam/tham-lam}
+\subfile{16-quy-hoach-dong/quy-hoach-dong}
+\subfile{17-do-thi/do-thi}
+\subfile{18-luong-va-ghep-doi/luong-va-ghep-doi}
+\subfile{19-tim-kiem-tren-dap-an/tim-kiem-tren-dap-an}
+\subfile{20-ngau-nhien-hoa/ngau-nhien-hoa}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

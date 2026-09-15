@@ -1,0 +1,316 @@
+% ---------------------------------------------------------------------------
+% Chương 14 — Hiệu chuẩn như một nhánh của SLAM
+% Tạo: 2026-09-13 | Phụ thuộc: A/02 (mô hình), A/04 (MAP), A/05 (kích thích), A/06 (hiệp phương sai)
+% Mức độ: XƯƠNG SỐNG. Đây là CHƯƠNG HỢP NHẤT của cả cây — nơi luận đề trung tâm
+%         được chứng minh bằng tay: đi từ ô "hiệu chuẩn" sang ô "SLAM" bằng cách thả biến.
+% Kiểm chứng:
+%   (1) Hiệu chuẩn = MAP với structure fix — cửa (a) dựng đồ thị nhân tử; cửa (c) furgale2013kalibr.
+%   (2) Bảng điều kiện kích thích — đã dẫn ở A/05 mục 5C.
+%   (3) Observability-aware calib: chỉ cập nhật hướng quan sát được — cửa (c) maye2013selfsupervised,
+%       schneider2019observability.
+%   (4) Hiệu chuẩn target chỉ là cách GIẢM PHƯƠNG SAI bằng cách fix structure — cửa (a).
+% Ghi chú trung thực: KHÔNG dẫn con số độ chính xác hiệu chuẩn nào (phụ thuộc thiết bị).
+% ---------------------------------------------------------------------------
+\documentclass[../../vslam.tex]{subfiles}
+\begin{document}
+\chapter{Hiệu chuẩn như một nhánh của SLAM (Calibration as a Branch of SLAM)}
+\ptrtarget{C/14}\ptrtarget{C/14-hieu-chuan-nhu-mot-nhanh-cua-slam}
+\dependency{\ptr{A/02-mo-hinh-camera} (mô hình nội và méo, và kỹ năng phân biệt mô hình sai với tham số sai); \ptr{A/04-uoc-luong-map-va-bundle-adjustment} (khung MAP --- chương này chỉ đổi danh sách biến); \ptr{A/05-observability-gauge-va-suy-bien} (điều kiện kích thích, Bảng điều kiện --- không có nó thì hiệu chuẩn trực tuyến là mở rộng trạng thái mù quáng); \ptr{A/06-bat-dinh-va-lan-truyen-sai-so} (hiệp phương sai tham số là thứ nên in ra thay cho RMS).}
+
+\begin{tomtat}
+Đây là chương hợp nhất của cả cây. Suốt Phần~A và Phần~B, tham số hiệu chuẩn được coi là hằng số nạp từ một tệp --- một giả định tiện lợi mà không chương nào biện minh. Chương này bỏ giả định ấy và cho thấy điều gì xảy ra: \emph{không có gì trong bộ giải phải thay đổi}. Hiệu chuẩn và SLAM là cùng một bài toán MAP; chúng khác nhau đúng ở danh sách biến tự do. Nội dung đi theo một mạch duy nhất: bắt đầu từ hiệu chuẩn nội với target đã biết --- bài toán dễ nhất vì cấu trúc bị fix --- rồi thả dần các biến ra, qua tự hiệu chuẩn, qua hiệu chuẩn ngoại, tới hiệu chuẩn trực tuyến trong một hệ VIO đang chạy, tức tới chính bài toán SLAM đầy đủ. Mỗi bước thả một biến, và mỗi bước đòi một điều kiện kích thích cụ thể --- đó là chỗ \ptr{A/05} trả công toàn bộ. Hai mục cuối bàn về hai thứ mà sản phẩm cần mà nghiên cứu ít nói: cách tự đánh giá chất lượng hiệu chuẩn, và cách phát hiện khi nó đã trôi. Nếu chỉ nhớ một điều: \emph{calibration target chỉ là một cách giảm phương sai bằng cách fix cấu trúc; khi không fix được cấu trúc, bạn phải dùng chuyển động để thay thế} --- và đó là toàn bộ khác biệt giữa phòng lab và robot đang chạy.
+\end{tomtat}
+
+\begin{nentang}
+\kn{hiệu chuẩn nội (intrinsic calibration)}{xác định các tham số mô tả cách camera biến tia thành pixel --- tiêu cự, điểm chính, hệ số méo (\ptr{A/02}).}
+\kn{hiệu chuẩn ngoại (extrinsic calibration)}{xác định tư thế tương đối giữa hai cảm biến --- hai camera trong cặp stereo, camera và IMU, camera và LiDAR.}
+\kn{sai lệch thời gian (time offset, \(t_d\))}{độ lệch giữa mốc thời gian mà hai cảm biến gán cho cùng một sự kiện vật lý. Nguyên nhân: độ trễ truyền, độ trễ phơi sáng, đồng hồ khác nhau.}
+\kn{target hiệu chuẩn}{một vật có hình học đã biết chính xác --- bảng cờ vua, ChArUco, lưới vòng tròn. Vai trò thật của nó là \emph{fix cấu trúc}, tức loại bỏ một nhóm biến khỏi bài toán.}
+\kn{tự hiệu chuẩn (self-calibration)}{ước lượng tham số hiệu chuẩn mà không có target, bằng cách coi chúng là biến trong chính bài toán SLAM hoặc SfM.}
+\kn{hiệu chuẩn trực tuyến (online calibration)}{tự hiệu chuẩn chạy liên tục trong lúc hệ thống hoạt động, để bù trôi theo nhiệt độ, rung, lão hoá.}
+\kn{cổng observability (observability gating)}{cơ chế chỉ cập nhật một tham số khi chuyển động hiện tại kích thích nó đủ, và đóng băng nó khi không. Đây là điều phân biệt hiệu chuẩn trực tuyến có nguyên tắc với việc mở rộng trạng thái mù quáng.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Hiệu chuẩn dùng bảng cờ vua, SLAM dùng cảnh tự nhiên. Nêu chính xác điều mà bảng cờ vua cung cấp, và nói vì sao điều đó làm bài toán dễ hơn --- không phải ``vì nó chính xác'' mà là gì?}
+\h{Hiệu chuẩn trực tuyến thường được mô tả là ``chỉ cần thêm biến vào vector trạng thái''. Nếu đơn giản như vậy thì vì sao phép biến đổi ngoại của bạn trôi lung tung trên một chuỗi và đứng im trên chuỗi khác?}
+\h{Bạn hiệu chuẩn camera--IMU bằng cách xoay thiết bị quanh đúng một trục trong suốt quá trình. Thành phần nào của phép biến đổi ngoại không xác định được, và vì sao tích có hướng là thủ phạm?}
+\h{Một kỹ sư báo rằng hiệu chuẩn ngoại trực tuyến của anh ta hội tụ rất nhanh và rất ổn định. Nêu hai cách giải thích --- một tốt một xấu --- và nêu phép thử phân biệt.}
+\h{Bạn cần biết hiệu chuẩn đã trôi để yêu cầu hiệu chuẩn lại. Nhưng tại hiện trường không có target và không có chân trị. Nêu ba đại lượng đo được có thể phát hiện trôi.}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{C/14/01}
+
+Suốt hai phần đầu của cây, có một giả định được dùng liên tục mà không chương nào biện minh: rằng tham số hiệu chuẩn là \emph{hằng số đã biết}. \ptr{A/01} làm việc trên mặt phẳng chuẩn hoá, tức giả định đã gỡ được \(K\) và méo. \ptr{A/04} đặt tư thế và cấu trúc làm biến, và lặng lẽ để hiệu chuẩn ra ngoài. \ptr{B/08} viết phần dư chiếu với một hàm \(\pi\) cố định.
+
+Giả định ấy sai theo hai cách, và cả hai đều tốn kém.
+
+\emph{Sai cách thứ nhất --- nó không bao giờ đúng chính xác.} Mọi phép hiệu chuẩn đều có sai số, và như \ptr{A/02} mục~4C đã chỉ ra, sai số ấy không biến mất mà \emph{chảy} vào tư thế và cấu trúc theo một hoa văn có hệ thống. Bình phương tối thiểu không khử được sai lệch có hệ thống.
+
+\emph{Sai cách thứ hai --- nó thay đổi theo thời gian.} Ống kính giãn nở khi nóng lên. Khung stereo biến dạng. Keo dán module lão hoá. Thiết bị bị va đập. Tham số đúng vào ngày xuất xưởng không còn đúng sau sáu tháng ở nhà khách hàng.
+
+Bài toán gốc của chương: \emph{làm sao ước lượng các tham số ấy, và làm sao giữ chúng đúng theo thời gian?}
+
+Ai gặp bài toán này? Ai làm thị giác đo đạc. Nhưng mức độ đau khác nhau rất nhiều giữa nghiên cứu và sản xuất, và đó là điều đáng nói. Trong nghiên cứu, ta hiệu chuẩn một lần bằng Kalibr, lưu tệp YAML, và quên đi --- vì thí nghiệm kéo dài vài giờ và thiết bị không rời khỏi bàn. Trong sản xuất, ta phải hiệu chuẩn hàng nghìn thiết bị trong dưới một phút mỗi cái, theo dõi trôi trong nhiều năm, và phát hiện khi một thiết bị cần hiệu chuẩn lại mà không có target trong tay (\ptr{D/21}).
+
+Trước khi có khung hợp nhất, hiệu chuẩn và SLAM được học như hai môn riêng. Hiệu chuẩn có bàn xoay, bảng cờ vua, một phần mềm chạy một lần rồi ra một tệp. SLAM có camera chuyển động, điểm đặc trưng, quỹ đạo. Hai thứ trông không liên quan, và chúng được dạy ở hai chỗ khác nhau.
+
+Cách nhìn đó sai, và nó sai theo một kiểu tốn kém: nó làm người ta học hai lần cùng một thứ, và tệ hơn, nó che mất việc \emph{cùng một lý thuyết observability quyết định cả hai}. Khi một kỹ sư hỏi ``vì sao hiệu chuẩn ngoại trực tuyến của tôi không hội tụ'', câu trả lời nằm ở đúng chỗ đã trả lời câu ``vì sao tỉ lệ mono của tôi sai'': chuyển động không đủ kích thích thì ma trận thông tin suy biến theo một hướng, và bộ ước lượng không có cách nào biết mình đang đoán mò theo hướng đó.
+
+Chương này lập luận rằng cả hai là \emph{một} bài toán, và nó chứng minh điều đó bằng cách đi từ ô này sang ô kia trong bảng ở \ptr{00-map}, mỗi lần thả thêm một biến.
+
+\begin{trucgiac}
+Hình dung lại hệ lò xo ở \ptr{A/04}: mỗi phép đo là một lò xo nối các ẩn số, và nghiệm là vị trí cân bằng.
+
+Hiệu chuẩn bằng target và SLAM khác nhau ở \emph{đúng một chuyện}: bạn hàn cứng cái gì vào tường.
+
+Với target, bạn hàn cứng \emph{cấu trúc} --- bạn biết chính xác các góc bảng cờ cách nhau bao nhiêu milimet, vì bạn đã in nó ra. Hệ lò xo còn lại giải ra tham số camera và quỹ đạo của bảng.
+
+Với SLAM, bạn hàn cứng \emph{tham số camera} --- bạn đã đo chúng hôm trước. Hệ giải ra quỹ đạo và cấu trúc.
+
+Với hiệu chuẩn trực tuyến, bạn \emph{không hàn gì cả}. Hệ giải ra tất cả --- nếu có đủ lò xo.
+
+Cái ``nếu'' cuối câu là toàn bộ nội dung khó của chương, và nó chính là observability ở \ptr{A/05}. Khi bạn tháo một cái hàn, bạn thêm một bậc tự do; nếu không có lò xo nào căng khi bậc đó thay đổi, hệ có vô số nghiệm và bộ giải dừng ở một chỗ tuỳ tiện.
+
+Từ đây rút ra câu quan trọng nhất của chương, và nó đáng thuộc lòng: \emph{target không phải một dụng cụ chính xác kỳ diệu --- nó chỉ là một cách giảm phương sai bằng cách fix cấu trúc}. Khi bạn không có target, bạn phải thay cái hàn ấy bằng thứ khác, và thứ duy nhất có sẵn là \emph{chuyển động}. Chuyển động đa dạng làm nhiều lò xo căng theo nhiều hướng, và nó thay thế được cái hàn.
+
+Đó là lý do mọi hướng dẫn hiệu chuẩn đều bảo bạn nghiêng bảng nhiều hướng, đưa ra sát rìa, lại gần rồi ra xa --- và cũng là lý do một robot đi thẳng mãi không bao giờ tự hiệu chuẩn được.
+\end{trucgiac}
+
+\section{Đi từ ô này sang ô kia}
+\ptrtarget{C/14/02}
+
+Đây là mục trung tâm của chương. Ta bắt đầu từ bài toán dễ nhất rồi thả dần các biến, và theo dõi xem mỗi lần thả đòi hỏi thêm điều gì.
+
+\subsection{A. Bước không: hiệu chuẩn nội với target}
+
+Biến: tham số nội \(\boldsymbol{\theta}_K\) (tiêu cự, điểm chính, hệ số méo) và tư thế của bảng ở mỗi ảnh \(T_1,\dots,T_N\).
+
+Hằng số: toạ độ \(3\)D của các góc bảng trong hệ của bảng --- \emph{đã biết chính xác vì ta in ra nó}.
+
+Nhân tử: với mỗi góc bảng nhìn thấy ở mỗi ảnh, một phần dư chiếu
+\[
+\mathbf{r}_{ij} = \mathbf{z}_{ij} - \pi\bigl(T_i\,\mathbf{P}_j;\ \boldsymbol{\theta}_K\bigr).
+\]
+
+So với bundle adjustment ở \ptr{A/04}, khác biệt duy nhất là \(\mathbf{P}_j\) là hằng số thay vì biến, và \(\boldsymbol{\theta}_K\) là biến thay vì hằng số. Cùng một bộ giải, cùng một cấu trúc thưa, cùng mọi thứ. (Cửa kiểm chứng a: dựng đồ thị nhân tử cho cả hai và so sánh.)
+
+Điều target thực sự cung cấp --- và đây là câu trả lời cho câu hỏi mở đầu thứ nhất --- \emph{không phải độ chính xác mà là việc loại bỏ một nhóm biến}. Với \(N\) ảnh và \(M\) góc bảng, SfM thuần tuý sẽ có \(6N + 3M\) ẩn; hiệu chuẩn bằng target chỉ có \(6N + |\boldsymbol{\theta}_K|\). Với \(M\) cỡ vài trăm, đó là khác biệt lớn --- và quan trọng hơn số lượng, nó loại bỏ gauge tỉ lệ, vì kích thước bảng cho đơn vị mét.
+
+\subsection{B. Bước một: bỏ target, thả cấu trúc}
+
+Bây giờ bỏ bảng đi và dùng cảnh tự nhiên. Cấu trúc trở thành biến, và ta có \emph{tự hiệu chuẩn}: bài toán SfM với tham số nội nằm trong tập biến. COLMAP làm chính xác điều này \cite{schonberger2016colmap}.
+
+Cái được: không cần target, nên làm được ở bất cứ đâu và bất cứ lúc nào --- kể cả trên robot đang chạy.
+
+Cái mất: \emph{phương sai tăng}, và gauge tỉ lệ quay lại. Bài toán bây giờ có nhiều biến hơn và ít ràng buộc hơn trên mỗi biến, nên bất định của \(\boldsymbol{\theta}_K\) lớn hơn. Và vì không còn kích thước đã biết, tỉ lệ lại là gauge tự do (\ptr{A/05} mục~3).
+
+Điều kiện mới xuất hiện: \emph{chuyển động phải đủ đa dạng}. Bảng~\ref{tab:a05-kichthich} ở \ptr{A/05} liệt kê chính xác cái gì cần gì: tiêu cự cần đa dạng độ sâu, điểm chính cần đặc trưng ở nhiều vị trí trong khung hình, hệ số méo cần đặc trưng ở rìa. Với target, người thao tác cung cấp sự đa dạng ấy một cách có chủ ý; với cảnh tự nhiên, ta phải \emph{chờ} nó xảy ra hoặc \emph{kiểm} xem nó đã xảy ra chưa.
+
+Đây là lần đầu trong chương mà việc thả một biến đòi thêm một điều kiện, và khuôn mẫu ấy lặp lại ở mọi bước sau.
+
+\subsection{C. Bước hai: thả ngoại}
+
+Với nhiều cảm biến, thêm phép biến đổi ngoại vào tập biến. Hai trường hợp đáng nói riêng vì điều kiện của chúng khác nhau.
+
+\emph{Stereo}: thả \(T_{\text{trái}\rightarrow\text{phải}}\). Điều kiện: cảnh phải có \emph{độ sâu đa dạng}. Lý do trực giác: nếu mọi điểm ở cùng một khoảng cách, thì một sai lệch nhỏ trong góc giữa hai camera có thể được bù bằng một sai lệch trong khoảng cách chung, và hai giả thuyết không phân biệt được. Có cả gần lẫn xa thì không bù được.
+
+\emph{Camera--IMU}: thả \(T_{\text{cam}\rightarrow\text{imu}}\) và \(t_d\). Đây là trường hợp được nghiên cứu kỹ nhất, và nó chứa một kết quả đẹp đáng dẫn lại.
+
+Vận tốc của camera và vận tốc của IMU liên hệ qua
+\[
+\mathbf{v}_{\text{cam}} = \mathbf{v}_{\text{imu}} + \boldsymbol{\omega} \times \mathbf{p}_{\text{cam}}^{\text{imu}},
+\]
+với \(\mathbf{p}\) là phần tịnh tiến của phép biến đổi ngoại. Số hạng \(\boldsymbol{\omega}\times\mathbf{p}\) là \emph{thứ duy nhất} trong toàn bộ hệ phương trình chứa \(\mathbf{p}\).
+
+Từ đó suy ra ngay câu trả lời cho câu hỏi mở đầu thứ ba. Nếu \(\boldsymbol{\omega} = 0\) --- tịnh tiến thuần --- thì số hạng đó bằng không và \(\mathbf{p}\) hoàn toàn không quan sát được. Nếu \(\boldsymbol{\omega}\) luôn cùng một hướng --- xoay quanh đúng một trục --- thì tích có hướng \(\boldsymbol{\omega}\times\mathbf{p}\) chỉ nhạy với thành phần của \(\mathbf{p}\) \emph{vuông góc} với \(\boldsymbol{\omega}\); thành phần \emph{song song} với trục quay không ảnh hưởng gì tới tích có hướng, nên nó không quan sát được. Cần xoay quanh ít nhất hai trục độc lập để xác định cả ba thành phần. (Cửa a: suy trực tiếp từ tính chất của tích có hướng.)
+
+Đây là một trong những ví dụ sạch nhất trong cả cây về việc một điều kiện thực hành --- ``xoay thiết bị quanh cả ba trục khi hiệu chuẩn'' --- là hệ quả trực tiếp của một tính chất đại số. Và nó cho thấy vì sao lời khuyên truyền miệng không tổng quát hoá được: ai chỉ nghe ``lắc thiết bị'' mà không biết vì sao sẽ không biết phải làm gì với một cấu hình cảm biến mới.
+
+\subsection{D. Bước ba: thả tất cả, trong lúc đang chạy}
+
+Bước cuối: đặt mọi thứ vào tập biến --- tư thế, vận tốc, độ lệch IMU, cấu trúc, nội, ngoại, \(t_d\) --- và chạy liên tục trong khi hệ thống hoạt động. Đây chính là ô cuối cùng của bảng ở \ptr{00-map}, và OpenVINS \cite{geneva2020openvins} là cài đặt tham chiếu.
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ hai. Mô tả ``chỉ cần thêm biến vào vector trạng thái'' đúng về \emph{cơ chế} và sai về \emph{điều kiện}. Công thức đầy đủ là:
+\[
+\text{hiệu chuẩn trực tuyến} \;=\; \text{mở rộng trạng thái} \;+\; \text{đủ kích thích} \;+\; \text{cổng để biết khi nào không đủ}.
+\]
+
+Vế thứ hai giải thích vì sao cùng một hệ thống hội tụ trên chuỗi này và trôi trên chuỗi kia: chuỗi có xoay quanh nhiều trục kích thích \(\mathbf{p}\) qua số hạng \(\boldsymbol{\omega}\times\mathbf{p}\), chuỗi tịnh tiến thuần thì không. Vế thứ ba là mục~3.
+
+\begin{cannho}
+\textbf{Target không phải một dụng cụ chính xác kỳ diệu --- nó là một cách giảm phương sai bằng cách fix cấu trúc.}
+
+Khi bạn không có target, bạn phải thay cái đó bằng thứ khác, và thứ duy nhất có sẵn là \emph{chuyển động}. Đó là toàn bộ khác biệt giữa hiệu chuẩn trong phòng lab và hiệu chuẩn trên một robot đang chạy.
+
+Hệ quả là một cách nhìn thống nhất cho mọi bài toán trong Bảng ở \ptr{00-map}: mỗi bài toán là cùng một đồ thị nhân tử, và việc đi từ ô này sang ô kia là việc \emph{tháo một cái hàn và thay nó bằng một điều kiện chuyển động}.
+
+Hệ quả thực hành trực tiếp: khi thiết kế một quy trình hiệu chuẩn --- dù trong lab hay trên dây chuyền --- câu hỏi đúng không phải ``dùng target nào'' mà là \textbf{``tham số nào tôi cần, và chuyển động nào làm nó quan sát được''}. Bảng~\ref{tab:a05-kichthich} ở \ptr{A/05} là bảng trả lời câu đó, và mọi hướng dẫn thu dữ liệu hiệu chuẩn đều là bảng ấy viết lại thành thao tác tay.
+\end{cannho}
+
+\section{Cổng observability: điều phân biệt có nguyên tắc với mù quáng}
+\ptrtarget{C/14/03}
+
+\subsection{A. Vấn đề}
+
+Thả một tham số ra mà không kiểm điều kiện kích thích là một sai lầm có hậu quả cụ thể và nghiêm trọng hơn vẻ ngoài.
+
+Khi một tham số không quan sát được, nó không đơn giản là ``không hội tụ''. Nó \emph{trôi tự do}, và tệ hơn, nó \emph{hấp thụ sai số từ các nguồn khác}. Bộ giải thấy một hướng phẳng trong hàm mục tiêu, và nó dùng hướng đó để giảm phần dư gây ra bởi những nguyên nhân hoàn toàn khác --- một vật động chưa loại, một mô hình méo sai, một sai lệch thời gian.
+
+Kết quả là tình huống tệ nhất có thể: tham số hiệu chuẩn nhận một giá trị sai, phần dư trông đẹp, và sai số thật đã được giấu vào một biến mà không ai kiểm tra. Khi điều kiện chuyển động thay đổi và tham số ấy trở lại quan sát được, nó phải dịch chuyển một quãng lớn, và hệ thống trải qua một giai đoạn bất ổn không giải thích được.
+
+\subsection{B. Cơ chế cổng}
+
+Ý tưởng đơn giản và có nguyên tắc \cite{maye2013selfsupervised,schneider2019observability}: theo dõi mức quan sát được của từng tham số theo thời gian thực, và chỉ cập nhật nó khi mức ấy đủ.
+
+Cài đặt cụ thể có vài mức tinh vi.
+
+\emph{Mức đơn giản nhất --- cổng theo chuyển động.} Với mỗi tham số, xác định trước một đại lượng chuyển động mà nó cần (Bảng~\ref{tab:a05-kichthich}), đo đại lượng ấy trên cửa sổ hiện tại, và đóng băng tham số nếu dưới ngưỡng. Với \(\mathbf{p}_{\text{cam}}^{\text{imu}}\), đại lượng là mức đa dạng của hướng \(\boldsymbol{\omega}\); với \(t_d\), là độ lớn của tốc độ góc.
+
+\emph{Mức đúng hơn --- cổng theo phổ ma trận thông tin.} Dựng khối của \(\Lambda\) tương ứng với các tham số hiệu chuẩn, tính giá trị riêng nhỏ nhất hoặc số điều kiện, và đóng băng khi nó dưới ngưỡng. Đắt hơn nhưng tổng quát --- nó không cần biết trước tham số nào cần chuyển động gì.
+
+\emph{Mức thực dụng --- prior mềm thích ứng.} Thay vì đóng băng cứng, đặt một prior quanh giá trị hiện tại với độ mạnh \emph{tỉ lệ nghịch} với mức quan sát được. Khi kích thích tốt, prior yếu và dữ liệu quyết định; khi kích thích kém, prior mạnh và tham số giữ nguyên. Mượt hơn, tránh được các bước nhảy khi cổng đóng mở.
+
+\subsection{C. Vì sao hội tụ nhanh có thể là tin xấu}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ tư, và là một phép chẩn đoán đáng nhớ.
+
+Hai cách giải thích cho việc hiệu chuẩn ngoại trực tuyến ``hội tụ rất nhanh và rất ổn định''.
+
+\emph{Cách tốt}: chuyển động thật sự kích thích mạnh, ma trận thông tin xác định dương tốt, và tham số hội tụ về giá trị đúng. Điều này xảy ra và là điều ta muốn.
+
+\emph{Cách xấu}: tham số thực ra không quan sát được, nhưng có một prior mạnh (có thể là một prior bạn đặt, hoặc damping LM, hoặc một khởi tạo được tin quá mức) đang ghim nó. Nó ``ổn định'' vì nó không đi đâu cả --- không phải vì dữ liệu xác nhận nó.
+
+Phép thử phân biệt, và nó rẻ: \emph{chạy lại với vài giá trị khởi đầu khác nhau}. Nếu kết quả hội tụ về cùng một chỗ bất kể khởi đầu, đó là cách tốt. Nếu kết quả đi theo giá trị khởi đầu, đó là cách xấu --- và đây chính là phép thử (1) ở \ptr{A/05} khối \emph{Cạm bẫy}, áp dụng cho một tình huống cụ thể.
+
+Phép thử thứ hai, đắt hơn nhưng nhiều thông tin hơn: \emph{nhìn hiệp phương sai của tham số}, không phải giá trị của nó. Một tham số quan sát được tốt có hiệp phương sai \emph{giảm dần} theo thời gian; một tham số bị ghim bởi prior có hiệp phương sai \emph{đứng yên} ở đúng giá trị prior.
+
+\section{Tự đánh giá chất lượng hiệu chuẩn}
+\ptrtarget{C/14/04}
+
+Đây là mục mà nghiên cứu ít nói và sản phẩm bắt buộc phải có.
+
+\subsection{A. Bốn đại lượng thay cho RMS}
+
+\ptr{A/02} khối \emph{Cạm bẫy} đã lập luận vì sao sai số chiếu lại trung bình gần như vô dụng. Bốn đại lượng thay thế, theo thứ tự giá trị:
+
+\emph{Một --- bản đồ phần dư dạng trường véctơ.} Chẩn đoán mô hình sai. Nếu phần dư có hoa văn, không lượng dữ liệu nào cứu được.
+
+\emph{Hai --- hiệp phương sai của tham số, từ \(\Lambda\).} Đây là đại lượng đúng để trả lời ``tôi biết tham số này chính xác tới đâu''. Quan trọng: nhìn cả \emph{tương quan} chứ không chỉ đường chéo. Tương quan cao giữa \(f\) và \(k_1\) nghĩa là hai tham số không tách được từ dữ liệu này, và bộ số thu được nằm tuỳ tiện dọc một thung lũng (\ptr{A/02} mục~4B).
+
+\emph{Ba --- độ phủ của dữ liệu.} Các góc bảng có tới sát bốn góc ảnh không? Có đủ đa dạng độ sâu không? Đây là kiểm \emph{đầu vào} chứ không phải kiểm đầu ra, và nó rẻ hơn nhiều vì nó chạy được \emph{trước} khi tối ưu --- một quy trình dây chuyền tốt sẽ từ chối một bộ dữ liệu kém ngay lúc thu, không phải sau khi chạy xong (\ptr{D/21}).
+
+\emph{Bốn --- kiểm chéo.} Hiệu chuẩn trên một nửa dữ liệu, đo phần dư trên nửa kia. Bắt được overfitting mà ba cái trên bỏ sót.
+
+\subsection{B. Phát hiện trôi tại hiện trường}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ năm, và là bài toán khó nhất trong mục này: tại hiện trường không có target, không có chân trị, và thiết bị đang phục vụ khách hàng.
+
+Ba đại lượng đo được, xếp theo độ nhạy.
+
+\emph{Một --- phần dư có cấu trúc theo thời gian.} Nếu hiệu chuẩn trôi, phần dư chiếu sẽ phát triển một hoa văn không gian giống như ở \ptr{A/02} mục~4A --- chỉ là bây giờ trên các đặc trưng tự nhiên thay vì trên góc bảng. Cách theo dõi rẻ: tích luỹ phần dư trung bình theo từng ô lưới trên mặt phẳng ảnh, trên một cửa sổ dài, và cảnh báo khi độ lệch giữa các ô vượt ngưỡng. Rẻ vì chỉ cần vài chục con số.
+
+\emph{Hai --- tham số hiệu chuẩn trực tuyến tự nó.} Nếu bạn đang chạy hiệu chuẩn trực tuyến có cổng, thì giá trị của tham số \emph{là} một tín hiệu. Theo dõi nó theo thời gian; một xu hướng đơn điệu (không phải dao động) là dấu hiệu trôi vật lý. Điều kiện: cổng phải hoạt động, nếu không bạn đang theo dõi nhiễu.
+
+\emph{Ba --- tương quan với nhiệt độ.} Nếu có cảm biến nhiệt --- và thiết bị nhúng thường có --- thì tương quan giữa tham số ước lượng và nhiệt độ vỏ máy là bằng chứng mạnh cho trôi nhiệt. Nó cũng cho một khả năng đáng giá: \emph{bù trước} bằng một mô hình tham số theo nhiệt độ, thay vì chỉ phát hiện.
+
+\begin{cambay}
+\textbf{Một hệ thống hiệu chuẩn trực tuyến không có cổng observability tệ hơn không có hiệu chuẩn trực tuyến.}
+
+Lý do: khi tham số không quan sát được, nó không đứng yên mà \emph{hấp thụ sai số từ các nguồn khác}. Bộ giải thấy một hướng phẳng và dùng nó để giảm phần dư gây ra bởi những nguyên nhân hoàn toàn khác --- một vật động chưa loại, một mô hình méo sai, một sai lệch thời gian chưa bù.
+
+Kết quả là tình huống tệ nhất: tham số nhận giá trị sai, \emph{phần dư trông đẹp}, và sai số thật bị giấu vào một biến không ai kiểm. Hệ thống trở nên khó chẩn đoán hơn so với khi tham số bị fix, vì giờ bạn có thêm một nguồn nghi ngờ.
+
+Ba yêu cầu tối thiểu cho một hệ hiệu chuẩn trực tuyến dùng được. \emph{Một}: có cổng, ở bất kỳ mức tinh vi nào trong ba mức ở mục 3B. \emph{Hai}: \textbf{ghi lại} khi nào tham số được cập nhật và khi nào bị đóng băng --- không có nhật ký này thì không debug được. \emph{Ba}: có giới hạn cứng --- nếu tham số đi quá xa giá trị hiệu chuẩn ban đầu một lượng không hợp lý về mặt vật lý, đó là lỗi, không phải một ước lượng; hãy báo động thay vì chấp nhận.
+\end{cambay}
+
+\section{Suy biến đặc thù của hiệu chuẩn}
+\ptrtarget{C/14/05}
+
+Ngoài các trường hợp ở \ptr{A/05}, hiệu chuẩn có vài suy biến riêng đáng biết vì chúng hay gặp trong thực tế.
+
+\emph{Chuyển động phẳng.} Một robot mặt đất di chuyển trên sàn phẳng: mọi tư thế nằm trong một mặt phẳng và mọi phép xoay quanh trục thẳng đứng. Hậu quả nghiêm trọng hơn vẻ ngoài: thành phần thẳng đứng của phép biến đổi ngoại không quan sát được, và roll với pitch của nó cũng vậy. Đây là tình huống mặc định của AGV và robot dịch vụ, tức phần lớn robot thương mại --- nên nó không phải một trường hợp biên mà là trường hợp thường gặp nhất. Cách xử lý: hoặc chấp nhận và fix các thành phần ấy từ thiết kế cơ khí, hoặc tạo một quy trình hiệu chuẩn riêng có nâng/nghiêng thiết bị.
+
+\emph{Xoay thuần.} Không có tịnh tiến nên không có parallax, nên cấu trúc không quan sát được (\ptr{A/01}); và phần tịnh tiến của ngoại thì \emph{có} quan sát được qua \(\boldsymbol{\omega}\times\mathbf{p}\). Đây là một trường hợp thú vị vì nó ngược với trực giác thông thường: xoay thuần tệ cho SLAM nhưng \emph{tốt} cho một phần của hiệu chuẩn ngoại.
+
+\emph{Target phẳng và lưỡng nghĩa tư thế.} Khi bảng hiệu chuẩn ở gần song song với mặt phẳng ảnh và chiếm phần nhỏ khung hình, bài toán PnP có hai nghiệm gần nhau. Đây là chủ đề của \code{../marker/} chương 4, và trong hiệu chuẩn nó biểu hiện thành các tư thế bảng bị lật, gây phần dư lớn ở vài ảnh. Cách xử lý: nghiêng bảng đủ nhiều, và dùng bộ giải PnP trả về cả hai nghiệm rồi chọn theo phần dư.
+
+\emph{Mọi đặc trưng ở cùng độ sâu.} Làm ngoại stereo không quan sát được theo một hướng, như mục~2C đã nêu. Trong thực tế: hiệu chuẩn stereo bằng cách nhìn vào một bức tường phẳng ở một khoảng cách cố định là một sai lầm phổ biến.
+
+\begin{ungdung}
+\ud{Kalibr \cite{furgale2013kalibr}}{Hiệu chuẩn camera--IMU và đa camera bằng batch MAP với spline liên tục thời gian}{Hiện thân rõ nhất của luận đề chương này; đọc tài liệu quy trình thu dữ liệu và đối chiếu với Bảng kích thích ở \ptr{A/05}}
+\ud{OpenVINS \cite{schneider2019observability}}{Hiệu chuẩn trực tuyến nội, ngoại và \(t_d\) trong MSCKF}{Mục 2D và 3B trong một hệ chạy thật; có cờ bật tắt từng nhóm tham số}
+\ud{COLMAP \cite{schonberger2016colmap}}{Tham số nội là biến trong BA; nhiều mô hình camera}{Mục 2B --- tự hiệu chuẩn ở dạng thuần tuý nhất}
+\ud{Basalt \cite{usenko2020basalt}}{Hiệu chuẩn bằng spline \(SE(3)\); double-sphere}{Chất lượng kỹ thuật cao; cách xử lý thời gian liên tục cho rolling shutter}
+\ud{\cite{maye2013selfsupervised}}{Chỉ cập nhật các hướng quan sát được, dựa trên phân tích phổ}{Nguồn của ý tưởng cổng ở mục 3B}
+\end{ungdung}
+
+\begin{duan}{Đi từ hiệu chuẩn tới SLAM bằng cách thả dần biến, trên cùng một bộ mã}{5 ngày}
+\dmt đây là bài tập làm sáng tỏ luận đề trung tâm của cả cây rõ nhất. Bạn sẽ viết \emph{một} bộ giải và dùng nó cho bốn bài toán khác nhau, chỉ bằng cách đổi danh sách biến.
+\ddl một chuỗi hiệu chuẩn với target (tự quay, hoặc từ Kalibr), và một chuỗi EuRoC có chân trị.
+\dbc dựng bài toán MAP bằng Ceres hoặc GTSAM với một hàm phần dư chiếu duy nhất dùng chung; rồi chạy bốn cấu hình: (1) \emph{hiệu chuẩn}: fix cấu trúc (toạ độ góc bảng), thả nội và tư thế; (2) \emph{SfM}: thả cấu trúc, fix nội; (3) \emph{tự hiệu chuẩn}: thả cả hai; (4) \emph{tất cả}: thêm ngoại và \(t_d\) nếu có IMU. Với mỗi cấu hình, in ra hiệp phương sai của mọi tham số hiệu chuẩn và phổ giá trị riêng của \(\Lambda\); rồi chạy mỗi cấu hình trên \emph{ba} đoạn quỹ đạo khác nhau --- một đa dạng, một chỉ tịnh tiến, một chỉ xoay quanh một trục.
+\dxk bạn có một bảng bốn cấu hình nhân ba quỹ đạo, mỗi ô ghi: số chiều không gian rỗng, hiệp phương sai của các tham số, và giá trị hội tụ. Bạn phải quan sát được ba điều: (a) cùng một bộ mã chạy cả bốn bài toán --- luận đề trung tâm được chứng minh bằng tay; (b) thả thêm biến làm hiệp phương sai tăng và số chiều không gian rỗng có thể tăng; (c) trên quỹ đạo chỉ xoay quanh một trục, thành phần của \(\mathbf{p}\) song song trục ấy có hiệp phương sai lớn hơn hẳn hai thành phần kia --- xác nhận mục 2C bằng số của chính bạn.
+\dnv \ptr{D/21-tu-prototype-len-mass-production} biến quy trình này thành một quy trình dây chuyền có chỉ tiêu thời gian và chỉ tiêu chất lượng; \ptr{D/22-huong-nghien-cuu-con-trong} lấy hiệu chuẩn có ý thức observability làm hướng số một.
+\end{duan}
+
+\begin{traloi}
+\tl{Target cung cấp \emph{cấu trúc đã biết} --- toạ độ \(3\)D của các góc, chính xác vì ta in ra nó. Điều đó làm bài toán dễ hơn không phải vì độ chính xác của bảng mà vì nó \emph{loại bỏ một nhóm biến}: với \(M\) góc, bài toán bớt \(3M\) ẩn, và quan trọng hơn, kích thước bảng cho đơn vị mét nên gauge tỉ lệ biến mất. Nói đúng nhất: \emph{target là một cách giảm phương sai bằng cách fix cấu trúc}. Khi không có target, phải thay cái fix ấy bằng \emph{chuyển động} --- chuyển động đa dạng làm nhiều ràng buộc căng theo nhiều hướng và thay thế được. Đó là toàn bộ khác biệt giữa lab và robot đang chạy.}
+\tl{Vì mô tả ấy đúng về \emph{cơ chế} và thiếu vế \emph{điều kiện}. Công thức đầy đủ: hiệu chuẩn trực tuyến \(=\) mở rộng trạng thái \(+\) đủ kích thích \(+\) cổng để biết khi nào không đủ. Trên chuỗi có xoay quanh nhiều trục, phần tịnh tiến của ngoại được kích thích qua số hạng \(\boldsymbol{\omega}\times\mathbf{p}\) và nó hội tụ. Trên chuỗi tịnh tiến thuần, số hạng đó bằng không nên \(\mathbf{p}\) trôi tự do --- và tệ hơn, nó hấp thụ sai số từ các nguồn khác. Chuỗi mà nó ``đứng im'' thường không phải chuỗi tốt mà là chuỗi mà bạn đã vô tình ghim nó bằng một prior mạnh hoặc bằng damping.}
+\tl{Thành phần của \(\mathbf{p}\) \emph{song song với trục quay} không xác định được. Vì số hạng duy nhất trong hệ phương trình chứa \(\mathbf{p}\) là \(\boldsymbol{\omega}\times\mathbf{p}\), và tích có hướng \emph{triệt tiêu} thành phần song song với \(\boldsymbol{\omega}\): thay \(\mathbf{p}\) bằng \(\mathbf{p} + \lambda\boldsymbol{\omega}\) cho đúng cùng một tích có hướng, nên cùng một phép đo. Đó là thủ phạm. Cần xoay quanh ít nhất hai trục độc lập để cả ba thành phần quan sát được. Đây là ví dụ sạch nhất trong cây về việc một lời khuyên thực hành --- ``xoay quanh cả ba trục'' --- là hệ quả trực tiếp của một tính chất đại số.}
+\tl{\emph{Cách tốt}: chuyển động thật sự kích thích mạnh, ma trận thông tin xác định dương tốt, tham số hội tụ về giá trị đúng. \emph{Cách xấu}: tham số không quan sát được nhưng bị ghim bởi một prior mạnh, damping LM, hoặc một khởi tạo được tin quá mức --- nó ``ổn định'' vì nó không đi đâu cả, không phải vì dữ liệu xác nhận. Phép thử rẻ: chạy lại với vài giá trị khởi đầu khác nhau; hội tụ về cùng chỗ bất kể khởi đầu là cách tốt, đi theo khởi đầu là cách xấu. Phép thử thứ hai nhiều thông tin hơn: nhìn \emph{hiệp phương sai} chứ không phải giá trị --- tham số quan sát được có hiệp phương sai giảm dần, tham số bị ghim có hiệp phương sai đứng yên ở đúng giá trị prior.}
+\tl{Ba đại lượng. (1) \emph{Phần dư có cấu trúc theo thời gian}: tích luỹ phần dư trung bình theo từng ô lưới trên mặt phẳng ảnh trên một cửa sổ dài, cảnh báo khi độ lệch giữa các ô vượt ngưỡng --- rẻ vì chỉ vài chục con số. (2) \emph{Chính giá trị tham số hiệu chuẩn trực tuyến}: một xu hướng đơn điệu (không phải dao động) là dấu hiệu trôi vật lý; điều kiện là cổng phải hoạt động, nếu không bạn đang theo dõi nhiễu. (3) \emph{Tương quan với nhiệt độ vỏ máy}: bằng chứng mạnh cho trôi nhiệt, và nó còn cho khả năng \emph{bù trước} bằng một mô hình tham số theo nhiệt độ thay vì chỉ phát hiện.}
+\end{traloi}
+
+\begin{dongian}
+Bạn có một cái thước và muốn đo một căn phòng. Nhưng cái thước của bạn có thể bị co giãn, và bạn không biết chắc nó dài bao nhiêu.
+
+Có hai cách xử lý.
+
+Cách một: mượn một vật mà bạn \emph{biết chắc} kích thước --- một tờ giấy A4 chẳng hạn. Đo nó bằng cái thước của mình, so với kích thước thật, và suy ra thước của mình sai bao nhiêu. Đó là hiệu chuẩn bằng target: bạn mượn một thứ đã biết để đo một thứ chưa biết.
+
+Cách hai: không có tờ giấy nào. Bạn chỉ có căn phòng và cái thước không đáng tin. Nghe như bó tay --- nhưng không hẳn. Nếu bạn đo cùng một bức tường \emph{theo nhiều cách khác nhau}, từ nhiều chỗ, theo nhiều hướng, thì các kết quả phải khớp với nhau. Và chính việc chúng \emph{không} khớp cho bạn biết thước sai ở đâu.
+
+Đó là toàn bộ chương này. Có vật chuẩn thì dễ. Không có vật chuẩn thì vẫn làm được, nhưng phải \emph{đo nhiều kiểu khác nhau} --- và ``nhiều kiểu khác nhau'' là chỗ mọi thứ có thể hỏng.
+
+Vì nếu bạn đo mười lần mà lần nào cũng theo đúng một cách, mười kết quả sẽ khớp nhau hoàn hảo --- và chúng cùng sai một kiểu. Bạn sẽ rất tự tin và rất nhầm.
+
+Đây là chỗ quan trọng nhất cần hiểu, và nó áp dụng cho mọi thứ chứ không riêng camera: \emph{sự nhất quán giữa nhiều phép đo giống nhau không chứng minh gì cả}. Chỉ sự nhất quán giữa các phép đo \emph{thật sự khác nhau} mới chứng minh được.
+
+Và có một hệ quả thực tế đáng nhớ. Nếu một tham số nào đó không được kiểm bởi cách bạn đang đo, thì đừng để máy tự do chỉnh nó. Nó sẽ chỉnh --- và nó sẽ chỉnh sai, đồng thời dùng cái sai ấy để che giấu những lỗi khác. Một cái núm bị vặn bừa còn tệ hơn một cái núm bị khoá.
+
+\chuadongian{chỗ không rút gọn được là việc \emph{biết chuyển động nào kiểm được tham số nào}. Không có trực giác chung cho việc này --- với mỗi cấu hình cảm biến mới, phải ngồi xuống viết ra phương trình và xem tham số ấy xuất hiện ở đâu. Với camera--IMU thì nó xuất hiện trong một tích có hướng, và từ đó suy ra phải xoay quanh hai trục. Với một cấu hình khác, câu trả lời sẽ khác.}
+\motcau{Hiệu chuẩn và SLAM là một bài toán --- khác nhau ở chỗ bạn hàn cứng cái gì, và chuyển động là thứ thay thế cho cái hàn.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{C/14/06}
+
+Mệnh đề chính --- \emph{hiệu chuẩn và SLAM là cùng một bài toán MAP, khác ở danh sách biến} --- là một phát biểu cấu trúc, và mini project chính là phép chứng minh: nếu một bộ mã chạy được cả bốn cấu hình thì mệnh đề đúng cho phạm vi đó. Nó bị bác bỏ nếu có một bài toán hiệu chuẩn không viết được thành một đồ thị nhân tử với cùng loại nhân tử --- và có một trường hợp như vậy đáng nêu: hiệu chuẩn quang trắc (\ptr{A/02} mục~5B) có phần dư dạng khác (cường độ thay vì toạ độ) và một số thành phần (đường cong đáp ứng) được biểu diễn phi tham số. Nó vẫn là MAP, nhưng nó không dùng chung nhân tử với SLAM indirect, nên phát biểu cần được giới hạn: \emph{đúng cho các bài toán hình học; hiệu chuẩn quang trắc là một họ riêng}.
+
+Mệnh đề thứ hai --- \emph{thành phần của \(\mathbf{p}\) song song trục quay không quan sát được khi chỉ xoay quanh một trục} --- suy trực tiếp từ tính chất tích có hướng (cửa a) và kiểm được bằng hiệp phương sai trong mini project (cửa b). Nó bị bác bỏ nếu có một số hạng khác trong hệ phương trình cũng chứa \(\mathbf{p}\) --- và thực tế \emph{có}: với gia tốc, số hạng \(\boldsymbol{\omega}\times(\boldsymbol{\omega}\times\mathbf{p})\) và \(\dot{\boldsymbol{\omega}}\times\mathbf{p}\) cũng xuất hiện. Số hạng thứ hai đưa vào một cơ chế quan sát khác nếu tốc độ góc \emph{thay đổi}. Nên phát biểu chặt hơn là: \emph{với tốc độ góc hằng quanh một trục, thành phần song song không quan sát được; với tốc độ góc biến thiên, nó có thể quan sát được yếu}. Tôi \emph{chưa} kiểm điều này bằng số và nó là một mục trong \code{99-chua-biet.md}.
+
+Mệnh đề thứ ba --- \emph{hiệu chuẩn trực tuyến không cổng tệ hơn không hiệu chuẩn} --- là một phán đoán về đánh đổi. Nó bị bác bỏ nếu một thí nghiệm cho thấy hiệu chuẩn trực tuyến không cổng vẫn cải thiện độ chính xác trung bình so với tham số fix, trên một tập chuỗi đa dạng. Điều đó \emph{có thể} xảy ra nếu phần lớn chuỗi có kích thích tốt và tham số ban đầu khá sai. Nếu vậy, kết luận đúng không phải ``cổng không cần thiết'' mà là ``lợi ích trung bình che mất rủi ro đuôi'' --- và với sản phẩm thì đuôi mới là thứ quan trọng (\ptr{C/18}).
+
+\section{Kết nối}
+\ptrtarget{C/14/07}
+
+Chương này là chỗ cây gập lại. Nối lên trên gần như mọi chương của Phần~A: \ptr{A/02-mo-hinh-camera} cho mô hình và cho kỹ năng chẩn đoán ở mục~4A; \ptr{A/04-uoc-luong-map-va-bundle-adjustment} cho khung MAP mà chương này chỉ đổi danh sách biến; \ptr{A/05-observability-gauge-va-suy-bien} cho toàn bộ phần điều kiện --- đây là chương mà Bảng kích thích ở đó trả công hoàn toàn; \ptr{A/06-bat-dinh-va-lan-truyen-sai-so} cho hiệp phương sai tham số, đại lượng nên in ra thay cho RMS.
+
+Nối ngang trong Phần~C. \ptr{C/13-quan-ly-ban-do} chia sẻ một câu hỏi với chương này: cái gì được coi là cố định và cái gì được phép đổi theo thời gian --- ở đó là bản đồ, ở đây là tham số. \ptr{C/15-hop-nhat-da-cam-bien} là chương mà hiệu chuẩn ngoại trở thành điều kiện tiên quyết: không thể ghép hai cảm biến mà không biết chúng đặt ở đâu so với nhau. \ptr{C/18-danh-gia-va-phuong-phap-luan} cho công cụ để so sánh hai quy trình hiệu chuẩn một cách có kỷ luật.
+
+Nối xuống dưới. \ptr{D/21-tu-prototype-len-mass-production} là chỗ chương này gặp thực tế khắc nghiệt nhất: thiết kế đồ gá hiệu chuẩn tự động dưới sáu mươi giây mỗi máy, quyết định hiệu chuẩn từng máy hay dùng tham số chung cho cả lô, phân tích độ nhạy trước khi chốt cơ khí, và thống kê SPC trên tham số qua từng lô hàng. \ptr{D/22-huong-nghien-cuu-con-trong} lấy \emph{hiệu chuẩn trực tuyến có ý thức observability} làm hướng số một, và lý do nằm trọn trong mục~3 của chương này: hầu hết hệ thống hoặc hiệu chuẩn mù quáng hoặc không hiệu chuẩn, và việc giám sát observability theo thời gian thực rồi quyết định cập nhật biến nào vẫn còn rất thô sơ.
+
+Nối ngang sang cây khác: \code{../IMU\_Fusion/} chương 6 bàn hiệu chuẩn quán tính --- đặc trưng hoá nhiễu, phương sai Allan, độ lệch --- và chương 5 ở đó cho phần observability cho trường hợp quán tính. \code{../marker/} chương 12 bàn hiệu chuẩn cho bài toán docking, nơi yêu cầu là milimet nên mọi thứ trong chương này phải làm chặt hơn một bậc.
+
+\begin{tukiem}
+\item Nêu chính xác điều mà calibration target cung cấp, và nói vì sao ``vì nó chính xác'' là câu trả lời sai.
+\item Viết công thức đầy đủ cho hiệu chuẩn trực tuyến, gồm cả vế điều kiện, và giải thích vì sao thiếu vế đó là nguy hiểm.
+\item Tự dẫn lại vì sao thành phần của \(\mathbf{p}_{\text{cam}}^{\text{imu}}\) song song với trục quay không quan sát được khi chỉ xoay quanh một trục.
+\item Hiệu chuẩn trực tuyến của bạn hội tụ nhanh và ổn định. Nêu hai cách giải thích và hai phép thử phân biệt.
+\item Nêu bốn đại lượng nên nhìn thay cho RMS khi đánh giá hiệu chuẩn, và nói cái nào chạy được \emph{trước} khi tối ưu.
+\item Nêu ba đại lượng phát hiện trôi hiệu chuẩn tại hiện trường, nơi không có target và không có chân trị.
+\item Robot mặt đất đi trên sàn phẳng. Thành phần nào của hiệu chuẩn ngoại không quan sát được, và vì sao đây không phải một trường hợp biên mà là trường hợp thường gặp nhất?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,313 @@
+% ---------------------------------------------------------------------------
+% Chương 2 — Mô hình camera
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-13  |  Ôn gần nhất: —
+% Phụ thuộc: A/01 (mặt phẳng chuẩn hoá, phép chiếu, toạ độ thuần nhất)
+% Mức độ: QUAN TRỌNG. Mục PHẢI đọc kỹ: mục 4 (mô hình sai vs tham số sai) —
+%         đây là kỹ năng chẩn đoán được dùng lại ở C/14, C/18, D/21.
+% Kiểm chứng công thức lõi:
+%   (1) Chuỗi pinhole x_pixel = K * pi(P_c) — cửa (a) tự dẫn từ tam giác đồng dạng;
+%       cửa (b) ví dụ số mục 2B (f=400, cx=320, P=(1,0,4) -> u=420).
+%   (2) Mô hình radtan (Brown-Conrady) — cửa (c) zhang2000camera; công thức chuẩn,
+%       KHÔNG tự suy dẫn được (là mô hình thực nghiệm, không phải định lý).
+%   (3) Bậc tự do của các họ mô hình (UCM 5, EUCM 6, DS 6, KB4 8) — cửa (c)
+%       usenko2018doublesphere Bảng I; cửa (a) đếm tham số từ dạng hàm.
+%   (4) Quan hệ z = b*f/d cho stereo đã hiệu chỉnh — cửa (a) tam giác đồng dạng;
+%       cửa (b) đã kiểm ở A/01 mục 4C.
+%   (5) Rolling shutter: tư thế là hàm của hàng ảnh, t_row = t_0 + r * t_line
+%       — cửa (c) schubert2018rollingshutter; cửa (a) hệ quả trực tiếp của cách đọc cảm biến.
+% Ghi chú trung thực: chương này KHÔNG chứa con số thực nghiệm đo được của tôi.
+%   Các con số trong ví dụ là tự đặt và ghi rõ "giả sử".
+% ---------------------------------------------------------------------------
+\documentclass[../../vslam.tex]{subfiles}
+\begin{document}
+\chapter{Mô hình camera (Camera Models)}
+\ptrtarget{A/02}\ptrtarget{A/02-mo-hinh-camera}
+\dependency{\ptr{A/01-hinh-hoc-da-thi} (mặt phẳng chuẩn hoá, phép chiếu, toạ độ thuần nhất --- chương này lấp vào chỗ chương 1 bỏ trống là làm sao từ pixel về tới mặt phẳng chuẩn hoá).}
+
+\begin{tomtat}
+Chương~1 làm việc trên mặt phẳng chuẩn hoá và giả định phép biến đổi từ pixel về đó đã có sẵn. Chương này xây dựng chính phép biến đổi ấy, và quan trọng hơn, nó dạy cách nhận ra khi phép biến đổi ấy \emph{sai}. Nội dung có bốn lớp. Lớp một là mô hình pinhole với ma trận nội \(K\) --- đơn giản, tuyến tính trong toạ độ thuần nhất, và không đủ cho ống kính thật. Lớp hai là các họ mô hình méo: radial-tangential cho ống kính hẹp, Kannala--Brandt cho fisheye, UCM/EUCM/double-sphere cho ống kính cực rộng --- và tiêu chí chọn giữa chúng, vốn là câu hỏi thiết kế chứ không phải câu hỏi tinh chỉnh. Lớp ba, quan trọng nhất, là kỹ năng phân biệt \emph{mô hình sai} với \emph{tham số sai}: hai bệnh có cùng triệu chứng bề mặt nhưng cần hai cách chữa ngược nhau, và nhầm chúng là nguồn của nhiều tháng công vô ích. Lớp bốn là những mô hình mà SLAM thường quên: rolling shutter, mô hình quang trắc, và mô hình của stereo. Nếu chỉ nhớ một điều: \emph{phần dư có cấu trúc là dấu hiệu mô hình sai, phần dư ngẫu nhiên là dấu hiệu nhiễu} --- và không lượng dữ liệu nào chữa được bệnh thứ nhất.
+\end{tomtat}
+
+\begin{nentang}
+\kn{tham số nội (intrinsic parameters)}{tập tham số mô tả cách camera biến một tia trong hệ toạ độ camera thành một pixel: tiêu cự, điểm chính, và các hệ số méo. Chúng gắn với thiết bị, không gắn với cảnh hay chuyển động.}
+\kn{tham số ngoại (extrinsic parameters)}{tư thế \((R,\mathbf{t})\) của camera so với một hệ quy chiếu khác --- thế giới, một camera khác, hay IMU. Chúng gắn với việc lắp đặt.}
+\kn{điểm chính (principal point)}{giao của trục quang với mặt phẳng ảnh, ký hiệu \((c_x, c_y)\). Về lý thuyết nằm gần tâm ảnh; trên thực tế lệch vài pixel do dung sai lắp ráp, và độ lệch đó là một trong những thứ hiệu chuẩn phải tìm ra.}
+\kn{méo xuyên tâm (radial distortion)}{hiện tượng điểm ảnh bị dịch vào trong (barrel) hay ra ngoài (pincushion) theo khoảng cách tới điểm chính. Nguyên nhân là hình dạng thấu kính; nó là thành phần méo lớn nhất ở hầu hết ống kính.}
+\kn{méo tiếp tuyến (tangential distortion)}{thành phần méo sinh ra khi mặt thấu kính không song song hoàn hảo với mặt cảm biến. Thường nhỏ hơn méo xuyên tâm một bậc độ lớn, và với ống kính hiện đại lắp máy thì nhiều khi bỏ được.}
+\kn{rolling shutter}{cách đọc cảm biến theo từng hàng chứ không đồng thời. Hàng cuối được phơi sáng muộn hơn hàng đầu một khoảng \(H \cdot t_{\text{line}}\), nên một ảnh chụp khi đang chuyển động không tương ứng với \emph{một} tư thế nào cả.}
+\kn{hàm đáp ứng camera (camera response function, CRF)}{quan hệ phi tuyến giữa lượng ánh sáng tới cảm biến và giá trị pixel ghi ra. Với phương pháp indirect nó không quan trọng; với phương pháp direct nó là một phần bắt buộc của mô hình.}
+\kn{vignetting}{hiện tượng ảnh tối dần về phía rìa do ống kính truyền ít ánh sáng hơn ở góc lớn. Cũng là một hiệu ứng mà indirect bỏ qua được còn direct thì không.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Bạn hiệu chuẩn camera, sai số chiếu lại trung bình là \(0{,}3\) px --- một con số trông rất tốt. Vì sao con số đó gần như không nói gì về việc hiệu chuẩn có đúng không, và bạn phải nhìn vào cái gì thay cho nó?}
+\h{Thêm hệ số méo bậc cao luôn làm sai số chiếu lại giảm. Vì sao điều đó \emph{không} chứng minh mô hình tốt hơn, và chuyện gì xảy ra khi bạn dùng bộ tham số ấy cho một vùng ảnh mà bảng hiệu chuẩn chưa từng đi qua?}
+\h{Hai camera cùng loại, cùng lô sản xuất, cùng nhà cung cấp. Hiệu chuẩn cái thứ nhất rồi dùng chung tham số cho cả lô --- một quyết định tiết kiệm rất nhiều tiền. Điều gì quyết định quyết định đó đúng hay sai, và bạn đo nó bằng cách nào \emph{trước khi} chốt thiết kế cơ khí?}
+\h{Hệ thống của bạn chính xác vào buổi sáng và lệch dần tới chiều, rồi hôm sau lại đúng. Không có gì trong phần mềm thay đổi. Nêu cơ chế vật lý nào có thể gây ra chuyện này, và nó thuộc về chương nào trong cây.}
+\h{Rolling shutter làm hỏng giả thiết ``một ảnh tương ứng một tư thế''. Vì sao việc chỉ ước lượng thêm một tham số \(t_{\text{line}}\) lại không đủ để chữa, và phải thêm cái gì nữa vào mô hình?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{A/02/01}
+
+Chương~1 kết thúc bằng một giả thiết ngầm mà nó không tự chữa được: mọi công thức ở đó viết trên mặt phẳng chuẩn hoá, tức giả định ta đã biết cách gỡ bỏ hoàn toàn ảnh hưởng của ống kính và cảm biến. Giả thiết ấy nghe vô hại, nhưng nó chứa gần như toàn bộ phần vật lý của bài toán, và nó là chỗ mà một hệ thống đúng về lý thuyết gặp thế giới thật.
+
+Bài toán gốc là như sau. Một ống kính thật không phải một lỗ kim. Nó là một chồng thấu kính thuỷ tinh hoặc nhựa, mỗi mặt có một sai số gia công, lắp trong một ống có dung sai cơ khí, gắn trước một cảm biến có thể không hoàn toàn vuông góc với trục quang, và toàn bộ cụm ấy giãn nở khi nóng lên. Ánh sáng đi qua chồng thấu kính đó không đi theo đường mà mô hình lỗ kim nói. Câu hỏi của chương là: \emph{mô tả sai lệch ấy bằng bao nhiêu con số, theo dạng hàm nào, và làm sao biết mình đã chọn đúng?}
+
+Ai gặp bài toán này? Tất cả mọi người làm thị giác đo đạc, nhưng mức độ đau thì rất khác nhau. Với phân loại ảnh, méo ống kính gần như không ảnh hưởng. Với SLAM, nó ảnh hưởng theo một kiểu đặc biệt tệ: sai số hiệu chuẩn không sinh ra nhiễu ngẫu nhiên mà sinh ra \emph{sai lệch có hệ thống}, và sai lệch có hệ thống thì bình phương tối thiểu không khử được --- nó chảy thẳng vào ước lượng tư thế và tích luỹ theo quỹ đạo. Một sai số hiệu chuẩn nhỏ ổn định gây hại nhiều hơn một nhiễu lớn ngẫu nhiên, và đây là điều phản trực giác đầu tiên của chương.
+
+Trước khi có mô hình tham số, cách làm cũ là bảng tra: đo độ lệch tại một lưới điểm rồi nội suy. Cách đó \emph{đúng} và vẫn được dùng trong trắc địa ảnh độ chính xác cao, nhưng nó hỏng ở ba chỗ khi đưa vào SLAM. Nó cần rất nhiều điểm đo, nên quy trình hiệu chuẩn dài --- không chấp nhận được trên dây chuyền sản xuất (\ptr{D/21}). Nó không nội suy được ra ngoài vùng đã đo. Và quan trọng nhất, nó không cho ta một \emph{đạo hàm} giải tích để đưa tham số vào bài toán tối ưu, nên không làm hiệu chuẩn trực tuyến được (\ptr{C/14}). Mô hình tham số giải quyết cả ba, với cái giá là ta phải chọn đúng dạng hàm --- và chọn sai dạng hàm là bệnh mà mục~4 dành riêng để nói.
+
+Có một lý do thứ hai, sâu hơn, để chương này quan trọng hơn vẻ ngoài của nó. Theo luận đề trung tâm của cây, tham số nội chỉ là một nhóm biến trong cùng bài toán MAP với tư thế và cấu trúc. Fix chúng thì ta có SLAM; thả chúng ra thì ta có tự hiệu chuẩn. Nhưng để thả được, ta phải biết \emph{dạng hàm} --- và dạng hàm là thứ không tối ưu ra được, nó phải được chọn. Đây là ranh giới giữa thứ thuật toán làm được và thứ kỹ sư phải quyết định, và chương này nằm đúng trên ranh giới đó.
+
+\begin{trucgiac}
+Hình dung mô hình camera là một cái \emph{ống dẫn} biến tia sáng thành pixel, và hiệu chuẩn là việc đo hình dạng ống dẫn ấy.
+
+Nếu ống dẫn thật có hình dạng nằm trong họ hình dạng mà mô hình của bạn mô tả được, thì hiệu chuẩn chỉ là tìm đúng con số --- và với đủ dữ liệu bạn sẽ tìm được, sai số còn lại là nhiễu thuần tuý, phân bố ngẫu nhiên.
+
+Nếu ống dẫn thật có hình dạng \emph{không} nằm trong họ ấy --- chẳng hạn bạn dùng mô hình radial cho một ống kính có méo bất đối xứng --- thì không con số nào đúng cả. Bộ tối ưu sẽ tìm ra bộ tham số làm sai số nhỏ nhất có thể, và sai số nhỏ nhất đó \emph{không phải nhiễu}: nó là hình dạng của phần mô hình không mô tả được, in dấu lên phần dư thành một hoa văn.
+
+Đó là toàn bộ nội dung của mục 4, và nó là lý do vì sao phải nhìn \emph{bản đồ} phần dư chứ không nhìn \emph{trung bình} phần dư. Trung bình xoá mất hoa văn; bản đồ giữ nó lại. Một con số trung bình đẹp hoàn toàn tương thích với một mô hình sai hoàn toàn.
+\end{trucgiac}
+
+\section{Pinhole và ma trận nội}
+\ptrtarget{A/02/02}
+
+\subsection{A. Chuỗi biến đổi}
+
+Mô hình pinhole là mô hình nền mà mọi thứ khác là hiệu chỉnh của nó. Chuỗi đầy đủ từ điểm thế giới tới pixel gồm bốn bước, và tách rạch ròi bốn bước ấy là điều đáng làm vì mỗi bước hỏng theo một kiểu khác nhau:
+
+\[
+\mathbf{P}_w
+\;\xrightarrow{\ (R,\mathbf{t})\ }\;
+\mathbf{P}_c
+\;\xrightarrow{\ \pi\ }\;
+\mathbf{x}
+\;\xrightarrow{\ d(\cdot)\ }\;
+\mathbf{x}_d
+\;\xrightarrow{\ K\ }\;
+\mathbf{p}
+\]
+
+Bước một là ngoại: \(\mathbf{P}_c = R\,\mathbf{P}_w + \mathbf{t}\). Bước hai là phép chiếu phối cảnh về mặt phẳng chuẩn hoá: \(\mathbf{x} = (X_c/Z_c,\; Y_c/Z_c)\). Bước ba là méo: \(\mathbf{x}_d = d(\mathbf{x};\, \boldsymbol{\theta}_d)\). Bước bốn là affine sang pixel:
+
+\[
+\mathbf{p} \;=\; K\,\tilde{\mathbf{x}}_d,
+\qquad
+K \;=\; \begin{pmatrix} f_x & s & c_x \\ 0 & f_y & c_y \\ 0 & 0 & 1\end{pmatrix} .
+\]
+
+Bốn tham số của \(K\) có ý nghĩa vật lý cụ thể. \(f_x\) và \(f_y\) là tiêu cự tính bằng pixel --- chúng khác nhau khi pixel không vuông, điều hiếm ở cảm biến hiện đại nhưng vẫn nên để tự do vì việc ép \(f_x = f_y\) khi chúng thật sự khác nhau chính là một dạng \emph{mô hình sai}. \((c_x, c_y)\) là điểm chính. Hệ số trượt \(s\) mô tả trục pixel không vuông góc; với mọi cảm biến CMOS hiện đại nó bằng không, và để nó tự do chỉ thêm một hướng gần suy biến vào bài toán --- một ví dụ nhỏ của bài học ở \ptr{A/05} rằng thêm biến không miễn phí.
+
+\subsection{B. Ví dụ nhỏ tính tay}
+
+Giả sử \(f_x = f_y = 400\) px, \((c_x, c_y) = (320, 240)\), không méo. Một điểm ở toạ độ camera \(\mathbf{P}_c = (1,\, 0,\, 4)\) mét.
+
+Chiếu về mặt phẳng chuẩn hoá: \(\mathbf{x} = (1/4,\; 0/4) = (0{,}25,\; 0)\). Sang pixel: \(u = 400 \times 0{,}25 + 320 = 420\), \(v = 400 \times 0 + 240 = 240\). Vậy \(\mathbf{p} = (420, 240)\). (Cửa kiểm chứng b.)
+
+Kiểm ngược lại để thấy điều quan trọng: nếu điểm ở \((2,\, 0,\, 8)\) --- cùng hướng, gấp đôi khoảng cách --- thì \(\mathbf{x} = (2/8,\, 0) = (0{,}25,\, 0)\), ra \emph{đúng cùng một pixel}. Đây là sự mất mát thông tin ở \ptr{A/01} được xác nhận bằng số: phép chiếu là ánh xạ từ một tia vào một điểm, và mọi điểm trên tia đều cho cùng kết quả. Không có phép hiệu chuẩn nào lấy lại được chiều đã mất; chỉ có parallax làm được.
+
+Một con số đáng nhớ rút ra từ đây: với \(f = 400\) px, một pixel tương ứng khoảng \(1/400 = 2{,}5\) mrad, tức khoảng \(0{,}14^\circ\). Ở khoảng cách \(4\) m, một pixel là \(4 \times 2{,}5\) mm \(= 1\) cm theo phương ngang. Quan hệ ``một pixel bằng bao nhiêu mm ở khoảng cách \(z\)'' là \(z/f\), và nó là phép tính đầu tiên nên làm khi ai đó hỏi hệ thống chính xác tới đâu.
+
+\section{Các họ mô hình méo}
+\ptrtarget{A/02/03}
+
+Chọn mô hình méo là một quyết định thiết kế, và nó nên được quyết định bởi \emph{trường nhìn} của ống kính chứ không bởi thói quen hay bởi mô hình mà thư viện mặc định.
+
+\subsection{A. Radial-tangential (Brown--Conrady)}
+
+Đây là mô hình quen thuộc nhất, và là mặc định của OpenCV và của Zhang \cite{zhang2000camera}. Với \(r^2 = x^2 + y^2\) trên mặt phẳng chuẩn hoá:
+
+\[
+\mathbf{x}_d \;=\; (1 + k_1 r^2 + k_2 r^4 + k_3 r^6)\,\mathbf{x} \;+\; \mathbf{x}_{\text{tan}},
+\]
+với \(\mathbf{x}_{\text{tan}}\) là hai số hạng tiếp tuyến theo \(p_1, p_2\). Đây là một \emph{mô hình thực nghiệm}, không phải một định lý --- nó là khai triển đa thức chẵn của một hàm méo được giả định trơn và đối xứng xuyên tâm. Tôi không tự dẫn lại được nó và cũng không nên cố; nó qua cửa kiểm chứng (c) qua \cite{zhang2000camera} và \cite{hartley2004}.
+
+Hai tính chất quyết định phạm vi dùng. Thứ nhất, nó không có nghịch đảo ở dạng đóng: từ pixel về mặt phẳng chuẩn hoá phải lặp. Với phương pháp indirect điều này chấp nhận được vì ta chỉ gỡ méo một lần cho mỗi đặc trưng; với direct, nơi ta chiếu hàng nghìn điểm mỗi khung, nó là chi phí thật. Thứ hai, và nghiêm trọng hơn: đa thức \emph{phân kỳ} ngoài vùng dữ liệu hiệu chuẩn. Với ống kính trường nhìn lớn hơn khoảng \(120^\circ\), \(r\) lớn và số hạng \(r^6\) làm mô hình hành xử hoang dã ở rìa. Đây là lý do kỹ thuật khiến radtan không dùng được cho fisheye, và nó không phải chuyện ``kém chính xác hơn một chút''.
+
+\subsection{B. Kannala--Brandt và các mô hình trường nhìn rộng}
+
+Với ống kính rộng, cách đúng là mô hình hoá \emph{góc} chứ không phải bán kính trên mặt phẳng chuẩn hoá. Gọi \(\vartheta\) là góc giữa tia và trục quang; Kannala--Brandt \cite{kannala2006generic} đặt
+
+\[
+r_d \;=\; \vartheta + k_1\vartheta^3 + k_2\vartheta^5 + k_3\vartheta^7 + k_4\vartheta^9 .
+\]
+
+Khác biệt then chốt so với radtan: \(\vartheta\) bị chặn bởi trường nhìn (tối đa \(\pi\)), trong khi \(r\) trên mặt phẳng chuẩn hoá tiến ra vô hạn khi góc tiến tới \(90^\circ\). Việc khai triển theo một biến bị chặn là lý do mô hình này ổn định ở trường nhìn rộng, còn khai triển theo một biến không bị chặn thì không. Đây là một ví dụ rõ ràng của việc \emph{chọn đúng biến quan trọng hơn thêm bậc}.
+
+Ba mô hình còn lại đi theo hướng khác: thay vì thêm bậc đa thức, chúng thêm \emph{cấu trúc hình học}. \term{UCM} \cite{mei2007ucm} chiếu tia lên một mặt cầu đơn vị rồi chiếu phối cảnh từ một điểm lệch tâm --- đúng năm tham số. \term{EUCM} tổng quát mặt cầu thành ellipsoid, thêm một tham số. \term{Double-sphere} \cite{usenko2018doublesphere} dùng hai mặt cầu liên tiếp, cũng sáu tham số, và có lợi thế quyết định là \emph{cả phép chiếu lẫn phép chiếu ngược đều có dạng đóng}. Với hệ thống chạy thời gian thực, đặc biệt là direct, tính chất này thường quan trọng hơn một chút độ chính xác.
+
+\begin{table}[H]\centering\small
+\caption{Năm họ mô hình méo. Cột cuối là tiêu chí chọn thực dụng, và nó nên được quyết định cùng lúc với việc chọn ống kính, không phải sau đó.}
+\label{tab:a02-models}
+\begin{tabularx}{\linewidth}{@{}L{2.3cm}L{1.1cm}L{3.2cm}YL{2.5cm}@{}}
+\toprule
+\textbf{Mô hình} & \textbf{Số tham số} & \textbf{Nguyên lý} & \textbf{Hỏng khi} & \textbf{Chọn khi}\\
+\midrule
+Radtan & 4--9 & Khai triển đa thức theo \(r\) trên mặt phẳng chuẩn hoá & Trường nhìn rộng --- đa thức phân kỳ ở rìa; không có nghịch đảo dạng đóng & FOV \(\lesssim 100^\circ\); hệ sinh thái OpenCV\\
+Kannala--Brandt & 4--8 & Đa thức lẻ theo góc \(\vartheta\) & Ống kính rất bất đối xứng; vẫn cần lặp để chiếu ngược & Fisheye tới \(180^\circ\); mặc định của Kalibr\\
+UCM & 5 & Chiếu qua mặt cầu đơn vị lệch tâm & Ống kính lệch nhiều khỏi giả định cầu & Ít tham số, cần bền vững\\
+EUCM & 6 & Mặt ellipsoid thay cho mặt cầu & Như UCM nhưng nhẹ hơn & Thoả hiệp tốt cho FOV rộng\\
+Double-sphere & 6 & Hai mặt cầu liên tiếp & Rất rộng và rất bất đối xứng & \textbf{Cần chiếu ngược dạng đóng} --- direct, thời gian thực\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{cannho}
+Chọn mô hình theo \textbf{trường nhìn} và theo \textbf{việc có cần chiếu ngược dạng đóng hay không} --- hai tiêu chí đó quyết định gần hết. Đừng chọn theo số tham số: thêm tham số không phải luôn tốt hơn, và mục 4 giải thích vì sao.
+
+Quy tắc thô dùng được ngay: FOV dưới \(100^\circ\) thì radtan là đủ và tiện vì cả hệ sinh thái hỗ trợ; từ \(100^\circ\) tới \(180^\circ\) thì Kannala--Brandt hoặc double-sphere; cần direct method hoặc cần chiếu ngược hàng nghìn lần mỗi khung thì double-sphere vì nó có dạng đóng cả hai chiều \cite{usenko2018doublesphere}.
+
+Và một điều quan trọng hơn việc chọn: \textbf{ghi lại lựa chọn ấy cùng lý do}, trong mã nguồn và trong tài liệu sản phẩm. Một tệp hiệu chuẩn không ghi rõ mô hình nào đã sinh ra nó là một quả mìn hẹn giờ --- ai đó sẽ nạp nó bằng một mô hình khác, các con số vẫn hợp lệ về kiểu dữ liệu, và hệ thống sẽ sai một cách im lặng.
+\end{cannho}
+
+\section{Mô hình sai so với tham số sai}
+\ptrtarget{A/02/04}
+
+Đây là mục quan trọng nhất của chương, và kỹ năng nó dạy được dùng lại ở \ptr{C/14}, \ptr{C/18} và \ptr{D/21}.
+
+\subsection{A. Hai bệnh, một triệu chứng}
+
+Sau khi hiệu chuẩn, bạn có một tập phần dư --- hiệu giữa vị trí góc bảng cờ quan sát được và vị trí chiếu lại từ mô hình. Có hai lý do hoàn toàn khác nhau khiến phần dư không bằng không, và chúng cần hai cách chữa ngược nhau.
+
+\term{Tham số sai} (\emph{parameter error}): dạng hàm đúng, nhưng con số chưa tối ưu --- vì dữ liệu chưa đủ, vì bộ tối ưu dừng sớm, vì khởi tạo tệ. Dấu hiệu: phần dư phân bố \emph{ngẫu nhiên}, không có hoa văn không gian, và \emph{giảm} khi thêm dữ liệu tốt. Cách chữa: thêm dữ liệu, đa dạng hoá tư thế bảng, tối ưu kỹ hơn.
+
+\term{Mô hình sai} (\emph{model mismatch}): dạng hàm không mô tả nổi ống kính thật. Dấu hiệu: phần dư có \emph{cấu trúc không gian} --- tăng dần ra rìa, xoáy quanh tâm, khác nhau giữa các vùng ảnh --- và \emph{không giảm} khi thêm dữ liệu; nó hội tụ về một mức sàn khác không. Cách chữa: đổi mô hình. Thêm dữ liệu chỉ làm bạn ước lượng chính xác hơn các tham số của một mô hình sai.
+
+Phân biệt hai bệnh này rẻ tới mức đáng ngạc nhiên, và hầu như không ai làm: \emph{vẽ phần dư lên mặt phẳng ảnh dưới dạng trường véctơ}. Nếu bạn thấy một hoa văn --- các mũi tên hướng ra ngoài ở rìa, hoặc xoáy tròn --- thì đó là mô hình sai, và bạn vừa nhìn thấy đúng phần mà mô hình không mô tả được. Nếu bạn thấy một đám nhiễu vô hướng thì đó là tham số sai hoặc chỉ là nhiễu, và bạn đã xong.
+
+\begin{cambay}
+\textbf{Sai số chiếu lại trung bình (RMS) gần như vô dụng làm thước đo chất lượng hiệu chuẩn}, và đây là con số mà mọi công cụ hiệu chuẩn in ra đầu tiên.
+
+Ba lý do. Thứ nhất, nó là một con số tổng hợp --- nó xoá đúng cái hoa văn không gian vốn là thông tin chẩn đoán duy nhất. Một mô hình sai với hoa văn rõ rệt có thể có RMS thấp hơn một mô hình đúng với nhiễu cao. Thứ hai, nó \emph{luôn giảm} khi thêm tham số, vì bạn đang khớp nhiều bậc tự do hơn vào cùng lượng dữ liệu; điều này không nói gì về khả năng tổng quát hoá. Thứ ba, nó chỉ đo trên vùng ảnh mà bảng hiệu chuẩn đã đi qua --- và ống kính sai nhiều nhất ở rìa, đúng chỗ bảng khó tới nhất.
+
+Bốn thứ đáng nhìn thay cho nó, theo thứ tự giá trị: (1) \textbf{bản đồ phần dư} dưới dạng trường véctơ trên mặt phẳng ảnh --- chẩn đoán mô hình sai; (2) \textbf{độ phủ} của các góc bảng trên toàn khung hình, đặc biệt bốn góc ảnh; (3) \textbf{hiệp phương sai của tham số} lấy từ Hessian --- tham số nào xác định kém, và có tương quan cao giữa hai tham số nào không (\ptr{A/06}); (4) \textbf{kiểm chéo}: hiệu chuẩn trên một nửa dữ liệu, đo phần dư trên nửa kia. Cái thứ tư bắt được overfitting mà ba cái kia bỏ sót.
+\end{cambay}
+
+\subsection{B. Vì sao thêm tham số là một cái bẫy}
+
+Thêm \(k_3\), rồi \(k_4\), rồi số hạng tiếp tuyến bậc cao --- RMS giảm mỗi lần. Cảm giác tiến bộ rất rõ ràng, và nó là ảo giác.
+
+Cơ chế: mỗi tham số thêm vào là một bậc tự do để khớp \emph{nhiễu} trong dữ liệu hiệu chuẩn, không chỉ khớp tín hiệu. Hệ quả trong vùng có dữ liệu là một cải thiện nhỏ và thật; hệ quả ngoài vùng có dữ liệu là một hàm dao động mạnh. Vì bảng hiệu chuẩn hiếm khi phủ tới sát bốn góc ảnh, ``ngoài vùng có dữ liệu'' chính là nơi đặc trưng SLAM thường xuất hiện khi robot quay.
+
+Có một hệ quả thứ hai, tinh vi hơn và tốn kém hơn, thuộc về \ptr{A/05}. Các hệ số bậc cao \emph{tương quan mạnh} với nhau và với tiêu cự: nhiều tổ hợp \((f, k_1, k_2, k_3)\) khác nhau cho gần như cùng một ánh xạ trên vùng đã đo. Nghĩa là ma trận thông tin gần suy biến theo một hướng nào đó trong không gian tham số. Bộ tối ưu vẫn trả về một bộ số, nhưng bộ số đó nằm tuỳ tiện dọc theo một thung lũng phẳng --- và hai lần hiệu chuẩn cùng một camera sẽ cho hai bộ số khác nhau đáng kể trong khi cho cùng RMS. Đây là kiểu hỏng im lặng mà chương~5 mô tả tổng quát, gặp lần đầu ở đây.
+
+Phép thử rẻ để phát hiện: hiệu chuẩn cùng một camera \emph{ba lần} với ba bộ dữ liệu khác nhau, rồi so sánh các tham số. Nếu \(f\) ổn định trong vòng một phần nghìn mà \(k_2\) nhảy ba chục phần trăm giữa các lần, thì \(k_2\) không xác định được từ dữ liệu của bạn, và giữ nó trong mô hình chỉ là giữ một biến nhiễu. Phép thử này nên nằm trong quy trình sản xuất ở \ptr{D/21}, không phải chỉ trong phòng nghiên cứu.
+
+\subsection{C. Hiệu chuẩn sai chảy đi đâu}
+
+Câu hỏi cuối của mục, và là câu hỏi nối chương này vào cả phần còn lại của cây: nếu tham số nội sai một chút, hậu quả xuất hiện ở đâu?
+
+Nó không biến mất. Bài toán MAP ở \ptr{A/04} sẽ tìm cách làm phần dư nhỏ nhất có thể, và với tham số nội bị fix sai, cách duy nhất còn lại là \emph{bẻ cong} các biến còn tự do --- tư thế và cấu trúc. Vài đường chảy điển hình:
+
+Tiêu cự sai chảy chủ yếu vào \emph{tỉ lệ} của bản đồ. Nếu \(f\) ước lượng lớn hơn thật \(1\%\), toàn bộ cấu trúc thu nhỏ tương ứng --- và với mono, nơi tỉ lệ vốn là gauge tự do, điều này \emph{hoàn toàn không nhìn thấy được} cho tới khi bạn so với chân trị hoặc ghép với một cảm biến có đơn vị mét. Đây là một trong những lý do stereo và VIO lộ ra lỗi hiệu chuẩn còn mono thì giấu nó đi.
+
+Điểm chính sai chảy vào tư thế theo một kiểu đặc biệt khó chịu: nó trông \emph{giống hệt} một phép xoay nhỏ. Lệch điểm chính \(\Delta c_x\) pixel tương đương xấp xỉ một yaw \(\Delta c_x / f\) radian. Với \(f = 400\) và \(\Delta c_x = 4\) px, đó là \(10\) mrad, tức \(0{,}57^\circ\) --- và vì nó là một sai lệch \emph{hằng}, nó không bị khử qua trung bình mà tích luỹ thành quỹ đạo cong. Một quỹ đạo đáng lẽ thẳng trôi thành một cung tròn rộng là dấu hiệu kinh điển của điểm chính sai. (Quan hệ này tôi tự dẫn từ xấp xỉ góc nhỏ của phép chiếu; chưa đối chiếu một nguồn cụ thể nào.)
+
+Hệ số méo sai chảy vào phần dư có cấu trúc theo bán kính, và vào một sai lệch phụ thuộc vị trí trong ảnh --- điểm ở rìa bị sai nhiều hơn điểm ở tâm. Trong BA, điều này nghĩa là các quan sát ở rìa mang thông tin sai lệch có hệ thống trong khi được gán cùng trọng số với quan sát ở tâm. Một cách chữa tạm thời thô nhưng hiệu quả là hạ trọng số quan sát theo bán kính; cách chữa đúng là sửa mô hình.
+
+\section{Ba mô hình mà SLAM hay quên}
+\ptrtarget{A/02/05}
+
+\subsection{A. Rolling shutter}
+
+Phần lớn cảm biến CMOS giá rẻ đọc theo hàng: hàng \(r\) được phơi sáng vào khoảng thời điểm \(t_0 + r\,t_{\text{line}}\). Với cảm biến \(480\) hàng và \(t_{\text{line}} = 30\;\mu\text{s}\), hàng cuối muộn hơn hàng đầu khoảng \(14{,}4\) ms --- so sánh được với cả một chu kỳ khung hình.
+
+Hệ quả với SLAM lớn hơn vẻ ngoài: giả thiết ``một ảnh tương ứng một tư thế'' --- giả thiết nền của cả \ptr{A/01} và \ptr{A/04} --- \emph{sai}. Mỗi hàng ứng với một tư thế khác nhau, nên một ảnh tương ứng với một \emph{đoạn quỹ đạo}. Với tốc độ góc \(1\) rad/s và \(14{,}4\) ms, chênh lệch hướng giữa hàng đầu và hàng cuối là \(14{,}4\) mrad; với \(f = 400\) px, đó là gần \(6\) px dịch chuyển ở rìa ảnh --- lớn hơn hàng chục lần so với độ chính xác subpixel mà \ptr{B/07} vất vả đạt được.
+
+Vì sao chỉ thêm một tham số \(t_{\text{line}}\) không đủ? Vì \(t_{\text{line}}\) chỉ cho biết \emph{khi nào} mỗi hàng được chụp; để biết tư thế lúc đó, bạn còn cần một mô hình \emph{chuyển động liên tục} để nội suy giữa các tư thế đã biết. Ba lựa chọn: nội suy tuyến tính giữa hai keyframe (rẻ, đủ cho chuyển động êm), B-spline trên \(SE(3)\) \cite{furgale2012continuous} (đúng hơn, đắt hơn, là cách Kalibr làm), hoặc dùng IMU để nội suy (chính xác nhất khi có IMU, cách DSO rolling-shutter dùng \cite{schubert2018rollingshutter}).
+
+Kết luận thực dụng, và nó thuộc về \ptr{D/21} nhiều hơn thuộc về chương này: \emph{với sản phẩm đo đạc, hãy mua global shutter}. Chênh lệch giá vài đô la trên mỗi máy đổi lấy việc xoá bỏ hoàn toàn một lớp mô hình, một lớp tham số phải hiệu chuẩn, và một lớp chế độ hỏng chỉ xuất hiện khi rung. Đây là một trong số ít quyết định trong cây mà phần cứng thắng phần mềm một cách rõ ràng.
+
+\subsection{B. Mô hình quang trắc}
+
+Với phương pháp indirect, giá trị pixel chỉ dùng để tìm và mô tả đặc trưng, nên mọi biến đổi cường độ đơn điệu đều vô hại. Với phương pháp direct (\ptr{B/08}), phần dư \emph{chính là} hiệu cường độ, nên mô hình quang trắc trở thành một phần bắt buộc của mô hình đo.
+
+Ba thành phần cần hiệu chuẩn \cite{engel2016photometric}: \term{vignetting} \(V(\mathbf{p})\), hệ số suy giảm theo vị trí trong ảnh; \term{hàm đáp ứng} \(G(\cdot)\), quan hệ phi tuyến giữa năng lượng và giá trị pixel; và \term{thời gian phơi sáng} \(e_t\), thường tự động thay đổi giữa các khung. Mô hình đầy đủ:
+\[
+I(\mathbf{p}) \;=\; G\bigl(e_t \cdot V(\mathbf{p}) \cdot B(\mathbf{p})\bigr),
+\]
+với \(B\) là độ sáng thật của cảnh --- đại lượng ta muốn so sánh giữa các khung.
+
+Bỏ qua mô hình này thì direct method sẽ diễn giải một thay đổi phơi sáng thành một chuyển động của camera, vì cả hai đều làm cường độ pixel đổi. Đây là kiểu hỏng đặc trưng của direct và là lý do DSO dành hẳn một quy trình hiệu chuẩn riêng cho nó. Cách chữa rẻ hơn --- không cần hiệu chuẩn --- là đưa hai tham số affine cường độ \((a, b)\) cho mỗi khung vào chính bài toán tối ưu, tức \emph{tự hiệu chuẩn quang trắc trực tuyến}: đúng theo luận đề trung tâm, thả biến ra thay vì fix nó.
+
+\subsection{C. Stereo và mô hình độ sâu}
+
+Cặp stereo đã hiệu chỉnh (rectified) là trường hợp đặc biệt của hình học epipolar mà \ptr{A/01} mục~3C đã tính: ràng buộc epipolar rút thành \(v_1 = v_2\), và độ sâu là \(z = b f / d\). Rectification là phép biến đổi ảnh làm điều đó thành đúng cho một cặp camera bất kỳ, và nó bao gồm cả việc gỡ méo --- nên mọi bàn luận về mô hình méo ở mục~3 áp dụng nguyên vẹn.
+
+Điều đáng nhấn mạnh ở đây là \emph{tại sao stereo đáng giá trong sản xuất}, và nó không phải lý do hay được nêu. Lý do thường nghe là ``có độ sâu trực tiếp''. Lý do thật sâu hơn: đường cơ sở \(b\) là một độ dài \emph{đã biết bằng mét}, nên nó phá vỡ gauge tỉ lệ ngay từ khung hình đầu tiên. Khởi tạo trở nên tầm thường --- không cần parallax, không cần model selection, không cần chờ chuyển động --- và toàn bộ lớp chế độ hỏng ở \ptr{A/01} mục~6 biến mất. Đó là lý do thật sự khiến stereo là lựa chọn mặc định cho sản phẩm, và vì sao \ptr{D/21} khuyến nghị stereo cộng IMU cộng odometry bánh xe làm điểm ngọt cho robot mặt đất.
+
+Cái giá cũng phải nói rõ. Đường cơ sở phải \emph{giữ ổn định}: một thay đổi vài chục micromet trong khoảng cách hoặc vài phần trăm độ trong góc giữa hai camera đã đủ làm sai độ sâu ở xa một cách đáng kể. Với khung nhựa và thay đổi nhiệt độ hàng ngày, đây là vấn đề thật chứ không phải lo xa, và nó là lý do hiệu chuẩn ngoại stereo trực tuyến (\ptr{C/14}) tồn tại. Đồng thời, quan hệ \(\sigma_z \approx z^2\sigma_d/(bf)\) từ \ptr{A/01} nói rằng lợi ích của stereo tắt dần theo bình phương khoảng cách --- ngoài một tầm nào đó, stereo thoái hoá thành mono và bạn phải trở lại mọi thứ ở chương~1.
+
+\begin{ungdung}
+\ud{Kalibr \cite{furgale2013kalibr}}{Hiệu chuẩn nội đa mô hình (pinhole-radtan, KB, UCM...); mô hình liên tục theo thời gian cho rolling shutter}{Công cụ chuẩn; đọc tài liệu của nó để hiểu quy trình thu dữ liệu chính là điều kiện kích thích ở \ptr{A/05}}
+\ud{DSO \cite{engel2018dso}}{Mô hình quang trắc đầy đủ: vignette, CRF, exposure; cộng hai tham số affine mỗi khung}{Ví dụ rõ nhất của mục 5B; cũng là ví dụ về tự hiệu chuẩn trực tuyến}
+\ud{Basalt \cite{usenko2020basalt}}{Mặc định double-sphere; spline \(SE(3)\) cho hiệu chuẩn}{Lý do chọn double-sphere là chiếu ngược dạng đóng, đúng như Bảng~\ref{tab:a02-models}}
+\ud{OpenCV \code{calib3d}}{radtan và fisheye; \code{initUndistortRectifyMap}}{Hệ sinh thái mặc định; chú ý nó dùng quy ước tham số riêng, dễ sai khi chuyển đổi}
+\ud{COLMAP \cite{schonberger2016colmap}}{Nhiều mô hình camera, ước lượng nội ngay trong BA}{Minh hoạ luận đề trung tâm: nội là biến chứ không phải hằng}
+\end{ungdung}
+
+\begin{duan}{Hiệu chuẩn một camera ba lần, rồi chứng minh bằng số rằng RMS nói dối}{2 ngày}
+\dmt tự tay thấy sự khác nhau giữa mô hình sai và tham số sai, và thấy vì sao RMS không phân biệt được hai thứ đó.
+\ddl tự chụp: một bảng ChArUco, một camera bất kỳ có FOV càng rộng càng tốt. Thu \emph{ba} bộ dữ liệu độc lập, mỗi bộ vài chục ảnh với tư thế bảng đa dạng --- và cố tình để một bộ có độ phủ kém ở bốn góc ảnh.
+\dbc hiệu chuẩn mỗi bộ với ba cấu hình mô hình: radtan \(k_1k_2\), radtan \(k_1k_2k_3p_1p_2\), và Kannala--Brandt; với mỗi lần chạy ghi lại RMS, bộ tham số, và hiệp phương sai tham số từ Hessian; vẽ bản đồ phần dư dạng trường véctơ cho từng lần; cuối cùng làm kiểm chéo --- hiệu chuẩn trên bộ 1 rồi đo phần dư trên bộ 2 và 3.
+\dxk bạn có một bảng chín hàng (ba bộ dữ liệu \(\times\) ba mô hình) với các cột: RMS trong mẫu, RMS kiểm chéo, độ lệch của \(f\) giữa ba bộ, độ lệch của \(k_2\) giữa ba bộ. Bạn phải quan sát được ít nhất hai điều: RMS trong mẫu giảm đơn điệu theo số tham số trong khi RMS kiểm chéo thì không, và các hệ số bậc cao dao động mạnh hơn nhiều so với \(f\) giữa ba bộ. Nếu không quan sát được, hãy kiểm xem độ phủ ảnh của bạn có quá tốt không --- và đó cũng là một kết quả đáng ghi.
+\dnv \ptr{C/14-hieu-chuan-nhu-mot-nhanh-cua-slam} biến quy trình này thành một bài toán MAP có thể thả tham số ra; \ptr{D/21-tu-prototype-len-mass-production} biến bảng trên thành tiêu chí nghiệm thu trên dây chuyền.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì RMS là một con số tổng hợp và nó xoá đúng thứ mang thông tin chẩn đoán: hoa văn không gian của phần dư. Một mô hình sai có hoa văn rõ rệt vẫn có thể cho RMS thấp hơn một mô hình đúng có nhiễu cao. Thêm nữa, RMS luôn giảm khi thêm tham số, và nó chỉ đo trên vùng ảnh mà bảng đã đi qua --- trong khi ống kính sai nhiều nhất ở rìa, chỗ bảng khó tới nhất. Bốn thứ nên nhìn thay: bản đồ phần dư dạng trường véctơ, độ phủ góc bảng trên toàn khung, hiệp phương sai tham số từ Hessian, và kiểm chéo trên dữ liệu chưa dùng để khớp.}
+\tl{Vì mỗi tham số thêm vào là một bậc tự do để khớp \emph{nhiễu}, không chỉ khớp tín hiệu --- đây là overfitting ở dạng thuần tuý nhất. Trong vùng có dữ liệu bạn được một cải thiện nhỏ và thật; ngoài vùng có dữ liệu, đa thức bậc cao dao động mạnh. Vì bảng hiếm khi phủ sát bốn góc ảnh, ``ngoài vùng có dữ liệu'' chính là nơi đặc trưng SLAM xuất hiện khi robot quay --- nên lỗi lớn nhất nằm đúng chỗ nó gây hại nhất. Có một hệ quả thứ hai tinh vi hơn: các hệ số bậc cao tương quan mạnh với nhau và với \(f\), nên ma trận thông tin gần suy biến và hai lần hiệu chuẩn cùng một camera cho hai bộ số khác nhau đáng kể với cùng RMS.}
+\tl{Quyết định đó đúng hay sai phụ thuộc vào \emph{tỉ số giữa độ tán của tham số trong lô và độ nhạy của hệ thống với tham số ấy} --- không phụ thuộc vào việc các camera ``cùng loại''. Cách đo trước khi chốt thiết kế: hiệu chuẩn một mẫu vài chục máy, tính độ lệch chuẩn của từng tham số qua lô; rồi chạy phân tích độ nhạy --- nhiễu loạn tham số bằng đúng độ lệch chuẩn ấy trong mô phỏng và đo sai số tư thế đầu ra. Nếu sai số vẫn dưới ngân sách thì dùng chung tham số được. Điều quan trọng là việc này phải làm \emph{trước} khi chốt cơ khí, vì kết quả có thể nói rằng dung sai lắp ráp phải siết chặt hơn --- và đổi cơ khí sau khi mở khuôn thì đắt. Chi tiết ở \ptr{D/21}.}
+\tl{Nhiệt độ. Ống kính và khung giãn nở, tiêu cự đổi vài phần vạn, và với stereo thì đường cơ sở cùng góc giữa hai camera đổi --- đủ để làm sai độ sâu ở xa. Chu kỳ ngày đêm giải thích tính lặp lại hàng ngày. Nó thuộc về \ptr{C/14} (hiệu chuẩn trực tuyến để bù trôi) và \ptr{D/21} (mục về trôi hiệu chuẩn theo nhiệt độ, rung, lão hoá keo). Cần phân biệt với hai nguyên nhân khác có cùng biểu hiện chu kỳ: thay đổi ánh sáng trong ngày làm đổi tập đặc trưng, và auto-exposure đổi theo giờ --- phép thử phân biệt là xem sai lệch có tương quan với nhiệt độ vỏ máy hay với độ sáng cảnh.}
+\tl{Vì \(t_{\text{line}}\) chỉ nói \emph{khi nào} mỗi hàng được chụp; để biết tư thế tại thời điểm đó, cần thêm một \emph{mô hình chuyển động liên tục} để nội suy giữa các tư thế rời rạc. Không có nó thì biết thời điểm cũng vô dụng. Ba lựa chọn: nội suy tuyến tính giữa hai keyframe, B-spline trên \(SE(3)\) \cite{furgale2012continuous}, hoặc dùng IMU nội suy \cite{schubert2018rollingshutter}. Về mặt sản phẩm, kết luận thực dụng là mua global shutter: vài đô la đổi lấy việc xoá hẳn một lớp mô hình, một lớp tham số phải hiệu chuẩn, và một lớp chế độ hỏng chỉ xuất hiện khi rung.}
+\end{traloi}
+
+\begin{dongian}
+Một cái máy ảnh giống một cái cửa sổ có kính hơi cong. Bạn nhìn qua nó thấy thế giới, nhưng mọi thứ bị bẻ đi một chút --- và bị bẻ nhiều nhất ở gần mép cửa sổ.
+
+Hiệu chuẩn là việc đo xem kính cong như thế nào, để sau này biết đường bẻ ngược lại. Cách đo là giơ một tấm bìa kẻ ô vuông đã biết trước kích thước lên trước cửa sổ ở nhiều tư thế, xem các ô vuông méo ra sao, rồi suy ngược ra độ cong.
+
+Chỗ khó không phải việc đo. Chỗ khó là bạn phải \emph{đoán trước} kính cong theo kiểu gì --- cong đều như đáy chai, hay cong xoắn, hay cong một bên nhiều hơn bên kia. Bạn chọn một kiểu, rồi máy tính tìm con số khớp nhất với kiểu đó. Nếu bạn đoán đúng kiểu, kết quả tốt. Nếu bạn đoán sai kiểu, máy tính vẫn đưa ra con số --- con số khớp nhất có thể trong cái kiểu sai ấy --- và nó vẫn báo ``sai lệch trung bình rất nhỏ''.
+
+Cách phân biệt rất đơn giản và hầu như không ai làm. Đừng nhìn con số trung bình. Hãy \emph{vẽ} chỗ nào còn lệch và lệch về hướng nào, lên cả tấm ảnh. Nếu các mũi tên lệch nằm lung tung không theo quy luật gì, bạn đã xong --- phần còn lại chỉ là nhiễu. Nếu các mũi tên xếp thành hình --- toả ra ở rìa, hay xoáy quanh tâm --- thì bạn đang nhìn thấy chính cái phần mà kiểu bạn đoán không mô tả được. Lúc đó đo thêm bao nhiêu cũng vô ích; phải đổi cách đoán.
+
+Và một chuyện nữa, quan trọng cho việc làm sản phẩm. Kính giãn nở khi trời nóng. Nên cái máy bạn đo chính xác vào buổi sáng có thể lệch đi vào buổi chiều, rồi hôm sau lại đúng. Không có lỗi phần mềm nào cả --- chỉ là thế giới vật lý không đứng yên như tài liệu giả định.
+
+\chuadongian{chỗ không rút gọn được là việc \emph{chọn dạng hàm}. Không có thuật toán nào chọn hộ bạn: bạn phải nhìn hoa văn phần dư, biết một chút về quang học của ống kính đang dùng, rồi quyết định. Đây là một trong ít chỗ trong cả cây mà kinh nghiệm của con người thật sự không thay thế được, và cũng là lý do mục 4 được viết dài hơn vẻ ngoài của nó.}
+\motcau{Sai số ngẫu nhiên là nhiễu và chữa được bằng nhiều dữ liệu hơn; sai số có hình dạng là mô hình sai và chỉ chữa được bằng mô hình khác.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{A/02/06}
+
+Mệnh đề chính --- \emph{phần dư có cấu trúc không gian là dấu hiệu mô hình sai, và thêm dữ liệu không chữa được} --- bị bác bỏ nếu ai đó cho thấy một trường hợp mà phần dư có hoa văn rõ rệt nhưng hoa văn ấy \emph{biến mất} khi thêm dữ liệu với cùng mô hình. Có một trường hợp cần loại trừ cẩn thận trước khi kết luận: nếu dữ liệu ban đầu có độ phủ rất lệch --- chẳng hạn bảng chỉ ở một góc ảnh --- thì bộ tối ưu có thể trả về tham số kém và sinh ra hoa văn giả, và thêm dữ liệu đúng là chữa được. Đó là tham số sai chứ không phải mô hình sai, và phép thử phân biệt là xem hoa văn có hội tụ về một mức sàn khác không hay không.
+
+Mệnh đề thứ hai --- \emph{RMS không phải thước đo chất lượng hiệu chuẩn} --- là mệnh đề dễ kiểm nhất và mini project ở trên chính là phép kiểm. Nó bị bác bỏ nếu trên một tập đủ lớn các lần hiệu chuẩn, RMS trong mẫu tương quan chặt với sai số tư thế thật của hệ SLAM dùng bộ tham số ấy. Tôi cho là không, nhưng tôi \emph{chưa} chạy thí nghiệm đó và không dẫn được nguồn nào đã chạy nó một cách có hệ thống \emph{(tôi suy ra, chưa đối chiếu nguồn)}.
+
+Mệnh đề thứ ba --- \emph{lệch điểm chính \(\Delta c_x\) tương đương một yaw \(\Delta c_x/f\)} --- là một xấp xỉ góc nhỏ mà tôi tự dẫn. Nó bị bác bỏ nếu ai đó chỉ ra rằng hai hiệu ứng đó tách được từ dữ liệu trong cấu hình SLAM thông thường. Thực ra tôi ngờ rằng chúng \emph{tách được một phần} khi có chuyển động đủ đa dạng --- vì lệch điểm chính gắn với vị trí trong ảnh còn yaw thì không --- và làm rõ điều đó là một mục trong \code{99-chua-biet.md}.
+
+Cuối cùng, một mệnh đề mềm: chương này khuyến nghị global shutter cho sản phẩm đo đạc. Điều đó bị bác bỏ nếu một hệ rolling shutter có mô hình đúng đạt độ chính xác tương đương trong điều kiện rung thật, với chi phí tính toán chấp nhận được trên phần cứng nhúng. Các công trình rolling-shutter \cite{schubert2018rollingshutter} cho thấy mô hình hoá được vấn đề; điều chúng \emph{không} cho thấy là chi phí và độ bền trong sản xuất hàng loạt, và đó mới là câu hỏi của \ptr{D/21}.
+
+\section{Kết nối}
+\ptrtarget{A/02/07}
+
+Nối lên trên: \ptr{A/01-hinh-hoc-da-thi} là chương mà chương này phục vụ --- toàn bộ hình học ở đó giả định phép biến đổi pixel sang mặt phẳng chuẩn hoá đã đúng, và mục~4C ở đây nói chuyện gì xảy ra khi nó không đúng.
+
+Nối xuống dưới trong Phần~A. \ptr{A/04-uoc-luong-map-va-bundle-adjustment} là chỗ tham số nội trở thành biến tối ưu được chứ không còn là hằng số nạp từ tệp. \ptr{A/05-observability-gauge-va-suy-bien} giải thích tổng quát hiện tượng ở mục~4B: tương quan giữa các hệ số bậc cao là một hướng gần suy biến của ma trận thông tin, và ``hiệu chuẩn ba lần ra ba kết quả'' là phép thử thực dụng để phát hiện nó. \ptr{A/06-bat-dinh-va-lan-truyen-sai-so} cho công cụ định lượng: hiệp phương sai tham số lấy từ Hessian là thứ nên in ra thay cho RMS.
+
+Nối sang các phần sau. \ptr{B/08-mo-hinh-phan-du} là nơi mô hình quang trắc ở mục~5B trở thành bắt buộc, vì direct method dùng cường độ pixel làm phần dư. \ptr{C/14-hieu-chuan-nhu-mot-nhanh-cua-slam} là chương nối trực tiếp: nó lấy mọi thứ ở đây và đặt vào khung MAP, biến hiệu chuẩn thành một trường hợp của SLAM với cấu trúc bị fix. \ptr{C/18-danh-gia-va-phuong-phap-luan} mượn nguyên kỹ năng ở mục~4: phân biệt sai lệch có hệ thống với nhiễu là cùng một kỹ năng dù đối tượng là phần dư hiệu chuẩn hay là NEES của bộ ước lượng. \ptr{D/21-tu-prototype-len-mass-production} là chỗ mọi thứ ở đây gặp thực tế: thời gian hiệu chuẩn mỗi máy, dung sai cơ khí, trôi theo nhiệt độ, và quyết định hiệu chuẩn từng máy hay dùng chung tham số cho cả lô.
+
+Nối ngang: \code{../marker/} chương 1 bàn cùng chủ đề từ góc nhìn khác --- ở đó mục tiêu là độ chính xác milimet trên một target đã biết, nên yêu cầu về mô hình méo còn gắt hơn, và lưỡng nghĩa tư thế phẳng làm mọi sai số nội trở nên nguy hiểm hơn.
+
+\begin{tukiem}
+\item Vì sao khai triển theo góc \(\vartheta\) ổn định hơn khai triển theo bán kính \(r\) khi trường nhìn rộng --- và tính chất nào của hai biến ấy tạo ra khác biệt?
+\item Nêu hai dấu hiệu phân biệt mô hình sai với tham số sai, và nêu phép đo rẻ nhất thực hiện được cả hai.
+\item Thêm \(k_3\) làm RMS giảm. Nêu ba lý do khác nhau khiến điều đó không chứng minh mô hình tốt hơn.
+\item Tiêu cự ước lượng lớn hơn thật \(1\%\). Với hệ mono, hệ stereo và hệ VIO, hậu quả xuất hiện ở đâu và hệ nào phát hiện được?
+\item Vì sao double-sphere được ưa chuộng trong hệ direct thời gian thực, trong khi Kannala--Brandt chính xác không kém?
+\item Rolling shutter với \(480\) hàng và \(t_{\text{line}} = 30\,\mu\)s, camera xoay \(1\) rad/s, \(f = 400\) px. Tính độ dịch pixel giữa hàng đầu và hàng cuối ở rìa ảnh, rồi so với độ chính xác subpixel mà front-end đạt được.
+\item Bốn giả thiết ngầm của mô hình pinhole là gì --- kể cả những cái không ai nói ra --- và bỏ mỗi cái thì chương nào trong cây phải xử lý?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

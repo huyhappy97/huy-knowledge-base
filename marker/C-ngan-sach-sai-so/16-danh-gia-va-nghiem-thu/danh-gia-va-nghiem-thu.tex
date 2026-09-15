@@ -1,0 +1,447 @@
+% ---------------------------------------------------------------------------
+% Chương 16 — Đánh giá và nghiệm thu
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-14  |  Ôn gần nhất: —
+% Phụ thuộc: C/15 (bảng ngân sách — chương này kiểm nó), và mọi mini project
+%            của Phần B (chương này gom chúng thành một quy trình).
+% Mức độ: XƯƠNG SỐNG — chương chứa CỬA KIỂM CHỨNG (b) cho toàn cây.
+% Kiểm chứng công thức lõi:
+%   (1) Script Monte Carlo ĐÃ ĐƯỢC CHẠY ngày 2026-09-14; kết quả ở mục 3.
+%       Đây là lần đầu tiên trong cây một khẳng định qua được cửa (b) bằng
+%       số thật chứ không bằng ví dụ tính tay.
+%   (2) Tách bias khỏi độ lặp lại — cửa (c) iso9283.
+%   (3) Quy tắc căn chỉnh trước khi tính sai số — cửa (c) zhang2018tutorial.
+% Ghi chú trung thực: mục 3 báo cáo SỐ ĐO THẬT của script trên dữ liệu MÔ PHỎNG.
+%   Chúng là số đo của một mô phỏng, KHÔNG phải số đo của một hệ phần cứng.
+%   Sự phân biệt ấy được giữ nghiêm ngặt trong cả chương.
+%   MỘT KẾT QUẢ ĐI NGƯỢC DỰ ĐOÁN được báo cáo thẳng ở mục 3C — xem ở đó.
+% ---------------------------------------------------------------------------
+\documentclass[../../marker.tex]{subfiles}
+\begin{document}
+\chapter{Đánh giá và nghiệm thu (Evaluation and Acceptance)}
+\ptrtarget{C/16}\ptrtarget{C/16-danh-gia-va-nghiem-thu}
+\dependency{\ptr{C/15-ngan-sach-sai-so} (bảng ngân sách --- chương này là chương \emph{kiểm} nó); và mọi mini project của Phần~B, mà chương này gom lại thành một quy trình duy nhất.}
+
+\begin{tomtat}
+Chương này trả lời câu hỏi mà \ptr{C/15} để ngỏ: \emph{làm sao biết bảng ngân sách nói đúng?} Hai công cụ, rất khác nhau về chi phí. Công cụ thứ nhất là mô phỏng Monte Carlo --- rẻ, làm được trước khi có phần cứng, và nó là cửa kiểm chứng (b) cho toàn bộ cây. Script ấy nằm trong \code{code/} cạnh chương này, \emph{đã được chạy}, và mục~3 báo cáo kết quả thật của nó --- gồm cả một chỗ mà kết quả \emph{đi ngược} dự đoán của tôi. Công cụ thứ hai là nghiệm thu trên phần cứng: cần chuẩn tham chiếu, và nó phải tách bạch \emph{bias} khỏi \emph{độ lặp lại} theo đúng chuẩn robot công nghiệp. Nếu chỉ nhớ một điều: \emph{độ tản mát của một hệ có làm mượt không phải độ chính xác của nó} --- lấy trung bình giảm tản mát mà không giảm thiên lệch, nên một hệ thống thiên lệch 3\,mm có thể báo cáo độ lặp lại 0,2\,mm và trông tuyệt vời.
+\end{tomtat}
+
+\begin{nentang}
+\kn{Monte Carlo}{mô phỏng bằng cách sinh nhiễu ngẫu nhiên nhiều lần và thống kê phân bố kết quả. Nó cho biết \emph{kết quả là bao nhiêu} chứ không cho biết \emph{vì sao} --- nên nó bổ sung chứ không thay thế công thức giải tích ở \ptr{A/05}.}
+\kn{chuẩn tham chiếu (ground truth)}{một phép đo độc lập, chính xác hơn hệ đang đánh giá ít nhất vài lần, dùng làm mốc so sánh.}
+\kn{bias (độ chệch)}{sai lệch trung bình so với giá trị thật. Đo được chỉ khi có chuẩn tham chiếu.}
+\kn{độ lặp lại (repeatability)}{độ tản mát giữa các lần thực hiện cùng một lệnh. Đo được \emph{không cần} chuẩn tham chiếu --- và sự bất đối xứng ấy là nguồn của một cạm bẫy lớn ở mục~5 \cite{iso9283}.}
+\kn{NEES}{\en{normalized estimation error squared}: \(\varepsilon = \tilde{x}^\top P^{-1}\tilde{x}\). Nếu hiệp phương sai \(P\) trung thực thì kỳ vọng của nó bằng số bậc tự do. Nó đo \emph{tính thành thật} của hệ về bất định của chính nó, không đo độ chính xác.}
+\kn{cửa kiểm chứng (b)}{theo \code{learning-rules.md} mục~5: kiểm một công thức bằng một ví dụ số nhỏ, tính tay hoặc bằng vài dòng code. Rẻ nhất và bắt được phần lớn lỗi.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Bạn đo hệ thống 50 lần và độ tản mát là 0,2\,mm. Vì sao con số ấy \emph{không} cho phép nói hệ chính xác 0,2\,mm, và phép đo nào mới cho phép?}
+\h{Mô phỏng Monte Carlo cho bạn kết quả mà không cần phần cứng. Nêu hai loại sai số mà nó \emph{không bao giờ} phát hiện được, dù chạy bao nhiêu lần.}
+\h{Chạy script kiểm công thức \(\delta x \approx Z\sigma/f\), bạn thấy kết quả mô phỏng nhỏ hơn dự đoán đúng hai lần một cách nhất quán. Đó là lỗi của công thức, lỗi của script, hay không phải lỗi nào cả?}
+\h{Một hệ báo cáo hiệp phương sai \(0{,}3\) mm nhưng sai số thật là \(1{,}5\) mm. Đại lượng nào phát hiện được điều đó, và vì sao nó quan trọng hơn bản thân độ chính xác?}
+\h{Bạn đã chạy mô phỏng và mọi thứ khớp. Nêu ba việc mà bạn \emph{vẫn} phải làm trên phần cứng trước khi nói hệ đạt.}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{C/16/01}
+
+\ptr{C/15} kết thúc bằng một bảng và một con số tổng. Câu hỏi tự nhiên tiếp theo là câu hỏi mà chương ấy không trả lời được: \emph{làm sao biết bảng nói đúng?}
+
+Bảng ngân sách là một mô hình, và nó thừa hưởng mọi điểm yếu của một mô hình. Nó cộng những thứ bạn đã nghĩ tới theo những quy tắc bạn đã chọn, với những con số bạn đã ước lượng. Ba chỗ có thể sai, và \ptr{C/15} mục~8 đã liệt kê chúng. Chương này là chương đi kiểm.
+
+Có hai cách kiểm, và chúng khác nhau về chi phí tới mức nên coi là hai công cụ riêng.
+
+\emph{Cách thứ nhất: mô phỏng.} Sinh nhiễu, chạy pipeline, thống kê. Rẻ, nhanh, làm được trước khi có phần cứng, và lặp lại được vô hạn với các cấu hình khác nhau. Nó kiểm được \emph{tính đúng của các công thức} và \emph{ảnh hưởng của hình học} --- tức phần lớn nội dung của Phần~A và các quyết định thiết kế của \ptr{B/09}.
+
+\emph{Cách thứ hai: đo trên phần cứng thật.} Đắt, chậm, cần chuẩn tham chiếu. Nhưng nó là cách duy nhất kiểm được những thứ mà mô phỏng theo định nghĩa không thể: liệu mô hình nhiễu có đúng không, liệu có nguồn sai số nào bạn chưa nghĩ tới không, và liệu các con số bạn nhập vào bảng có đúng không.
+
+Sự phân công ấy dẫn tới một quy trình rõ ràng, và nó là khung của chương: \emph{mô phỏng trước để chọn thiết kế, đo thật sau để nghiệm thu}. Làm ngược --- dựng phần cứng rồi mới mô phỏng --- thì mô phỏng chỉ còn để giải thích chuyện đã rồi.
+
+Chương này có một đặc điểm mà không chương nào khác trong cây có: \emph{script của nó đã được chạy, và mục~3 báo cáo số đo thật}. Theo \code{learning-rules.md} mục~5, đó là cửa kiểm chứng (b), và cho tới lúc ấy mọi công thức trong cây mới chỉ qua cửa (a) --- tự dẫn --- chứ chưa qua (b). Mục~3 cũng báo cáo thẳng một chỗ mà kết quả \emph{đi ngược} dự đoán của tôi, vì che nó đi sẽ phá hỏng chính điều làm cây này đáng tin.
+
+\begin{trucgiac}
+Hình dung sự khác nhau giữa hai công cụ bằng việc kiểm một công thức nấu ăn.
+
+Mô phỏng giống việc đọc lại công thức và kiểm số học: nếu công thức nói bốn người ăn cần 200 gam gạo, thì tám người cần 400 --- bạn kiểm được điều đó mà không cần bếp. Nó bắt được lỗi tính toán, lỗi logic, và nó cho bạn thử nhiều biến thể rất nhanh.
+
+Cái nó không bao giờ bắt được: công thức có ghi thiếu một nguyên liệu không. Nếu người viết quên mất muối, thì dù bạn kiểm số học kỹ tới đâu, món ăn vẫn nhạt --- vì muối không có trong bảng để mà kiểm.
+
+Nấu thật thì bắt được cả hai loại lỗi, nhưng nó tốn nguyên liệu và thời gian, và mỗi lần chỉ thử được một biến thể.
+
+Nên thứ tự hợp lý rất rõ: kiểm số học trước cho hết mọi biến thể, rồi mới nấu cái tốt nhất. Và khi nấu, nếu món ăn không giống dự đoán, thì cái sai gần như luôn nằm ở một nguyên liệu không có trong bảng --- chứ không nằm ở phép nhân.
+
+Còn một chuyện thứ ba, tinh tế hơn cả hai. Giả sử bạn nấu năm lần và cả năm lần đều \emph{giống hệt nhau}. Điều đó chứng minh gì? Nó chứng minh bạn nấu ổn định --- và không chứng minh gì về việc món ăn có ngon không. Nếu công thức thiếu muối thì cả năm lần đều nhạt như nhau, rất ổn định, và không có gì trong sự ổn định ấy báo cho bạn biết.
+\end{trucgiac}
+
+\section{Mô phỏng Monte Carlo: công cụ và cách dùng}
+\ptrtarget{C/16/02}
+
+Script nằm ở \code{code/monte\_carlo\_constellation.py} cạnh chương này. Nó cần \code{numpy} và \code{opencv-python}, không cần phần cứng, và chạy trong vài phút.
+
+Nó làm bốn việc, tương ứng bốn mệnh đề quan trọng nhất của cây.
+
+\emph{Phần 1} kiểm bốn quan hệ tỉ lệ của \ptr{A/05} bằng cách quét \(Z\) và quét baseline \(B\).
+
+\emph{Phần 2} kiểm luận điểm của \ptr{A/04}: target phẳng có hai nghiệm, tỉ số \(\rho\) tiến về 1 khi góc nghiêng tiến về 0, và tính không đồng phẳng khử được hiện tượng ấy.
+
+\emph{Phần 3} so PnP hợp nhất với trung bình pose --- mệnh đề của \ptr{A/03} mục~5 và \ptr{B/09} mục~2.
+
+\emph{Phần 4} so bốn phương án bố trí constellation --- mini project của \ptr{B/09}.
+
+\subsection{A. Một quy ước phải làm đúng, và một cái bẫy}
+
+Trong quá trình viết script tôi mắc một lỗi đáng ghi lại vì nó là lỗi dễ mắc và nó làm mọi con số sai số góc trở nên vô nghĩa.
+
+Có \emph{hai} chỗ có thể đặt một góc nghiêng: trong \emph{mô hình 3D} của constellation (tức cái nêm cơ khí ở \ptr{B/09} mục~4), hoặc trong \emph{tư thế camera} \(R_{\text{true}}\). Chúng là hai thứ khác hẳn nhau về vật lý, và nếu bạn đặt góc nghiêng vào mô hình rồi so \(R_{\text{true}}\) với nghiệm, bạn đang so hai hệ quy chiếu khác nhau --- phép so cho ra đúng góc nghiêng của mô hình ở mọi lần chạy, và trông như một sai số khổng lồ không đổi.
+
+Quy ước đúng, và nó được ghi thẳng vào docstring của hàm \code{tag\_corners}: \emph{góc nghiêng của tag so với tấm dock nằm ở mô hình; góc nhìn của camera nằm ở pose}. Khi kiểm các công thức của \ptr{A/05} cho một tag đơn, mô hình phải \emph{phẳng} và góc nghiêng phải nằm ở pose.
+
+Tôi ghi lại chuyện này thay vì lặng lẽ sửa, vì nó minh hoạ một điểm chung của mọi mô phỏng: \emph{cái khó không nằm ở thuật toán mà ở việc giữ đúng hệ quy chiếu}, và một mô phỏng sai hệ quy chiếu cho ra những con số trông hợp lý.
+
+\subsection{B. Đại lượng phải báo cáo: từng trục, không phải một con số}
+
+Lỗi thứ hai tôi mắc, và nó cũng đáng ghi lại. Ban đầu script báo cáo sai số xoay bằng \emph{một con số} --- góc của phép quay đưa nghiệm về chân trị. Với con số ấy, kết quả quét baseline trông như bác bỏ công thức của \ptr{A/05}: tăng \(B\) tám lần chỉ cải thiện 2,7 lần thay vì 8 lần.
+
+Nguyên nhân không phải công thức sai mà là \emph{cách đo sai}. Như \ptr{B/09} mục~3 đã lập luận, baseline \emph{có hướng}: trải rộng theo phương ngang cải thiện yaw và roll, và \emph{không} cải thiện pitch. Một con số góc vô hướng bị trục tệ nhất --- pitch --- chi phối, nên nó che mất toàn bộ cải thiện ở hai trục kia.
+
+Script hiện tại báo cáo cả ba trục riêng, và mục~3 cho thấy kết quả đổi hẳn. Bài học tổng quát, và nó áp dụng cho cả việc nghiệm thu phần cứng ở mục~4: \emph{đừng gộp một đại lượng có hướng thành một con số vô hướng, vì phép gộp che mất đúng cấu trúc mà bạn đang muốn kiểm}.
+
+\section{Kết quả đo được}
+\ptrtarget{C/16/03}
+
+Mục này báo cáo kết quả \emph{thật} của script, chạy ngày 2026-09-14 với 3000 lần thử mỗi cấu hình. Log đầy đủ ở \code{code/ket-qua-chay-2026-09-14.txt}.
+
+\begin{cambay}
+Đây là số đo của một \textbf{mô phỏng}, không phải của một hệ phần cứng.
+
+Chúng kiểm được rằng các công thức của cây nhất quán với hành vi của \code{solvePnP} dưới nhiễu Gauss độc lập trên toạ độ góc. Chúng \emph{không} kiểm được rằng nhiễu thật là Gauss, rằng nhiễu thật độc lập, hay rằng không có nguồn sai số nào bị bỏ sót --- mục~5 bàn về điều đó.
+
+Sự phân biệt này được giữ nghiêm ngặt trong cả chương, và nó là sự phân biệt mà \code{research-rules.md} mục~9 gọi là ``phân biệt đã đo được với suy ra từ số liệu''.
+\end{cambay}
+
+\subsection{A. Bốn quan hệ tỉ lệ: khớp}
+
+\begin{table}[H]\centering\small
+\caption{Quét \(Z\) với một tag 100\,mm, camera nhìn chếch \(20^\circ\), \(\sigma = 0{,}2\) px. Số đo mô phỏng so với dự đoán giải tích của \ptr{A/05}.}
+\label{tab:c16-scale}
+\begin{tabularx}{\linewidth}{@{}L{1.3cm}L{1.6cm}L{1.9cm}L{1.6cm}L{1.9cm}Y@{}}
+\toprule
+\(Z\) (m) & \(\delta x\) đo & \(\delta x\) dự đoán\(/2\) & \(\delta Z\) đo & \(\delta Z\) dự đoán & \(\delta Z/\delta x\) so với \(Z/W\)\\
+\midrule
+0,30 & 0,056 & 0,050 & 0,254 & 0,300 & 4,6 so với 3\\
+0,50 & 0,087 & 0,083 & 0,786 & 0,833 & 9,1 so với 5\\
+1,00 & 0,169 & 0,167 & 3,279 & 3,333 & 19,4 so với 10\\
+2,00 & 0,370 & 0,333 & 12,999 & 13,333 & 35,1 so với 20\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Hai cột \(\delta Z\) khớp rất tốt --- sai lệch dưới 15\% ở mọi \(Z\), và tốt hơn 3\% ở \(Z \ge 1\) m. Công thức \(\delta Z \approx Z\sigma/w\) của \ptr{A/05} mục~3B \textbf{qua cửa (b)}.
+
+Hai cột \(\delta x\) cũng khớp, nhưng \emph{chỉ sau khi chia dự đoán cho 2} --- và đây là câu trả lời cho Q3. Hệ số 2 chính là \(\sqrt{N}\) với \(N = 4\) góc. \ptr{A/05} mục~3A đã \emph{cố ý} bỏ hệ số \(1/\sqrt{N}\) ra khỏi công thức, với lý do được ghi rõ ở đó: nhiễu giữa các góc cùng một tag không độc lập trong thực tế, nên \(\sqrt{N}\) là một lời hứa thường không được giữ, và bỏ nó ra là cách ước lượng thận trọng. Trong mô phỏng, nhiễu \emph{đúng là} độc lập theo xây dựng, nên \(\sqrt{N}\) xuất hiện đầy đủ.
+
+Vậy đây không phải lỗi của công thức, cũng không phải lỗi của script --- đó là \emph{sự chênh lệch có chủ ý, đúng như dự kiến}. Nó là một xác nhận chứ không phải một bất đồng, và nó cho thấy giá trị của việc ghi rõ lý do bỏ một hệ số thay vì lặng lẽ bỏ.
+
+Tỉ số \(\delta Z/\delta x\) lớn hơn \(Z/W\) đúng khoảng hai lần ở mọi \(Z\) --- hệ quả trực tiếp của cùng hệ số \(\sqrt{N}\), vì nó chỉ áp vào tử số. Điều đáng kiểm là \emph{độ dốc}, và nó đúng: tỉ số tăng tuyến tính theo \(Z\).
+
+\subsection{B. Ambiguity: khớp mạnh}
+
+\begin{table}[H]\centering\small
+\caption{Tỉ số ambiguity \(\rho\) và sai số góc theo góc nghiêng, một tag 100\,mm ở \(Z = 0{,}5\) m. Số đo mô phỏng.}
+\label{tab:c16-rho}
+\begin{tabularx}{\linewidth}{@{}L{2.6cm}L{2.2cm}L{2.6cm}Y@{}}
+\toprule
+Nghiêng (\(^\circ\)) & \(\rho\) trung vị & Sai số góc (\(^\circ\)) & Đọc\\
+\midrule
+0 & 1,33 & 1,34 & hai nghiệm không phân biệt được\\
+2 & 1,79 & 1,32 & \\
+5 & 4,76 & 1,15 & \\
+10 & 13,8 & 0,86 & \\
+20 & 33,0 & 0,51 & \\
+40 & 66,6 & 0,28 & một nghiệm thắng áp đảo\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Đây là xác nhận mạnh nhất trong cả chương. \(\rho\) tăng từ 1,33 ở fronto-parallel lên 66,6 ở \(40^\circ\) --- một dải năm mươi lần --- và sai số góc giảm đơn điệu theo chiều ngược lại. Cả hai mệnh đề của \ptr{A/04} mục~4 \textbf{qua cửa (b)}: ambiguity tệ nhất ở fronto-parallel, và \(\rho\) là một chỉ báo dùng được.
+
+Đáng chú ý: ở \(0^\circ\), sai số góc là \(1{,}34^\circ\) --- \emph{gấp gần ba lần ngân sách \(0{,}5^\circ\)} của cây, với một tag đơn 100\,mm ở nửa mét trong điều kiện nhiễu lý tưởng. Con số ấy là minh hoạ định lượng cho luận điểm ở \ptr{00-map} rằng một tag phẳng nhìn vuông góc không đạt được mục tiêu.
+
+\subsection{C. Một kết quả đi ngược dự đoán}
+
+Phần khử ambiguity bằng tính không đồng phẳng cho kết quả \emph{yếu hơn nhiều} so với tôi dự đoán, và tôi báo cáo nó thẳng.
+
+\begin{table}[H]\centering\small
+\caption{Bốn tag, baseline ngang 0,22\,m, camera nhìn thẳng trục. Số đo mô phỏng, sai số xoay theo từng trục (độ).}
+\label{tab:c16-tilt}
+\begin{tabularx}{\linewidth}{@{}L{4.6cm}L{1.8cm}L{1.8cm}L{1.8cm}Y@{}}
+\toprule
+Cấu hình & pitch & yaw & roll & tổng\\
+\midrule
+4 tag đồng phẳng & 0,154 & 0,113 & 0,018 & 0,192\\
+4 tag nghiêng \(20^\circ\) & 0,124 & 0,090 & 0,019 & 0,154\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Cải thiện chỉ \(1{,}24\) lần. \ptr{B/09} mục~4 ngụ ý rằng phá tính đồng phẳng là bước có đòn bẩy rất lớn; con số này nói rằng --- \emph{trong cấu hình cụ thể đã mô phỏng} --- nó chỉ cho khoảng 24\%.
+
+Ba cách giải thích, và tôi chưa phân biệt được chúng.
+
+\emph{Một, cấu hình đã đủ tốt sẵn.} Bốn tag trải trên baseline 0,22\,m đã có nhiều thông tin hình học, nên sai số góc đã ở mức \(0{,}19^\circ\) --- \emph{trong ngân sách} \(0{,}5^\circ\) rồi. Khi đã ở vùng tốt, lợi ích của việc phá đồng phẳng nhỏ lại. Điều này nhất quán với dữ liệu: phần~4 cho thấy một tag đơn 150\,mm có sai số \(0{,}43^\circ\), và \emph{đó} mới là chỗ cần cứu.
+
+\emph{Hai, lợi ích thật của không đồng phẳng nằm ở chỗ khác.} \ptr{A/04} lập luận rằng nó khử \emph{lỗi thô} --- việc chọn nhầm nghiệm --- chứ không chủ yếu giảm \emph{nhiễu}. Bảng trên đo độ tản mát, tức đo nhiễu. Nếu lợi ích chính là loại lỗi thô thì nó phải đo bằng \emph{tỉ lệ chọn nhầm nghiệm}, và script hiện chưa đo đại lượng ấy cho cấu hình nhiều tag.
+
+\emph{Ba, độ nghiêng chưa đủ.} \ptr{B/09} mục~4B khuyến nghị độ lệch khỏi mặt phẳng ít nhất 20\% kích thước tag, và ghi rõ rằng con số ấy chưa qua cửa kiểm chứng nào. Với tag 75\,mm nghiêng \(20^\circ\), độ lệch là \(75\sin 20^\circ = 26\) mm --- trên ngưỡng, nhưng ngưỡng ấy là phỏng đoán.
+
+Cách phân biệt ba giả thuyết là một thí nghiệm cụ thể: đo \emph{tỉ lệ chọn nhầm nghiệm} thay vì độ tản mát, và quét độ nghiêng từ \(0^\circ\) tới \(45^\circ\). Tôi \emph{chưa} làm, và nó đã được ghi vào \code{99-chua-biet.md} như mục đầu tiên.
+
+Điều đáng nói về phương pháp: kết quả này \emph{không} bác bỏ \ptr{B/09} mục~4 --- nó cho thấy phép đo tôi chọn không đo đúng thứ mà mệnh đề nói về. Đó là một loại sai lầm khác với ``mệnh đề sai'', và phân biệt hai loại ấy là việc phải làm trước khi sửa bất cứ chương nào.
+
+\subsection{D. Baseline có hướng: khớp, và nó cứu một mệnh đề}
+
+\begin{table}[H]\centering\small
+\caption{Quét baseline ngang, hai tag 100\,mm ở \(Z = 0{,}5\) m. Số đo mô phỏng, sai số xoay theo từng trục (độ).}
+\label{tab:c16-baseline}
+\begin{tabularx}{\linewidth}{@{}L{1.6cm}L{1.8cm}L{1.8cm}L{1.8cm}Y@{}}
+\toprule
+\(B\) (m) & pitch & yaw & roll & yaw dự đoán\\
+\midrule
+0,10 & 0,189 & 0,124 & 0,041 & 0,096\\
+0,20 & 0,175 & 0,097 & 0,028 & 0,048\\
+0,40 & 0,130 & 0,060 & 0,016 & 0,024\\
+0,80 & 0,077 & 0,037 & 0,008 & 0,012\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Đọc theo trục thì bức tranh rõ. Từ \(B = 0{,}1\) tới \(0{,}8\) m --- tám lần --- yaw cải thiện \(0{,}124/0{,}037 = 3{,}4\) lần và roll cải thiện \(0{,}041/0{,}008 = 4{,}9\) lần, trong khi pitch chỉ cải thiện \(2{,}5\) lần. Đúng như \ptr{B/09} mục~3 dự đoán: baseline ngang cải thiện yaw và roll, và nó không cải thiện pitch vì baseline \emph{đứng} không đổi.
+
+Cải thiện chưa đạt tuyến tính hoàn toàn (3,4 thay vì 8 lần cho yaw), và lý do nhất quán với chính bảng: khi yaw đã tốt lên thì các trục khác trở thành ràng buộc, và bài toán hợp nhất phân bổ lại thông tin. Đây là một hiệu ứng mà công thức vô hướng của \ptr{A/05} mục~6 không mô hình hoá --- nó giả định một trục độc lập.
+
+Kết luận về mức kiểm chứng, và tôi phát biểu nó thận trọng: quan hệ \(\delta\theta \propto 1/B\) \textbf{được ủng hộ về chiều và về bậc} nhưng \emph{chưa} được xác nhận là tuyến tính chính xác. Chỗ chưa khớp có giải thích hợp lý, và việc kiểm nó đầy đủ đòi một mô phỏng tách bạch từng trục với baseline theo cả hai phương --- đã ghi vào \code{99-chua-biet.md}.
+
+\subsection{E. Bốn phương án bố trí}
+
+\begin{table}[H]\centering\small
+\caption{Bốn phương án ở \(Z = 0{,}5\) m, \(\sigma = 0{,}2\) px. Số đo mô phỏng.}
+\label{tab:c16-layouts}
+\begin{tabularx}{\linewidth}{@{}L{4.3cm}L{1.5cm}L{1.5cm}L{1.4cm}L{1.4cm}Y@{}}
+\toprule
+Phương án & \(\delta x\) (mm) & \(\delta Z\) (mm) & pitch & yaw & roll\\
+\midrule
+A. một tag 150\,mm & 0,119 & 0,384 & 0,431 & 0,429 & 0,045\\
+B. 4 tag đồng phẳng, \(B=0{,}22\) & 0,056 & 0,158 & 0,161 & 0,111 & 0,018\\
+C. 4 tag nghiêng \(20^\circ\) & 0,050 & 0,160 & 0,124 & 0,089 & 0,018\\
+D. C + tag nhô ra 60\,mm & 0,037 & 0,162 & 0,064 & 0,049 & 0,018\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Bảng này là kết quả có giá trị thực hành cao nhất của chương, và ba điều đọc ra từ nó.
+
+\emph{Một, phương án A không đạt ngân sách góc trong điều kiện lý tưởng nhất.} Một tag 150\,mm --- lớn hơn nhiều so với tag trong các phương án khác --- cho pitch và yaw quanh \(0{,}43^\circ\), tức \emph{86\% ngân sách} \(0{,}5^\circ\) tiêu vào riêng nhiễu góc, chưa tính một dòng nào khác của \ptr{C/15}. Đây là xác nhận định lượng cho luận điểm trung tâm của cây.
+
+\emph{Hai, chuyển từ A sang B cải thiện góc gần bốn lần}, và nó chỉ là việc thay một tag lớn bằng bốn tag nhỏ trải rộng. Không dòng code nào khác.
+
+\emph{Ba, và đây là kết quả mạnh nhất: phương án D cải thiện thêm hai lần nữa so với C.} Tag nhô ra 60\,mm --- tức phá tính đồng phẳng \emph{theo chiều sâu} thay vì bằng nêm nghiêng --- cho pitch \(0{,}064^\circ\) so với \(0{,}124^\circ\) của C. Đây là bằng chứng ủng hộ \ptr{B/09} mục~4A cách thứ hai (tag ở các độ sâu khác nhau), và nó gợi ý rằng cách ấy \emph{mạnh hơn} nêm nghiêng --- một kết luận mà \ptr{B/09} không nêu và tôi chưa có lý thuyết giải thích.
+
+Tổng hợp: từ A tới D, sai số góc cải thiện \(0{,}431/0{,}064 = 6{,}7\) lần, hoàn toàn bằng hình học.
+
+\section{Nghiệm thu trên phần cứng}
+\ptrtarget{C/16/04}
+
+Mô phỏng không thay thế được đo thật, và mục này nói cần gì.
+
+\subsection{A. Chuẩn tham chiếu}
+
+Bốn lựa chọn, theo thứ tự chi phí giảm dần.
+
+\emph{Máy toàn đạc hoặc laser tracker.} Chính xác nhất, đắt nhất, và thường phải thuê. Dùng khi cần nghiệm thu chính thức.
+
+\emph{Hệ motion capture.} Tốt cho quỹ đạo động, cần lắp đặt.
+
+\emph{Đồ gá cơ khí có dung sai biết trước.} Rẻ và thường đủ: một tấm có các lỗ định vị gia công chính xác, robot được đặt vào từng lỗ. Nó cho các vị trí \emph{tương đối} rất chính xác mà không cần thiết bị đo đắt tiền --- và với bài toán docking, quan hệ tương đối là thứ ta cần.
+
+\emph{Chính cơ cấu cập.} Rẻ nhất và thường bị bỏ qua: nếu robot cập được và chốt khớp, thì bạn biết nó đang ở đúng vị trí trong phạm vi dung sai của cơ cấu. Đây là một chuẩn tham chiếu nhị phân --- đạt hay không đạt --- nhưng với nghiệm thu thì đó chính là tiêu chí cuối cùng.
+
+\subsection{B. Tách bias khỏi độ lặp lại}
+
+Đây là yêu cầu phương pháp luận quan trọng nhất của mục, và nó trả lời Q1.
+
+Tiêu chuẩn robot công nghiệp phân biệt rõ \emph{độ chính xác} (accuracy, gồm cả bias) và \emph{độ lặp lại} (repeatability, chỉ độ tản mát) \cite{iso9283}, và hai đại lượng ấy đòi hai phép đo khác nhau:
+
+\emph{Độ lặp lại} đo được \emph{không cần} chuẩn tham chiếu: cho robot cập nhiều lần và đo độ tản mát giữa các lần.
+
+\emph{Bias} đo được \emph{chỉ khi có} chuẩn tham chiếu: so vị trí trung bình với vị trí thật.
+
+Sự bất đối xứng ấy là nguồn của cạm bẫy lớn nhất trong nghiệm thu, và nó là câu trả lời cho Q1: vì độ lặp lại dễ đo hơn nhiều, người ta đo nó, rồi báo cáo nó như thể nó là độ chính xác. Một hệ thống có bias 3\,mm và độ lặp lại 0,2\,mm sẽ được báo cáo là ``chính xác 0,2\,mm'' --- và con số ấy đúng theo nghĩa đen của từ ``lặp lại'' mà sai hoàn toàn nếu người đọc hiểu là độ chính xác.
+
+Với docking thì --- như \ptr{B/13} lập luận --- \emph{độ lặp lại mới là đại lượng quan trọng}, nên đo nó là hợp lý. Điều bắt buộc là \emph{gọi đúng tên}, và báo cáo rõ rằng bias chưa được đo nếu chưa đo.
+
+\begin{cambay}
+Một hệ thống có \emph{làm mượt} (\ptr{B/11}) báo cáo độ tản mát nhỏ hơn thực chất, vì làm mượt giảm tản mát mà không giảm thiên lệch.
+
+Hệ quả: đo độ lặp lại của một hệ có bộ lọc rồi gọi nó là độ chính xác là sai \emph{hai lần} --- một lần vì nhầm hai đại lượng, một lần nữa vì bộ lọc đã làm đẹp chính đại lượng đang đo.
+
+Cách đo đúng: đo độ lặp lại của \emph{toàn bộ chu trình cập dock}, tức cho robot lùi ra hẳn rồi cập lại từ đầu, chứ không đo độ tản mát của pose trong khi robot đứng yên ở vị trí cuối. Hai con số ấy khác nhau nhiều, và chỉ con số thứ nhất có nghĩa với người dùng.
+\end{cambay}
+
+\subsection{C. Bản đồ sai số theo tư thế}
+
+\ptr{C/15} mục~8 cảnh báo rằng bảng ngân sách tính tại \emph{một} tư thế. Nghiệm thu phải quét toàn dải: đo sai số ở nhiều khoảng cách và nhiều góc tiếp cận, rồi vẽ bản đồ.
+
+Cái bản đồ ấy cho hai thứ mà một con số duy nhất không cho: nó chỉ ra \emph{vùng} nào của không gian tư thế có vấn đề, và nó cho thấy sai số có \emph{cấu trúc} hay không. Sai số có cấu trúc --- chẳng hạn tăng đều theo một hướng --- là dấu hiệu của một nguồn hệ thống chưa được nhận diện, và nó là manh mối chẩn đoán tốt nhất mà nghiệm thu cung cấp.
+
+\subsection{D. Thử nghiệm độ bền}
+
+Bốn yếu tố, lấy từ các chương tương ứng: ánh sáng (\ptr{B/14} mini project), nhiệt độ (\ptr{B/12} mục~6), rung, và marker bẩn hoặc bị che một phần. Với mỗi yếu tố, đo lại \(\sigma\) và --- quan trọng hơn --- đo lại \emph{vị trí trung bình}, vì thay đổi ở vị trí trung bình là thiên lệch và nó không được các biện pháp làm mượt chạm tới.
+
+\section{Kiểm tính nhất quán của hiệp phương sai}
+\ptrtarget{C/16/05}
+
+Mục này trả lời Q4, và nó bàn một đại lượng ít được đo nhưng quan trọng.
+
+Mọi thứ trong cây này sinh ra không chỉ một pose mà cả một hiệp phương sai (\ptr{A/03} mục~4B). Câu hỏi: hiệp phương sai ấy có \emph{trung thực} không?
+
+Đại lượng đo là NEES: với sai số thật \(\tilde{x}\) và hiệp phương sai khai báo \(P\), tính \(\varepsilon = \tilde{x}^\top P^{-1}\tilde{x}\). Nếu \(P\) trung thực thì kỳ vọng của \(\varepsilon\) bằng số bậc tự do của \(\tilde{x}\) --- sáu với một pose đầy đủ.
+
+Đọc kết quả: NEES trung bình lớn hơn 6 nhiều nghĩa là hệ \emph{quá tự tin} --- nó khai một bất định nhỏ hơn sai số thật. Nhỏ hơn 6 nhiều nghĩa là quá bi quan.
+
+Vì sao điều này quan trọng hơn bản thân độ chính xác --- phần hai của Q4: vì mọi tầng phía trên dùng hiệp phương sai làm trọng số. Bộ lọc ở \ptr{B/11} dùng nó để cân các phép đo; cổng chi-square ở \ptr{B/09} mục~7 dùng nó để loại ngoại lai; tiêu chí hội tụ ở \ptr{B/13} mục~8 dùng nó để quyết định khi nào dừng. Một hiệp phương sai quá tự tin làm cả ba tầng ấy sai theo chiều nguy hiểm: bộ lọc tin quá mức vào phép đo xấu, cổng loại nhầm phép đo tốt, và bộ điều khiển dừng khi chưa đạt.
+
+Và có một mối nối quan trọng với \ptr{A/05} mục~2: công thức hiệp phương sai ở đó \emph{giả định mô hình đúng}. Nếu có sai số hệ thống chưa được mô hình hoá --- méo còn sót, constellation lệch --- thì phần dư mang thành phần hệ thống và hiệp phương sai báo về nhỏ hơn sự thật. Nói cách khác: \emph{NEES cao là một chỉ báo của sai số mô hình}, và đó là cách dùng có giá trị nhất của nó trong cây này.
+
+Cạm bẫy khi dùng NEES: nó giả định mô hình \emph{đúng dạng} và chỉ sai độ lớn. Nếu bạn thấy NEES cao và phản ứng bằng cách nới hiệp phương sai lên cho tới khi NEES về 6, bạn đã giấu một lỗi mô hình vào trọng số. Phép thử phân biệt: kiểm xem phần dư có \emph{tương quan với tư thế} không --- nếu có thì đó là lỗi mô hình, không phải lỗi trọng số.
+
+\section{Giới hạn của mô phỏng}
+\ptrtarget{C/16/06}
+
+Mục này trả lời Q2, và nó là mục bắt buộc phải đọc trước khi tin kết quả mục~3.
+
+\textbf{Mô phỏng không phát hiện được nguồn sai số bị bỏ sót.} Nó mô phỏng chính xác mô hình bạn đã viết, nên nếu mô hình thiếu một hiện tượng thì mô phỏng cũng thiếu. Mọi con số ở mục~3 giả định: nhiễu Gauss, độc lập giữa các góc, không có méo, constellation đúng chính xác, không có rolling shutter, không có blur, không có loá. Tức là mô phỏng \emph{chỉ} kiểm được các dòng \emph{ngẫu nhiên} của \ptr{C/15}, và hoàn toàn im lặng về các dòng hệ thống --- vốn chiếm 72\% ngân sách trong ví dụ của chương ấy.
+
+\textbf{Mô phỏng không kiểm được mô hình nhiễu.} Nó giả định Gauss độc lập vì đó là điều tôi đã viết vào script. \ptr{A/05} mục~9 liệt kê ba cách giả định ấy bị vi phạm trong thực tế, và không cách nào xuất hiện trong mô phỏng.
+
+Hai điểm trên là câu trả lời cho Q2, và chúng dẫn tới một phát biểu gọn: \emph{mô phỏng kiểm được phép tính, không kiểm được danh sách}.
+
+\textbf{Kết quả phụ thuộc vào \(\sigma\) giả định.} Mọi con số ở mục~3 dùng \(\sigma = 0{,}2\) px --- một bậc độ lớn kinh nghiệm, không phải số đo (\ptr{00-map}). Với \(\sigma\) thật của hệ bạn, mọi con số co giãn tuyến tính, nên chiều của các kết luận không đổi nhưng độ lớn thì đổi.
+
+\textbf{Ba chỗ trong chính kết quả chưa được kiểm đầy đủ}, đã ghi rõ: mức cải thiện của không đồng phẳng (mục~3C), tính tuyến tính chính xác của quan hệ \(1/B\) (mục~3D), và vì sao tag nhô ra theo chiều sâu lại mạnh hơn nêm nghiêng (mục~3E).
+
+\section{Thực hành: quy trình sáu bước}
+\ptrtarget{C/16/07}
+
+Gom cả chương thành một quy trình, và nó trả lời Q5.
+
+\emph{Một, chạy mô phỏng trước khi gia công.} Script đã có, đã chạy, và nó nhận cấu hình của bạn qua vài hằng số ở đầu tệp. Một buổi chiều.
+
+\emph{Hai, đo \(\sigma\) thật} (\ptr{B/07} mini project) và chạy lại mô phỏng với con số ấy.
+
+\emph{Ba, đo bốn con số đầu vào của ngân sách} (\ptr{C/15} mục~3B) và tính lại bảng.
+
+\emph{Bốn, đo độ lặp lại của toàn bộ chu trình cập dock} --- lùi ra hẳn rồi cập lại, ít nhất 30 lần, với tiêu chí đạt/không đạt bằng chính cơ cấu.
+
+\emph{Năm, vẽ bản đồ sai số theo tư thế} và kiểm xem sai số có cấu trúc không.
+
+\emph{Sáu, thử nghiệm độ bền} ở bốn điều kiện của mục~4D.
+
+Ba việc trong danh sách này là ba việc mà mô phỏng không thay được --- câu trả lời cho Q5: đo \(\sigma\) thật (vì mô phỏng giả định nó), đo độ lặp lại toàn chu trình (vì mô phỏng không có bộ điều khiển, không có cơ khí, không có bánh xe trượt), và thử nghiệm độ bền (vì mô phỏng không có ánh sáng, nhiệt độ, bụi).
+
+\begin{onbai}
+\ar[3]{Hai công cụ, hai vai trò}{Mô phỏng: rẻ, trước khi có phần cứng, kiểm \emph{tính đúng của công thức} và \emph{ảnh hưởng của hình học}. Đo thật: đắt, cần chuẩn tham chiếu, kiểm \emph{mô hình nhiễu} và \emph{các nguồn bị bỏ sót}. Thứ tự: mô phỏng chọn thiết kế, đo thật nghiệm thu.}
+\ar[3]{Mô phỏng không kiểm được gì}{\textbf{Nguồn bị bỏ sót} (nó mô phỏng đúng mô hình bạn viết) và \textbf{mô hình nhiễu} (nó giả định Gauss độc lập vì bạn viết thế). Gọn: \emph{mô phỏng kiểm được phép tính, không kiểm được danh sách}.}
+\ar[3]{Cái bẫy hệ quy chiếu}{Góc nghiêng của tag so với dock nằm ở \emph{mô hình 3D}; góc nhìn của camera nằm ở \emph{pose}. Trộn hai thứ thì phép so góc so hai hệ khác nhau và cho ra một ``sai số'' khổng lồ không đổi. Lỗi tôi đã mắc, ghi lại ở mục 2A.}
+\ar[3]{Vì sao phải báo cáo từng trục}{Baseline \emph{có hướng} (\ptr{B/09} mục 3). Một con số góc vô hướng bị trục tệ nhất chi phối và che mất cải thiện ở các trục khác --- ban đầu nó làm kết quả trông như bác bỏ \ptr{A/05}. Bài học: đừng gộp đại lượng có hướng thành vô hướng.}
+\ar[3]{Kết quả: \(\delta Z \approx Z\sigma/w\)}{\textbf{Khớp}, sai lệch dưới 15\% ở mọi \(Z\) và dưới 3\% ở \(Z \ge 1\) m. Qua cửa (b).}
+\ar[3]{Kết quả: \(\delta x\) nhỏ hơn dự đoán đúng 2 lần}{\textbf{Không phải lỗi.} Hệ số là \(\sqrt{N}\) với \(N=4\) góc; \ptr{A/05} mục 3A đã \emph{cố ý} bỏ nó ra cho thận trọng, với lý do ghi rõ. Mô phỏng có nhiễu độc lập thật nên \(\sqrt{N}\) xuất hiện đầy đủ.}
+\ar[3]{Kết quả: ambiguity}{\textbf{Khớp mạnh.} \(\rho\) tăng từ 1,33 (fronto-parallel) lên 66,6 (\(40^\circ\)) --- dải năm mươi lần; sai số góc giảm đơn điệu. Ở \(0^\circ\): sai số \(1{,}34^\circ\), gấp gần ba lần ngân sách.}
+\ar[3]{Kết quả ĐI NGƯỢC dự đoán}{Phá đồng phẳng bằng nêm nghiêng chỉ cải thiện \textbf{1,24 lần}, không phải nhiều lần. Ba giải thích chưa phân biệt được: cấu hình đã đủ tốt sẵn; lợi ích thật nằm ở \emph{loại lỗi thô} chứ không giảm nhiễu (và tôi đo nhầm đại lượng); hoặc độ nghiêng chưa đủ.}
+\ar[3]{Loại sai lầm của kết quả ấy}{Nó \emph{không} bác bỏ \ptr{B/09} mục 4 --- nó cho thấy phép đo tôi chọn (độ tản mát) không đo đúng thứ mệnh đề nói về (lỗi thô). Phân biệt ``mệnh đề sai'' với ``đo nhầm đại lượng'' là việc phải làm trước khi sửa chương nào.}
+\ar[3]{Kết quả: bốn phương án bố trí}{Một tag 150 mm cho pitch/yaw \(\approx 0{,}43^\circ\) --- \textbf{86\% ngân sách} tiêu riêng vào nhiễu góc. Từ A tới D cải thiện \(6{,}7\) lần, \emph{hoàn toàn bằng hình học}.}
+\ar[2]{Kết quả bất ngờ ở phương án D}{Tag nhô ra 60 mm (phá đồng phẳng theo \emph{chiều sâu}) cho pitch \(0{,}064^\circ\) so với \(0{,}124^\circ\) của nêm nghiêng --- mạnh hơn hai lần. \ptr{B/09} không nêu điều này và tôi chưa có lý thuyết giải thích.}
+\ar[3]{Tách bias khỏi độ lặp lại}{Độ lặp lại đo được \emph{không cần} chuẩn tham chiếu; bias thì \emph{cần}. Sự bất đối xứng ấy là nguồn cạm bẫy: người ta đo cái dễ rồi gọi tên cái khó \cite{iso9283}.}
+\ar[3]{Cạm bẫy khi hệ có làm mượt}{Làm mượt giảm tản mát mà không giảm thiên lệch, nên đo độ lặp lại của hệ có bộ lọc rồi gọi là độ chính xác là sai \emph{hai lần}. Đo đúng: độ lặp lại của \emph{toàn chu trình} --- lùi ra hẳn rồi cập lại.}
+\ar[2]{NEES và vì sao nó quan trọng}{\(\varepsilon = \tilde{x}^\top P^{-1}\tilde{x}\); kỳ vọng bằng số bậc tự do nếu \(P\) trung thực. Quan trọng vì mọi tầng trên dùng \(P\) làm trọng số: bộ lọc, cổng chi-square, tiêu chí hội tụ. NEES cao là chỉ báo của \emph{sai số mô hình}.}
+\ar[2]{Cạm bẫy của NEES}{Nó giả định mô hình \emph{đúng dạng}, chỉ sai độ lớn. Nới \(P\) cho tới khi NEES về đúng là \emph{giấu lỗi mô hình vào trọng số}. Phép thử phân biệt: phần dư có tương quan với tư thế không?}
+\ar[2]{Ba việc mô phỏng không thay được}{Đo \(\sigma\) thật (mô phỏng giả định nó); đo độ lặp lại toàn chu trình (mô phỏng không có bộ điều khiển, cơ khí, bánh trượt); thử nghiệm độ bền (không có ánh sáng, nhiệt, bụi).}
+\end{onbai}
+
+\begin{ungdung}
+\ud{\code{code/monte\_carlo\_constellation.py}}{Script của chương; đã chạy 2026-09-14, log ở \code{ket-qua-chay-2026-09-14.txt}}{Cửa kiểm chứng (b) cho toàn cây --- đổi hằng số đầu tệp thành số của bạn}
+\ud{\repo{OpenCV} \code{solvePnPGeneric}}{Trả nhiều nghiệm kèm reprojection --- nguồn của cột \(\rho\) ở mục 3B}{Không có nó thì không đo được ambiguity}
+\ud{ISO 9283 \cite{iso9283}}{Định nghĩa chuẩn của accuracy và repeatability cho robot}{Dùng đúng thuật ngữ khi báo cáo --- mục 4B}
+\ud{Đánh giá quỹ đạo \cite{zhang2018tutorial}}{Căn chỉnh trước khi tính sai số; chọn sai phép căn chỉnh thì con số vô nghĩa}{Cùng tư duy với mục 4B, khác lĩnh vực}
+\ud{\repo{evo} \cite{grupp2017evo}}{Công cụ đánh giá quỹ đạo có sẵn các phép căn chỉnh chuẩn}{Dùng nếu cần đánh giá cả quỹ đạo tiếp cận chứ không chỉ điểm cuối}
+\end{ungdung}
+
+\begin{duan}{Đo tỉ lệ chọn nhầm nghiệm --- phép đo còn thiếu}{1--2 ngày}
+\dmt giải quyết chỗ nợ kiểm chứng lớn nhất mà mục 3C để lại: phá tính đồng phẳng có thật sự khử ambiguity không, đo bằng \emph{đại lượng đúng}.
+\ddl mô phỏng, mở rộng script đã có. Không cần phần cứng.
+\dbc sửa \code{run\_config} để, với mỗi lần chạy, ghi lại \emph{nghiệm được chọn có phải nghiệm gần chân trị nhất không} --- tức tỉ lệ chọn nhầm, chứ không phải độ tản mát; chạy cho hai cấu hình của mục 3C (4 tag đồng phẳng và 4 tag nghiêng) ở nhiều góc tiếp cận, đặc biệt là gần fronto-parallel; rồi quét độ nghiêng của nêm từ \(0^\circ\) tới \(45^\circ\) và vẽ tỉ lệ chọn nhầm theo độ nghiêng; cuối cùng lặp với phương án D (tag nhô ra) để kiểm xem vì sao nó mạnh hơn.
+\dxk bạn có một đồ thị ``tỉ lệ chọn nhầm theo độ nghiêng''. Nếu nó giảm mạnh về không ở một ngưỡng nào đó, thì \ptr{B/09} mục 4 đúng và mục 3C của chương này chỉ đo nhầm đại lượng --- và bạn vừa có con số ngưỡng thật, thay cho khuyến nghị 20\% chưa kiểm. Nếu nó \emph{không} giảm, thì \ptr{B/09} mục 4 cần sửa và đó là một phát hiện quan trọng. Kiểm tra chéo bắt buộc: với cấu hình đồng phẳng ở fronto-parallel, tỉ lệ chọn nhầm phải gần 50\% --- nếu không thì cách xác định ``nghiệm đúng'' của bạn có lỗi.
+\dnv \ptr{B/09} mục 4B nhận con số ngưỡng; \code{99-chua-biet.md} xoá được mục đầu tiên.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì 0,2 mm là \emph{độ lặp lại}, không phải \emph{độ chính xác}: nó đo độ tản mát giữa các lần, và nó hoàn toàn im lặng về việc giá trị trung bình có đúng không. Một hệ có bias 3 mm và tản mát 0,2 mm cho đúng con số ấy \cite{iso9283}. Phép đo cho phép nói về độ chính xác đòi một \emph{chuẩn tham chiếu} độc lập --- máy toàn đạc, đồ gá cơ khí có dung sai biết trước, hoặc chính cơ cấu cập --- để so vị trí trung bình với vị trí thật. Và có một cạm bẫy thứ hai: nếu hệ có làm mượt (\ptr{B/11}) thì con số tản mát còn nhỏ hơn thực chất nữa, vì làm mượt giảm tản mát mà không giảm thiên lệch. Cách đo đúng là đo độ lặp lại của \emph{toàn bộ chu trình} --- lùi ra hẳn rồi cập lại từ đầu --- chứ không đo độ tản mát của pose khi robot đã đứng yên ở vị trí cuối.}
+\tl{Thứ nhất: \emph{nguồn sai số bị bỏ sót}. Mô phỏng mô phỏng chính xác mô hình bạn đã viết, nên nếu mô hình thiếu một hiện tượng thì mô phỏng cũng thiếu --- và nó không có cách nào báo cho bạn. Mọi con số ở mục 3 giả định không có méo, không rolling shutter, không blur, không loá, constellation đúng chính xác. Thứ hai: \emph{tính đúng của mô hình nhiễu}. Script giả định nhiễu Gauss độc lập giữa các góc vì đó là điều tôi viết vào; \ptr{A/05} mục 9 liệt kê ba cách giả định ấy bị vi phạm trong thực tế, và không cách nào xuất hiện trong mô phỏng. Gọn lại: \emph{mô phỏng kiểm được phép tính, không kiểm được danh sách}. Hệ quả cụ thể với cây này: mô phỏng chỉ kiểm được các dòng \emph{ngẫu nhiên} của \ptr{C/15} và im lặng hoàn toàn về các dòng hệ thống --- vốn chiếm 72\% ngân sách trong ví dụ của chương ấy.}
+\tl{Không phải lỗi nào cả --- đó là chênh lệch \emph{có chủ ý và đã được dự kiến}. Hệ số 2 chính là \(\sqrt{N}\) với \(N = 4\) góc của một tag. \ptr{A/05} mục 3A đã cố ý bỏ hệ số \(1/\sqrt{N}\) ra khỏi công thức, với lý do ghi rõ tại chỗ: trong thực tế nhiễu giữa các góc cùng một tag tương quan mạnh (chung blur, chung chiếu sáng, chung méo cục bộ), nên \(\sqrt{N}\) là một lời hứa thường không được giữ, và bỏ nó ra là cách ước lượng thận trọng cho ngân sách. Trong mô phỏng thì nhiễu \emph{đúng là} độc lập theo xây dựng, nên \(\sqrt{N}\) xuất hiện đầy đủ. Đây là một xác nhận chứ không phải một bất đồng, và nó minh hoạ giá trị của việc ghi rõ lý do khi bỏ một hệ số thay vì lặng lẽ bỏ --- nếu \ptr{A/05} không ghi lý do, kết quả này sẽ trông như một mâu thuẫn cần đi tìm nguyên nhân.}
+\tl{NEES: \(\varepsilon = \tilde{x}^\top P^{-1}\tilde{x}\), với kỳ vọng bằng số bậc tự do nếu \(P\) trung thực. Với sai số thật 1,5 mm và \(P\) khai 0,3 mm, NEES sẽ lớn hơn kỳ vọng khoảng \((1{,}5/0{,}3)^2 = 25\) lần --- rất dễ phát hiện. Nó quan trọng hơn bản thân độ chính xác vì \emph{mọi tầng phía trên dùng \(P\) làm trọng số}: bộ lọc ở \ptr{B/11} dùng nó để cân các phép đo, cổng chi-square ở \ptr{B/09} mục 7 dùng nó để loại ngoại lai, và tiêu chí hội tụ ở \ptr{B/13} mục 8 dùng nó để quyết định khi nào dừng. Một \(P\) quá tự tin làm cả ba sai theo chiều nguy hiểm: bộ lọc tin quá mức vào phép đo xấu, cổng loại nhầm phép đo tốt, và bộ điều khiển dừng khi chưa đạt. Thêm nữa, NEES cao là chỉ báo tốt của \emph{sai số mô hình}, vì công thức hiệp phương sai ở \ptr{A/05} mục 2 giả định mô hình đúng --- nên khi có méo còn sót hoặc constellation lệch, \(P\) báo về nhỏ hơn sự thật. Cạm bẫy: đừng nới \(P\) cho tới khi NEES về đúng, vì như thế là giấu lỗi mô hình vào trọng số; phép thử phân biệt là kiểm xem phần dư có tương quan với tư thế không.}
+\tl{Ba việc mô phỏng không thay được. Một, \emph{đo \(\sigma\) thật} của hệ (\ptr{B/07} mini project) --- vì mô phỏng \emph{giả định} \(\sigma\), nên mọi con số của nó co giãn tuyến tính theo con số bạn nhập vào, và 0,2 px chỉ là bậc độ lớn kinh nghiệm. Hai, \emph{đo độ lặp lại của toàn bộ chu trình cập dock} --- lùi ra hẳn rồi cập lại ít nhất 30 lần --- vì mô phỏng không có bộ điều khiển, không có cơ khí, không có bánh xe trượt, và ba thứ đó đóng góp những dòng mà không phép mô phỏng thị giác nào chạm tới. Ba, \emph{thử nghiệm độ bền} ở các điều kiện ánh sáng, nhiệt độ, rung và marker bẩn --- vì mô phỏng không có ánh sáng. Và với mỗi thử nghiệm độ bền, phải đo lại \emph{cả vị trí trung bình} chứ không chỉ độ tản mát, vì thay đổi ở vị trí trung bình là thiên lệch và không biện pháp làm mượt nào chạm tới nó.}
+\end{traloi}
+
+\begin{dongian}
+Chương trước cho một cái bảng cộng các khoản sai số lại. Chương này hỏi: làm sao biết cái bảng ấy nói đúng?
+
+Có hai cách kiểm, và chúng khác nhau như kiểm số học với nấu thử.
+
+Cách thứ nhất là \emph{mô phỏng}: cho máy tính giả vờ có một cái camera, một tấm marker, rồi thêm nhiễu ngẫu nhiên và xem kết quả ra sao. Rẻ, nhanh, thử được hàng chục phương án trong một buổi chiều, và làm được khi chưa có gì trong tay. Lần này tôi đã chạy thật, và kết quả nằm ở giữa chương.
+
+Phần lớn khớp với dự đoán, và có hai con số đáng nhớ. Một cái tag phẳng đơn lẻ nhìn thẳng cho sai số góc một phẩy ba độ --- gấp gần ba lần cái ngưỡng nửa độ mà ta đặt ra. Và bốn tấm tag nhỏ trải rộng thay cho một tấm lớn cải thiện gần bốn lần, chỉ bằng việc dán khác đi.
+
+Nhưng có một chỗ \emph{không} khớp, và tôi để nguyên nó trong bài thay vì giấu đi. Tôi đã dự đoán rằng kê nghiêng mấy tấm tag sẽ cải thiện rất nhiều; mô phỏng nói nó chỉ cải thiện hai mươi bốn phần trăm. Nghĩ kỹ thì có lẽ tôi đã đo nhầm thứ: cái nêm nghiêng sinh ra để chữa chuyện \emph{nhìn nhầm} --- máy chọn sai một trong hai câu trả lời --- chứ không phải để giảm cái run tay, mà tôi lại đi đo cái run tay. Đo nhầm đại lượng thì không giống với mệnh đề sai, và phân biệt hai chuyện đó trước khi đi sửa là việc phải làm.
+
+Cách kiểm thứ hai là \emph{đo thật}, và nó bắt được thứ mà mô phỏng không bao giờ bắt được: những nguyên nhân mà bạn chưa nghĩ tới. Mô phỏng chỉ mô phỏng đúng cái danh sách bạn đã viết ra; nếu bạn quên một thứ thì nó cũng quên, và nó không có cách nào nhắc bạn.
+
+Cuối cùng, một cái bẫy khi nghiệm thu mà rất nhiều báo cáo rơi vào. Đo robot cập hai chục lần rồi thấy nó \emph{luôn} dừng ở cùng một chỗ trong phạm vi hai phần mười milimét --- điều đó nghe tuyệt vời, nhưng nó chỉ chứng minh robot \emph{đều tay}, không chứng minh nó \emph{đúng chỗ}. Nếu có một chỗ lệch cố định ba milimét thì cả hai chục lần đều lệch đúng ba milimét ấy, rất đều, và không có gì trong sự đều đặn đó báo cho bạn biết. Muốn biết có lệch hay không thì phải có một cái thước độc lập --- hoặc đơn giản là xem cái chốt có khớp vào không.
+
+\chuadongian{ranh giới giữa ``mô hình sai'' và ``đo nhầm đại lượng'' thì không có quy tắc chung. Cả hai đều cho ra một con số không như dự đoán, và phân biệt chúng đòi phải nghĩ lại xem mệnh đề gốc thật ra nói về cái gì --- việc này làm bằng tay, không có công thức.}
+\motcau{Mô phỏng kiểm được phép tính chứ không kiểm được danh sách; và đo thấy đều tay không có nghĩa là đúng chỗ.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{C/16/08}
+
+Chương này khác các chương khác: phần lớn nội dung của nó \emph{đã là} kết quả kiểm chứng, nên mục này nói về những gì còn lại.
+
+Kết quả ở mục~3C --- \emph{phá đồng phẳng chỉ cải thiện 1,24 lần} --- là kết quả cần được kiểm lại bằng đại lượng đúng, và mini project là cách. Nếu tỉ lệ chọn nhầm nghiệm \emph{cũng} không cải thiện khi kê nghiêng, thì \ptr{B/09} mục~4 và \ptr{A/04} mục~6 đều cần sửa --- và đó sẽ là thay đổi lớn nhất mà cây này từng phải làm.
+
+Kết quả ở mục~3E --- \emph{tag nhô ra theo chiều sâu mạnh hơn nêm nghiêng hai lần} --- là một phát hiện mà tôi chưa có lý thuyết giải thích. Nó có thể là một hiệu ứng thật (độ lệch khỏi mặt phẳng của tag nhô ra là 60\,mm so với 26\,mm của nêm nghiêng, tức lớn hơn hai lần --- và cải thiện cũng đúng hai lần, một sự trùng khớp đáng chú ý), hoặc nó có thể là hệ quả của việc tag thứ năm thêm bốn góc nữa. Phép thử phân biệt: so phương án D với một phương án E gồm năm tag nhưng tất cả đồng phẳng.
+
+Mệnh đề về \(\delta\theta \propto 1/B\) ở mục~3D được ủng hộ về chiều nhưng chưa xác nhận là tuyến tính chính xác, và tôi đã ghi rõ mức kiểm chứng thay vì tuyên bố nó đã qua cửa (b) đầy đủ.
+
+Cuối cùng, một điều về phạm vi: \emph{mọi kết quả trong chương này là kết quả mô phỏng}. Không một con số nào đến từ phần cứng. Cây này chưa có một phép đo thật nào, và đó là chỗ nợ lớn nhất của toàn bộ cây --- đã ghi ở \code{99-chua-biet.md}.
+
+\section{Kết nối}
+\ptrtarget{C/16/09}
+
+Chương này là chương kiểm, nên nó nối ngược về mọi chương nó kiểm.
+
+Nối lên trên. \ptr{C/15-ngan-sach-sai-so} là chương mà chương này kiểm; hai chương là một cặp và nên đọc liền. \ptr{A/05-lan-truyen-sai-so-pixel-sang-pose} được kiểm ở mục~3A và~3D, và kết quả xác nhận hai trong bốn quan hệ một cách chắc chắn. \ptr{A/04-pose-ambiguity-target-phang} được kiểm ở mục~3B, với kết quả mạnh nhất chương. \ptr{A/03-pnp-va-uoc-luong-tu-the} mục~5 được kiểm ở phần~3 của script.
+
+Nối ngang. \ptr{B/09-multi-marker-constellation} nhận cả xác nhận (bảng bốn phương án) lẫn thách thức (mục~3C) --- và mini project của chương này là cách giải quyết thách thức ấy. \ptr{B/07-detection-pipeline} và \ptr{B/14-dieu-kien-quan-sat-va-anh-sang} cấp các phép đo \(\sigma\) mà mô phỏng cần làm đầu vào. \ptr{B/11-uoc-luong-theo-thoi-gian} nhận cảnh báo ở mục~4B: một hệ có làm mượt không được báo cáo độ tản mát như độ chính xác.
+
+Nối xuống. \ptr{E/19-lo-trinh-toi-thieu} đặt chương này ở bước đầu tiên của lộ trình, và lý do nằm ở mục~7: chạy mô phỏng là việc rẻ nhất có tác dụng lớn nhất, và nó làm được trước khi có bất cứ thứ gì.
+
+\begin{tukiem}
+\item Nêu hai loại sai số mà mô phỏng không bao giờ phát hiện được, và phát biểu giới hạn ấy trong một câu.
+\item Kết quả mô phỏng cho \(\delta x\) nhỏ hơn công thức đúng hai lần. Giải thích, và nói vì sao đó là một xác nhận chứ không phải một mâu thuẫn.
+\item Vì sao phải báo cáo sai số xoay theo từng trục? Nêu hậu quả cụ thể của việc gộp thành một con số.
+\item Kết quả nào trong chương đi ngược dự đoán, và ba cách giải thích là gì? Nêu phép đo phân biệt chúng.
+\item Phân biệt ``mệnh đề sai'' với ``đo nhầm đại lượng'', và nói vì sao phân biệt ấy phải làm trước khi sửa một chương.
+\item Vì sao đo độ lặp lại của một hệ có bộ lọc rồi gọi nó là độ chính xác là sai hai lần?
+\item NEES đo cái gì, và vì sao nó quan trọng hơn bản thân độ chính xác với một hệ có nhiều tầng xử lý?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,235 @@
+% ===========================================================================
+%  refs.bib — thư mục tham khảo dùng chung cho cả cây deep_learning.
+%  CẢNH BÁO: các mục dưới đây được soạn từ trí nhớ về công trình gốc.
+%  Tên tác giả, năm và hội nghị đúng ở mức tra cứu được, nhưng PHẢI đối chiếu
+%  bản gốc trước khi trích dẫn ra ngoài cây này. Xem 00-map.tex, mục câu hỏi mở.
+% ===========================================================================
+
+% ---------------- Nền tảng, sách ----------------
+@book{deisenroth2020, author={Deisenroth, Marc Peter and Faisal, A. Aldo and Ong, Cheng Soon}, title={Mathematics for Machine Learning}, publisher={Cambridge University Press}, year={2020}}
+@book{szeliski2022, author={Szeliski, Richard}, title={Computer Vision: Algorithms and Applications}, edition={2}, publisher={Springer}, year={2022}}
+@book{hartley2004, author={Hartley, Richard and Zisserman, Andrew}, title={Multiple View Geometry in Computer Vision}, edition={2}, publisher={Cambridge University Press}, year={2004}}
+@book{goodfellow2016, author={Goodfellow, Ian and Bengio, Yoshua and Courville, Aaron}, title={Deep Learning}, publisher={MIT Press}, year={2016}}
+@book{murphy2022, author={Murphy, Kevin P.}, title={Probabilistic Machine Learning: An Introduction}, publisher={MIT Press}, year={2022}}
+@book{bishop2006, author={Bishop, Christopher M.}, title={Pattern Recognition and Machine Learning}, publisher={Springer}, year={2006}}
+@book{boyd2004, author={Boyd, Stephen and Vandenberghe, Lieven}, title={Convex Optimization}, publisher={Cambridge University Press}, year={2004}}
+@book{cover2006, author={Cover, Thomas M. and Thomas, Joy A.}, title={Elements of Information Theory}, edition={2}, publisher={Wiley}, year={2006}}
+@book{barfoot2017, author={Barfoot, Timothy D.}, title={State Estimation for Robotics}, publisher={Cambridge University Press}, year={2017}}
+@article{solà2018, author={Solà, Joan and Deray, Jérémie and Atchuthan, Dinesh}, title={A micro Lie theory for state estimation in robotics}, journal={arXiv:1812.01537}, year={2018}}
+@book{trefethen1997, author={Trefethen, Lloyd N. and Bau, David}, title={Numerical Linear Algebra}, publisher={SIAM}, year={1997}}
+@book{oppenheim1999, author={Oppenheim, Alan V. and Schafer, Ronald W.}, title={Discrete-Time Signal Processing}, edition={2}, publisher={Prentice Hall}, year={1999}}
+
+% ---------------- Vật lý tạo ảnh, ISP, nhiễu ----------------
+@inproceedings{brooks2019unprocessing, author={Brooks, Tim and Mildenhall, Ben and Xue, Tianfan and Chen, Jiawen and Sharlet, Dillon and Barron, Jonathan T.}, title={Unprocessing Images for Learned Raw Denoising}, booktitle={CVPR}, year={2019}}
+@article{zhang2000flexible, author={Zhang, Zhengyou}, title={A flexible new technique for camera calibration}, journal={IEEE TPAMI}, volume={22}, number={11}, pages={1330--1334}, year={2000}}
+@inproceedings{schoenberger2016colmap, author={Schönberger, Johannes L. and Frahm, Jan-Michael}, title={Structure-from-Motion Revisited}, booktitle={CVPR}, year={2016}}
+@inproceedings{abdelhamed2018sidd, author={Abdelhamed, Abdelrahman and Lin, Stephen and Brown, Michael S.}, title={A High-Quality Denoising Dataset for Smartphone Cameras}, booktitle={CVPR}, year={2018}}
+
+% ---------------- Học từ dữ liệu, tổng quát hoá ----------------
+@article{vapnik1999, author={Vapnik, Vladimir N.}, title={An overview of statistical learning theory}, journal={IEEE Trans. Neural Networks}, volume={10}, number={5}, pages={988--999}, year={1999}}
+@article{wolpert1997nfl, author={Wolpert, David H. and Macready, William G.}, title={No free lunch theorems for optimization}, journal={IEEE Trans. Evolutionary Computation}, volume={1}, number={1}, pages={67--82}, year={1997}}
+@inproceedings{zhang2017rethinking, author={Zhang, Chiyuan and Bengio, Samy and Hardt, Moritz and Recht, Benjamin and Vinyals, Oriol}, title={Understanding deep learning requires rethinking generalization}, booktitle={ICLR}, year={2017}}
+@article{belkin2019double, author={Belkin, Mikhail and Hsu, Daniel and Ma, Siyuan and Mandal, Soumik}, title={Reconciling modern machine-learning practice and the classical bias--variance trade-off}, journal={PNAS}, volume={116}, number={32}, pages={15849--15854}, year={2019}}
+@inproceedings{nakkiran2020deep, author={Nakkiran, Preetum and Kaplun, Gal and Bansal, Yamini and Yang, Tristan and Barak, Boaz and Sutskever, Ilya}, title={Deep Double Descent: Where Bigger Models and More Data Hurt}, booktitle={ICLR}, year={2020}}
+@article{geirhos2020shortcut, author={Geirhos, Robert and Jacobsen, Jörn-Henrik and Michaelis, Claudio and Zemel, Richard and Brendel, Wieland and Bethge, Matthias and Wichmann, Felix A.}, title={Shortcut learning in deep neural networks}, journal={Nature Machine Intelligence}, volume={2}, pages={665--673}, year={2020}}
+@inproceedings{recht2019imagenet, author={Recht, Benjamin and Roelofs, Rebecca and Schmidt, Ludwig and Shankar, Vaishaal}, title={Do ImageNet Classifiers Generalize to ImageNet?}, booktitle={ICML}, year={2019}}
+@inproceedings{taori2020measuring, author={Taori, Rohan and Dave, Achal and Shankar, Vaishaal and Carlini, Nicholas and Recht, Benjamin and Schmidt, Ludwig}, title={Measuring Robustness to Natural Distribution Shifts in Image Classification}, booktitle={NeurIPS}, year={2020}}
+@inproceedings{koh2021wilds, author={Koh, Pang Wei and Sagawa, Shiori and others}, title={WILDS: A Benchmark of in-the-Wild Distribution Shifts}, booktitle={ICML}, year={2021}}
+@inproceedings{sagawa2020groupdro, author={Sagawa, Shiori and Koh, Pang Wei and Hashimoto, Tatsunori B. and Liang, Percy}, title={Distributionally Robust Neural Networks for Group Shifts}, booktitle={ICLR}, year={2020}}
+@article{arjovsky2019irm, author={Arjovsky, Martin and Bottou, Léon and Gulrajani, Ishaan and Lopez-Paz, David}, title={Invariant Risk Minimization}, journal={arXiv:1907.02893}, year={2019}}
+@inproceedings{gulrajani2021search, author={Gulrajani, Ishaan and Lopez-Paz, David}, title={In Search of Lost Domain Generalization}, booktitle={ICLR}, year={2021}}
+@inproceedings{hendrycks2017baseline, author={Hendrycks, Dan and Gimpel, Kevin}, title={A Baseline for Detecting Misclassified and Out-of-Distribution Examples in Neural Networks}, booktitle={ICLR}, year={2017}}
+@inproceedings{hendrycks2019benchmarking, author={Hendrycks, Dan and Dietterich, Thomas}, title={Benchmarking Neural Network Robustness to Common Corruptions and Perturbations}, booktitle={ICLR}, year={2019}}
+@inproceedings{ovadia2019can, author={Ovadia, Yaniv and Fertig, Emily and others}, title={Can You Trust Your Model's Uncertainty?}, booktitle={NeurIPS}, year={2019}}
+
+% ---------------- Dữ liệu, nhãn, đánh giá ----------------
+@inproceedings{northcutt2021pervasive, author={Northcutt, Curtis G. and Athalye, Anish and Mueller, Jonas}, title={Pervasive Label Errors in Test Sets Destabilize Machine Learning Benchmarks}, booktitle={NeurIPS Datasets and Benchmarks}, year={2021}}
+@article{northcutt2021confident, author={Northcutt, Curtis G. and Jiang, Lu and Chuang, Isaac L.}, title={Confident Learning: Estimating Uncertainty in Dataset Labels}, journal={JAIR}, volume={70}, pages={1373--1411}, year={2021}}
+@article{gebru2021datasheets, author={Gebru, Timnit and Morgenstern, Jamie and others}, title={Datasheets for Datasets}, journal={Communications of the ACM}, volume={64}, number={12}, pages={86--92}, year={2021}}
+@inproceedings{mitchell2019model, author={Mitchell, Margaret and Wu, Simone and others}, title={Model Cards for Model Reporting}, booktitle={FAT*}, year={2019}}
+@article{cohen1960kappa, author={Cohen, Jacob}, title={A coefficient of agreement for nominal scales}, journal={Educational and Psychological Measurement}, volume={20}, number={1}, pages={37--46}, year={1960}}
+@inproceedings{lin2014coco, author={Lin, Tsung-Yi and Maire, Michael and Belongie, Serge and others}, title={Microsoft COCO: Common Objects in Context}, booktitle={ECCV}, year={2014}}
+@inproceedings{deng2009imagenet, author={Deng, Jia and Dong, Wei and Socher, Richard and Li, Li-Jia and Li, Kai and Fei-Fei, Li}, title={ImageNet: A Large-Scale Hierarchical Image Database}, booktitle={CVPR}, year={2009}}
+@article{everingham2010pascal, author={Everingham, Mark and Van Gool, Luc and Williams, Christopher K. I. and Winn, John and Zisserman, Andrew}, title={The PASCAL Visual Object Classes (VOC) Challenge}, journal={IJCV}, volume={88}, pages={303--338}, year={2010}}
+@inproceedings{cordts2016cityscapes, author={Cordts, Marius and Omran, Mohamed and others}, title={The Cityscapes Dataset for Semantic Urban Scene Understanding}, booktitle={CVPR}, year={2016}}
+
+% ---------------- Loss ----------------
+@inproceedings{lin2017focal, author={Lin, Tsung-Yi and Goyal, Priya and Girshick, Ross and He, Kaiming and Dollár, Piotr}, title={Focal Loss for Dense Object Detection}, booktitle={ICCV}, year={2017}}
+@inproceedings{szegedy2016rethinking, author={Szegedy, Christian and Vanhoucke, Vincent and Ioffe, Sergey and Shlens, Jon and Wojna, Zbigniew}, title={Rethinking the Inception Architecture for Computer Vision}, booktitle={CVPR}, year={2016}}
+@inproceedings{milletari2016vnet, author={Milletari, Fausto and Navab, Nassir and Ahmadi, Seyed-Ahmad}, title={V-Net: Fully Convolutional Neural Networks for Volumetric Medical Image Segmentation}, booktitle={3DV}, year={2016}}
+@inproceedings{rezatofighi2019giou, author={Rezatofighi, Hamid and Tsoi, Nathan and Gwak, JunYoung and Sadeghian, Amir and Reid, Ian and Savarese, Silvio}, title={Generalized Intersection over Union}, booktitle={CVPR}, year={2019}}
+@inproceedings{schroff2015facenet, author={Schroff, Florian and Kalenichenko, Dmitry and Philbin, James}, title={FaceNet: A Unified Embedding for Face Recognition and Clustering}, booktitle={CVPR}, year={2015}}
+@inproceedings{deng2019arcface, author={Deng, Jiankang and Guo, Jia and Xue, Niannan and Zafeiriou, Stefanos}, title={ArcFace: Additive Angular Margin Loss for Deep Face Recognition}, booktitle={CVPR}, year={2019}}
+@inproceedings{oord2018cpc, author={van den Oord, Aaron and Li, Yazhe and Vinyals, Oriol}, title={Representation Learning with Contrastive Predictive Coding}, booktitle={arXiv:1807.03748}, year={2018}}
+@inproceedings{hinton2015distilling, author={Hinton, Geoffrey and Vinyals, Oriol and Dean, Jeff}, title={Distilling the Knowledge in a Neural Network}, booktitle={NeurIPS Deep Learning Workshop}, year={2015}}
+@inproceedings{johnson2016perceptual, author={Johnson, Justin and Alahi, Alexandre and Fei-Fei, Li}, title={Perceptual Losses for Real-Time Style Transfer and Super-Resolution}, booktitle={ECCV}, year={2016}}
+@inproceedings{kendall2018multitask, author={Kendall, Alex and Gal, Yarin and Cipolla, Roberto}, title={Multi-Task Learning Using Uncertainty to Weigh Losses}, booktitle={CVPR}, year={2018}}
+
+% ---------------- Huấn luyện: gradient, init, norm, optimizer ----------------
+@article{rumelhart1986, author={Rumelhart, David E. and Hinton, Geoffrey E. and Williams, Ronald J.}, title={Learning representations by back-propagating errors}, journal={Nature}, volume={323}, pages={533--536}, year={1986}}
+@inproceedings{glorot2010understanding, author={Glorot, Xavier and Bengio, Yoshua}, title={Understanding the difficulty of training deep feedforward neural networks}, booktitle={AISTATS}, year={2010}}
+@inproceedings{he2015delving, author={He, Kaiming and Zhang, Xiangyu and Ren, Shaoqing and Sun, Jian}, title={Delving Deep into Rectifiers}, booktitle={ICCV}, year={2015}}
+@inproceedings{ioffe2015batchnorm, author={Ioffe, Sergey and Szegedy, Christian}, title={Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift}, booktitle={ICML}, year={2015}}
+@article{ba2016layernorm, author={Ba, Jimmy Lei and Kiros, Jamie Ryan and Hinton, Geoffrey E.}, title={Layer Normalization}, journal={arXiv:1607.06450}, year={2016}}
+@inproceedings{wu2018groupnorm, author={Wu, Yuxin and He, Kaiming}, title={Group Normalization}, booktitle={ECCV}, year={2018}}
+@inproceedings{santurkar2018how, author={Santurkar, Shibani and Tsipras, Dimitris and Ilyas, Andrew and Madry, Aleksander}, title={How Does Batch Normalization Help Optimization?}, booktitle={NeurIPS}, year={2018}}
+@inproceedings{kingma2015adam, author={Kingma, Diederik P. and Ba, Jimmy}, title={Adam: A Method for Stochastic Optimization}, booktitle={ICLR}, year={2015}}
+@inproceedings{loshchilov2019adamw, author={Loshchilov, Ilya and Hutter, Frank}, title={Decoupled Weight Decay Regularization}, booktitle={ICLR}, year={2019}}
+@inproceedings{loshchilov2017sgdr, author={Loshchilov, Ilya and Hutter, Frank}, title={SGDR: Stochastic Gradient Descent with Warm Restarts}, booktitle={ICLR}, year={2017}}
+@article{goyal2017accurate, author={Goyal, Priya and Dollár, Piotr and Girshick, Ross and others}, title={Accurate, Large Minibatch SGD: Training ImageNet in 1 Hour}, journal={arXiv:1706.02677}, year={2017}}
+@inproceedings{smith2018dont, author={Smith, Samuel L. and Kindermans, Pieter-Jan and Ying, Chris and Le, Quoc V.}, title={Don't Decay the Learning Rate, Increase the Batch Size}, booktitle={ICLR}, year={2018}}
+@inproceedings{keskar2017large, author={Keskar, Nitish Shirish and Mudigere, Dheevatsa and Nocedal, Jorge and Smelyanskiy, Mikhail and Tang, Ping Tak Peter}, title={On Large-Batch Training for Deep Learning: Generalization Gap and Sharp Minima}, booktitle={ICLR}, year={2017}}
+@inproceedings{micikevicius2018mixed, author={Micikevicius, Paulius and Narang, Sharan and others}, title={Mixed Precision Training}, booktitle={ICLR}, year={2018}}
+@article{srivastava2014dropout, author={Srivastava, Nitish and Hinton, Geoffrey and Krizhevsky, Alex and Sutskever, Ilya and Salakhutdinov, Ruslan}, title={Dropout: A Simple Way to Prevent Neural Networks from Overfitting}, journal={JMLR}, volume={15}, pages={1929--1958}, year={2014}}
+@inproceedings{zhang2018mixup, author={Zhang, Hongyi and Cisse, Moustapha and Dauphin, Yann N. and Lopez-Paz, David}, title={mixup: Beyond Empirical Risk Minimization}, booktitle={ICLR}, year={2018}}
+@inproceedings{yun2019cutmix, author={Yun, Sangdoo and Han, Dongyoon and Oh, Seong Joon and Chun, Sanghyuk and Choe, Junsuk and Yoo, Youngjoon}, title={CutMix: Regularization Strategy to Train Strong Classifiers}, booktitle={ICCV}, year={2019}}
+@inproceedings{cubuk2020randaugment, author={Cubuk, Ekin D. and Zoph, Barret and Shlens, Jonathon and Le, Quoc V.}, title={RandAugment: Practical Automated Data Augmentation}, booktitle={CVPR Workshops}, year={2020}}
+@inproceedings{huang2016stochastic, author={Huang, Gao and Sun, Yu and Liu, Zhuang and Sedra, Daniel and Weinberger, Kilian}, title={Deep Networks with Stochastic Depth}, booktitle={ECCV}, year={2016}}
+@article{rajbhandari2020zero, author={Rajbhandari, Samyam and Rasley, Jeff and Ruwase, Olatunji and He, Yuxiong}, title={ZeRO: Memory Optimizations Toward Training Trillion Parameter Models}, journal={SC}, year={2020}}
+@article{chen2016training, author={Chen, Tianqi and Xu, Bing and Zhang, Chiyuan and Guestrin, Carlos}, title={Training Deep Nets with Sublinear Memory Cost}, journal={arXiv:1604.06174}, year={2016}}
+
+% ---------------- Kiến trúc backbone ----------------
+@article{lecun1998gradient, author={LeCun, Yann and Bottou, Léon and Bengio, Yoshua and Haffner, Patrick}, title={Gradient-based learning applied to document recognition}, journal={Proceedings of the IEEE}, volume={86}, number={11}, pages={2278--2324}, year={1998}}
+@inproceedings{krizhevsky2012alexnet, author={Krizhevsky, Alex and Sutskever, Ilya and Hinton, Geoffrey E.}, title={ImageNet Classification with Deep Convolutional Neural Networks}, booktitle={NeurIPS}, year={2012}}
+@inproceedings{simonyan2015vgg, author={Simonyan, Karen and Zisserman, Andrew}, title={Very Deep Convolutional Networks for Large-Scale Image Recognition}, booktitle={ICLR}, year={2015}}
+@inproceedings{szegedy2015going, author={Szegedy, Christian and Liu, Wei and others}, title={Going Deeper with Convolutions}, booktitle={CVPR}, year={2015}}
+@inproceedings{he2016resnet, author={He, Kaiming and Zhang, Xiangyu and Ren, Shaoqing and Sun, Jian}, title={Deep Residual Learning for Image Recognition}, booktitle={CVPR}, year={2016}}
+@inproceedings{huang2017densenet, author={Huang, Gao and Liu, Zhuang and van der Maaten, Laurens and Weinberger, Kilian Q.}, title={Densely Connected Convolutional Networks}, booktitle={CVPR}, year={2017}}
+@article{howard2017mobilenets, author={Howard, Andrew G. and Zhu, Menglong and others}, title={MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications}, journal={arXiv:1704.04861}, year={2017}}
+@inproceedings{tan2019efficientnet, author={Tan, Mingxing and Le, Quoc V.}, title={EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks}, booktitle={ICML}, year={2019}}
+@inproceedings{hu2018senet, author={Hu, Jie and Shen, Li and Sun, Gang}, title={Squeeze-and-Excitation Networks}, booktitle={CVPR}, year={2018}}
+@inproceedings{yu2016dilated, author={Yu, Fisher and Koltun, Vladlen}, title={Multi-Scale Context Aggregation by Dilated Convolutions}, booktitle={ICLR}, year={2016}}
+@inproceedings{dai2017deformable, author={Dai, Jifeng and Qi, Haozhi and others}, title={Deformable Convolutional Networks}, booktitle={ICCV}, year={2017}}
+@inproceedings{liu2022convnext, author={Liu, Zhuang and Mao, Hanzi and Wu, Chao-Yuan and Feichtenhofer, Christoph and Darrell, Trevor and Xie, Saining}, title={A ConvNet for the 2020s}, booktitle={CVPR}, year={2022}}
+@article{hochreiter1997lstm, author={Hochreiter, Sepp and Schmidhuber, Jürgen}, title={Long Short-Term Memory}, journal={Neural Computation}, volume={9}, number={8}, pages={1735--1780}, year={1997}}
+@inproceedings{bahdanau2015neural, author={Bahdanau, Dzmitry and Cho, Kyunghyun and Bengio, Yoshua}, title={Neural Machine Translation by Jointly Learning to Align and Translate}, booktitle={ICLR}, year={2015}}
+@inproceedings{vaswani2017attention, author={Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and others}, title={Attention Is All You Need}, booktitle={NeurIPS}, year={2017}}
+@inproceedings{dosovitskiy2021vit, author={Dosovitskiy, Alexey and Beyer, Lucas and Kolesnikov, Alexander and others}, title={An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale}, booktitle={ICLR}, year={2021}}
+@inproceedings{touvron2021deit, author={Touvron, Hugo and Cord, Matthieu and Douze, Matthijs and Massa, Francisco and Sablayrolles, Alexandre and Jégou, Hervé}, title={Training Data-Efficient Image Transformers and Distillation Through Attention}, booktitle={ICML}, year={2021}}
+@inproceedings{liu2021swin, author={Liu, Ze and Lin, Yutong and Cao, Yue and others}, title={Swin Transformer: Hierarchical Vision Transformer Using Shifted Windows}, booktitle={ICCV}, year={2021}}
+@article{su2024roformer, author={Su, Jianlin and Ahmed, Murtadha and Lu, Yu and Pan, Shengfeng and Bo, Wen and Liu, Yunfeng}, title={RoFormer: Enhanced Transformer with Rotary Position Embedding}, journal={Neurocomputing}, volume={568}, year={2024}}
+@inproceedings{dao2022flashattention, author={Dao, Tri and Fu, Daniel Y. and Ermon, Stefano and Rudra, Atri and Ré, Christopher}, title={FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness}, booktitle={NeurIPS}, year={2022}}
+@article{gu2023mamba, author={Gu, Albert and Dao, Tri}, title={Mamba: Linear-Time Sequence Modeling with Selective State Spaces}, journal={arXiv:2312.00752}, year={2023}}
+@inproceedings{shazeer2017outrageously, author={Shazeer, Noam and Mirhoseini, Azalia and others}, title={Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer}, booktitle={ICLR}, year={2017}}
+
+% ---------------- Detection, segmentation ----------------
+@inproceedings{girshick2014rcnn, author={Girshick, Ross and Donahue, Jeff and Darrell, Trevor and Malik, Jitendra}, title={Rich Feature Hierarchies for Accurate Object Detection and Semantic Segmentation}, booktitle={CVPR}, year={2014}}
+@inproceedings{girshick2015fast, author={Girshick, Ross}, title={Fast R-CNN}, booktitle={ICCV}, year={2015}}
+@inproceedings{ren2015faster, author={Ren, Shaoqing and He, Kaiming and Girshick, Ross and Sun, Jian}, title={Faster R-CNN: Towards Real-Time Object Detection with Region Proposal Networks}, booktitle={NeurIPS}, year={2015}}
+@inproceedings{he2017maskrcnn, author={He, Kaiming and Gkioxari, Georgia and Dollár, Piotr and Girshick, Ross}, title={Mask R-CNN}, booktitle={ICCV}, year={2017}}
+@inproceedings{lin2017fpn, author={Lin, Tsung-Yi and Dollár, Piotr and Girshick, Ross and He, Kaiming and Hariharan, Bharath and Belongie, Serge}, title={Feature Pyramid Networks for Object Detection}, booktitle={CVPR}, year={2017}}
+@inproceedings{redmon2016yolo, author={Redmon, Joseph and Divvala, Santosh and Girshick, Ross and Farhadi, Ali}, title={You Only Look Once: Unified, Real-Time Object Detection}, booktitle={CVPR}, year={2016}}
+@inproceedings{liu2016ssd, author={Liu, Wei and Anguelov, Dragomir and Erhan, Dumitru and others}, title={SSD: Single Shot MultiBox Detector}, booktitle={ECCV}, year={2016}}
+@inproceedings{tian2019fcos, author={Tian, Zhi and Shen, Chunhua and Chen, Hao and He, Tong}, title={FCOS: Fully Convolutional One-Stage Object Detection}, booktitle={ICCV}, year={2019}}
+@article{zhou2019objects, author={Zhou, Xingyi and Wang, Dequan and Krähenbühl, Philipp}, title={Objects as Points}, journal={arXiv:1904.07850}, year={2019}}
+@inproceedings{zhang2020atss, author={Zhang, Shifeng and Chi, Cheng and Yao, Yongqiang and Lei, Zhen and Li, Stan Z.}, title={Bridging the Gap Between Anchor-Based and Anchor-Free Detection via Adaptive Training Sample Selection}, booktitle={CVPR}, year={2020}}
+@inproceedings{ge2021ota, author={Ge, Zheng and Liu, Songtao and Li, Zeming and Yoshie, Osamu and Sun, Jian}, title={OTA: Optimal Transport Assignment for Object Detection}, booktitle={CVPR}, year={2021}}
+@inproceedings{carion2020detr, author={Carion, Nicolas and Massa, Francisco and Synnaeve, Gabriel and Usunier, Nicolas and Kirillov, Alexander and Zagoruyko, Sergey}, title={End-to-End Object Detection with Transformers}, booktitle={ECCV}, year={2020}}
+@inproceedings{zhu2021deformabledetr, author={Zhu, Xizhou and Su, Weijie and Lu, Lewei and Li, Bin and Wang, Xiaogang and Dai, Jifeng}, title={Deformable DETR: Deformable Transformers for End-to-End Object Detection}, booktitle={ICLR}, year={2021}}
+@inproceedings{zhang2023dino, author={Zhang, Hao and Li, Feng and Liu, Shilong and others}, title={DINO: DETR with Improved DeNoising Anchor Boxes for End-to-End Object Detection}, booktitle={ICLR}, year={2023}}
+@inproceedings{long2015fcn, author={Long, Jonathan and Shelhamer, Evan and Darrell, Trevor}, title={Fully Convolutional Networks for Semantic Segmentation}, booktitle={CVPR}, year={2015}}
+@inproceedings{ronneberger2015unet, author={Ronneberger, Olaf and Fischer, Philipp and Brox, Thomas}, title={U-Net: Convolutional Networks for Biomedical Image Segmentation}, booktitle={MICCAI}, year={2015}}
+@article{chen2018deeplab, author={Chen, Liang-Chieh and Papandreou, George and Kokkinos, Iasonas and Murphy, Kevin and Yuille, Alan L.}, title={DeepLab: Semantic Image Segmentation with Deep Convolutional Nets, Atrous Convolution, and Fully Connected CRFs}, journal={IEEE TPAMI}, volume={40}, number={4}, pages={834--848}, year={2018}}
+@inproceedings{xie2021segformer, author={Xie, Enze and Wang, Wenhai and Yu, Zhiding and Anandkumar, Anima and Alvarez, Jose M. and Luo, Ping}, title={SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers}, booktitle={NeurIPS}, year={2021}}
+@inproceedings{cheng2022mask2former, author={Cheng, Bowen and Misra, Ishan and Schwing, Alexander G. and Kirillov, Alexander and Girdhar, Rohit}, title={Masked-Attention Mask Transformer for Universal Image Segmentation}, booktitle={CVPR}, year={2022}}
+@inproceedings{kirillov2019panoptic, author={Kirillov, Alexander and He, Kaiming and Girshick, Ross and Rother, Carsten and Dollár, Piotr}, title={Panoptic Segmentation}, booktitle={CVPR}, year={2019}}
+@inproceedings{kirillov2023sam, author={Kirillov, Alexander and Mintun, Eric and Ravi, Nikhila and others}, title={Segment Anything}, booktitle={ICCV}, year={2023}}
+@inproceedings{sun2019hrnet, author={Sun, Ke and Xiao, Bin and Liu, Dong and Wang, Jingdong}, title={Deep High-Resolution Representation Learning for Human Pose Estimation}, booktitle={CVPR}, year={2019}}
+@inproceedings{cao2017openpose, author={Cao, Zhe and Simon, Tomas and Wei, Shih-En and Sheikh, Yaser}, title={Realtime Multi-Person 2D Pose Estimation Using Part Affinity Fields}, booktitle={CVPR}, year={2017}}
+@inproceedings{bodla2017softnms, author={Bodla, Navaneeth and Singh, Bharat and Chellappa, Rama and Davis, Larry S.}, title={Soft-NMS: Improving Object Detection with One Line of Code}, booktitle={ICCV}, year={2017}}
+
+% ---------------- Video, flow, tracking ----------------
+@inproceedings{xu2015show, author={Xu, Kelvin and Ba, Jimmy and Kiros, Ryan and others}, title={Show, Attend and Tell: Neural Image Caption Generation with Visual Attention}, booktitle={ICML}, year={2015}}
+@inproceedings{simonyan2014twostream, author={Simonyan, Karen and Zisserman, Andrew}, title={Two-Stream Convolutional Networks for Action Recognition in Videos}, booktitle={NeurIPS}, year={2014}}
+@inproceedings{carreira2017i3d, author={Carreira, Joao and Zisserman, Andrew}, title={Quo Vadis, Action Recognition? A New Model and the Kinetics Dataset}, booktitle={CVPR}, year={2017}}
+@inproceedings{tran2018closer, author={Tran, Du and Wang, Heng and Torresani, Lorenzo and Ray, Jamie and LeCun, Yann and Paluri, Manohar}, title={A Closer Look at Spatiotemporal Convolutions for Action Recognition}, booktitle={CVPR}, year={2018}}
+@inproceedings{feichtenhofer2019slowfast, author={Feichtenhofer, Christoph and Fan, Haoqi and Malik, Jitendra and He, Kaiming}, title={SlowFast Networks for Video Recognition}, booktitle={ICCV}, year={2019}}
+@inproceedings{dosovitskiy2015flownet, author={Dosovitskiy, Alexey and Fischer, Philipp and Ilg, Eddy and others}, title={FlowNet: Learning Optical Flow with Convolutional Networks}, booktitle={ICCV}, year={2015}}
+@inproceedings{sun2018pwcnet, author={Sun, Deqing and Yang, Xiaodong and Liu, Ming-Yu and Kautz, Jan}, title={PWC-Net: CNNs for Optical Flow Using Pyramid, Warping, and Cost Volume}, booktitle={CVPR}, year={2018}}
+@inproceedings{teed2020raft, author={Teed, Zachary and Deng, Jia}, title={RAFT: Recurrent All-Pairs Field Transforms for Optical Flow}, booktitle={ECCV}, year={2020}}
+@inproceedings{bewley2016sort, author={Bewley, Alex and Ge, Zongyuan and Ott, Lionel and Ramos, Fabio and Upcroft, Ben}, title={Simple Online and Realtime Tracking}, booktitle={ICIP}, year={2016}}
+@inproceedings{zhang2022bytetrack, author={Zhang, Yifu and Sun, Peize and Jiang, Yi and others}, title={ByteTrack: Multi-Object Tracking by Associating Every Detection Box}, booktitle={ECCV}, year={2022}}
+@article{luiten2021hota, author={Luiten, Jonathon and Osep, Aljosa and Dendorfer, Patrick and others}, title={HOTA: A Higher Order Metric for Evaluating Multi-Object Tracking}, journal={IJCV}, volume={129}, pages={548--578}, year={2021}}
+@article{bernardin2008clear, author={Bernardin, Keni and Stiefelhagen, Rainer}, title={Evaluating Multiple Object Tracking Performance: The CLEAR MOT Metrics}, journal={EURASIP J. Image and Video Processing}, year={2008}}
+
+% ---------------- 3D ----------------
+@inproceedings{qi2017pointnet, author={Qi, Charles R. and Su, Hao and Mo, Kaichun and Guibas, Leonidas J.}, title={PointNet: Deep Learning on Point Sets for 3D Classification and Segmentation}, booktitle={CVPR}, year={2017}}
+@inproceedings{qi2017pointnetpp, author={Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.}, title={PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space}, booktitle={NeurIPS}, year={2017}}
+@inproceedings{mildenhall2020nerf, author={Mildenhall, Ben and Srinivasan, Pratul P. and Tancik, Matthew and Barron, Jonathan T. and Ramamoorthi, Ravi and Ng, Ren}, title={NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis}, booktitle={ECCV}, year={2020}}
+@article{mueller2022instant, author={Müller, Thomas and Evans, Alex and Schied, Christoph and Keller, Alexander}, title={Instant Neural Graphics Primitives with a Multiresolution Hash Encoding}, journal={ACM TOG}, volume={41}, number={4}, year={2022}}
+@article{kerbl20233dgs, author={Kerbl, Bernhard and Kopanas, Georgios and Leimkühler, Thomas and Drettakis, George}, title={3D Gaussian Splatting for Real-Time Radiance Field Rendering}, journal={ACM TOG}, volume={42}, number={4}, year={2023}}
+@article{mur2017orbslam2, author={Mur-Artal, Raúl and Tardós, Juan D.}, title={ORB-SLAM2: An Open-Source SLAM System for Monocular, Stereo, and RGB-D Cameras}, journal={IEEE T-RO}, volume={33}, number={5}, pages={1255--1262}, year={2017}}
+@article{campos2021orbslam3, author={Campos, Carlos and Elvira, Richard and Rodríguez, Juan J. Gómez and Montiel, José M. M. and Tardós, Juan D.}, title={ORB-SLAM3: An Accurate Open-Source Library for Visual, Visual-Inertial and Multi-Map SLAM}, journal={IEEE T-RO}, volume={37}, number={6}, pages={1874--1890}, year={2021}}
+@inproceedings{sturm2012benchmark, author={Sturm, Jürgen and Engelhard, Nikolas and Endres, Felix and Burgard, Wolfram and Cremers, Daniel}, title={A Benchmark for the Evaluation of RGB-D SLAM Systems}, booktitle={IROS}, year={2012}}
+@inproceedings{eigen2014depth, author={Eigen, David and Puhrsch, Christian and Fergus, Rob}, title={Depth Map Prediction from a Single Image Using a Multi-Scale Deep Network}, booktitle={NeurIPS}, year={2014}}
+@article{ranftl2022midas, author={Ranftl, René and Lasinger, Katrin and Hafner, David and Schindler, Konrad and Koltun, Vladlen}, title={Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-Shot Cross-Dataset Transfer}, journal={IEEE TPAMI}, volume={44}, number={3}, year={2022}}
+@inproceedings{wang2024dust3r, author={Wang, Shuzhe and Leroy, Vincent and Cabon, Yohann and Chidlovskii, Boris and Revaud, Jerome}, title={DUSt3R: Geometric 3D Vision Made Easy}, booktitle={CVPR}, year={2024}}
+@inproceedings{lang2019pointpillars, author={Lang, Alex H. and Vora, Sourabh and Caesar, Holger and Zhou, Lubing and Yang, Jiong and Beijbom, Oscar}, title={PointPillars: Fast Encoders for Object Detection from Point Clouds}, booktitle={CVPR}, year={2019}}
+
+% ---------------- Sinh ảnh, low-level ----------------
+@inproceedings{goodfellow2014gan, author={Goodfellow, Ian and Pouget-Abadie, Jean and Mirza, Mehdi and others}, title={Generative Adversarial Nets}, booktitle={NeurIPS}, year={2014}}
+@inproceedings{kingma2014vae, author={Kingma, Diederik P. and Welling, Max}, title={Auto-Encoding Variational Bayes}, booktitle={ICLR}, year={2014}}
+@inproceedings{karras2019stylegan, author={Karras, Tero and Laine, Samuli and Aila, Timo}, title={A Style-Based Generator Architecture for Generative Adversarial Networks}, booktitle={CVPR}, year={2019}}
+@inproceedings{isola2017pix2pix, author={Isola, Phillip and Zhu, Jun-Yan and Zhou, Tinghui and Efros, Alexei A.}, title={Image-to-Image Translation with Conditional Adversarial Networks}, booktitle={CVPR}, year={2017}}
+@inproceedings{zhu2017cyclegan, author={Zhu, Jun-Yan and Park, Taesung and Isola, Phillip and Efros, Alexei A.}, title={Unpaired Image-to-Image Translation Using Cycle-Consistent Adversarial Networks}, booktitle={ICCV}, year={2017}}
+@inproceedings{gatys2016style, author={Gatys, Leon A. and Ecker, Alexander S. and Bethge, Matthias}, title={Image Style Transfer Using Convolutional Neural Networks}, booktitle={CVPR}, year={2016}}
+@inproceedings{huang2017adain, author={Huang, Xun and Belongie, Serge}, title={Arbitrary Style Transfer in Real-Time with Adaptive Instance Normalization}, booktitle={ICCV}, year={2017}}
+@inproceedings{ho2020ddpm, author={Ho, Jonathan and Jain, Ajay and Abbeel, Pieter}, title={Denoising Diffusion Probabilistic Models}, booktitle={NeurIPS}, year={2020}}
+@inproceedings{song2021ddim, author={Song, Jiaming and Meng, Chenlin and Ermon, Stefano}, title={Denoising Diffusion Implicit Models}, booktitle={ICLR}, year={2021}}
+@inproceedings{song2021score, author={Song, Yang and Sohl-Dickstein, Jascha and Kingma, Diederik P. and Kumar, Abhishek and Ermon, Stefano and Poole, Ben}, title={Score-Based Generative Modeling Through Stochastic Differential Equations}, booktitle={ICLR}, year={2021}}
+@inproceedings{rombach2022latent, author={Rombach, Robin and Blattmann, Andreas and Lorenz, Dominik and Esser, Patrick and Ommer, Björn}, title={High-Resolution Image Synthesis with Latent Diffusion Models}, booktitle={CVPR}, year={2022}}
+@article{ho2022classifier, author={Ho, Jonathan and Salimans, Tim}, title={Classifier-Free Diffusion Guidance}, journal={arXiv:2207.12598}, year={2022}}
+@inproceedings{peebles2023dit, author={Peebles, William and Xie, Saining}, title={Scalable Diffusion Models with Transformers}, booktitle={ICCV}, year={2023}}
+@inproceedings{lipman2023flow, author={Lipman, Yaron and Chen, Ricky T. Q. and Ben-Hamu, Heli and Nickel, Maximilian and Le, Matt}, title={Flow Matching for Generative Modeling}, booktitle={ICLR}, year={2023}}
+@inproceedings{zhang2023controlnet, author={Zhang, Lvmin and Rao, Anyi and Agrawala, Maneesh}, title={Adding Conditional Control to Text-to-Image Diffusion Models}, booktitle={ICCV}, year={2023}}
+@inproceedings{ledig2017srgan, author={Ledig, Christian and Theis, Lucas and Huszár, Ferenc and others}, title={Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network}, booktitle={CVPR}, year={2017}}
+@inproceedings{blau2018perception, author={Blau, Yochai and Michaeli, Tomer}, title={The Perception-Distortion Tradeoff}, booktitle={CVPR}, year={2018}}
+@inproceedings{zhang2018lpips, author={Zhang, Richard and Isola, Phillip and Efros, Alexei A. and Shechtman, Eli and Wang, Oliver}, title={The Unreasonable Effectiveness of Deep Features as a Perceptual Metric}, booktitle={CVPR}, year={2018}}
+@inproceedings{heusel2017fid, author={Heusel, Martin and Ramsauer, Hubert and Unterthiner, Thomas and Nessler, Bernhard and Hochreiter, Sepp}, title={GANs Trained by a Two Time-Scale Update Rule Converge to a Local Nash Equilibrium}, booktitle={NeurIPS}, year={2017}}
+@article{wang2004ssim, author={Wang, Zhou and Bovik, Alan C. and Sheikh, Hamid R. and Simoncelli, Eero P.}, title={Image Quality Assessment: From Error Visibility to Structural Similarity}, journal={IEEE TIP}, volume={13}, number={4}, pages={600--612}, year={2004}}
+
+% ---------------- Pretraining, foundation model ----------------
+@inproceedings{chen2020simclr, author={Chen, Ting and Kornblith, Simon and Norouzi, Mohammad and Hinton, Geoffrey}, title={A Simple Framework for Contrastive Learning of Visual Representations}, booktitle={ICML}, year={2020}}
+@inproceedings{he2020moco, author={He, Kaiming and Fan, Haoqi and Wu, Yuxin and Xie, Saining and Girshick, Ross}, title={Momentum Contrast for Unsupervised Visual Representation Learning}, booktitle={CVPR}, year={2020}}
+@inproceedings{grill2020byol, author={Grill, Jean-Bastien and Strub, Florian and Altché, Florent and others}, title={Bootstrap Your Own Latent: A New Approach to Self-Supervised Learning}, booktitle={NeurIPS}, year={2020}}
+@inproceedings{caron2021dino, author={Caron, Mathilde and Touvron, Hugo and Misra, Ishan and others}, title={Emerging Properties in Self-Supervised Vision Transformers}, booktitle={ICCV}, year={2021}}
+@article{oquab2024dinov2, author={Oquab, Maxime and Darcet, Timothée and Moutakanni, Théo and others}, title={DINOv2: Learning Robust Visual Features Without Supervision}, journal={TMLR}, year={2024}}
+@inproceedings{he2022mae, author={He, Kaiming and Chen, Xinlei and Xie, Saining and Li, Yanghao and Dollár, Piotr and Girshick, Ross}, title={Masked Autoencoders Are Scalable Vision Learners}, booktitle={CVPR}, year={2022}}
+@inproceedings{radford2021clip, author={Radford, Alec and Kim, Jong Wook and Hallacy, Chris and others}, title={Learning Transferable Visual Models from Natural Language Supervision}, booktitle={ICML}, year={2021}}
+@inproceedings{li2023blip2, author={Li, Junnan and Li, Dongxu and Savarese, Silvio and Hoi, Steven}, title={BLIP-2: Bootstrapping Language-Image Pre-training with Frozen Image Encoders and Large Language Models}, booktitle={ICML}, year={2023}}
+@inproceedings{liu2023llava, author={Liu, Haotian and Li, Chunyuan and Wu, Qingyang and Lee, Yong Jae}, title={Visual Instruction Tuning}, booktitle={NeurIPS}, year={2023}}
+@article{kaplan2020scaling, author={Kaplan, Jared and McCandlish, Sam and Henighan, Tom and others}, title={Scaling Laws for Neural Language Models}, journal={arXiv:2001.08361}, year={2020}}
+@inproceedings{hoffmann2022chinchilla, author={Hoffmann, Jordan and Borgeaud, Sebastian and Mensch, Arthur and others}, title={Training Compute-Optimal Large Language Models}, booktitle={NeurIPS}, year={2022}}
+@inproceedings{zhai2022scalingvit, author={Zhai, Xiaohua and Kolesnikov, Alexander and Houlsby, Neil and Beyer, Lucas}, title={Scaling Vision Transformers}, booktitle={CVPR}, year={2022}}
+@inproceedings{hu2022lora, author={Hu, Edward J. and Shen, Yelong and Wallis, Phillip and others}, title={LoRA: Low-Rank Adaptation of Large Language Models}, booktitle={ICLR}, year={2022}}
+@inproceedings{houlsby2019adapter, author={Houlsby, Neil and Giurgiu, Andrei and Jastrzebski, Stanislaw and others}, title={Parameter-Efficient Transfer Learning for NLP}, booktitle={ICML}, year={2019}}
+@inproceedings{kornblith2019better, author={Kornblith, Simon and Shlens, Jonathon and Le, Quoc V.}, title={Do Better ImageNet Models Transfer Better?}, booktitle={CVPR}, year={2019}}
+@inproceedings{wortsman2022modelsoups, author={Wortsman, Mitchell and Ilharco, Gabriel and Gadre, Samir Yitzhak and others}, title={Model Soups: Averaging Weights of Multiple Fine-Tuned Models Improves Accuracy Without Increasing Inference Time}, booktitle={ICML}, year={2022}}
+
+% ---------------- Nén, tăng tốc, triển khai ----------------
+@inproceedings{han2016deep, author={Han, Song and Mao, Huizi and Dally, William J.}, title={Deep Compression: Compressing Deep Neural Networks with Pruning, Trained Quantization and Huffman Coding}, booktitle={ICLR}, year={2016}}
+@inproceedings{jacob2018quantization, author={Jacob, Benoit and Kligys, Skirmantas and Chen, Bo and others}, title={Quantization and Training of Neural Networks for Efficient Integer-Arithmetic-Only Inference}, booktitle={CVPR}, year={2018}}
+@article{nagel2021whitepaper, author={Nagel, Markus and Fournarakis, Marios and Amjad, Rana Ali and Bondarenko, Yelysei and van Baalen, Mart and Blankevoort, Tijmen}, title={A White Paper on Neural Network Quantization}, journal={arXiv:2106.08295}, year={2021}}
+@inproceedings{frankle2019lottery, author={Frankle, Jonathan and Carbin, Michael}, title={The Lottery Ticket Hypothesis: Finding Sparse, Trainable Neural Networks}, booktitle={ICLR}, year={2019}}
+@article{dettmers2022llmint8, author={Dettmers, Tim and Lewis, Mike and Belkada, Younes and Zettlemoyer, Luke}, title={LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale}, journal={NeurIPS}, year={2022}}
+@article{williams2009roofline, author={Williams, Samuel and Waterman, Andrew and Patterson, David}, title={Roofline: An Insightful Visual Performance Model for Multicore Architectures}, journal={Communications of the ACM}, volume={52}, number={4}, pages={65--76}, year={2009}}
+
+% ---------------- Đánh giá, độ tin cậy, thực nghiệm ----------------
+@inproceedings{guo2017calibration, author={Guo, Chuan and Pleiss, Geoff and Sun, Yu and Weinberger, Kilian Q.}, title={On Calibration of Modern Neural Networks}, booktitle={ICML}, year={2017}}
+@inproceedings{gal2016dropout, author={Gal, Yarin and Ghahramani, Zoubin}, title={Dropout as a Bayesian Approximation: Representing Model Uncertainty in Deep Learning}, booktitle={ICML}, year={2016}}
+@inproceedings{lakshminarayanan2017simple, author={Lakshminarayanan, Balaji and Pritzel, Alexander and Blundell, Charles}, title={Simple and Scalable Predictive Uncertainty Estimation Using Deep Ensembles}, booktitle={NeurIPS}, year={2017}}
+@book{angelopoulos2023conformal, author={Angelopoulos, Anastasios N. and Bates, Stephen}, title={Conformal Prediction: A Gentle Introduction}, publisher={Foundations and Trends in Machine Learning}, year={2023}}
+@inproceedings{selvaraju2017gradcam, author={Selvaraju, Ramprasaath R. and Cogswell, Michael and Das, Abhishek and Vedantam, Ramakrishna and Parikh, Devi and Batra, Dhruv}, title={Grad-CAM: Visual Explanations from Deep Networks via Gradient-Based Localization}, booktitle={ICCV}, year={2017}}
+@inproceedings{adebayo2018sanity, author={Adebayo, Julius and Gilmer, Justin and Muelly, Michael and Goodfellow, Ian and Hardt, Moritz and Kim, Been}, title={Sanity Checks for Saliency Maps}, booktitle={NeurIPS}, year={2018}}
+@article{maaten2008tsne, author={van der Maaten, Laurens and Hinton, Geoffrey}, title={Visualizing Data Using t-SNE}, journal={JMLR}, volume={9}, pages={2579--2605}, year={2008}}
+@article{mcinnes2018umap, author={McInnes, Leland and Healy, John and Melville, James}, title={UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction}, journal={arXiv:1802.03426}, year={2018}}
+@inproceedings{hoiem2012diagnosing, author={Hoiem, Derek and Chodpathumwan, Yodsawalai and Dai, Qieyun}, title={Diagnosing Error in Object Detectors}, booktitle={ECCV}, year={2012}}
+@inproceedings{bolya2020tide, author={Bolya, Daniel and Foley, Sean and Hays, James and Hoffman, Judy}, title={TIDE: A General Toolbox for Identifying Object Detection Errors}, booktitle={ECCV}, year={2020}}
+@inproceedings{lipton2019troubling, author={Lipton, Zachary C. and Steinhardt, Jacob}, title={Troubling Trends in Machine Learning Scholarship}, booktitle={ICML Debates}, year={2018}}
+@inproceedings{musgrave2020metric, author={Musgrave, Kevin and Belongie, Serge and Lim, Ser-Nam}, title={A Metric Learning Reality Check}, booktitle={ECCV}, year={2020}}
+@inproceedings{dacrema2019worrying, author={Ferrari Dacrema, Maurizio and Cremonesi, Paolo and Jannach, Dietmar}, title={Are We Really Making Much Progress? A Worrying Analysis of Recent Neural Recommendation Approaches}, booktitle={RecSys}, year={2019}}
+@article{henderson2018deep, author={Henderson, Peter and Islam, Riashat and Bachman, Philip and Pineau, Joelle and Precup, Doina and Meger, David}, title={Deep Reinforcement Learning That Matters}, journal={AAAI}, year={2018}}
+@article{demsar2006statistical, author={Demšar, Janez}, title={Statistical Comparisons of Classifiers over Multiple Data Sets}, journal={JMLR}, volume={7}, pages={1--30}, year={2006}}
+@article{sculley2015hidden, author={Sculley, D. and Holt, Gary and Golovin, Daniel and others}, title={Hidden Technical Debt in Machine Learning Systems}, journal={NeurIPS}, year={2015}}
+@inproceedings{bergstra2012random, author={Bergstra, James and Bengio, Yoshua}, title={Random Search for Hyper-Parameter Optimization}, booktitle={JMLR}, year={2012}}
+@misc{keshav2007paper, author={Keshav, S.}, title={How to Read a Paper}, howpublished={ACM SIGCOMM Computer Communication Review}, year={2007}}

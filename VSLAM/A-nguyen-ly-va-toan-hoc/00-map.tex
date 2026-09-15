@@ -1,0 +1,23 @@
+% 00-map.tex — bản đồ Phần A: có gì, mức đầu tư, thứ tự đọc.
+% Ngày tạo: 2026-09-13 | Sửa gần nhất: 2026-09-13 | Ôn gần nhất: chưa
+% Dependency: ../00-map.tex | Mức độ: điều hướng
+\documentclass[../vslam.tex]{subfiles}
+\begin{document}
+\begin{table}[H]\centering\small
+\caption{Bản đồ Phần A: các chương, nội dung, và mức đầu tư đề xuất.}
+\begin{tabularx}{\linewidth}{@{}L{0.8cm}L{3.5cm}YL{1.6cm}@{}}
+\toprule
+\textbf{Ch.} & \textbf{Thư mục} & \textbf{Nội dung} & \textbf{Mức}\\
+\midrule
+1 & \code{01-hinh-hoc-da-thi} & Toạ độ thuần nhất; ràng buộc epipolar, \(E\), \(F\), \(H\); triangulation DLT/midpoint/optimal; cheirality; phân rã \(E\) và \(H\); cấu hình suy biến & \muc{2}\\
+2 & \code{02-mo-hinh-camera} & Pinhole và \(K\); các họ distortion (radtan, KB, UCM, EUCM, double-sphere); mô hình sai so với tham số sai; rolling shutter; mô hình quang trắc; stereo và disparity & \muc{2}\\
+3 & \code{03-lie-group-va-toi-uu-tren-da-tap} & \(SO(3)\), \(SE(3)\), \(Sim(3)\); exp/log, Adjoint, BCH, Jacobian phải; nhiễu loạn trái/phải; \(\boxplus/\boxminus\); đạo hàm của phần dư chiếu & \muc{3}\\
+4 & \code{04-uoc-luong-map-va-bundle-adjustment} & Bayes tới MAP tới bình phương tối thiểu; Gauss-Newton, LM, dogleg; đồ thị nhân tử; độ thưa, Schur, marginalization; M-estimator, IRLS, GNC & \muc{3}\\
+5 & \code{05-observability-gauge-va-suy-bien} & Bảy bậc tự do của SfM đơn mắt; ba cách cố định gauge; chuyển động suy biến; điều kiện kích thích; nhất quán, FEJ & \muc{3}\\
+6 & \code{06-bat-dinh-va-lan-truyen-sai-so} & Hiệp phương sai từ Hessian; lan truyền trên đa tạp; pixel \(\rightarrow\) độ sâu \(\rightarrow\) tư thế; khôi phục hiệp phương sai thưa; NEES và bệnh quá tự tin & \muc{2}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent Chương 1 và 2 có thể đọc lướt nếu bạn đã quen hình học đa thị --- nhưng \emph{đừng} lướt hai mục về cấu hình suy biến ở chương 1 và mục ``mô hình sai so với tham số sai'' ở chương 2, vì hai mục đó là nơi hai chương trả lại giá trị. Ba chương 3, 4, 5 là xương sống và nên đọc theo đúng thứ tự, vì chương 5 chỉ có nghĩa khi đã có ma trận thông tin từ chương 4, và ma trận đó chỉ dựng được khi đã có Jacobian trên đa tạp từ chương 3. Chương 6 đọc sau cùng và đọc kỹ: nó là chương duy nhất trả lời câu ``con số bất định tôi vừa in ra có nghĩa gì không'', và câu đó là câu quyết định hệ thống có dùng được trong sản phẩm hay không.
+\end{document}

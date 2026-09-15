@@ -1,0 +1,90 @@
+% ============================================================================
+%  03-doc-va-bieu-dien — Đọc và xây biểu diễn theo cấu trúc sâu
+%  Ngày tạo: 2026-09-09 | Sửa gần nhất: 2026-09-09 | Ôn gần nhất: chưa
+%  Dependency: 02-moi-truong-phan-hoi. Mức độ: nên nắm.
+% ============================================================================
+\documentclass[../hieu-suat.tex]{subfiles}
+\begin{document}
+\chapter{Đọc: chuyên gia không nhớ nhiều hơn, họ nhìn thấy thứ khác}
+\ptrtarget{03}\ptrtarget{03-doc-va-bieu-dien}
+\dependency{\ptr{02} --- chương này là vòng phản hồi thứ nhất: mượn phản hồi mà người khác đã trả giá để có.}
+
+\begin{tomtat}
+Khác biệt giữa chuyên gia và người mới không nằm ở dung lượng trí nhớ mà ở \emph{cách bài toán được biểu diễn trong đầu}: người mới lưu bề mặt, chuyên gia lưu nguyên lý. Điều đó quyết định cách đọc: đọc để thu thập thủ thuật thì mỗi paper là một mục rời rạc và quên sau hai tuần; đọc để rút ra giả thiết, cơ chế và chế độ hỏng thì mỗi paper bổ sung vào một cấu trúc dùng lại được. Chương này rút từ bốn kết quả kinh điển của tâm lý học chuyên gia, cộng một quan sát trực tiếp trong phòng thí nghiệm thật, thành một quy trình đọc cụ thể. Nếu chỉ nhớ một điều: sau khi đọc xong, thứ phải ghi lại không phải ``họ làm gì'' mà \emph{``họ giả định gì, và bỏ giả định đó thì hỏng ở đâu''}.
+\end{tomtat}
+
+\begin{khoigoi}
+\h{Kỳ thủ nhớ được cả bàn cờ sau vài giây --- vậy trí nhớ của họ có tốt hơn người thường không?}
+\h{Vì sao đọc trăm bài báo vẫn không tự động thành hiểu biết dùng được?}
+\h{Khi nào nên đọc lời giải mẫu, và khi nào đọc lời giải mẫu lại làm hại?}
+\end{khoigoi}
+
+\section{Bằng chứng gốc: chunk, không phải trí nhớ}
+
+Chase và Simon \cite{chase1973} cho kỳ thủ nhìn một thế cờ vài giây rồi dựng lại. Kỳ thủ mạnh dựng lại chính xác hơn hẳn người yếu --- nhưng khi các quân được đặt \emph{ngẫu nhiên} lên bàn, ưu thế đó gần như biến mất \nD{}. Giải thích của họ: trí nhớ làm việc của kỳ thủ không lớn hơn; cái lớn hơn là kích thước mỗi \emph{chunk}. Người mới lưu ``quân này ở ô này'' hai mươi lần; kỳ thủ lưu ``cấu trúc tốt điển hình của thế này'' vài lần \nT{}.
+
+Chi, Feltovich và Glaser \cite{chi1981} đưa kết quả đó sang lĩnh vực giải bài toán. Họ đưa các bài vật lý cho chuyên gia và cho sinh viên rồi bảo phân loại. Sinh viên xếp theo \emph{đặc điểm bề mặt} --- bài nào có mặt phẳng nghiêng, bài nào có lò xo. Chuyên gia xếp theo \emph{nguyên lý dùng để giải} --- bảo toàn năng lượng, định luật thứ hai của Newton \nD{}. Nghĩa là trước khi bắt đầu giải, hai nhóm đã \emph{nhìn thấy hai bài toán khác nhau}.
+
+\begin{trucgiac}
+Chuyển sang lĩnh vực của tôi \nM{}: hai bài báo, một về SLAM thị giác--quán tính và một về hiệu chỉnh camera, trông thuộc hai chủ đề khác nhau ở tầng bề mặt. Ở tầng nguyên lý, cả hai có thể là cùng một bài toán --- một hướng trong không gian tham số không quan sát được, và mọi thứ còn lại là các cách khác nhau để ràng buộc hướng đó. Người xếp theo bề mặt sẽ đọc hai lần và không nối được; người xếp theo nguyên lý đọc bài thứ hai như một biến thể của bài thứ nhất.
+\end{trucgiac}
+
+\section{Vì sao chuyển giao không tự xảy ra}
+
+Ngay cả khi đã có kiến thức đúng trong đầu, việc \emph{nhớ ra} nó đúng lúc lại là một bài toán riêng. Gick và Holyoak \cite{gick1980} cho người tham gia đọc một câu chuyện có cấu trúc giải giống hệt bài toán sắp phải giải; chỉ khoảng 30\% tự nghĩ ra cách áp dụng nó. Khi được gợi ý rằng câu chuyện vừa đọc có ích, tỉ lệ giải được tăng lên khoảng 75--80\% \nD{}. Nghĩa là tri thức đã nằm sẵn trong đầu mà không tự kích hoạt: \emph{nút thắt là truy hồi, không phải là hiểu}.
+
+Đây là lý do việc ghi chú theo cấu trúc sâu không phải chuyện thẩm mỹ. Nếu một paper được lưu dưới nhãn ``bài về hiệu chỉnh stereo'', nó chỉ bật lên khi tôi đang làm hiệu chỉnh stereo. Nếu nó được lưu dưới nhãn ``cách ràng buộc một hướng không quan sát được bằng một phép đo phụ'', nó bật lên đúng lúc tôi gặp một bài toán hoàn toàn khác nhưng cùng cấu trúc \nM{}.
+
+Quan sát trực tiếp trong các phòng thí nghiệm sinh học phân tử của Dunbar \cite{dunbar1997} bổ sung một điểm quan trọng ngược với trực giác lãng mạn về sáng tạo: trong 99 phép loại suy được các nhà khoa học dùng ở 16 buổi họp nhóm, chỉ có \textbf{hai} phép lấy từ một lĩnh vực xa; toàn bộ phần còn lại lấy từ trong cùng ngành sinh học \nD{}. Sáng tạo thực tế không đến từ một tia chớp liên ngành mà từ việc \emph{khai thác có hệ thống vùng lân cận gần} --- điều mà một người đọc rộng trong chính ngành mình làm được, còn người đợi cảm hứng thì không.
+
+\section{Đọc bao nhiêu là đủ kỹ: ba lượt}
+
+Keshav \cite{keshav2007} đề nghị đọc theo ba lượt, và tôi giữ nguyên cấu trúc đó vì nó khớp với kết luận ở trên: mục tiêu của lượt một không phải là hiểu mà là \emph{phân loại theo nguyên lý}. Lượt một, năm tới mười phút: tiêu đề, tóm tắt, mở đầu, các tiêu đề mục, hình, kết luận --- đủ để trả lời bài này thuộc họ nào, giả định gì, có đáng đọc tiếp không. Lượt hai, khoảng một giờ: toàn bộ trừ chứng minh; nắm cơ chế và thiết kế thí nghiệm. Lượt ba, nhiều giờ, chỉ cho bài nền tảng: dựng lại như thể chính mình viết, và ở lượt này mới lộ ra các giả thiết mà tác giả không nói \nT{}.
+
+\section{Khi nào lời giải mẫu giúp, khi nào nó hại}
+
+Có một kết quả rất hữu dụng và hay bị bỏ qua: hiệu quả của việc học qua ví dụ mẫu \emph{đảo chiều} theo trình độ. Kalyuga và cộng sự \cite{kalyuga2003} tổng hợp nhiều thí nghiệm cho thấy các kỹ thuật giảm tải nhận thức --- đưa lời giải từng bước, chỉ dẫn chi tiết --- rất hiệu quả với người mới, nhưng mất tác dụng và thậm chí gây hại với người đã có nền, vì lúc đó phần chỉ dẫn trở thành thông tin dư mà trí nhớ làm việc vẫn phải xử lý \nD{}.
+
+Áp dụng \nM{}: khi bước vào một mảng hoàn toàn mới --- ví dụ lần đầu đụng tới một họ thuật toán chưa từng dùng --- đọc mã nguồn tham chiếu và suy dẫn có sẵn là cách nhanh nhất. Khi đã có nền trong mảng đó, đọc lời giải trước khi tự thử là cách chắc chắn để \emph{cảm thấy} mình hiểu mà không thật sự có khả năng tự dựng lại; lúc này thứ tự đúng là tự thử trước, đọc sau, và dùng bản gốc như phản hồi.
+
+\begin{cambay}
+``Đọc thấy hiểu'' là tín hiệu gần như vô giá trị. Nó đo độ trôi chảy của văn bản chứ không đo khả năng dựng lại. Phép thử rẻ: gấp bài lại và viết bằng lời mình cơ chế chính trong năm câu; chỗ nào viết không ra là chỗ chưa hiểu, và nó gần như không bao giờ là chỗ mình đoán trước.
+\end{cambay}
+
+\section{Quy trình đọc mà tôi rút ra}
+
+Đây là quy trình \nM{}, ghép các kết quả trên, và nó khớp với sổ ghi chú quy định trong \code{../research-rules.md} mục 5.
+
+\begin{enumerate}
+\item \textbf{Trước khi mở bài:} viết một câu về việc mình đang tìm gì. Không có câu này thì lượt một sẽ trôi thành đọc lướt vô định.
+\item \textbf{Lượt một:} phân loại theo \emph{nguyên lý}, không theo chủ đề. Câu hỏi: bài này giải bài toán cấu trúc nào? Nó gần với bài nào tôi đã đọc?
+\item \textbf{Lượt hai:} rút ra bốn thứ và chỉ bốn thứ --- giả thiết (kể cả giả thiết ngầm), cơ chế trong năm câu, bằng chứng kèm điều kiện đo, và chế độ hỏng. Ghi kèm định vị (mục, số hiệu công thức) để sau này trích lại mà không phải đọc lại.
+\item \textbf{Kiểm tra truy hồi:} gấp bài, viết lại bốn thứ đó bằng trí nhớ, rồi mở ra đối chiếu. Đây là vòng phản hồi ngắn duy nhất có được trong việc đọc \nM{}.
+\item \textbf{Nối vào cây:} bài này mâu thuẫn hay bổ sung cho bài nào đã đọc? Nếu không nối được vào ít nhất một nút đã có, khả năng cao là tôi chưa hiểu nó ở tầng nguyên lý.
+\item \textbf{Lượt ba, chỉ khi bài đó sẽ đỡ một phần công trình của tôi:} dựng lại suy dẫn, và ghi lại chỗ nào tác giả lặng lẽ dùng một giả định.
+\end{enumerate}
+
+\begin{traloi}
+\tl{Không. Với thế cờ ngẫu nhiên, ưu thế của kỳ thủ mạnh gần như biến mất \cite{chase1973}; cái khác biệt là kích thước chunk, tức là biểu diễn, không phải dung lượng.}
+\tl{Vì kiến thức được lưu theo bề mặt thì không được truy hồi đúng lúc: ngay cả khi vừa đọc xong một lời giải có cấu trúc giống hệt, chỉ khoảng 30\% người tự áp dụng được nếu không có gợi ý \cite{gick1980}.}
+\tl{Lời giải mẫu giúp mạnh khi chưa có nền, và mất tác dụng hoặc gây hại khi đã có nền --- hiệu ứng đảo chiều theo trình độ \cite{kalyuga2003}.}
+\end{traloi}
+
+\begin{tukiem}
+\item Vì sao kết quả ``thế cờ ngẫu nhiên'' lại là bằng chứng quyết định, trong khi kết quả ``kỳ thủ nhớ giỏi hơn'' thì không?
+\item Lấy hai bài báo bạn đọc gần nhất và xếp chúng theo nguyên lý thay vì theo chủ đề. Chúng có rơi vào cùng một họ không?
+\item Bạn đang ở mức nào trong mảng đang làm --- và điều đó nói gì về việc nên đọc mã tham chiếu trước hay tự dựng trước?
+\item Chỉ có hai trong 99 phép loại suy của các nhà khoa học thật là loại suy xa \cite{dunbar1997}. Điều này đổi gì trong chiến lược đọc của bạn?
+\end{tukiem}
+
+\begin{onbai}
+\ar[3]{Chunk}{Đơn vị nhớ đã nén nhờ kinh nghiệm; chuyên gia có chunk lớn hơn, không có trí nhớ lớn hơn \cite{chase1973}.}
+\ar[3]{Bề mặt vs nguyên lý}{Người mới phân loại bài toán theo đặc điểm bề mặt, chuyên gia theo nguyên lý giải \cite{chi1981}.}
+\ar[3]{Nút thắt là truy hồi}{30\% tự chuyển giao, 75--80\% khi được gợi ý \cite{gick1980} \(\Rightarrow\) ghi chú phải lưu theo cấu trúc sâu.}
+\ar[2]{Loại suy gần}{97 trên 99 phép loại suy trong lab thật là trong cùng ngành \cite{dunbar1997}.}
+\ar[2]{Đảo chiều theo trình độ}{Ví dụ mẫu giúp người mới, hại người đã có nền \cite{kalyuga2003}.}
+\ar[2]{Ba lượt đọc}{Phân loại (10 phút) \(\rightarrow\) cơ chế và bằng chứng (1 giờ) \(\rightarrow\) dựng lại (nhiều giờ, chỉ bài nền tảng) \cite{keshav2007}.}
+\ar[1]{``Đọc thấy hiểu''}{Đo độ trôi chảy của văn bản, không đo khả năng dựng lại.}
+\end{onbai}
+
+\end{document}

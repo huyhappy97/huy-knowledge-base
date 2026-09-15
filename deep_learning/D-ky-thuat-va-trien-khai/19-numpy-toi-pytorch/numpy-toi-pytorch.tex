@@ -1,0 +1,134 @@
+% ============================================================================
+%  Chương 19 — Từ NumPy tự viết tới PyTorch thành thạo
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: A/01/02, B/09, B/11, C/12 | Mức độ: cốt lõi
+% ============================================================================
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Từ NumPy tự viết tới PyTorch thành thạo (From Hand-Written NumPy to Fluent PyTorch)}
+\ptrtarget{D/19}\ptrtarget{D/19-numpy-toi-pytorch}
+\dependency{\ptr{A/01-toan-toi-thieu/02-vi-phan-va-toi-uu} (quy tắc chuỗi); \ptr{B/09-thiet-ke-ham-mat-mat} (\en{hinge loss}, cross-entropy); \ptr{B/11-gioi-han-tinh-toan} (\en{roofline} --- bắt buộc trước khi đọc phần tăng tốc của mục 19.2); \ptr{C/12-co-che-huan-luyen} (BatchNorm, dropout, optimizer).}
+
+\begin{tomtat}
+Chương này có hai giai đoạn đọc theo đúng thứ tự: tự cài \vn{lan truyền ngược}{backpropagation} bằng NumPy để có trực giác về cơ chế, rồi học PyTorch theo mạch vấn đề \(\rightarrow\) công cụ để có năng suất. Đọc xong bạn debug được những lỗi không có thông báo lỗi: gradient sai, trạng thái train/eval lẫn lộn, rò bộ nhớ vì logging. Bạn cũng tăng tốc được một vòng lặp huấn luyện dựa trên số đo, thay vì dựa trên mẹo nghe được. Nếu chỉ nhớ một điều: giai đoạn 1 là bài tập \emph{trực giác} tầng \T{2}\T{3}, làm đúng một lần rồi bỏ. Giai đoạn 2 là bài tập \emph{công cụ} tầng \T{4}, phải cập nhật liên tục. Lẫn lộn hai loại này là cách phổ biến nhất để phí thời gian.
+\end{tomtat}
+
+\begin{nentang}
+\kn{\vn{lượt xuôi}{forward pass} và \vn{lượt ngược}{backward pass}}{forward là lượt tính từ đầu vào ra loss; lượt ngược là lượt tính ngược để lấy đạo hàm của loss theo từng tham số. Mọi khung huấn luyện đều là vòng lặp hai lượt này.}
+\kn{gradient}{vector đạo hàm của loss theo tham số; nó chỉ hướng làm loss \emph{tăng} nhanh nhất, nên ta đi ngược lại nó.}
+\kn{lan truyền ngược (backpropagation)}{thuật toán tính toàn bộ gradient bằng một lượt đi ngược qua đồ thị tính toán, tốn cùng bậc chi phí với một lượt xuôi --- lý do duy nhất khiến huấn luyện mạng sâu khả thi.}
+\kn{learning rate}{độ dài mỗi bước cập nhật trọng số theo hướng ngược gradient. Quá lớn thì loss phát tán, quá nhỏ thì huấn luyện không bao giờ xong; đây là siêu tham số quan trọng nhất.}
+\kn{framework}{thư viện lo hộ bạn đồ thị tính toán, lan truyền ngược tự động, quản lý thiết bị và dữ liệu --- PyTorch là ví dụ. Giá trị của chương này nằm ở chỗ biết framework đang giấu cái gì.}
+\kn{tầng bán rã \T{2} so với \T{4}}{\T{2} là kiến thức nguyên lý, không hết hạn khi công cụ đổi; \T{4} là kiến thức công cụ, sẽ cũ trong vài năm. Giai đoạn 1 của chương là \T{2}--\T{3}, giai đoạn 2 là \T{4}.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Một mạng \(10^9\) tham số huấn luyện được trong vài ngày, trong khi vi phân thuận cần \(10^9\) lượt chạy --- lượt ngược lấy khoản tiết kiệm chín bậc đó ở đâu ra?}
+\h{Số trọng số y hệt nhau, vậy vì sao huấn luyện tốn bộ nhớ gấp nhiều lần suy luận?}
+\h{Kiểm tra gradient của bạn qua sạch mọi tầng nhưng mạng vẫn không học --- phép kiểm đó theo thiết kế đã bỏ sót cái gì?}
+\h{Bạn bật \code{torch.compile} và AMP, mọi thứ chạy đúng, nhưng thời gian một \en{epoch} không đổi một giây nào. Vì sao đó không phải là bug?}
+\end{khoigoi}
+
+Framework che giấu rất nhiều thứ, và phần lớn thời gian đó là điều tốt. Nhưng có một tập nhỏ những thứ mà không tự tay làm một lần thì bạn sẽ không bao giờ debug nổi. Chúng không hiện ra dưới dạng thông báo lỗi, chỉ dưới dạng một con số hơi lệch hoặc một đường cong loss hơi chậm. Câu hỏi dẫn dắt của chương là: \emph{tập nhỏ ấy gồm những gì, và làm tới đâu thì đủ?}
+
+Chương chia làm hai mục vì hai giai đoạn có \emph{bản chất khác nhau}, và nhầm lẫn giữa chúng là cái bẫy chính:
+
+\begin{itemize}
+\item \textbf{19.1 --- Giai đoạn 1, tự viết bằng NumPy} \T{2}\T{3}. Mục tiêu là trực giác về cơ chế, không phải kỹ năng công cụ. Bạn sẽ không dùng lại một dòng NumPy nào trong việc thật. Có tiêu chí dừng rõ ràng, và khi đạt thì \emph{dừng hẳn}.
+\item \textbf{19.2 --- Giai đoạn 2, PyTorch} \T{4}. Mục tiêu là năng suất và khả năng chẩn đoán. Nội dung sẽ cũ khi API đổi, nhưng danh sách các nút thắt mà công cụ gỡ thì không cũ.
+\end{itemize}
+
+Thứ tự phụ thuộc chỉ đi một chiều. Mục 19.2 giới thiệu \code{autograd}, \code{buffer} và cặp \code{train()}/\code{eval()} như \emph{tên gọi mới} của những thứ bạn vừa tự cài bằng tay. Đọc ngược thì chúng thành từ vựng phải học thuộc, thay vì thành khái niệm đã hiểu. Ngược lại, nếu bạn đã từng viết một solver phi tuyến với Jacobian giải tích và bước so sai phân, giai đoạn 1 sẽ nhanh hơn bạn nghĩ. Nó là cùng một kỹ năng, đặt vào miền mới.
+
+Một sợi chỉ chạy suốt cả chương: hầu hết bug ở đây là bug về \emph{trạng thái}, không phải về công thức. Ba câu hỏi lặp lại ở cả hai giai đoạn. Cái gì được nhớ giữa lượt xuôi và lượt ngược? Cái gì được lưu vào checkpoint? Cái gì đổi hành vi giữa train và eval? Ở giai đoạn 1 chúng hiện ra dưới dạng ``tôi phải cache gì''; ở giai đoạn 2 chúng mang tên \code{parameter} so với \code{buffer}.
+
+\subfile{00-map}
+\subfile{01-tu-viet-bang-numpy/tu-viet-bang-numpy}
+\subfile{02-pytorch-thanh-thao/pytorch-thanh-thao}
+
+\section{Thực hành}
+Hai mini project dưới đây được thiết kế để \emph{đóng} giai đoạn 1 và \emph{mở} giai đoạn 2. Cái thứ nhất chứng minh bạn đã hiểu đúng cơ chế; cái thứ hai chứng minh bạn tăng tốc được dựa trên số đo.
+
+\begin{description}
+\item[Repo và tài nguyên.] \emph{Để học:} bài tập CS231n (làm hết assignment 1 và 2), \repo{karpathy/micrograd} (autograd trong hai trăm dòng), \repo{karpathy/nn-zero-to-hero}, \repo{pytorch/examples}. \emph{Để dùng thật:} \repo{huggingface/pytorch-image-models} (timm), \repo{Lightning-AI/pytorch-lightning}, \repo{facebookresearch/hydra}, \repo{NVIDIA/DALI}, \repo{albumentations}. \emph{Để hiểu framework từ bên trong:} \repo{tinygrad/tinygrad} --- đủ nhỏ để đọc hết. Danh sách này chốt tại tháng 9/2026; các repo hạ tầng ở đây (timm, DALI, Hydra) bền hơn nhiều so với tên mô hình dẫn đầu bảng, nhưng API của chính PyTorch cũng đổi, nên hãy nhớ vấn đề và tra lại cú pháp.
+
+\item[Câu hỏi kiểm tra hiểu.] Khi nào \code{.view()} thất bại mà \code{.reshape()} thì không, và điều đó liên quan gì tới \en{stride}? Vì sao \code{torch.compile} không giúp gì cho mô hình bị nghẽn ở dataloader? \en{Hook} nào cần dùng để lấy activation ở giữa mạng mà không sửa \code{forward}? Và câu hỏi đóng giai đoạn 1: vì sao BatchNorm khiến lượt ngược tốn thêm bộ nhớ, còn dropout phải scale lúc train chứ không lúc test?
+
+\item[Mini project (vài giờ đến hai ngày).] Viết lại \emph{chính xác} một mạng NumPy của bạn bằng PyTorch và kiểm tra hai bên khớp tới $10^{-6}$ ở cả lượt xuôi lẫn gradient. Phần đáng giá không phải lúc nó khớp mà lúc nó không khớp: với mỗi chỗ lệch, phân loại xem đó là \emph{bug} (lệch có hệ thống, không giảm khi bạn tăng độ chính xác) hay \emph{số học} (lệch cỡ epsilon máy, đổi khi bạn đổi thứ tự phép cộng). Kỹ năng phân loại này là thứ bạn sẽ dùng lại mỗi lần export mô hình ở chương 21.
+
+\end{description}
+
+
+\begin{onbai}
+\ar[3]{Lượt xuôi, lượt ngược}{Lượt xuôi tính từ đầu vào ra loss; lượt ngược đi ngược để lấy đạo hàm theo từng tham số. Mọi vòng lặp huấn luyện là hai lượt này lặp lại.}
+\ar[3]{Lan truyền ngược}{Thuật toán vi phân cho mọi đồ thị khả vi, tốn cùng bậc chi phí với một lượt xuôi. Đừng nhầm nó (thuật toán) với lượt ngược (một lần chạy).}
+\ar[2]{Hinge so softmax}{Hinge cho gradient bằng đúng không khi lề đã thoả, nên ổn định. Softmax không bao giờ tắt, nên nó tinh chỉnh tiếp nhưng nhạy với nhãn sai.}
+\ar[3]{Gradient check}{So gradient giải tích với sai phân trung tâm ở vài chục toạ độ ngẫu nhiên. Nó chỉ chứng minh xuôi và ngược khớp nhau, không chứng minh lượt xuôi đúng.}
+\ar[3]{Bộ nhớ kích hoạt}{Chỗ chứa đầu ra trung gian mà lượt ngược phải đọc lại. Đây là lý do huấn luyện tốn bộ nhớ hơn suy luận nhiều lần, và là thứ chặn batch size.}
+\ar[2]{Vì sao lượt ngược BatchNorm không theo từng phần tử?}{Nó chứa hai tổng trên toàn batch, một cho trung bình và một cho phương sai. Gradient của một mẫu vì thế phụ thuộc mọi mẫu khác trong batch.}
+\ar[2]{Inverted dropout}{Giữ phần tử với xác suất \(1-p\) rồi chia cho \(1-p\) lúc train; lúc test không làm gì. Bảo toàn kỳ vọng mà không đặt bước bắt buộc nào lên đường suy luận.}
+\ar[2]{Vì sao col2im sinh ra bất định trên GPU?}{Nó cộng dồn gradient vào các vị trí cửa sổ chồng lấn, và cài đặt GPU dùng \code{atomicAdd}. Cộng số thực không kết hợp, nên thứ tự luồng quyết định bit cuối.}
+\ar[2]{Vì sao gradient check phải chạy \code{float64}?}{Sai phân trung tâm lấy hiệu hai số gần bằng nhau. Ở \code{float32}, epsilon máy khoảng \(1{,}2{\times}10^{-7}$ nên bạn đo nhiễu làm tròn chứ không đo đạo hàm.}
+\ar[3]{Autograd}{Cuốn băng ghi lại các phép toán lúc lượt xuôi, tua ngược khi gọi \code{backward()} rồi xoá. Giữ một tensor còn dính băng nghĩa là giữ luôn cả đoạn băng phía sau nó.}
+\ar[2]{Stride}{Mỗi bước theo một chiều nhảy bao nhiêu phần tử trong bộ nhớ. Chuyển vị chỉ đổi stride nên miễn phí, nhưng làm tensor không còn liền mạch.}
+\ar[2]{\code{view} so với \code{reshape}}{\code{view} đòi tensor liền mạch và báo lỗi nếu không; \code{reshape} lặng lẽ sao chép. Dùng \code{view} ở chỗ bạn muốn chương trình ồn ào.}
+\ar[3]{Parameter so với buffer}{Parameter được optimizer cập nhật; buffer thì không, nhưng vẫn nằm trong \code{state\_dict} và vẫn đổi thiết bị theo mô hình. Thống kê chạy của BatchNorm là buffer.}
+\ar[2]{Vì sao quên \code{eval()} làm kết quả đổi theo batch?}{Ở chế độ train, BatchNorm dùng thống kê của batch hiện tại thay vì buffer, và dropout bật lại. Một mẫu vì thế cho hai kết quả khác nhau tuỳ bạn xếp nó cùng ai.}
+\ar[3]{AMP}{Tính phần lớn phép toán ở 16 bit, giữ trọng số ở 32 bit. Nó giảm số byte phải nạp chứ không giảm số phép tính, nên vô ích với kernel compute-bound.}
+\ar[2]{\code{torch.compile}}{Hợp nhất kernel và cắt chi phí điều phối Python. Chỉ giúp khi bạn overhead-bound; shape thay đổi liên tục làm nó biên dịch lại và chậm hơn.}
+\ar[2]{Sai số gradient check khoảng \(3{\times}10^{-3}\) và đổi mỗi lần chạy?}{Còn một nguồn ngẫu nhiên chưa đóng băng: mặt nạ dropout, hoặc BatchNorm đang ở chế độ train. Con số ổn định thì mới nên nghi công thức.}
+\ar[2]{Bật AMP và \code{torch.compile} mà epoch không nhanh hơn?}{Bạn đang nghẽn ở dataloader, không phải ở GPU. Chạy profiler xem GPU rảnh bao nhiêu phần trăm trước khi đụng vào mô hình.}
+\ar[2]{Bộ nhớ GPU phình dần suốt epoch rồi hết?}{Bạn đang giữ tensor còn đồ thị trong một danh sách log. Dùng \code{loss.detach()} hoặc \code{loss.item()}.}
+\end{onbai}
+
+
+\begin{ungdung}
+\ud{PyTorch, JAX}{Toàn bộ \code{autograd} là hiện thực của vi phân chế độ nghịch trên đồ thị động --- đúng thứ bạn tự cuộn bằng tay ở giai đoạn 1}{Hạ tầng, ổn định từ 2017 tới nay}
+\ud{FlashAttention}{Đánh đổi tính lại lượt xuôi để giảm bộ nhớ kích hoạt, tức chính \en{gradient checkpointing} áp cho attention}{Đã thành mặc định trong gần như mọi thư viện transformer}
+\ud{\repo{timm}}{Vòng lặp huấn luyện chuẩn với AMP, \code{channels\_last} và \code{torch.compile} --- đúng bốn đòn bẩy của Bảng~\ref{tab:don-bay-tang-toc}}{Hạ tầng thị giác; công thức trong repo đáng đọc hơn tài liệu}
+\ud{FSDP và ZeRO}{Chia trọng số và trạng thái optimizer thay vì nhân bản chúng, khi một GPU không chứa nổi mô hình}{Ý tưởng từ 2020, vẫn là nền của mọi huấn luyện quy mô lớn}
+\ud{\repo{tinygrad}, \repo{micrograd}}{Chính bài tập giai đoạn 1, viết đủ nhỏ để đọc hết trong một buổi}{Giá trị sư phạm, không phải công cụ sản xuất}
+\end{ungdung}
+
+\begin{duan}{Tự cài lại tầng mô tả của frontend bằng NumPy}{1--2 ngày}
+\dmt làm đúng một lần cái việc mà framework luôn làm hộ, trên đúng khối bạn đang dùng thật: viết cả lượt xuôi lẫn lượt ngược cho một mạng mô tả đặc trưng, và không tin nó cho tới khi kiểm tra gradient số cho phép.
+\ddl chính tập mảnh ảnh $32\times32$ dựng ở mini project chương 18, cùng nhãn cặp lấy từ liên kết dữ liệu của bản đồ.
+\dbc viết lượt xuôi cho một khối gồm \en{convolution} $3\times3$, BatchNorm, ReLU, max-pool và một tầng \en{fully-connected} rồi chuẩn hoá L2 ra vector mô tả 32 chiều. Viết lượt ngược giải tích cho từng tầng. Chạy kiểm tra gradient ở \code{float64} trên 20 toạ độ ngẫu nhiên của \emph{mỗi} tham số, với mọi nguồn ngẫu nhiên đóng băng và BatchNorm đặt ở chế độ cố định. Chỉ khi mọi tầng qua ngưỡng mới ghép lại và huấn luyện bằng một hàm mất mát tương phản trên các cặp có nhãn.
+\dxk sai số tương đối của kiểm tra gradient dưới $10^{-6}$ cho mọi tham số của mọi tầng. Toạ độ nằm sát điểm gãy của ReLU hoặc max-pool được phép bỏ qua, nhưng phải ghi rõ đã bỏ bao nhiêu và vì sao. Sau đó bản NumPy khớp bản PyTorch tới $10^{-6}$ ở cả lượt xuôi lẫn \en{gradient}.
+\dnv \ptr{D/19} cho bảng ``backward cần nhớ gì'' và cây chẩn đoán; \ptr{A/01} cho quy tắc chuỗi. Mô hình mô tả sinh ra ở đây chính là thứ chương 20 đem đi lượng tử hoá.
+\end{duan}
+
+\begin{traloi}
+\tl{Vì vi phân chế độ nghịch trả về đạo hàm theo \emph{mọi} tham số trong một lượt, còn vi phân thuận chỉ trả về theo một hướng mỗi lượt. Chi phí một lượt ngược cùng bậc với một lượt xuôi, nên tổng chi phí không phụ thuộc số tham số --- đó là toàn bộ khoản tiết kiệm.}
+\tl{Vì backward phải đọc lại trạng thái của lượt xuôi: đầu vào cho tầng \en{fully-connected}, mặt nạ cho ReLU và dropout, $\hat{x}$ cùng hai tổng batch cho BatchNorm. Suy luận không cần lượt ngược nên giải phóng được ngay sau mỗi tầng; huấn luyện thì không.}
+\tl{Nó chỉ kiểm tính \emph{nhất quán} giữa lượt xuôi và lượt ngược, không kiểm tính đúng của lượt xuôi. Một tầng cài sai công thức xuôi nhưng có ngược khớp với chính nó sẽ qua hoàn hảo; ngoài ra nó không bắt được lỗi trạng thái, lỗi nhãn và lỗi ở các chỗ nối.}
+\tl{Vì mỗi đòn bẩy chỉ gỡ đúng nút thắt của nó. Nếu GPU đang đói dữ liệu thì thời gian nằm ở dataloader, và cả AMP lẫn \code{torch.compile} đều không chạm tới chỗ đó. Cây quyết định ở Hình~\ref{fig:cay-tang-toc} bắt đầu bằng ``GPU rảnh bao nhiêu phần trăm'' chính vì lý do này.}
+\end{traloi}
+
+\begin{dongian}
+Hãy tưởng tượng một dây chuyền làm bánh gồm mười khâu, mỗi khâu có vài cái núm chỉnh. Bánh ra lò bị mặn. Câu hỏi là: núm nào ở khâu nào đã làm nó mặn, và mặn thêm bao nhiêu?
+
+Cách ngây thơ là vặn thử từng núm rồi chạy lại cả mẻ bánh. Có một nghìn cái núm thì phải chạy một nghìn mẻ. Không ai làm nổi.
+
+Mẹo là đi ngược dây chuyền đúng một lần. Đứng ở cuối, bạn biết bánh mặn hơn mong muốn bao nhiêu. Lùi về khâu thứ mười và hỏi: nếu khâu này đưa ra thứ mặn hơn một chút, bánh cuối mặn thêm bao nhiêu? Có câu trả lời rồi thì lùi tiếp về khâu chín, và cứ thế. Một lượt đi ngược chia được trách nhiệm cho cả nghìn cái núm, tốn xấp xỉ bằng một lượt làm bánh bình thường.
+
+Cái giá rất cụ thể: muốn hỏi ngược thì mỗi khâu phải giữ lại mẫu bán thành phẩm của lượt xuôi. Xưởng vì thế cần kho chứa gấp nhiều lần, và đó đúng là lý do máy tính hết bộ nhớ khi huấn luyện chứ không hết khi chạy thật. Cái giá thứ hai: công thức chia trách nhiệm ở mỗi khâu do bạn tự viết, và nếu sai một dấu thì cả dây chuyền vẫn chạy êm, bánh vẫn ra, chỉ là không bao giờ ngon lên. Vì vậy phải thử tay từng khâu trước khi ghép.
+
+\motcau{Chạy xuôi một lần và giữ lại dấu vết, đi ngược một lần để chia trách nhiệm --- rẻ hơn thử từng núm hàng nghìn lần, và cái giá đúng bằng chỗ chứa dấu vết đó.}
+\end{dongian}
+
+\subsection*{Tổng kết chương}
+Chương này đi từ chỗ tự tay cuộn một cuốn băng autograd trong NumPy tới chỗ đọc được một trace của \code{torch.profiler} và biết chính xác dòng nào cần sửa. Sợi chỉ xuyên suốt là \emph{trạng thái}: cái gì được nhớ, cái gì được lưu, cái gì đổi hành vi giữa hai chế độ --- và phần lớn bug im lặng trong deep learning là bug ở đúng ba câu hỏi đó.
+
+Điều còn bỏ ngỏ là toàn bộ phía \vn{suy luận}{inference}. Ở đây ta chỉ quan tâm huấn luyện: bộ nhớ hoạt động, thông lượng, tính đúng đắn của gradient. Nhưng ràng buộc thật của một hệ thống trên thiết bị nằm ở phía kia: độ trễ đuôi, năng lượng, và tập toán tử mà runtime hỗ trợ. Cùng những đòn bẩy trong Bảng~\ref{tab:don-bay-tang-toc} sẽ xuất hiện lại ở \ptr{D/20-toi-uu-va-nen-mo-hinh}, nhưng với một hàm mục tiêu khác hẳn. Điều thứ hai còn bỏ ngỏ là tính tái lập: mục 19.2 chỉ nêu tên \code{use\_deterministic\_algorithms} và nói nó không đủ; vì sao nó không đủ, và mục tiêu đúng là gì, thuộc về \ptr{D/22-tai-lap-va-mlops}.
+\begin{tukiem}
+\item Chương chia hai giai đoạn theo tầng bán rã \T{2}\T{3} và \T{4}. Hãy nêu một hiểu biết từ giai đoạn 1 mà giai đoạn 2 \emph{không} dạy được, và một sai lầm ở giai đoạn 2 mà giai đoạn 1 không giúp bạn tránh?
+\item Cùng một triệu chứng ``mạng không học'' có thể do đạo hàm sai, do lẫn lộn trạng thái train và eval, hoặc do dữ liệu. Hai giai đoạn cho bạn những công cụ phát hiện khác nhau nào, và thứ tự dùng chúng nên là gì?
+\item BatchNorm xuất hiện ở cả hai mục: một lần là hai tổng trên batch trong lượt ngược, một lần là buffer chứ không phải parameter. Hai góc nhìn đó nói cùng điều gì về BatchNorm, và điều đó giải thích thế nào cho hành vi khi lưu rồi nạp lại checkpoint?
+\item Phép cộng dồn tán xạ trong lượt ngược của convolution ở giai đoạn 1 quay lại ám bạn ở giai đoạn 2 dưới dạng nào, và nó liên quan gì tới việc hai lần chạy cho kết quả không trùng nhau?
+\item Vì sao ``huấn luyện tốn bộ nhớ gấp nhiều lần suy luận'' là kết luận rút ra được từ giai đoạn 1 nhưng chỉ đo được ở giai đoạn 2, và bạn đo thế nào để tách phần kích hoạt khỏi phần trạng thái optimizer?
+\item Bạn bật \code{torch.compile} và AMP mà thời gian một epoch không đổi. Trước khi kết luận công cụ vô dụng, bạn đo ba đại lượng nào, và mỗi đại lượng loại bỏ giả thuyết nào?
+\item Một mẹo tối ưu nghe được trên diễn đàn có tuổi thọ ngắn hơn hẳn hiểu biết ở giai đoạn 1. Bạn dùng tiêu chí nào để quyết định một mẹo có đáng đưa vào code nền của mình hay không?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

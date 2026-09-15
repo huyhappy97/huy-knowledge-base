@@ -1,0 +1,226 @@
+% ============================================================================
+%  B/10-tu-vung-chuyen-nganh — file chương
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+%  Dependency: A/02, A/04, B/07. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../english.tex]{subfiles}
+\begin{document}
+\chapter{Xây vốn từ chuyên ngành (Building Your Domain Vocabulary)}
+\ptrtarget{B/10}\ptrtarget{B/10-tu-vung-chuyen-nganh}
+\dependency{\ptr{A/02} cho ba nhóm từ và ngưỡng độ phủ; \ptr{A/04} cho cấu tạo từ; \ptr{B/07} cho việc đọc định nghĩa trong bài báo.}
+
+\begin{tomtat}
+Chương \ptr{A/02} đã chỉ ra rằng với người đọc tài liệu chuyên ngành, con đường ngắn nhất tới ngưỡng đọc trôi chảy đi qua từ vựng ngành. Chương này biến nhận xét đó thành quy trình. Nội dung gồm: ba loại từ trong tài liệu kỹ thuật, trong đó loại nguy hiểm nhất là những từ thông thường được gán nghĩa hẹp; bốn cách một thuật ngữ được định nghĩa và cách đọc từng cách; quy trình xây bảng thuật ngữ cá nhân với sáu trường thông tin; cách xử lý khi các tác giả dùng thuật ngữ không nhất quán; và cách viết định nghĩa trong bài của chính bạn. Nếu chỉ nhớ một điều: từ gây hiểu nhầm nhiều nhất không phải từ lạ mà là từ quen mang nghĩa kỹ thuật --- vì bạn không biết là mình đang hiểu sai.
+\end{tomtat}
+
+\begin{nentang}
+\kn{từ kỹ thuật}{từ chỉ tồn tại trong một ngành hoặc chỉ mang nghĩa đó trong ngành: \emph{covariance}, \emph{keyframe}, \emph{eigenvalue}.}
+\kn{từ bán kỹ thuật}{từ thông thường mang nghĩa hẹp trong ngành: \emph{significant}, \emph{kernel}, \emph{field}, \emph{regular}, \emph{expectation}. Nguy hiểm nhất vì bạn tưởng mình đã hiểu.}
+\kn{định nghĩa theo loại và khác biệt}{cách định nghĩa chuẩn: nêu loại lớn hơn rồi nêu đặc điểm phân biệt --- \emph{a keyframe is a frame that is stored in the map and used for optimisation}.}
+\kn{định nghĩa thao tác}{định nghĩa bằng cách nói \emph{đo thế nào}: \emph{we define drift as the final position error divided by trajectory length}.}
+\kn{bảng thuật ngữ cá nhân}{danh sách thuật ngữ của riêng bạn, kèm nghĩa trong ngành, nguồn, và các cụm đi kèm.}
+\kn{không nhất quán thuật ngữ}{hiện tượng các tác giả dùng từ khác nhau cho cùng khái niệm, hoặc cùng một từ cho hai khái niệm khác nhau --- rất phổ biến ở lĩnh vực trẻ.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Loại từ nào gây hiểu nhầm nhiều nhất trong tài liệu kỹ thuật, và vì sao nó nguy hiểm hơn từ hoàn toàn xa lạ?}
+\h{Khi một bài báo không định nghĩa thuật ngữ then chốt, bạn tìm nghĩa của nó ở đâu trong bài?}
+\h{Hai bài báo dùng cùng một thuật ngữ với hai nghĩa khác nhau. Làm sao phát hiện, và xử lý thế nào?}
+\h{Bảng thuật ngữ cá nhân nên chứa gì để còn dùng được, thay vì thành một danh sách chết?}
+\h{Khi viết bài của chính mình, khi nào bạn \emph{phải} định nghĩa một thuật ngữ?}
+\end{khoigoi}
+
+Chương \ptr{A/02} có một kết luận đáng nhắc lại: người đọc tài liệu trong đúng ngành của mình đạt ngưỡng đọc trôi chảy với vốn từ nhỏ hơn nhiều\cite{nation2013} so với người đọc văn bản phổ thông, vì chủ đề hẹp và từ vựng lặp lại. Nhưng kết luận đó chỉ đúng nếu bạn \emph{có} vốn từ ngành --- và phần lớn người học không xây nó một cách có hệ thống. Họ tra từng thuật ngữ khi gặp, quên, tra lại, và ba tháng sau vẫn khựng ở cùng những chỗ.
+
+Chương này đưa ra một quy trình. Nhưng trước đó cần một cảnh báo, vì nó thay đổi cách bạn đọc: rào cản lớn nhất không phải các thuật ngữ trông lạ mà là những từ trông \emph{quen}.
+
+\section{Ba loại từ, ba mức nguy hiểm}
+
+\emph{Loại một --- từ kỹ thuật thuần tuý.} \emph{Covariance}, \emph{quaternion}, \emph{eigenvector}. Chúng trông lạ, bạn biết mình không biết, nên bạn tra. Đây là loại \emph{ít nguy hiểm nhất}, và với người đã có nền chuyên môn thì gánh nặng học rất nhẹ vì khái niệm đã có sẵn (\ptr{A/02}).
+
+\emph{Loại hai --- từ bán kỹ thuật.} Đây là loại nguy hiểm nhất và là câu trả lời cho câu hỏi mở đầu thứ nhất. Đó là những từ thông thường được một ngành gán cho nghĩa hẹp, và vì bạn ``đã biết'' chúng nên bạn không dừng lại. Vài ví dụ mà mỗi ví dụ đều từng gây hiểu nhầm thật:
+
+\begin{tuvung}[Từ quen mang nghĩa kỹ thuật]
+\tv{significant}{quan trọng, đáng kể}{Trong thống kê: đạt ngưỡng ý nghĩa đã chọn, \emph{không} nói gì về độ lớn thực tế}{The difference is statistically significant but practically negligible.}
+\tv{expectation}{sự mong đợi}{Trong xác suất: giá trị trung bình theo phân phối}{The expectation of the estimator equals the true value.}
+\tv{regular}{đều đặn, bình thường}{Trong toán và tối ưu: thoả một điều kiện trơn hoặc không suy biến}{The problem is well posed if the matrix is regular.}
+\tv{kernel}{hạt nhân}{Trong đại số: không gian nghiệm; trong học máy: hàm nhân; trong hệ điều hành: lõi}{Three fields, three unrelated meanings --- luôn đọc theo ngành.}
+\tv{robust}{bền, chắc}{Thống kê: không nhạy với ngoại lai; kỹ thuật phần mềm: không sập; điều khiển: chịu được sai lệch mô hình}{Nghĩa khác nhau đủ để gây tranh cãi giữa các nhóm.}
+\tv{bias}{thiên vị}{Thống kê: chênh lệch có hệ thống giữa ước lượng và giá trị thật; học máy: cả thành phần cộng trong mô hình}{An unbiased estimator may still be inaccurate.}
+\tv{noise}{tiếng ồn}{Mọi biến thiên không được mô hình giải thích --- không nhất thiết là âm thanh}{Sensor noise is modelled as zero-mean Gaussian.}
+\end{tuvung}
+
+\emph{Loại ba --- từ học thuật chung.} \emph{Derive}, \emph{constitute}, \emph{account for}, \emph{yield}. Chúng không thuộc ngành nào nhưng xuất hiện dày và nối các phần lập luận. Nhóm này đã nói ở \ptr{A/02} và có tỉ lệ lợi ích trên công sức cao nhất.
+
+Hệ quả thực hành: khi đọc tài liệu ngành, hãy đặc biệt cảnh giác với loại hai. Một mẹo cụ thể: mỗi khi gặp một từ quen ở vị trí kỹ thuật --- trong định nghĩa, trong công thức, trong tên một tính chất --- hãy dừng nửa giây và hỏi ``từ này ở đây có nghĩa thường ngày không, hay nó là thuật ngữ?''.
+
+\section{Bốn cách một thuật ngữ được định nghĩa}
+
+Câu hỏi mở đầu thứ hai hỏi tìm nghĩa ở đâu khi bài không định nghĩa tường minh. Câu trả lời: định nghĩa thường có mặt, chỉ ở dạng khác.
+
+\emph{Cách một --- định nghĩa tường minh theo loại và khác biệt.} \emph{A keyframe is a camera frame that is retained in the map and used as an optimisation variable.} Nêu loại lớn hơn (\emph{a camera frame}) rồi nêu đặc điểm phân biệt. Đây là dạng rõ nhất; dấu hiệu ngôn ngữ: \emph{is defined as}, \emph{we refer to X as}, \emph{by X we mean}.
+
+\emph{Cách hai --- định nghĩa thao tác.} Tác giả không nói khái niệm là gì mà nói \emph{đo nó thế nào}: \emph{we measure drift as the final position error divided by the total trajectory length}. Trong bài thực nghiệm, đây thường là định nghĩa \emph{có giá trị nhất} vì nó không mơ hồ --- và nó nằm ở phần phương pháp hoặc phần thiết lập thí nghiệm.
+
+\emph{Cách ba --- định nghĩa qua ví dụ.} \emph{Dynamic objects, such as pedestrians and vehicles, are excluded.} Không cho ranh giới chính xác nhưng cho đủ để đọc tiếp. Cẩn thận: ví dụ không nói cho bạn biết trường hợp biên --- một chiếc xe đang đỗ có phải \emph{dynamic object} không?
+
+\emph{Cách bốn --- định nghĩa ngầm qua cách dùng.} Không có câu định nghĩa nào; nghĩa hiện dần qua các câu chứa từ đó. Đây là trường hợp bạn phải làm việc: thu thập ba tới bốn câu chứa thuật ngữ, đặt cạnh nhau, và tự viết một định nghĩa khớp với cả bốn. Việc tự viết đó vừa cho bạn nghĩa vừa là bài kiểm tra hiểu.
+
+\begin{cannho}
+Khi một thuật ngữ then chốt không được định nghĩa tường minh, hãy tìm theo thứ tự: phần thiết lập thí nghiệm (định nghĩa thao tác thường nằm đó); lần xuất hiện \emph{đầu tiên} trong bài; chú thích hình và bảng; rồi tới bài báo được trích dẫn ngay cạnh thuật ngữ đó ở lần đầu --- đó thường là nguồn gốc của thuật ngữ.
+\end{cannho}
+
+\section{Bảng thuật ngữ cá nhân}
+
+Câu hỏi mở đầu thứ tư hỏi bảng thuật ngữ nên chứa gì. Một danh sách hai cột --- thuật ngữ và nghĩa tiếng Việt --- gần như luôn thành danh sách chết. Sáu trường dưới đây là mức tối thiểu để nó sống.
+
+\begin{center}\footnotesize
+\rowcolors{2}{white}{tblalt}
+\begin{longtable}{@{}L{3.2cm}L{5.0cm}L{6.2cm}@{}}
+\toprule
+\textbf{Trường} & \textbf{Nội dung} & \textbf{Vì sao cần}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Trường} & \textbf{Nội dung} & \textbf{Vì sao cần (tiếp)}\\
+\midrule
+\endhead
+Thuật ngữ & Dạng tiếng Anh chuẩn, kèm dạng viết tắt nếu có & Đây là dạng bạn sẽ gặp lại và phải dùng\\
+Định nghĩa & Bằng tiếng Anh, chép hoặc viết lại từ một nguồn cụ thể & Bản dịch tiếng Việt thường không khớp hoàn toàn\\
+Nguồn & Bài báo, sách hoặc chuẩn nơi bạn lấy định nghĩa & Cho phép kiểm lại và cho biết định nghĩa này thuộc trường phái nào\\
+Cụm đi kèm & Hai ba động từ hoặc tính từ hay đi với từ này & Đây là phần cho bạn khả năng \emph{dùng} chứ không chỉ hiểu (\ptr{D/17})\\
+Từ lân cận & Thuật ngữ gần nghĩa hoặc đối lập trong cùng ngành & Nghĩa của một thuật ngữ được xác định bởi những gì nó \emph{không} phải\\
+Ghi chú tiếng Việt & Bản dịch quen dùng, kèm cảnh báo nếu không khớp & Giúp bạn nói chuyện với đồng nghiệp mà không mất chính xác\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+Trường ``từ lân cận'' đáng nói thêm, vì nó ít gặp trong các bảng thuật ngữ thông thường nhưng lại rất hiệu quả. Nghĩa của một thuật ngữ kỹ thuật thường được xác định bởi ranh giới với các thuật ngữ khác: \emph{accuracy} khác \emph{precision}; \emph{keyframe} khác \emph{frame}; \emph{drift} khác \emph{error}; \emph{latency} khác \emph{throughput}. Ghi cặp lại với nhau khiến cả hai rõ hơn ghi riêng từng cái.
+
+Về quy mô: với một ngành hẹp, một trăm tới hai trăm thuật ngữ đã phủ phần lớn tài liệu. Đó là mục tiêu khả thi trong vài tuần nếu bạn thêm năm mục mỗi ngày từ chính tài liệu đang đọc.
+
+\section{Khi các tác giả không thống nhất}
+
+Câu hỏi mở đầu thứ ba chạm vào một hiện tượng gây bối rối cho người mới vào ngành và ít ai cảnh báo trước: trong các lĩnh vực đang phát triển, thuật ngữ \emph{không} thống nhất.
+
+Ba dạng không thống nhất, với ba cách xử lý.
+
+\emph{Dạng một --- nhiều tên cho một khái niệm.} Hai nhóm nghiên cứu độc lập đặt hai tên khác nhau, và cả hai cùng tồn tại. Cách xử lý: trong bảng thuật ngữ của bạn, gộp chúng thành một mục và ghi các tên khác nhau cùng nguồn dùng mỗi tên. Khi viết, chọn tên phổ biến nhất trong cộng đồng bạn nhắm tới và nhắc tên kia một lần trong ngoặc.
+
+\emph{Dạng hai --- một tên cho nhiều khái niệm.} Nguy hiểm hơn nhiều, vì nó gây hiểu nhầm im lặng. Dấu hiệu phát hiện: khi bạn đọc hai bài và thấy các kết luận về cùng ``một'' khái niệm mâu thuẫn nhau một cách khó hiểu, khả năng cao là hai bài đang nói về hai thứ khác nhau. Cách xử lý: quay lại tìm định nghĩa thao tác của từng bài --- chúng gần như luôn để lộ khác biệt.
+
+\emph{Dạng ba --- cùng tên, nghĩa dịch chuyển theo thời gian.} Một thuật ngữ được đặt ra với nghĩa hẹp, rồi mở rộng dần khi cộng đồng dùng nó cho các trường hợp mới. Đọc một bài cũ với nghĩa hiện nay là một nguồn hiểu nhầm phổ biến. Cách xử lý: chú ý năm xuất bản, và với các thuật ngữ quan trọng, hãy đọc bài \emph{đặt ra} thuật ngữ đó ít nhất một lần.
+
+\section{Viết định nghĩa trong bài của chính bạn}
+
+Câu hỏi mở đầu thứ năm đảo ngược vấn đề. Ba tình huống bạn \emph{phải} định nghĩa.
+
+\emph{Khi bạn dùng một từ bán kỹ thuật ở nghĩa hẹp.} Nếu bài của bạn nói \emph{robust} hay \emph{accuracy}, hãy nói rõ bạn hiểu nó thế nào và đo thế nào --- vì người đọc từ ngành khác sẽ hiểu khác.
+
+\emph{Khi bạn đặt ra một thuật ngữ mới.} Hiếm, nhưng nếu có thì định nghĩa phải ở dạng loại và khác biệt, và nên kèm một ví dụ cùng một phản ví dụ.
+
+\emph{Khi thuật ngữ có nhiều nghĩa trong ngành.} Nêu rõ bạn theo nghĩa nào và trích dẫn nguồn.
+
+Ba mẫu câu dùng được ngay:
+
+\begin{mauau}[Mẫu câu định nghĩa]
+\mc{Định nghĩa tường minh}{We define X as Y that satisfies Z.}{Loại lớn hơn rồi đặc điểm phân biệt}
+\mc{Định nghĩa thao tác}{Throughout this paper, we measure X as \ldots}{Dạng rõ nhất trong bài thực nghiệm}
+\mc{Chọn một nghĩa}{Following \textup{[12]}, we use the term X to refer to \ldots}{Vừa định nghĩa vừa ghi công và định vị mình}
+\mc{Phân biệt với khái niệm gần}{Note that X differs from Y in that \ldots}{Ranh giới làm rõ hơn định nghĩa}
+\mc{Giới hạn phạm vi}{We restrict our use of X to the case where \ldots}{Tránh bị hiểu rộng hơn ý}
+\end{mauau}
+
+\section{Gốc rễ: khi thuật ngữ trở thành một ngành}
+
+Việc phân loại từ trong văn bản chuyên ngành đã được đo một cách hệ thống\cite{chungnation2003}, nhưng bản thân việc chuẩn hoá thuật ngữ trở thành một vấn đề nghiêm túc sớm hơn nhiều, vào đầu thế kỷ 20, và động cơ rất thực dụng: thương mại và kỹ thuật quốc tế. Khi các nước trao đổi máy móc và bản vẽ, việc cùng một bộ phận mang ba tên khác nhau ở ba nước gây tốn kém thật. Từ đó hình thành cả một ngành nghiên cứu về thuật ngữ, với nguyên tắc trung tâm: một khái niệm nên ứng với một thuật ngữ, và định nghĩa nên nêu vị trí của khái niệm trong một hệ thống khái niệm chứ không chỉ mô tả rời rạc.
+
+Ý tưởng đó về sau đi vào các bộ tiêu chuẩn kỹ thuật, nơi phần định nghĩa thường được đặt ngay đầu văn bản --- một quy ước mà các văn bản pháp lý cũng dùng, và vì cùng lý do: giảm chi phí của hiểu nhầm.
+
+Trong khoa học thì tình hình lỏng hơn nhiều, và có lý do. Khái niệm mới xuất hiện trước khi có tên ổn định; nhiều nhóm làm việc song song và đặt tên độc lập; và nghĩa của một thuật ngữ dịch chuyển khi hiểu biết thay đổi. Vì vậy không thống nhất thuật ngữ không phải dấu hiệu ngành làm việc cẩu thả mà là hệ quả tự nhiên của việc ngành đang phát triển --- các lĩnh vực đã ổn định có thuật ngữ ổn định, còn lĩnh vực trẻ thì không.
+
+Với người đọc, kết luận thực dụng là: đừng giả định thuật ngữ có nghĩa cố định trong cả ngành. Hãy giả định nó có nghĩa cố định trong \emph{một bài}, và luôn tìm định nghĩa thao tác. Đó cũng là lý do trường ``nguồn'' trong bảng thuật ngữ ở mục 3 lại quan trọng: nó ghi lại \emph{định nghĩa này của ai}.
+
+\begin{gocre}
+\gr{Đầu thế kỷ 20 --- chuẩn hoá thuật ngữ kỹ thuật}{Thương mại và kỹ thuật quốc tế: cùng một bộ phận mang nhiều tên gây tốn kém.}{Nguyên tắc một khái niệm--một thuật ngữ; định nghĩa đặt khái niệm vào một hệ thống.}
+\gr{Giữa thế kỷ 20 --- tiêu chuẩn kỹ thuật}{Văn bản kỹ thuật bị diễn giải khác nhau.}{Phần định nghĩa đặt ở đầu tài liệu --- quy ước mà văn bản pháp lý cũng dùng.}
+\gr{Khoa học đang phát triển}{Khái niệm mới xuất hiện trước khi có tên ổn định.}{Không thống nhất thuật ngữ là hệ quả tự nhiên; định nghĩa thao tác trở thành neo đáng tin nhất.}
+\gr{2003 --- Chung \& Nation\cite{chungnation2003}}{Từ kỹ thuật chiếm bao nhiêu và nhận diện thế nào?}{Đo được mật độ từ kỹ thuật trong văn bản chuyên ngành; xác nhận rằng chúng là rào cản chính với người đọc ngoài ngành.}
+\gr{Thời của dữ liệu mở}{Thuật ngữ trong một ngành khó tra cứu có hệ thống.}{Các bảng thuật ngữ cộng đồng và bảng chú giải trong tài liệu chuẩn --- nguồn tốt hơn từ điển chung cho từ bán kỹ thuật.}
+\end{gocre}
+
+\section{Liên hệ ngang}
+
+\begin{lienhe}
+\lh{Hệ thống tri thức}{Bản thể luận và đồ thị tri thức}{Cùng nguyên tắc: một khái niệm nối vào các khái niệm khác bằng quan hệ tường minh. Trường ``từ lân cận'' trong bảng thuật ngữ chính là phiên bản thủ công của ý tưởng đó.}
+\lh{Lập trình}{Đặt tên biến và tài liệu API}{Cùng vấn đề một tên nhiều nghĩa. Các dự án tốt có một trang thuật ngữ mô tả từ vựng của miền --- và lý do tồn tại của nó giống hệt lý do ở mục 5.}
+\lh{Pháp lý}{Điều khoản định nghĩa đầu hợp đồng}{Cực đoan hoá nguyên tắc ở mục 6: mọi thuật ngữ then chốt định nghĩa trước, vì chi phí hiểu nhầm là pháp lý. Đọc một hợp đồng là bài tập tốt về đọc định nghĩa.}
+\lh{Y khoa}{Phân loại bệnh và mã chẩn đoán chuẩn}{Ví dụ về ngành đã chuẩn hoá thuật ngữ tới mức có hệ mã quốc tế --- cho thấy cái giá và lợi ích của chuẩn hoá.}
+\lh{Dịch thuật kỹ thuật}{Bảng thuật ngữ song ngữ, bộ nhớ dịch}{Trường ``ghi chú tiếng Việt'' ở mục 3 chính là một mục trong bảng thuật ngữ song ngữ, kèm cảnh báo về chỗ không khớp --- điều mà người dịch chuyên nghiệp luôn ghi.}
+\lh{Giáo dục}{Dạy khái niệm bằng ví dụ và phản ví dụ}{Cách định nghĩa qua ví dụ ở mục 2 hiệu quả khi kèm \emph{phản} ví dụ; đó cũng là lý do mục 5 khuyên bạn viết cả hai khi đặt ra thuật ngữ mới.}
+\end{lienhe}
+
+\begin{traloi}
+\tl{Từ bán kỹ thuật --- những từ thông thường được gán nghĩa hẹp trong ngành, như \emph{significant}, \emph{robust}, \emph{regular}, \emph{expectation}. Chúng nguy hiểm hơn từ hoàn toàn xa lạ vì bạn không dừng lại: từ lạ thì bạn biết mình không biết và sẽ tra, còn từ quen thì bạn đọc lướt qua với nghĩa thường ngày và không hề biết mình vừa hiểu sai. Mẹo phòng: mỗi khi gặp từ quen ở vị trí kỹ thuật --- trong định nghĩa, công thức, hoặc tên một tính chất --- hãy dừng nửa giây và hỏi nó có phải thuật ngữ không.}
+\tl{Theo thứ tự: phần thiết lập thí nghiệm, vì định nghĩa \emph{thao tác} (đo thế nào) thường nằm ở đó và là dạng rõ nhất; lần xuất hiện đầu tiên của thuật ngữ trong bài, nơi tác giả hay giải thích ngắn; chú thích hình và bảng; và bài báo được trích dẫn ngay cạnh thuật ngữ ở lần đầu --- đó thường là nguồn gốc. Nếu vẫn không có, hãy thu thập ba bốn câu chứa thuật ngữ và tự viết một định nghĩa khớp với cả bốn.}
+\tl{Phát hiện qua một dấu hiệu gián tiếp: các kết luận về cùng ``một'' khái niệm mâu thuẫn nhau một cách khó hiểu. Khi thấy vậy, hãy quay lại tìm định nghĩa thao tác của từng bài --- chúng gần như luôn để lộ rằng hai bên đang đo hai thứ khác nhau. Cách xử lý trong bảng thuật ngữ: tạo hai mục riêng, mỗi mục ghi rõ nguồn, thay vì cố hợp nhất thành một nghĩa chung. Khi viết bài, nêu rõ bạn theo nghĩa nào và trích dẫn nguồn.}
+\tl{Sáu trường: thuật ngữ ở dạng tiếng Anh chuẩn; định nghĩa bằng tiếng Anh từ một nguồn cụ thể; nguồn; hai ba cụm đi kèm; các thuật ngữ lân cận hoặc đối lập; và ghi chú tiếng Việt kèm cảnh báo nếu bản dịch không khớp. Trường ``cụm đi kèm'' cho bạn khả năng dùng chứ không chỉ hiểu; trường ``từ lân cận'' quan trọng vì nghĩa của một thuật ngữ kỹ thuật được xác định bởi ranh giới với các thuật ngữ gần --- \emph{accuracy} so với \emph{precision}, \emph{drift} so với \emph{error}.}
+\tl{Ba tình huống. Khi bạn dùng một từ bán kỹ thuật ở nghĩa hẹp --- vì người đọc từ ngành khác sẽ hiểu khác. Khi bạn đặt ra một thuật ngữ mới --- lúc đó cần định nghĩa theo loại và khác biệt, kèm ví dụ và phản ví dụ. Và khi thuật ngữ có nhiều nghĩa trong ngành --- lúc đó nêu rõ bạn theo nghĩa nào và trích dẫn nguồn. Trong bài thực nghiệm, cách an toàn nhất luôn là định nghĩa thao tác: nói bạn \emph{đo} nó thế nào.}
+\end{traloi}
+
+\begin{dongian}
+Khi đọc tài liệu chuyên ngành bằng tiếng Anh, thứ làm bạn khựng lại thường không phải từ tiếng Anh khó. Đó là thuật ngữ. Và trong các thuật ngữ, loại gây hại nhất không phải những từ trông lạ hoắc --- vì gặp chúng bạn biết ngay là mình không biết và sẽ tra.
+
+Loại nguy hiểm là những từ trông rất quen. \emph{Significant} trong đời thường nghĩa là ``đáng kể'', nhưng trong thống kê nó có nghĩa hẹp và không nói gì về chuyện khác biệt đó có lớn hay không. \emph{Noise} không nhất thiết là tiếng ồn --- nó là mọi biến thiên mà mô hình không giải thích được. Bạn đọc lướt qua với nghĩa quen thuộc và không hề biết mình vừa hiểu sai.
+
+Vì thế mẹo đầu tiên rất đơn giản: khi thấy một từ quen nằm ở chỗ kỹ thuật --- trong một định nghĩa, trong một công thức --- hãy dừng nửa giây và hỏi ``ở đây nó có nghĩa thường không, hay là thuật ngữ?''.
+
+Mẹo thứ hai là về chỗ tìm nghĩa. Nếu bài không định nghĩa tường minh, hãy xem phần mô tả thí nghiệm: tác giả thường không nói khái niệm là gì nhưng lại nói họ \emph{đo} nó thế nào --- và với người đọc, định nghĩa kiểu đó còn rõ hơn.
+
+Mẹo thứ ba là về sổ thuật ngữ của riêng bạn. Đừng ghi hai cột ``từ tiếng Anh --- nghĩa tiếng Việt''. Hãy ghi thêm bốn thứ: định nghĩa bằng tiếng Anh, nguồn lấy định nghĩa đó, vài từ hay đi kèm, và một hai thuật ngữ gần nghĩa để so. Cái cuối quan trọng bất ngờ: bạn hiểu \emph{accuracy} rõ hơn nhiều khi đặt nó cạnh \emph{precision}.
+
+Và một điều cần biết trước để đỡ hoang mang: trong các ngành còn đang phát triển, hai bài báo có thể dùng cùng một từ với hai nghĩa khác nhau. Đó không phải lỗi của bạn. Khi thấy hai kết luận mâu thuẫn khó hiểu, hãy quay lại xem mỗi bên định nghĩa và đo thế nào --- thường thì họ đang nói về hai thứ khác nhau.
+\motcau{Từ gây hiểu nhầm nhiều nhất là từ bạn tưởng đã biết.}
+\chuadongian{Với thuật ngữ chưa ổn định trong ngành, không có ``nghĩa đúng'' để tra; chỉ có nghĩa mà từng tác giả dùng, nên phải ghi kèm nguồn.}
+\end{dongian}
+
+\begin{onbai}
+\ar[3]{Ba loại từ và mức nguy hiểm}{Kỹ thuật thuần tuý (ít nguy hiểm --- bạn biết mình không biết); bán kỹ thuật (nguy hiểm nhất --- tưởng đã biết); học thuật chung (lợi ích trên công sức cao nhất).}
+\ar[3]{Mẹo phòng từ bán kỹ thuật}{Gặp từ quen ở vị trí kỹ thuật --- trong định nghĩa, công thức, tên tính chất --- thì dừng nửa giây hỏi ``có phải thuật ngữ không''.}
+\ar[3]{Bốn cách định nghĩa}{Tường minh (loại \(+\) khác biệt); thao tác (đo thế nào); qua ví dụ; và ngầm qua cách dùng.}
+\ar[3]{Định nghĩa thao tác}{Dạng đáng tin nhất trong bài thực nghiệm vì không mơ hồ; nằm ở phần phương pháp hoặc thiết lập thí nghiệm.}
+\ar[3]{Thứ tự tìm định nghĩa}{Thiết lập thí nghiệm \(\rightarrow\) lần xuất hiện đầu tiên \(\rightarrow\) chú thích hình \(\rightarrow\) bài được trích cạnh thuật ngữ.}
+\ar[3]{Sáu trường của bảng thuật ngữ}{Thuật ngữ; định nghĩa tiếng Anh; nguồn; cụm đi kèm; từ lân cận/đối lập; ghi chú tiếng Việt kèm cảnh báo.}
+\ar[2]{Vì sao cần trường ``từ lân cận''}{Nghĩa của thuật ngữ được xác định bởi ranh giới với khái niệm gần: \emph{accuracy}/\emph{precision}, \emph{drift}/\emph{error}, \emph{latency}/\emph{throughput}.}
+\ar[2]{Ba dạng không thống nhất}{Nhiều tên một khái niệm; một tên nhiều khái niệm (nguy hiểm nhất); và nghĩa dịch chuyển theo thời gian.}
+\ar[2]{Dấu hiệu một tên nhiều nghĩa}{Hai bài cho kết luận mâu thuẫn khó hiểu về cùng ``một'' khái niệm \(\Rightarrow\) so định nghĩa thao tác của hai bên.}
+\ar[2]{Khi nào phải định nghĩa trong bài của bạn}{Dùng từ bán kỹ thuật ở nghĩa hẹp; đặt ra thuật ngữ mới; hoặc thuật ngữ có nhiều nghĩa trong ngành.}
+\ar[2]{Quy mô cần đạt}{Một trăm tới hai trăm thuật ngữ phủ phần lớn tài liệu của một ngành hẹp --- khả thi trong vài tuần với năm mục mỗi ngày.}
+\ar[1]{Vì sao ngành trẻ không thống nhất thuật ngữ}{Khái niệm mới xuất hiện trước khi có tên ổn định, nhiều nhóm đặt tên độc lập, và nghĩa dịch chuyển khi hiểu biết thay đổi.}
+\end{onbai}
+
+\begin{hoidap}
+\qa{Tôi nên dùng công cụ gì để giữ bảng thuật ngữ?}{Công cụ ít quan trọng hơn cấu trúc. Một bảng tính hoặc một tệp văn bản với sáu cột ở mục 3 là đủ, và ưu điểm của chúng là dễ tìm kiếm và dễ xuất ra thẻ ghi nhớ. Nếu bạn đã dùng một hệ thống ghi chú liên kết cho việc đọc (\ptr{B/07}), hãy để mỗi thuật ngữ là một ghi chú riêng và liên kết tới các bài dùng nó --- lúc đó bảng thuật ngữ và ghi chú đọc trở thành một mạng duy nhất.}
+\qa{Có nên học thuật ngữ bằng thẻ ghi nhớ không?}{Có, nhưng thiết kế thẻ khác với thẻ từ vựng thông thường. Mặt trước không nên là thuật ngữ trần mà là một \emph{câu có chỗ trống} lấy từ tài liệu thật, hoặc một câu hỏi kiểu ``khái niệm nào chỉ chênh lệch có hệ thống giữa ước lượng và giá trị thật''. Mặt sau là định nghĩa cộng một cụm đi kèm. Lý do: bạn cần truy xuất được thuật ngữ \emph{từ khái niệm}, vì đó là hướng bạn dùng khi viết. Chi tiết ở \ptr{E/20}, và cơ sở của việc lặp lại ngắt quãng ở \cite{cepeda2006}.}
+\qa{Tôi có nên dịch mọi thuật ngữ sang tiếng Việt không?}{Nên có bản dịch để trao đổi với đồng nghiệp, nhưng đừng để bản dịch thay thế dạng gốc trong đầu bạn. Hai rủi ro: nhiều bản dịch quen dùng có phạm vi rộng hơn hoặc hẹp hơn nghĩa gốc, và bạn sẽ mang theo sai lệch đó khi đọc; và khi viết bài tiếng Anh, bạn sẽ đi đường vòng qua tiếng Việt và chọn sai từ. Cách an toàn: định nghĩa bằng tiếng Anh là chính, bản dịch là ghi chú phụ kèm cảnh báo khi không khớp.}
+\qa{Làm sao biết một thuật ngữ đã ổn định trong ngành hay chưa?}{Ba dấu hiệu. Nó xuất hiện trong các giáo trình chứ không chỉ trong bài báo --- giáo trình chỉ nhận thuật ngữ đã ổn định. Các bài gần đây dùng nó mà không cần định nghĩa lại. Và nó có mặt trong bảng chú giải của một tài liệu chuẩn hoặc một khảo sát lớn. Nếu mỗi bài đều phải định nghĩa lại, thuật ngữ đó chưa ổn định --- và khi viết, bạn cũng nên định nghĩa nó.}
+\qa{Tôi đọc bài cũ và thấy thuật ngữ dùng khác bây giờ. Nên theo nghĩa nào?}{Khi \emph{đọc} bài cũ, hãy theo nghĩa của thời điểm đó --- nếu không bạn sẽ hiểu sai kết luận của họ. Khi \emph{viết}, hãy theo nghĩa hiện hành của cộng đồng bạn nhắm tới, và nếu phải nhắc tới bài cũ thì nói rõ sự khác biệt. Trong bảng thuật ngữ, hãy ghi cả hai nghĩa kèm mốc thời gian; đây là một trong những chỗ mà trường ``nguồn'' trả công nhiều nhất.}
+\qa{Bao nhiêu thuật ngữ thì đủ để đọc trôi tài liệu ngành?}{Với một ngành hẹp, một trăm tới hai trăm thuật ngữ lõi thường đủ để xoá phần lớn chỗ khựng. Con số nghe nhỏ so với hàng nghìn từ mà \ptr{A/02} nhắc tới, và đó chính là lý do chiến lược ưu tiên từ vựng ngành lại hiệu quả: thuật ngữ có mật độ cao trong văn bản ngành và bạn thường đã có sẵn khái niệm. Cách kiểm tiến độ: đếm số lần khựng lại trên một trang; khi xuống dưới hai lần, bạn đã ở ngưỡng đọc trôi chảy.}
+\end{hoidap}
+
+\begin{baitap}
+\bt[1]{Lập bảng thuật ngữ với 20 mục đầu tiên từ tài liệu bạn đang đọc}{Tài liệu ngành}{Đủ sáu trường; lấy định nghĩa từ nguồn cụ thể chứ không tự dịch.}
+\bt[1]{Tìm 5 từ bán kỹ thuật trong ngành bạn}{Tài liệu ngành}{Với mỗi từ, viết nghĩa thường ngày và nghĩa kỹ thuật cạnh nhau.}
+\bt[2]{Với một thuật ngữ không được định nghĩa tường minh, thu thập 4 câu chứa nó và tự viết định nghĩa}{Tài liệu ngành}{Kiểm định nghĩa của bạn có khớp cả bốn câu không.}
+\bt[2]{Lập 5 cặp thuật ngữ gần nghĩa và viết ranh giới giữa chúng}{Tài liệu ngành}{Ví dụ \emph{accuracy}/\emph{precision}; ranh giới làm cả hai rõ hơn.}
+\bt[2]{Tìm hai bài dùng cùng thuật ngữ với nghĩa khác nhau}{Tài liệu ngành}{So định nghĩa thao tác của hai bên và ghi khác biệt vào bảng.}
+\bt[3]{Viết phần định nghĩa thuật ngữ cho một bài của chính bạn}{Bài viết của bạn}{Dùng mẫu câu ở mục 5; với mỗi thuật ngữ bán kỹ thuật, thêm định nghĩa thao tác.}
+\bt[3]{Đếm số lần khựng lại trên một trang tài liệu, mỗi tuần một lần trong bốn tuần}{Tài liệu ngành}{Đây là chỉ số tiến bộ khách quan cho việc xây vốn từ ngành.}
+\end{baitap}
+
+\section*{Kết chương và đọc tiếp}
+
+Phần B khép lại ở đây. Chương này cho một quy trình biến việc đọc thành vốn từ: nhận diện ba loại từ với cảnh giác đặc biệt cho loại bán kỹ thuật; tìm định nghĩa theo bốn dạng, ưu tiên định nghĩa thao tác; và giữ một bảng thuật ngữ sáu trường mà trường ``từ lân cận'' là trường bị bỏ quên nhưng hiệu quả nhất.
+
+Sáu chương của phần B đều nhằm một việc: lấy đúng ý ra khỏi văn bản. Phần C đảo chiều. Khi bạn viết, bạn ở phía bên kia của mọi cơ chế vừa học --- bạn là người phải đặt câu chủ đề để người đọc bắt được ý, phải chọn mức cam kết đúng với bằng chứng của mình, và phải định nghĩa thuật ngữ để không bị hiểu sai. Chương \ptr{C/11} bắt đầu từ đơn vị nhỏ nhất mà cũng quan trọng nhất: câu.
+\end{document}

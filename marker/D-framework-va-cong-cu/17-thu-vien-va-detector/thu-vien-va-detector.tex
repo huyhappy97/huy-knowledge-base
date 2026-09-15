@@ -1,0 +1,303 @@
+% ---------------------------------------------------------------------------
+% Chương 17 — Thư viện và detector
+% Tạo: 2026-09-13  |  Sửa gần nhất: 2026-09-14  |  Ôn gần nhất: —
+% Phụ thuộc: B/07 (pipeline), B/08 (tinh chỉnh góc), A/03 (PnP), A/04 (ambiguity)
+% Mức độ: QUAN TRỌNG — tầng công cụ. CHỐT TẠI THÁNG 9/2026, hết hạn nhanh nhất.
+% Kiểm chứng:
+%   Chương này mô tả API và hành vi phần mềm, không có công thức lõi.
+%   Các khẳng định về API đã được kiểm bằng cách CHẠY THẬT trên
+%   OpenCV 4.13.0 / numpy 2.2.6 ngày 2026-09-14 — xem mục 3B.
+%   Các khẳng định về nội dung mã nguồn của apriltag/ViSP là từ trí nhớ,
+%   CHƯA mở lại mã — đánh dấu rõ ở chỗ tương ứng.
+% Ghi chú trung thực: KHÔNG có benchmark so sánh tốc độ hay độ chính xác giữa
+%   các detector. Lý do ở B/07 mục 6: tôi không có dữ liệu so sánh được.
+% ---------------------------------------------------------------------------
+\documentclass[../../marker.tex]{subfiles}
+\begin{document}
+\chapter{Thư viện và detector (Libraries and Detectors)}
+\ptrtarget{D/17}\ptrtarget{D/17-thu-vien-va-detector}
+\dependency{\ptr{B/07-detection-pipeline} (quy trình phát hiện --- chương này chỉ ra chỗ nào trong mã hiện thực hoá từng bước); \ptr{B/08-corner-refinement} (tinh chỉnh góc); \ptr{A/03-pnp-va-uoc-luong-tu-the} và \ptr{A/04-pose-ambiguity-target-phang} (PnP và hai nghiệm --- \code{solvePnPGeneric} là API quan trọng nhất của cả cây).}
+
+\begin{tomtat}
+Chương này là tầng công cụ cho những gì chạy \emph{mỗi khung hình}: detector và bộ giải PnP. Nó không nhằm liệt kê đủ mà nhằm ba việc cụ thể. Thứ nhất, chỉ ra \emph{một} API quan trọng hơn mọi API khác --- \code{solvePnPGeneric}, vì nó là API duy nhất trả về nhiều nghiệm kèm sai số tái chiếu của từng nghiệm, tức đại lượng cần để đo ambiguity. Thứ hai, chỉ ra ba tệp mã nguồn đáng \emph{đọc} chứ không chỉ dùng, vì đọc chúng là cách kiểm xem mình đã hiểu lý thuyết đúng chưa. Thứ ba, liệt kê các tham số thực sự đáng chỉnh và nói rõ phần còn lại nên để mặc định. Nếu chỉ nhớ một điều: \emph{nếu pipeline của bạn không lấy ra \(\rho\) và hiệp phương sai của pose, bạn đang vứt đi hai đại lượng đã được tính sẵn} --- và cả cây này dựa vào chúng.
+\end{tomtat}
+
+\begin{nentang}
+\kn{\code{solvePnPGeneric}}{hàm OpenCV giải PnP và trả về \emph{mảng} nghiệm cùng \emph{mảng} sai số tái chiếu tương ứng. Khác với \code{solvePnP} vốn chỉ trả một nghiệm.}
+\kn{cờ \code{SOLVEPNP\_*}}{tham số chọn thuật toán: \code{ITERATIVE}, \code{EPNP}, \code{P3P}, \code{IPPE}, \code{IPPE\_SQUARE}, \code{SQPNP} và vài cái khác. Chúng không tương đương --- xem bảng ở mục 3A.}
+\kn{\code{objdetect}}{module của OpenCV chứa ArUco và ChArUco từ phiên bản 4.7 trở đi; trước đó chúng nằm ở \code{contrib}.}
+\kn{wrapper ROS}{gói ROS bọc một thư viện gốc để nó nhận và trả dữ liệu qua topic. Tiện, nhưng nó thường \emph{ẩn} các tham số quan trọng và \emph{vứt} các đại lượng chẩn đoán.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Trong toàn bộ các API của OpenCV liên quan tới marker, có đúng một hàm mà thiếu nó thì bạn không thực hiện được \ptr{B/10}. Hàm nào, và đại lượng nào nó cho mà các hàm khác giấu?}
+\h{Bạn gọi \code{solvePnP} với cờ mặc định trên bốn góc của một tag vuông. Nêu hai điều không tối ưu đang xảy ra, và cách sửa mỗi điều.}
+\h{Có ba tệp mã nguồn trong cả hệ sinh thái đáng đọc chứ không chỉ dùng. Chúng là gì, và mỗi tệp kiểm được sự hiểu của bạn về chương nào?}
+\h{Wrapper ROS cho detector marker tiện lợi nhưng nó thường làm mất hai thứ mà cây này coi là bắt buộc. Hai thứ nào?}
+\h{Chương này chốt tại tháng 9/2026 và sẽ hết hạn. Phần nào của nó hết hạn nhanh nhất, và phần nào gần như không hết hạn?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{D/17/01}
+
+Phần~A tới~C không nhắc tới một dòng code cụ thể nào, và đó là có chủ ý: hình học phối cảnh không đổi phiên bản, còn tên hàm thì đổi. Chương này là chỗ trả nợ, và nó mang theo một hạn sử dụng.
+
+Mục đích của chương không phải là một danh mục. Các thư viện đều có tài liệu tốt hơn bất cứ thứ gì tôi viết ở đây, và chép lại chúng là vô ích. Mục đích là ba việc mà tài liệu chính thức \emph{không} làm.
+
+\emph{Việc thứ nhất: chỉ ra cái gì quan trọng.} Tài liệu API liệt kê mọi hàm với cùng trọng số. Nhưng với bài toán của cây này, có đúng một hàm mà thiếu nó thì cả \ptr{B/10} không thực hiện được, và có ba tham số đáng chỉnh trong khi vài chục tham số khác nên để mặc định. Biết điều đó tiết kiệm nhiều thời gian hơn biết thêm mười hàm.
+
+\emph{Việc thứ hai: nói cái gì bị giấu.} Nhiều đại lượng chẩn đoán quan trọng \emph{đã được tính} bên trong thư viện rồi bị vứt đi ở giao diện. Tỉ số ambiguity là ví dụ rõ nhất: IPPE tính cả hai nghiệm dù bạn có dùng hay không, nhưng \code{solvePnP} chỉ trả về một. Biết chỗ nào có đại lượng bị giấu là biết chỗ nào đáng sửa vài dòng.
+
+\emph{Việc thứ ba, và nó là việc có giá trị lâu dài nhất: chỉ ra mã nào đáng đọc như một bài kiểm tra.} Đọc \code{apriltag\_pose.c} rồi nhận ra mình hiểu vì sao nó tính hai nghiệm --- đó là một phép kiểm xem \ptr{A/04} đã được hiểu hay chỉ được đọc. Mục~4 dành cho ba tệp như vậy.
+
+\begin{cambay}
+\textbf{Chương này chốt tại tháng 9/2026 và là chương hết hạn nhanh nhất của cây.}
+
+Tên hàm đổi, module được chuyển vị trí (ArUco đã chuyển từ \code{contrib} sang \code{objdetect} ở OpenCV 4.7), tham số mặc định đổi giữa các phiên bản, và các thư viện mới xuất hiện.
+
+Phần \emph{không} hết hạn: các nguyên tắc ở mục~2 (đại lượng nào cần lấy ra), lý do đằng sau việc chọn cờ ở mục~3, và giá trị của việc đọc mã ở mục~4. Chúng vẫn đúng khi tên hàm đã đổi.
+
+Rà lại mỗi sáu tháng, và khi rà thì kiểm bằng cách \emph{chạy} chứ không bằng cách đọc tài liệu --- mục~3B là một ví dụ về việc chạy thật phát hiện ra gì.
+\end{cambay}
+
+\section{Đại lượng phải lấy ra khỏi pipeline}
+\ptrtarget{D/17/02}
+
+Trước khi nói về hàm nào, nói về \emph{cái gì} phải có ở đầu ra. Ba đại lượng, và cả ba thường bị vứt.
+
+\emph{Một, tỉ số ambiguity \(\rho\).} Không có nó thì \ptr{B/10} bậc~2 không thực hiện được, và bạn không biết khi nào pose của mình không đáng tin. Nó đã được tính sẵn bởi IPPE.
+
+\emph{Hai, hiệp phương sai của pose} \(\mathcal{I}^{-1}\). Không có nó thì \ptr{B/11} không có trọng số, \ptr{B/09} mục~7 không có cổng chi-square, và \ptr{B/13} mục~8 không có tiêu chí ``phép đo đáng tin''. Nó đã được tính sẵn bởi bước tinh chỉnh --- nó chính là ma trận của phương trình chuẩn (\ptr{A/03} mục~4B).
+
+\emph{Ba, hiệp phương sai của từng góc.} Không có nó thì trọng số ở \ptr{A/03} mục~6 là trọng số đều. Nó đã được tính sẵn bởi bước tinh chỉnh góc --- nghịch đảo ma trận cấu trúc (\ptr{B/08} mục~2).
+
+Ba đại lượng, ba lần ``đã được tính sẵn''. Đây là chủ đề của chương: \emph{phần lớn thông tin chẩn đoán mà cây này cần đã tồn tại bên trong thư viện, và việc của bạn là lấy nó ra chứ không phải tính lại}.
+
+Chi phí: với \(\rho\) thì đổi một lời gọi hàm; với hai đại lượng còn lại thì vài chục dòng, vì OpenCV không xuất chúng qua API công khai. Đây là một thiếu sót đáng tiếc của API và nó là lý do chính đáng nhất để tự viết bước tinh chỉnh PnP thay vì dùng \code{solvePnPRefineLM}.
+
+\section{OpenCV: các API và một phép chạy thật}
+\ptrtarget{D/17/03}
+
+\subsection{A. Chọn cờ \texorpdfstring{\code{SOLVEPNP\_*}}{SOLVEPNP} nào}
+
+\begin{table}[H]\centering\small
+\caption{Các cờ \code{SOLVEPNP\_*} và khi nào dùng cho bài toán marker.}
+\label{tab:d17-flags}
+\begin{tabularx}{\linewidth}{@{}L{3.5cm}L{2.3cm}Y@{}}
+\toprule
+\textbf{Cờ} & \textbf{Số điểm} & \textbf{Dùng khi}\\
+\midrule
+\code{IPPE\_SQUARE} & đúng 4, tag vuông & \textbf{Mặc định cho một tag vuông.} Trả \emph{hai} nghiệm kèm reprojection (\ptr{A/04})\\
+\code{IPPE} & \(\ge 4\), đồng phẳng & Target phẳng không vuông, chẳng hạn ChArUco một mặt phẳng\\
+\code{SQPNP} & \(\ge 3\), tổng quát & \textbf{Mặc định cho constellation không đồng phẳng}; tối ưu toàn cục ở mức đại số \cite{terzakis2020sqpnp}\\
+\code{EPNP} & \(\ge 4\), tổng quát & Nhiều điểm, cần \(O(n)\) \cite{lepetit2009epnp}\\
+\code{P3P} / \code{AP3P} & đúng 4 & Hạt nhân RANSAC, không dùng làm bộ giải chính\\
+\code{ITERATIVE} & \(\ge 4\) & Cần khởi tạo tốt; hữu ích với \code{useExtrinsicGuess}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Câu trả lời cho Q2: gọi \code{solvePnP} với cờ mặc định (\code{ITERATIVE}) trên bốn góc tag vuông có hai điều không tối ưu. Thứ nhất, nó \emph{không} dùng cấu trúc phẳng nên nó không cho bạn hai nghiệm --- sửa bằng cách chuyển sang \code{solvePnPGeneric} với \code{IPPE\_SQUARE}. Thứ hai, \code{ITERATIVE} không có khởi tạo tốt nên nó có thể hội tụ về nghiệm sai --- và nó không báo. Sửa bằng cách khởi tạo bằng lời giải dạng đóng rồi mới tinh chỉnh, đúng như \ptr{A/03} mục~9 khuyến nghị.
+
+\subsection{B. Một phép chạy thật, và điều nó phát hiện}
+
+Tôi kiểm các khẳng định trên bằng cách chạy chứ không bằng cách đọc tài liệu, trên OpenCV 4.13.0 ngày 2026-09-14. Hai điều đáng ghi lại.
+
+\emph{Điều thứ nhất, xác nhận:} \code{solvePnPGeneric} với \code{IPPE\_SQUARE} trả về đúng \emph{hai} nghiệm ở mọi tư thế đã thử, kể cả fronto-parallel, kèm hai giá trị sai số tái chiếu. Tỉ số của chúng là \(\rho\), và \ptr{C/16} mục~3B báo cáo nó biến thiên từ 1,33 tới 66,6 theo góc nghiêng. Khẳng định trung tâm của chương --- rằng API này cho bạn đại lượng cần thiết --- \textbf{đã được kiểm}.
+
+\emph{Điều thứ hai, một cái bẫy:} với tag ở tư thế fronto-parallel \emph{chính xác}, hai nghiệm có sai số tái chiếu bằng nhau tới sai số số học, nên \(\rho\) tính được là \(\infty\) hoặc \code{nan} tuỳ vào việc mẫu số có đúng bằng không hay không. Trong dữ liệu không nhiễu, tôi gặp cả hai. Mã của bạn \emph{phải} xử lý trường hợp này --- kiểm mẫu số trước khi chia --- vì nếu không thì ở đúng tư thế nguy hiểm nhất, chỉ báo an toàn của bạn trả về \code{nan} và mọi so sánh với ngưỡng đều thành \code{false}.
+
+Đây là một ví dụ nhỏ nhưng đáng nhớ của việc vì sao phải chạy: đọc tài liệu không cho bạn biết điều này, và nó là chế độ hỏng ở đúng chỗ mà chỉ báo cần hoạt động nhất.
+
+\subsection{C. ArUco và ChArUco}
+
+Từ OpenCV 4.7, chúng ở \code{objdetect} thay vì \code{contrib}. Lớp chính là \code{ArucoDetector} và \code{CharucoDetector}.
+
+Tham số đáng chỉnh, và nó khớp với ba tham số ở \ptr{B/07} mục~5C:
+
+\emph{\code{cornerRefinementMethod}} --- \textbf{bật nó}. Mặc định ở một số phiên bản là \code{CORNER\_REFINE\_NONE}, và khi ấy bạn đang lấy góc của đa giác xấp xỉ, kém hơn hẳn (\ptr{B/08}). Đặt \code{CORNER\_REFINE\_SUBPIX} cho ArUco, và với ChArUco thì bước saddle point đã có sẵn trong \code{interpolateCornersCharuco}.
+
+\emph{\code{minMarkerPerimeterRate}} --- ngưỡng kích thước tối thiểu, đặt theo con số đo được của \ptr{A/02} mục~4 chứ không theo mặc định.
+
+\emph{\code{errorCorrectionRate}} --- số lỗi bit cho phép sửa. Đặt \emph{thấp} và bù bằng whitelist ID (\ptr{B/14} mục~7A).
+
+Về từ điển: OpenCV có sẵn nhiều từ điển chuẩn, nhưng với docking thì \ptr{B/07} mục~5C khuyến nghị từ điển \emph{nhỏ, ít ô bit}. \code{generateCustomDictionary} tạo được từ điển theo yêu cầu, và nó là một trong số ít chỗ mà đi chệch khỏi mặc định gần như luôn đúng.
+
+\section{Ba tệp mã đáng đọc}
+\ptrtarget{D/17/04}
+
+Mục này trả lời Q3, và nó là mục có giá trị lâu dài nhất của chương.
+
+\emph{Tệp thứ nhất: \code{apriltag\_pose.c} của \repo{apriltag}.} Vài trăm dòng, và nó là toàn bộ \ptr{A/04} cộng \ptr{B/10} bậc~2 thành code. Bạn sẽ thấy: IPPE được cài ra sao, hai nghiệm được tính thế nào, và sai số tái chiếu của từng nghiệm được dùng để chọn ra sao. Đọc nó và nhận ra mình \emph{dự đoán được} nó làm gì tiếp là một phép kiểm tốt xem chương~4 đã được hiểu hay chỉ được đọc.
+
+\emph{Tệp thứ hai: phần quad fitting của \repo{apriltag}} (thường ở \code{apriltag\_quad\_thresh.c}). Đây là \ptr{B/07} mục~2 thành code, và chỗ đáng chú ý nhất là bước khớp đường có trọng số gradient --- cải tiến chính của AprilTag 2 (\ptr{B/07} mục~2). Đọc nó để thấy vì sao độ chính xác dưới pixel là chuyện có thể.
+
+\emph{Tệp thứ ba: phần IBVS của \repo{ViSP}.} Đây là \ptr{B/13} mục~2 thành code: ma trận tương tác được dựng thế nào, và luật \(\mathbf{v} = -\lambda L^{+}\mathbf{e}\) được cài ra sao. Đáng đọc nếu bạn cân nhắc IBVS cho pha cuối.
+
+\emph{(Ghi chú trung thực: mô tả về nội dung ba tệp này là từ trí nhớ về cấu trúc của chúng; tôi \emph{chưa} mở lại mã trong lần soạn này. Tên tệp cụ thể có thể đã đổi. Điều tôi tin chắc là \emph{chức năng} tồn tại trong các thư viện ấy, không phải tên tệp chính xác.)}
+
+Ngược lại, ba thứ \emph{đáng dùng mà không cần đọc}: \repo{Kalibr}, \repo{COLMAP}, \repo{Ceres}. Chúng là công cụ trưởng thành, tài liệu tốt, và việc đọc mã của chúng không trả lại tương xứng với thời gian bỏ ra.
+
+\section{Các họ tag khác và detector học sâu}
+\ptrtarget{D/17/05}
+
+Ngắn, vì \ptr{B/07} mục~4 đã bàn về mặt kỹ thuật; mục này chỉ nói về mặt công cụ.
+
+\repo{STag} \cite{benligiray2019stag}, \repo{TopoTag} \cite{yu2021topotag}, \repo{ChromaTag} \cite{degol2017chromatag}: các họ tag với thiết kế khác. Mã nguồn có, chất lượng khác nhau. Đáng thử nếu bạn có một yêu cầu cụ thể mà AprilTag và ArUco không đáp ứng --- chẳng hạn STag khi cần ổn định pose tốt hơn ở tư thế xấu.
+
+\repo{CCTag} \cite{calvet2016cctag}, \repo{WhyCon} \cite{krajnik2014whycon}: marker tròn. Nhớ cảnh báo về bias tâm ellipse (\ptr{A/02} mục~6) --- nếu dùng, phải kiểm xem cài đặt có hiệu chỉnh conic không, và nếu không thì bạn có một dòng hệ thống phụ thuộc tư thế trong ngân sách.
+
+\repo{DeepTag} \cite{zhang2023deeptag}, \repo{DeepArUco} \cite{berral2023deeparuco}: detector học sâu. Đáng cân nhắc khi điều kiện quan sát khắc nghiệt và không cải thiện được bằng chiếu sáng (\ptr{B/14}). Với docking --- nơi điều kiện kiểm soát được --- lợi ích ít rõ, và \ptr{B/07} mục~4 nêu lý do thận trọng: bền hơn không có nghĩa là chính xác hơn về định vị góc.
+
+\repo{apriltag-generation}: tạo họ tag riêng với số ô và khoảng cách Hamming tuỳ chọn. Công cụ để thực hiện đánh đổi ở \ptr{B/07} mục~5C, và nó đáng dùng hơn vẻ ngoài vì lựa chọn mặc định (dùng họ phổ biến nhất) thường không tối ưu cho docking.
+
+\section{Wrapper ROS}
+\ptrtarget{D/17/06}
+
+Mục này trả lời Q4, và nó là một cảnh báo.
+
+\repo{apriltag\_ros}, \repo{aruco\_ros}, \repo{fiducials}: các gói ROS bọc thư viện gốc. Chúng tiện --- nhận ảnh qua topic, trả pose qua TF --- và với một hệ thống ROS thì chúng là điểm xuất phát hợp lý.
+
+Nhưng chúng thường làm mất hai thứ mà cây này coi là bắt buộc.
+
+\emph{Thứ nhất, \(\rho\).} Giao diện ROS thường trả về một pose duy nhất, nên tỉ số ambiguity bị vứt ở tầng wrapper. Hệ quả: bạn không thực hiện được \ptr{B/10} bậc~2, và bạn không biết khi nào pose không đáng tin.
+
+\emph{Thứ hai, hiệp phương sai trung thực.} Một số wrapper trả về một trường hiệp phương sai, và nó thường là một hằng số cấu hình chứ không phải \(\mathcal{I}^{-1}\) tính từ dữ liệu. Một hiệp phương sai hằng số tệ hơn không có hiệp phương sai, vì nó trông như thông tin thật và mọi tầng trên sẽ tin nó.
+
+Hai mất mát ấy là lý do tôi khuyên: \emph{dùng wrapper để bắt đầu, nhưng sửa nó hoặc thay nó trước khi nghiêm túc}. Việc sửa không lớn --- lấy \(\rho\) ra và thêm nó vào message --- và nó là điều kiện để phần lớn Phần~B áp dụng được.
+
+Một điều đáng nêu về \repo{tagslam} \cite{pfrommer2019tagslam}: nó khác các wrapper trên ở chỗ nó giải bài toán hợp nhất trên nhiều tag bằng factor graph, tức nó làm đúng việc mà \ptr{B/09} mục~2 khuyến nghị. Nếu bạn cần map nhiều tag trong môi trường thì nó là điểm xuất phát tốt. Mức tin C --- tiền ấn, nhưng có mã nguồn công khai và được dùng rộng rãi.
+
+\section{Giới hạn}
+\ptrtarget{D/17/07}
+
+\textbf{Chương này không có benchmark.} \ptr{B/07} mục~6 giải thích: tôi không có dữ liệu so sánh được giữa các detector, và trích số từ các bài báo khác nhau ra khỏi ngữ cảnh thì chúng không so sánh được. Nếu cần xếp hạng cho hệ của bạn, mini project của \ptr{B/07} là cách đo.
+
+\textbf{Các khẳng định về mã nguồn là từ trí nhớ.} Đã ghi ở mục~4. Tên tệp có thể đã đổi; chức năng thì tôi tin là còn.
+
+\textbf{Chỉ các khẳng định về OpenCV API đã được chạy kiểm}, trên đúng một phiên bản (4.13.0) và một hệ điều hành. Hành vi có thể khác ở phiên bản khác --- và đặc biệt, vị trí module ArUco đã đổi một lần rồi.
+
+\textbf{Chương chốt tháng 9/2026.} Xem cảnh báo ở mục~1.
+
+\section{Thực hành}
+\ptrtarget{D/17/08}
+
+Bốn việc.
+
+\emph{Một, chuyển sang \code{solvePnPGeneric} và lấy \(\rho\) ra} --- việc có tỉ lệ lợi ích trên công sức cao nhất trong chương, và nó là điều kiện cho \ptr{B/10}.
+
+\emph{Hai, xử lý trường hợp \(\rho\) là \code{nan} hoặc vô hạn} --- mục~3B; nó xảy ra ở đúng tư thế nguy hiểm nhất.
+
+\emph{Ba, bật tinh chỉnh góc} nếu dùng ArUco, và kiểm giá trị mặc định của phiên bản bạn đang dùng thay vì giả định.
+
+\emph{Bốn, nếu dùng wrapper ROS, sửa nó để xuất \(\rho\)} trước khi xây dựng gì phía trên.
+
+\begin{onbai}
+\ar[3]{API quan trọng nhất của cả cây}{\code{solvePnPGeneric} --- API duy nhất trả về \emph{nhiều nghiệm kèm sai số tái chiếu của từng nghiệm}, tức \(\rho\). Thiếu nó thì \ptr{B/10} bậc 2 không thực hiện được.}
+\ar[3]{Ba đại lượng phải lấy ra}{\(\rho\) (cho \ptr{B/10}); hiệp phương sai pose \(\mathcal{I}^{-1}\) (cho \ptr{B/11}, cổng chi-square, tiêu chí hội tụ); hiệp phương sai từng góc (cho trọng số ở \ptr{A/03} mục 6). \textbf{Cả ba đã được tính sẵn} --- việc của bạn là lấy ra, không phải tính lại.}
+\ar[3]{Chọn cờ nào}{\code{IPPE\_SQUARE} cho một tag vuông (cho hai nghiệm); \code{SQPNP} cho constellation không đồng phẳng; \code{EPNP} khi nhiều điểm; \code{P3P} chỉ làm hạt nhân RANSAC.}
+\ar[3]{Hai vấn đề của \code{solvePnP} mặc định}{Cờ \code{ITERATIVE} không dùng cấu trúc phẳng nên không cho hai nghiệm; và nó không có khởi tạo tốt nên có thể hội tụ về nghiệm sai \emph{mà không báo}.}
+\ar[3]{Cái bẫy \(\rho\) tại fronto-parallel}{Ở tư thế fronto-parallel chính xác, hai sai số tái chiếu bằng nhau tới sai số số học nên \(\rho\) ra \code{nan} hoặc \(\infty\). \textbf{Phải kiểm mẫu số trước khi chia} --- nếu không thì ở đúng tư thế nguy hiểm nhất, chỉ báo an toàn trả \code{nan} và mọi so sánh ngưỡng thành \code{false}. Phát hiện bằng cách CHẠY, không bằng đọc tài liệu.}
+\ar[2]{Ba tham số ArUco đáng chỉnh}{\code{cornerRefinementMethod} (bật --- mặc định có thể là \code{NONE}); \code{minMarkerPerimeterRate} (theo ngưỡng đo được của \ptr{A/02} mục 4); \code{errorCorrectionRate} (thấp, bù bằng whitelist).}
+\ar[3]{Ba tệp mã đáng đọc}{\code{apriltag\_pose.c} (\ptr{A/04} + \ptr{B/10} thành code); phần quad fitting của \repo{apriltag} (\ptr{B/07} mục 2, khớp đường có trọng số gradient); phần IBVS của \repo{ViSP} (\ptr{B/13} mục 2).}
+\ar[2]{Ba thứ đáng dùng mà không cần đọc}{\repo{Kalibr}, \repo{COLMAP}, \repo{Ceres} --- công cụ trưởng thành, tài liệu tốt, đọc mã không trả lại tương xứng.}
+\ar[3]{Hai thứ wrapper ROS làm mất}{\(\rho\) (giao diện trả một pose duy nhất); và hiệp phương sai \emph{trung thực} (thường là hằng số cấu hình chứ không phải \(\mathcal{I}^{-1}\)). Hiệp phương sai hằng số \emph{tệ hơn} không có, vì nó trông như thông tin thật.}
+\ar[2]{Vì sao chương này không có benchmark}{Không có dữ liệu so sánh được giữa các detector; trích số từ các bài báo khác nhau ra khỏi ngữ cảnh thì chúng không so được (\ptr{B/07} mục 6). Cần xếp hạng thì đo trên hệ của mình.}
+\ar[2]{Phần nào của chương hết hạn}{Tên hàm, vị trí module, giá trị mặc định --- hết hạn nhanh. \emph{Nguyên tắc} (đại lượng nào cần lấy ra, lý do chọn cờ, giá trị của việc đọc mã) --- gần như không hết hạn.}
+\ar[1]{Từ điển tuỳ chỉnh}{\code{generateCustomDictionary} --- một trong số ít chỗ mà đi chệch khỏi mặc định gần như luôn đúng cho docking, vì bạn chỉ cần vài chục ID (\ptr{B/07} mục 5C).}
+\end{onbai}
+
+\begin{ungdung}
+\ud{\repo{OpenCV} \code{solvePnPGeneric}}{Nhiều nghiệm kèm reprojection từng nghiệm}{Đã kiểm bằng cách chạy, 4.13.0, 2026-09-14}
+\ud{\repo{apriltag} (AprilRobotics)}{Bản C gốc; \code{apriltag\_pose.c} và phần quad fitting}{Hai trong ba tệp đáng đọc}
+\ud{\repo{OpenCV} \code{objdetect}}{ArUco và ChArUco từ 4.7; \code{ArucoDetector}, \code{CharucoDetector}}{Nhớ kiểm mặc định của \code{cornerRefinementMethod}}
+\ud{\repo{ViSP} \cite{marchand2005visp}}{IBVS, PBVS, ma trận tương tác, tracker marker}{Tệp thứ ba đáng đọc; cho \ptr{B/13}}
+\ud{\repo{tagslam} \cite{pfrommer2019tagslam}}{Hợp nhất nhiều tag bằng factor graph --- đúng việc \ptr{B/09} mục 2 khuyến nghị}{Khác các wrapper ROS khác ở điểm này; mức tin C}
+\end{ungdung}
+
+\begin{duan}{Sửa pipeline để xuất ba đại lượng chẩn đoán}{1 ngày}
+\dmt biến pipeline của bạn từ một hộp đen trả về một pose thành một hệ đo lường trả về pose kèm bằng chứng về độ tin cậy của nó.
+\ddl chính pipeline hiện tại của bạn.
+\dbc chuyển lời gọi PnP sang \code{solvePnPGeneric} với cờ đúng theo bảng ở mục 3A; lấy mảng reprojection ra và tính \(\rho\), \emph{có xử lý trường hợp mẫu số bằng không}; tự viết bước tinh chỉnh LM (hoặc sửa \code{solvePnPRefineLM}) để lấy ra ma trận \(\mathcal{I} = \sum J^\top\Sigma^{-1}J\) và nghịch đảo nó; nếu dùng ArUco, lấy ma trận cấu trúc từ bước \code{cornerSubPix} để có hiệp phương sai từng góc; cuối cùng đổi giao diện trả về từ một pose thành cấu trúc ba giá trị của \ptr{B/10} mục 3C.
+\dxk pipeline trả về pose, hiệp phương sai, \(\rho\), và một trạng thái ba giá trị; và log của bạn ghi cả ba ở mỗi khung. Kiểm tra chéo bắt buộc: chạy trên một chuỗi có đoạn fronto-parallel và xác nhận rằng \(\rho\) \emph{không} trả về \code{nan} ở đó --- nếu có thì bạn chưa xử lý trường hợp ở mục 3B, và bạn vừa mất chỉ báo ở đúng chỗ cần nó nhất.
+\dnv \ptr{B/10} và \ptr{B/13} mục 8 tiêu thụ trực tiếp ba đại lượng này.
+\end{duan}
+
+\begin{traloi}
+\tl{\code{solvePnPGeneric}. Nó là API duy nhất trả về \emph{mảng} nghiệm cùng \emph{mảng} sai số tái chiếu tương ứng; mọi hàm khác --- kể cả \code{solvePnP} với cùng cờ IPPE --- chỉ trả về một nghiệm và vứt phần còn lại. Đại lượng nó cho mà các hàm khác giấu là tỉ số \(\rho = e_2/e_1\), tức chỉ báo duy nhất cho biết hai nghiệm có phân biệt được hay không. Thiếu nó thì bậc 2 của \ptr{B/10} --- đo và từ chối khi không tin được --- không thực hiện được, và hệ của bạn sẽ chọn nghiệm theo nhiễu ở những tư thế mà hai nghiệm ngang nhau, không có cảnh báo nào. Điều đáng nói là IPPE \emph{đã tính} cả hai nghiệm dù bạn có dùng hay không, nên chi phí để lấy \(\rho\) ra bằng không --- chỉ là đổi một lời gọi hàm.}
+\tl{Thứ nhất, cờ mặc định \code{ITERATIVE} không khai thác cấu trúc phẳng của tag vuông, nên nó không cho bạn hai nghiệm và bạn mất \(\rho\). Sửa: dùng \code{solvePnPGeneric} với \code{SOLVEPNP\_IPPE\_SQUARE}. Thứ hai, \code{ITERATIVE} là một bộ giải lặp cần điểm khởi đầu, và nếu không truyền \code{useExtrinsicGuess} thì nó tự khởi tạo --- nên nó có thể hội tụ về nghiệm sai trong hai nghiệm của target phẳng, và nó \emph{không báo} là đã làm thế. Sửa: khởi tạo bằng một lời giải dạng đóng (IPPE cho target phẳng) rồi mới tinh chỉnh, đúng như \ptr{A/03} mục 9 khuyến nghị. Cả hai lỗi này đều thầm lặng --- hàm trả về một pose trông hợp lý trong cả hai trường hợp.}
+\tl{Một: \code{apriltag\_pose.c} của \repo{apriltag} --- nó là \ptr{A/04} (hai nghiệm của target phẳng) cộng \ptr{B/10} bậc 2 (dùng tỉ số reprojection để chọn) gói trong vài trăm dòng; đọc nó và thấy mình \emph{dự đoán được} bước tiếp theo là phép kiểm xem chương 4 đã được hiểu hay chỉ được đọc. Hai: phần quad fitting của \repo{apriltag} --- nó là \ptr{B/07} mục 2, và chỗ đáng chú ý nhất là bước khớp đường có trọng số gradient, tức cơ chế làm cho độ chính xác dưới pixel khả thi. Ba: phần IBVS của \repo{ViSP} --- nó là \ptr{B/13} mục 2, cho thấy ma trận tương tác được dựng thế nào và luật điều khiển được cài ra sao. Ngược lại, \repo{Kalibr}, \repo{COLMAP} và \repo{Ceres} thì nên dùng mà không cần đọc: chúng trưởng thành, tài liệu tốt, và đọc mã không trả lại tương xứng thời gian.}
+\tl{Thứ nhất, tỉ số ambiguity \(\rho\): giao diện ROS thường trả về một pose duy nhất qua TF hoặc một message pose, nên \(\rho\) bị vứt ở tầng wrapper --- và không có nó thì bạn không biết khi nào pose của mình không đáng tin. Thứ hai, hiệp phương sai \emph{trung thực}: một số wrapper có trường hiệp phương sai trong message, nhưng nó thường được điền bằng một hằng số lấy từ tệp cấu hình chứ không phải \(\mathcal{I}^{-1}\) tính từ dữ liệu của khung hiện tại. Mất mát thứ hai tệ hơn mất mát thứ nhất, vì một hiệp phương sai hằng số \emph{tệ hơn không có hiệp phương sai}: nó trông như thông tin thật, nên mọi tầng phía trên --- bộ lọc, cổng chi-square, tiêu chí hội tụ --- sẽ tin nó và cân các phép đo sai. Khuyến nghị: dùng wrapper để bắt đầu, nhưng sửa nó để xuất \(\rho\) trước khi xây dựng gì phía trên; việc sửa nhỏ và nó là điều kiện để phần lớn Phần B áp dụng được.}
+\tl{Hết hạn nhanh nhất: tên hàm, vị trí module (ArUco đã chuyển từ \code{contrib} sang \code{objdetect} ở 4.7 --- một lần đổi đã xảy ra rồi), giá trị mặc định của tham số, và danh sách các thư viện mới. Gần như không hết hạn: các \emph{nguyên tắc} --- rằng có ba đại lượng chẩn đoán cần lấy ra và cả ba đã được tính sẵn; rằng phải chọn cờ theo cấu trúc hình học của target chứ không theo mặc định; rằng đọc mã là một phép kiểm sự hiểu chứ không chỉ là cách học API; và rằng wrapper tiện lợi thường vứt đi thông tin chẩn đoán. Bốn nguyên tắc ấy vẫn đúng khi mọi tên hàm trong chương đã đổi. Cách rà lại đúng: kiểm bằng cách \emph{chạy} chứ không bằng đọc tài liệu --- mục 3B là ví dụ về việc chạy thật phát hiện ra một cái bẫy mà tài liệu không nói.}
+\end{traloi}
+
+\begin{dongian}
+Phần lớn tài liệu này nói về nguyên lý, và nguyên lý thì không đổi. Chương này nói về tên hàm, và tên hàm thì đổi --- nên nó có hạn sử dụng, ghi rõ là tháng 9 năm 2026.
+
+Điều đáng nhớ nhất của chương không phải một tên hàm mà là một quan sát: \emph{phần lớn thông tin bạn cần đã được máy tính sẵn rồi, chỉ là nó bị vứt đi ở cửa ra}.
+
+Ví dụ rõ nhất là chuyện hai câu trả lời của cái tag phẳng. Thư viện \emph{luôn} tính cả hai --- nó không có cách nào tính một mà không tính cái kia --- nhưng cái hàm thông dụng nhất chỉ trả về một và ném cái còn lại đi. Đổi sang một hàm khác, và bạn có thêm con số cho biết hai câu trả lời có ngang nhau hay không. Đổi một dòng, được một chỉ báo an toàn.
+
+Tương tự với chuyện ``máy tin vào kết quả của mình tới mức nào''. Con số đó cũng được tính sẵn trong lúc giải, rồi bị vứt. Lấy nó ra tốn vài chục dòng, và không có nó thì một nửa những việc ở phần trước của tài liệu không làm được.
+
+Có một cái bẫy nhỏ mà tôi chỉ phát hiện được nhờ chạy thử chứ không nhờ đọc tài liệu, và nó đáng kể lại vì nó rất đặc trưng. Cái tỉ số so sánh hai câu trả lời được tính bằng một phép chia. Ở đúng cái tư thế nguy hiểm nhất --- tag nhìn thẳng vào camera --- hai câu trả lời khớp ảnh ngang nhau hoàn hảo, nên mẫu số bằng không, nên phép chia cho ra một giá trị vô nghĩa. Và một giá trị vô nghĩa thì khi đem so với ngưỡng sẽ luôn ra ``không đạt ngưỡng'' theo cách im lặng. Nghĩa là: nếu không cẩn thận, cái chỉ báo an toàn của bạn sẽ tắt ngúm đúng vào lúc bạn cần nó nhất.
+
+Cuối cùng, một lời khuyên về việc đọc mã người khác. Có ba tệp đáng đọc trong cả hệ sinh thái này, và lý do đọc chúng không phải để học cách dùng thư viện --- tài liệu làm việc đó tốt hơn. Lý do là để \emph{tự kiểm tra mình}: nếu bạn đọc một tệp và thấy mình đoán trước được dòng tiếp theo làm gì, thì bạn đã hiểu cái chương lý thuyết tương ứng. Nếu bạn đọc mà thấy lạ, thì chương ấy mới chỉ được đọc chứ chưa được hiểu.
+
+\chuadongian{tên hàm, tên module và giá trị mặc định sẽ đổi, và không có cách nào viết một chương như thế này cho nó bền. Cách duy nhất là mỗi lần quay lại thì \emph{chạy thử} chứ đừng tin cái đã viết --- kể cả cái tôi vừa viết.}
+\motcau{Thông tin bạn cần đã được tính sẵn rồi; việc của bạn là đừng để nó bị vứt ở cửa ra.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{D/17/085}
+
+Chương công cụ khác chương lý thuyết ở chỗ phần lớn khẳng định của nó kiểm được
+bằng cách chạy, và một phần đã được kiểm --- nên mục này nói về phần còn lại.
+
+Khẳng định trung tâm --- \emph{\code{solvePnPGeneric} với \code{IPPE\_SQUARE} trả
+về hai nghiệm kèm sai số tái chiếu, và tỉ số của chúng là một chỉ báo dùng được}
+--- \textbf{đã được kiểm bằng cách chạy} (mục~3B), trên OpenCV 4.13.0. Nó bị bác
+bỏ nếu một phiên bản khác trả về một nghiệm, hoặc trả về hai nghiệm mà sai số tái
+chiếu không phân biệt được chúng ở góc nghiêng lớn. Cách kiểm lại khi nâng cấp:
+chạy phần~2 của script ở \ptr{C/16} và xem cột \(\rho\) có còn tăng theo góc
+nghiêng không.
+
+Khẳng định thứ hai --- \emph{ba đại lượng chẩn đoán đã được tính sẵn và chỉ cần
+lấy ra} --- bị bác bỏ nếu hoá ra một trong ba không tồn tại ở dạng có thể lấy
+được. Với \(\rho\) thì tôi đã kiểm. Với hiệp phương sai pose và hiệp phương sai
+góc thì tôi \emph{chưa} --- tôi dẫn ra từ cấu trúc của thuật toán (\ptr{A/03}
+mục~4B, \ptr{B/08} mục~2) chứ không từ việc mở mã OpenCV. Nếu hoá ra chúng bị
+huỷ trước khi hàm trả về thì lời khuyên ``lấy ra'' phải đổi thành ``tự cài bước
+tinh chỉnh'', và chi phí của mini project tăng đáng kể.
+
+Khẳng định thứ ba --- \emph{ba tệp mã đáng đọc} --- là phán đoán chủ quan của tôi
+về giá trị sư phạm, và nó không bị bác bỏ bằng dữ liệu. Điều \emph{có thể} sai là
+mô tả về nội dung của chúng, vốn từ trí nhớ và chưa mở lại mã (mục~4).
+
+Cuối cùng, khẳng định về wrapper ROS ở mục~6 dựa trên hiểu biết chung về các gói
+ấy, \emph{không} phải trên việc đọc mã của chúng trong lần soạn này. Nếu một
+wrapper cụ thể có xuất \(\rho\) thì cảnh báo ở mục~6 không áp dụng cho nó --- và
+đó sẽ là tin tốt đáng ghi lại.
+
+\section{Kết nối}
+\ptrtarget{D/17/09}
+
+Chương này là tầng công cụ cho những gì chạy mỗi khung.
+
+Nối lên trên. \ptr{B/07-detection-pipeline} mô tả quy trình mà mục~3C và~4 chỉ ra chỗ hiện thực hoá. \ptr{B/08-corner-refinement} mô tả các phương pháp mà tham số \code{cornerRefinementMethod} chọn giữa. \ptr{A/03-pnp-va-uoc-luong-tu-the} và \ptr{A/04-pose-ambiguity-target-phang} là hai chương mà \code{solvePnPGeneric} phục vụ trực tiếp.
+
+Nối ngang. \ptr{D/18-cong-cu-calib-servo-va-do-dac} là chương anh em: nó bàn những gì chạy \emph{một lần} thay vì mỗi khung, và ranh giới ấy gần trùng với ranh giới ``thứ bạn phải tự cài'' và ``thứ nên dùng đồ có sẵn''.
+
+Nối xuống. \ptr{B/10-xu-ly-ambiguity} và \ptr{B/13-docking-control} mục~8 tiêu thụ trực tiếp ba đại lượng ở mục~2, nên mini project của chương này là điều kiện tiên quyết cho cả hai.
+
+\begin{tukiem}
+\item Nêu ba đại lượng phải lấy ra khỏi pipeline, chương nào tiêu thụ mỗi cái, và điều chung của cả ba.
+\item Vì sao gọi \code{solvePnP} với cờ mặc định trên tag vuông là không tối ưu theo hai cách? Nêu cách sửa mỗi cách.
+\item Mô tả cái bẫy \(\rho\) tại fronto-parallel, và nói vì sao nó nguy hiểm hơn một lỗi thông thường.
+\item Ba tệp mã nào đáng đọc, và mỗi tệp kiểm được sự hiểu của bạn về chương nào?
+\item Wrapper ROS làm mất hai thứ. Nêu cả hai, và nói vì sao mất mát thứ hai tệ hơn mất mát thứ nhất.
+\item Phần nào của chương này hết hạn nhanh nhất và phần nào không? Nêu cách rà lại đúng.
+\item Vì sao chương này cố ý không có bảng benchmark so sánh các detector?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

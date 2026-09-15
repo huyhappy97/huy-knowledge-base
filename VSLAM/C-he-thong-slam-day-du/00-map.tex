@@ -1,0 +1,21 @@
+% 00-map.tex — bản đồ Phần C. Ngày tạo: 2026-09-13 | Dependency: ../00-map.tex | Mức độ: điều hướng
+\documentclass[../vslam.tex]{subfiles}
+\begin{document}
+\begin{table}[H]\centering\small
+\caption{Bản đồ Phần C: các chương, nội dung, và mức đầu tư đề xuất.}
+\begin{tabularx}{\linewidth}{@{}L{0.8cm}L{3.4cm}YL{1.6cm}@{}}
+\toprule
+\textbf{Ch.} & \textbf{Thư mục} & \textbf{Nội dung} & \textbf{Mức}\\
+\midrule
+13 & \code{13-quan-ly-ban-do} & Chọn và loại keyframe; loại landmark; đồ thị đồng quan sát và essential graph; cửa sổ bản đồ cục bộ; làm thưa bản đồ; ghép nhiều phiên và Atlas; cập nhật dài hạn; nén và tuần tự hoá; quyền riêng tư & \muc{3}\\
+14 & \code{14-hieu-chuan-nhu-mot-nhanh-cua-slam} & Hiệu chuẩn nội từ target; tự hiệu chuẩn; ngoại stereo và camera--IMU; hiệu chuẩn trực tuyến có cổng observability; tự đánh giá chất lượng; suy biến trong hiệu chuẩn & \muc{3}\\
+15 & \code{15-hop-nhat-da-cam-bien} & Nguyên tắc chung để thêm một nguồn; IMU, odometry bánh xe, LiDAR, GNSS, marker, UWB; ràng buộc nonholonomic; căn chỉnh hệ toàn cục & \muc{2}\\
+16 & \code{16-dense-mapping-va-bieu-dien} & Stereo và MVS; TSDF và voxel hashing; surfel và mesh; octree và ESDF cho planning; NeRF-SLAM; 3D Gaussian Splatting; đánh đổi dày so với thưa & \muc{2}\\
+17 & \code{17-hoc-may-trong-slam} & Front-end học được; prior độ sâu; DROID-SLAM và luồng học được; bất định học được; foundation model \(3\)D; SLAM khả vi; semantic SLAM; vì sao hybrid là hướng đúng & \muc{2}\\
+18 & \code{18-danh-gia-va-phuong-phap-luan} & ATE và RPE, căn chỉnh đúng số bậc; drift theo đoạn; NEES; đánh giá reloc và loop closure; ablation có kỷ luật; mô phỏng; ý nghĩa thống kê; đánh giá ở đuôi phân bố & \muc{3}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent Chương 14 là chương nên đọc trước nếu chỉ có thời gian cho một chương --- nó là chỗ luận đề trung tâm của cây được chứng minh, và nó thay đổi cách bạn nhìn cả Phần A. Chương 13 và 18 là hai chương có tỉ lệ giá trị trên độ nổi tiếng cao nhất: cả hai đều bị coi nhẹ trong tài liệu và cả hai đều quyết định hệ thống có dùng được ngoài phòng thí nghiệm hay không. Chương 15 ngắn và chủ yếu trỏ sang các cây khác; đọc nó để lấy nguyên tắc, rồi sang \code{../IMU\_Fusion/} và \code{../marker/} khi cần chi tiết. Chương 16 và 17 nên đọc lướt để biết bản đồ lĩnh vực, rồi quay lại khi thật sự cần --- chúng là hai chương hết hạn nhanh nhất và được chốt tại tháng 9/2026.
+\end{document}

@@ -1,0 +1,19 @@
+% Bản đồ chương 19 — cập nhật 2026-09-03
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ chương 19 --- Từ NumPy tự viết tới PyTorch thành thạo}
+
+Chương này chia làm hai mục vì hai giai đoạn có \emph{bản chất khác nhau} và có tuổi thọ khác nhau. Nhầm lẫn giữa chúng là cái bẫy chính của cả chương.
+
+\textbf{19.1 --- Giai đoạn 1: tự viết bằng NumPy} \T{2}\T{3} \emph{(cốt lõi; làm đúng một lần rồi bỏ)}. Cài linear classifier với cả hinge lẫn softmax, viết lượt ngược giải tích cho sáu tầng, kiểm tra gradient số cho từng tầng trước khi ghép, rồi ghép thành mạng $n$ tầng với SGD + momentum. Đây \emph{không} phải bài tập công cụ --- mục tiêu là trực giác về cơ chế, thứ không hết hạn khi framework đổi. Tiêu chí dừng rất rõ: giải thích được vì sao BatchNorm khiến lượt ngược tốn thêm bộ nhớ, và vì sao dropout phải scale lúc train. Đạt rồi thì chuyển sang 19.2 và không viết NumPy nữa.
+
+\textbf{19.2 --- Giai đoạn 2: PyTorch thành thạo} \T{4} \emph{(cốt lõi phần ánh xạ triệu chứng \(\rightarrow\) công cụ; tham khảo phần cú pháp)}. Chín nút thắt và công cụ gỡ từng cái: stride và view/copy, autograd, parameter so với buffer, DataLoader, tự viết vòng lặp một lần, AMP và DDP và \code{torch.compile}, profiler, tính tất định, và cuối cùng là kernel tuỳ biến (biết là đủ). Phần bền của mục này là cây quyết định tăng tốc; phần sẽ cũ là tên API.
+
+\textbf{Vì sao chia như vậy và thứ tự bắt buộc.} 19.2 giới thiệu \code{autograd}, \code{buffer}, \code{train()}/\code{eval()} như tên gọi mới của thứ bạn vừa tự cài trong 19.1. Đọc ngược sẽ biến chúng thành từ vựng phải học thuộc thay vì khái niệm đã hiểu.
+
+\textbf{Sợi chỉ xuyên chương.} Hầu hết bug ở đây là bug về \emph{trạng thái}, không phải công thức: cái gì được nhớ giữa lượt xuôi và lượt ngược, cái gì được lưu vào checkpoint, cái gì đổi hành vi giữa hai chế độ.
+
+\textbf{Phụ thuộc lên trên.} \ptr{A/01-toan-toi-thieu/02-vi-phan-va-toi-uu} (quy tắc chuỗi), \ptr{B/09-thiet-ke-ham-mat-mat}, \ptr{B/11-gioi-han-tinh-toan} (bắt buộc trước phần tăng tốc), \ptr{C/12-co-che-huan-luyen}.
+
+\textbf{Toả xuống dưới.} \ptr{D/20-toi-uu-va-nen-mo-hinh} dùng lại đúng những đòn bẩy này nhưng cho \vn{suy luận}{inference}; \ptr{D/21-inference-va-trien-khai} dùng lại kỹ năng phân biệt ``lệch do bug'' với ``lệch do số học''; \ptr{D/22-tai-lap-va-mlops} mở rộng mục về tính tất định thành một chương.
+\end{document}

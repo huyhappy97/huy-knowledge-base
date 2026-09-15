@@ -1,0 +1,843 @@
+% ---------------------------------------------------------------------------
+%  Chương 32 — Bản đồ neural: NeRF và 3D Gaussian Splatting
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: C/16/03 (cơ chế NeRF và 3DGS), F/27 (khung bốn cổng), F/31 (backend khả vi)
+%  Mức độ: quan trọng — chương dễ bị bán hàng nhất trong Phần F, nên viết nặng về đánh giá.
+% ---------------------------------------------------------------------------
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Bản đồ neural: NeRF và 3D Gaussian Splatting (Neural Map Representations)}
+\ptrtarget{F/32}\ptrtarget{F/32-ban-do-neural}
+\dependency{\ptr{C/16/03-nerf-3dgs-va-hop-nhat} (cơ chế dựng ảnh thể tích, rasterize Gaussian, và vì sao PSNR không chứng minh hình học --- chương này giả định bạn đã nắm phần đó); \ptr{F/27} (khung bốn cổng để quyết định thay một khối cổ điển); \ptr{E/24} (thiết kế ablation, oracle experiment); \ptr{F/31} nếu bạn muốn hiểu bộ bám vết mà nhiều hệ trong chương này mượn lại.}
+
+\begin{tomtat}
+Chương này hỏi một câu duy nhất: có nên thay bản đồ điểm thưa của hệ SLAM hiện tại bằng một bản đồ neural. Bạn sẽ đọc được hai dòng công trình --- NeRF và 3D Gaussian Splatting --- theo đúng nút thắt mà mỗi mốc gỡ, chứ không theo thứ tự thời gian. Phần nặng nhất là phần đánh giá, vì đây là chủ đề mà chất lượng ảnh và độ chính xác quỹ đạo bị trộn lẫn nhiều nhất. Đọc xong bạn tách được hai trục đó, chỉ ra được điều kiện thí nghiệm ẩn sau một bảng kết quả đẹp, và lập được ngân sách bộ nhớ cùng băng thông cho Jetson Orin dưới dạng công thức, trước khi thử. Nếu chỉ nhớ một điều: một bản đồ đẹp ảnh không phải một bản đồ đúng hình học, và cho tới nay chưa có bằng chứng nào nói rằng bản đồ neural giúp \emph{quỹ đạo} của một hệ stereo-inertial đã tinh chỉnh kỹ tốt lên.
+\end{tomtat}
+
+\begin{nentang}
+\kn{bản đồ điểm thưa}{bản đồ của ORB-SLAM3 và họ hàng: vài chục nghìn tới vài trăm nghìn điểm 3D, mỗi điểm kèm một bộ mô tả để nhận lại. Nó đủ để trả lời ``tôi đang ở đâu'' và không trả lời được ``chỗ kia có trống không''.}
+\kn{bản đồ dày, TSDF, lưới chiếm dụng}{ba cách nói về cùng một ý: bản đồ gán một giá trị cho \emph{mọi} vị trí trong không gian, không chỉ ở vài điểm đặc trưng. TSDF lưu ở mỗi ô một khoảng cách có dấu tới bề mặt gần nhất --- âm ở trong vật, dương ở ngoài, bằng không đúng trên mặt --- nên bề mặt có định nghĩa sạch. Lưới chiếm dụng lưu xác suất mỗi ô bị chiếm, và đó là thứ bộ lập kế hoạch đường đi thật sự cần.}
+\kn{dựng ảnh ở góc nhìn mới}{cho một số ảnh đã chụp, tạo ra ảnh của cùng cảnh đó từ một vị trí camera chưa từng chụp. Đây là bài toán mà NeRF và 3DGS sinh ra để giải.}
+\kn{PSNR, SSIM, LPIPS}{ba thước đo ``ảnh dựng ra giống ảnh thật tới đâu''. PSNR đo sai lệch bình phương theo từng điểm ảnh, SSIM đo tương đồng cấu trúc cục bộ, LPIPS đo khoảng cách trong không gian đặc trưng của một mạng đã huấn luyện. Cả ba đều nói về \emph{ảnh}, không nói gì về hình học.}
+\kn{ATE và RPE}{hai thước đo quỹ đạo. ATE là sai số tuyệt đối của cả quỹ đạo sau khi căn chỉnh với chân trị; RPE là sai số của các chuyển vị tương đối trong một cửa sổ thời gian. Đây là hai con số quyết định một hệ SLAM có dùng được không.}
+\kn{bám vết theo mô hình}{cách ước lượng tư thế bằng cách dựng ảnh từ bản đồ hiện có rồi tối ưu tư thế cho ảnh dựng khớp ảnh thật, thay vì ghép đặc trưng giữa hai khung hình. Nó chính xác khi bản đồ đúng và trôi theo bản đồ khi bản đồ sai.}
+\kn{quên thảm khốc}{hiện tượng một mạng học dữ liệu mới rồi mất khả năng tái tạo dữ liệu cũ, vì cùng bộ trọng số phải gánh cả hai. Trong bản đồ neural, nó hiện ra thành ``đi sang phòng bên rồi quay lại thì phòng cũ mờ đi''.}
+\kn{Replica, TUM RGB-D, ScanNet}{ba tập dữ liệu mà gần như mọi bài trong chương này báo cáo trên đó. Replica là cảnh tổng hợp có độ sâu hoàn hảo; TUM RGB-D và ScanNet là cảnh trong nhà quay bằng cảm biến thật, chuỗi ngắn, tốc độ đi bộ.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Bản đồ của ORB-SLAM3 chỉ có vài trăm nghìn điểm rời rạc, mà hệ vẫn định vị chính xác tới centimét. Vậy chính xác thì một bản đồ dày cho bạn thêm \emph{điều gì} mà bạn đang thiếu?}
+\h{Nếu bạn thật sự cần bản đồ dày, vì sao lại là bản đồ neural chứ không phải TSDF --- thứ đã chạy thời gian thực từ 2011 và cho bề mặt có định nghĩa sạch?}
+\h{Một hệ dựng ảnh đẹp tới mức khó phân biệt với ảnh thật. Vì sao điều đó vẫn không nói gì về việc quỹ đạo của nó tốt hay tệ hơn hệ bạn đang có?}
+\h{3DGS nhanh hơn NeRF nhiều bậc độ lớn. Khoản chênh đó đến từ một thay đổi thuật toán duy nhất --- nó là gì, và vì sao nó lại đúng lúc mở ra khả năng sửa bản đồ sau khi đóng vòng?}
+\h{Một triệu Gaussian nghe không nhiều. Nhưng khi đưa lên Orin và chạy vài chục vòng tối ưu mỗi khung, cái gì cắn trước --- dung lượng bộ nhớ hay băng thông bộ nhớ --- và vì sao câu trả lời đó làm mọi mẹo tăng tốc suy luận trở nên vô dụng?}
+\end{khoigoi}
+
+\section{Đặt vấn đề: bản đồ thưa đủ cho việc gì}
+\ptrtarget{F/32/01}
+Hệ SLAM bạn đang bảo trì dựng một \vn{bản đồ điểm thưa}{sparse point map}. Mỗi điểm là một vị trí 3D cộng một bộ mô tả nhị phân. Với một tầng văn phòng, con số thường rơi vào bậc \(10^5\) điểm. Bản đồ đó làm rất tốt đúng một việc: trả lời câu ``tôi đang ở đâu''. Nó làm tốt vì nó chỉ cần các điểm \emph{nhận lại được}, và những điểm nhận lại được thì hiếm --- góc, biên, đốm vân.
+
+Nhưng có ba câu hỏi hạ nguồn mà chính bản đồ ấy không trả lời nổi. Thứ nhất: khoảng không giữa hai điểm là tường hay là lối đi? Bản đồ thưa không nói. Thứ hai: bề mặt này hình dạng ra sao, để robot đặt tay hoặc để người kiểm tra vết nứt? Bản đồ thưa không nói. Thứ ba: cảnh nhìn từ chỗ camera chưa từng đi qua thì trông thế nào, để người điều khiển từ xa xem trước, hoặc để sinh dữ liệu huấn luyện? Bản đồ thưa cũng không nói.
+
+Trước khi đi tiếp, một điều chỉnh cần thiết cho đúng hệ của bạn. Một cặp stereo đã cho độ sâu dày ở \emph{mỗi} khung hình. Vậy thứ bạn thiếu không phải độ sâu, mà là một bản đồ dày \emph{bền vững}: một chỗ để hợp nhất hàng nghìn quan sát độ sâu nhiễu thành một mô hình duy nhất, nhất quán, và tra cứu được ở mọi vị trí. Phân biệt này quan trọng vì nó thu hẹp câu hỏi rất nhiều. Nếu bộ lập kế hoạch của bạn chỉ cần nhìn một mét phía trước, độ sâu stereo tức thời đã đủ và bạn không cần chương này. Nhu cầu bản đồ dày chỉ thành thật khi robot phải nhớ chỗ nó đã đi qua.
+
+Hình~\ref{fig:map-repr-query} đặt ba biểu diễn cạnh nhau và hỏi chúng cùng một câu. Đây là hình đáng nhìn kỹ nhất của phần đặt vấn đề, vì nó cho thấy khác biệt không nằm ở ``chi tiết hơn'' mà nằm ở \emph{loại câu hỏi trả lời được}.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize]
+% --- 1. ban do thua ---
+\begin{scope}
+\node[font=\scriptsize\bfseries,inkblue] at (2.1,3.1) {Bản đồ điểm thưa};
+\draw[tiercol,thin] (0,0) rectangle (4.2,2.6);
+\foreach \x/\y in {0.3/2.3, 0.35/0.3, 1.1/2.45, 2.0/2.4, 3.1/2.35, 3.9/2.3,
+                   0.28/1.2, 3.95/1.1, 1.6/0.28, 2.7/0.32, 3.9/0.35, 1.2/1.55,
+                   2.55/1.6, 0.9/0.75, 3.3/0.8}
+  \fill[inkblue] (\x,\y) circle (1.6pt);
+\fill[reddark] (2.1,1.15) circle (2.4pt);
+\node[font=\scriptsize,reddark,anchor=west] at (2.25,1.15) {?};
+\node[font=\scriptsize,tiercol,align=center,text width=4.4cm] at (2.1,-0.75)
+  {biết \emph{có gì đó} ở 15 chỗ.\\ Giữa chúng: không có thông tin};
+\end{scope}
+% --- 2. TSDF ---
+\begin{scope}[xshift=5.4cm]
+\node[font=\scriptsize\bfseries,inkblue] at (2.1,3.1) {Lưới TSDF / chiếm dụng};
+\draw[tiercol,thin] (0,0) rectangle (4.2,2.6);
+\foreach \i in {0,...,13} \draw[tiercol!45,very thin] (\i*0.3,0) -- (\i*0.3,2.6);
+\foreach \j in {0,...,8} \draw[tiercol!45,very thin] (0,\j*0.3) -- (4.2,\j*0.3);
+\foreach \i in {0,...,13} {\fill[steel,opacity=0.75] (\i*0.3,2.3) rectangle (\i*0.3+0.3,2.6);
+                           \fill[steel,opacity=0.75] (\i*0.3,0) rectangle (\i*0.3+0.3,0.3);}
+\foreach \j in {0,...,8} {\fill[steel,opacity=0.75] (0,\j*0.3) rectangle (0.3,\j*0.3+0.3);
+                          \fill[steel,opacity=0.75] (3.9,\j*0.3) rectangle (4.2,\j*0.3+0.3);}
+\fill[reddark] (2.1,1.15) circle (2.4pt);
+\node[font=\scriptsize,reddark,anchor=west] at (2.25,1.15) {trống};
+\node[font=\scriptsize,tiercol,align=center,text width=4.4cm] at (2.1,-0.75)
+  {trả lời được mọi ô.\\ Độ phân giải cố định, bộ nhớ theo \(n^3\)};
+\end{scope}
+% --- 3. neural ---
+\begin{scope}[xshift=10.8cm]
+\node[font=\scriptsize\bfseries,inkblue] at (2.1,3.1) {Trường neural / Gaussian};
+\draw[tiercol,thin] (0,0) rectangle (4.2,2.6);
+\foreach \x/\y/\a/\b/\r in {0.4/2.35/0.5/0.16/6, 1.5/2.42/0.55/0.14/-4, 2.6/2.38/0.5/0.15/5,
+  3.6/2.3/0.45/0.17/-8, 0.22/1.3/0.15/0.6/2, 3.98/1.2/0.14/0.62/-3,
+  1.0/0.26/0.5/0.14/4, 2.2/0.3/0.55/0.15/-5, 3.4/0.28/0.5/0.16/3}
+  {\fill[violetdark,opacity=0.45,rotate around={\r:(\x,\y)}] (\x,\y) ellipse ({\a} and {\b});}
+\fill[reddark] (2.1,1.15) circle (2.4pt);
+\node[font=\scriptsize,reddark,anchor=west] at (2.25,1.15) {trống};
+\node[font=\scriptsize,tiercol,align=center,text width=4.6cm] at (2.1,-0.75)
+  {liên tục, dồn chi tiết vào chỗ có bề mặt.\\ Bề mặt \emph{không} được định nghĩa tường minh};
+\end{scope}
+\end{tikzpicture}}
+\caption{Cùng một hành lang, ba biểu diễn, và cùng một câu hỏi hỏi vào điểm đỏ ở giữa: chỗ này trống hay đặc? Bản đồ thưa không có câu trả lời --- không phải vì thiếu chi tiết mà vì nó chưa bao giờ mô hình hoá khoảng không. Lưới trả lời được mọi chỗ nhưng trả bằng bộ nhớ tăng theo luỹ thừa ba của độ phân giải. Biểu diễn neural trả lời được mọi chỗ và dồn tham số vào nơi có bề mặt, đổi lại bề mặt chỉ tồn tại ngầm dưới dạng một vùng mật độ cao.}
+\label{fig:map-repr-query}
+\end{figure}
+
+\begin{trucgiac}
+Bản đồ thưa giống một mạng lưới mốc trắc địa đóng trên nền đất. Đứng giữa công trường, bạn ngắm ba cái mốc là biết chính xác mình ở đâu, tới từng centimét. Nhưng không ai đưa bản vẽ mốc trắc địa cho người lái xe cẩu, vì nó không nói cái cột nào đang chắn đường. Bản đồ dày là bản vẽ mặt bằng: kém chính xác hơn ở từng điểm, nhưng nói được chỗ nào đi lọt. Hai thứ trả lời hai câu hỏi khác nhau, và một hệ SLAM tốt cho việc định vị hoàn toàn có thể vô dụng cho việc điều hướng.
+\end{trucgiac}
+
+\subsection{A. Đối thủ thật của bản đồ neural không phải bản đồ thưa}
+Đây là chỗ phần lớn bài báo trong chương này lặng lẽ bỏ qua, và cũng là cổng đầu tiên bạn nên dựng. Nhu cầu \vn{bản đồ dày}{dense map} có từ lâu và đã có lời giải cổ điển. KinectFusion hợp nhất độ sâu vào một lưới \vn{trường khoảng cách có dấu}{truncated signed distance field}, viết tắt TSDF, theo thời gian thực từ 2011 \cite{f32kinectfusion2011}. OctoMap cho \vn{lưới chiếm dụng}{occupancy grid} dạng cây tám nhánh, tiết kiệm bộ nhớ, có mô hình xác suất rõ ràng, và đã nằm trong hệ điều hướng của rất nhiều robot \cite{f32octomap2013}. Cả hai đều chạy được trên phần cứng nhúng, đều cho bề mặt hoặc thể tích trống có định nghĩa sạch, và đều đã được kiểm chứng hàng chục năm.
+
+Vậy câu hỏi đúng không phải ``thưa hay neural''. Nó là: bản đồ neural cho thêm gì so với TSDF, và đổi lại mất gì. Câu trả lời trung thực gồm ba khoản được và ba khoản mất, và cả sáu khoản đều nên nằm sẵn trong đầu bạn trước khi đọc bất kỳ bảng kết quả nào.
+
+\begin{itemize}
+\item \textbf{Được --- nội suy chỗ chưa quan sát.} Lưới TSDF để trống ô nào chưa có tia đi qua. Trường neural, do là một hàm liên tục có thiên lệch về hàm trơn, tự lấp các khe nhỏ. Với cảnh quét thưa, khác biệt này rất dễ thấy.
+\item \textbf{Được --- dựng được ảnh.} TSDF cho hình học nhưng không cho màu phụ thuộc góc nhìn. Muốn ảnh dựng ra giống ảnh thật, bạn cần một mô hình bức xạ, và đó chính là thứ neural rendering mang lại.
+\item \textbf{Được --- tham số dồn theo nội dung.} Lưới đều tiêu bộ nhớ cho cả không khí. Trường neural và tập Gaussian tiêu tham số ở nơi có bề mặt.
+\item \textbf{Mất --- bề mặt không tường minh.} Trong TSDF, bề mặt là tập mức 0. Trong trường mật độ hoặc tập Gaussian, không có định nghĩa nào tương đương, nên mọi thứ hạ nguồn cần bề mặt đều phải thêm một bước dựng lại.
+\item \textbf{Mất --- không có mô hình xác suất chiếm dụng.} OctoMap nói ``ô này bị chiếm với xác suất 0,8''. Mật độ của NeRF không phải xác suất chiếm dụng, và độ đục của một Gaussian càng không. Bộ lập kế hoạch nào cần biên an toàn sẽ không có thứ để dựa vào.
+\item \textbf{Mất --- chi phí là vòng lặp tối ưu, không phải một lượt tích hợp.} TSDF cập nhật bằng một phép trộn có trọng số, chi phí cố định mỗi khung. Bản đồ neural cập nhật bằng vài chục bước hạ gradient, và chi phí đó không giảm được bằng lượng tử hoá hay TensorRT.
+\end{itemize}
+
+Khoản mất cuối cùng là khoản đắt nhất trên phần cứng nhúng, và mục~\ref{sec:f32-orin} sẽ quy nó thành con số. Trước đó, hai mục tiếp theo đọc hai dòng công trình theo đúng mạch nút thắt.
+
+\section{Dòng NeRF: một MLP làm bản đồ, rồi mọi thứ sinh ra từ chỗ nó hỏng}
+\ptrtarget{F/32/02}
+Cơ chế dựng ảnh thể tích đã nằm ở \ptr{C/16/03-nerf-3dgs-va-hop-nhat}, nên mục này không nhắc lại. Điều đáng học ở đây là chuyện khác: khi mang cơ chế đó vào một hệ SLAM chạy trực tuyến, những giả định nào vỡ, và mỗi công trình tiếp theo vá đúng chỗ nào.
+
+\subsection{A. iMAP --- ý tưởng cực đoan nhất, và nó giải quyết việc gì}
+iMAP làm đúng một việc táo bạo: dùng \emph{một} perceptron nhiều lớp làm toàn bộ bản đồ của một hệ SLAM RGB-D chạy trực tuyến \cite{f32imap2021}. Không có lưới, không có point cloud, không có TSDF. Cảnh là trọng số của một mạng nhỏ. \vn{Bám vết theo mô hình}{frame-to-model tracking} là tối ưu tư thế khung hình mới sao cho ảnh và độ sâu dựng ra từ mạng khớp với quan sát. Dựng bản đồ là tiếp tục hạ gradient trên trọng số mạng, dùng các tia lấy mẫu từ một tập \vn{khung hình chốt}{keyframe}.
+
+Nó giải quyết việc gì cụ thể? Một hệ TSDF phải chọn trước độ phân giải ô lưới và phải trả bộ nhớ cho toàn bộ thể tích. iMAP không phải chọn gì cả: sức chứa nằm ở số trọng số, và mạng tự phân bổ chi tiết. Với một căn phòng, tác giả báo cáo mô hình chỉ vài trăm nghìn tham số --- nhỏ hơn nhiều bậc so với lưới tương đương. Thêm một điểm thiết kế đáng học: iMAP chọn khung hình chốt theo \emph{lượng thông tin mới}, đo bằng sai số dựng ảnh của khung hình đó dưới bản đồ hiện tại. Đây là một tiêu chí có cơ sở, khác hẳn các luật chốt khung hình bằng ngưỡng số điểm khớp mà hệ cổ điển vẫn dùng.
+
+Cụm ``vài trăm nghìn tham số'' đáng dừng lại một nhịp, vì nó là lý lẽ mạnh nhất của cả dòng này. Điều đáng nhớ không phải một tỉ số cụ thể mà là \emph{hai đại lượng đó lớn lên theo hai kiểu khác nhau}. Sức chứa của một MLP bốn tầng ẩn rộng 256 là một hằng số: nó không đổi khi căn phòng to ra. Bộ nhớ của một lưới thể tích thì tăng theo luỹ thừa ba của độ phân giải và tỉ lệ với thể tích, lại còn trả tiền cho cả không khí lẫn tường. Nên ở độ phân giải vài centimét cho một căn phòng, biểu diễn ẩn gọn hơn hẳn --- và càng gọn hơn khi bạn đòi độ phân giải mịn hơn. Tỉ số gọn hơn bao nhiêu lần thì phụ thuộc độ phân giải và kích thước phòng, nên nó không phải một hằng số trích dẫn được.
+
+Cái giá thì lộ ra ngay. Vì toàn bộ cảnh nằm trong một bộ trọng số dùng chung, mỗi bước cập nhật ở phòng B đều làm đổi hàm ở phòng A. Đó là \vn{quên thảm khốc}{catastrophic forgetting}, và cách chữa duy nhất trong khuôn khổ ấy là liên tục phát lại các tia từ khung hình cũ --- tức là trả chi phí tăng theo kích thước cảnh cho một biểu diễn vốn được quảng cáo là gọn. Các tác giả công bố hệ trên một GPU để bàn đời cao, với khâu dựng bản đồ chạy chậm hơn hẳn khâu bám vết. Chính chênh lệch đó, chứ không phải con số tốc độ, mới là điều đáng nhớ: khâu bản đồ là khâu bị ngân sách ép, và mọi công trình sau đều tấn công vào đúng nó. Phạm vi thí nghiệm là một căn phòng.
+
+\begin{mach}[Mạch 1 --- dòng NeRF làm bản đồ SLAM]
+\item \vd{Bản đồ dày cổ điển phải chọn trước độ phân giải và trả bộ nhớ cho cả không khí.}
+\gp iMAP đặt toàn bộ cảnh vào trọng số một MLP, tối ưu bằng chính sai số ảnh và độ sâu \cite{f32imap2021}.
+\gd cảnh cỡ một căn phòng, có độ sâu RGB-D, camera đi chậm, và một GPU để bàn luôn sẵn.
+\gia mỗi khung hình cần vài chục bước hạ gradient thay vì một lượt tích hợp.
+\vdm trọng số dùng chung cho cả cảnh, nên học chỗ mới làm hỏng chỗ cũ.
+
+\item \vd{Quên thảm hoạ, và chi phí phát lại tăng theo kích thước cảnh.}
+\gp NICE-SLAM thay MLP đơn bằng lưới đặc trưng nhiều mức, mỗi bước cập nhật chỉ chạm các ô lưới quanh tia \cite{f32niceslam2022}.
+\gd cảnh có biên giới hạn trước để cấp phát lưới; vẫn cần độ sâu.
+\gia bộ nhớ quay lại phụ thuộc thể tích cảnh, đúng thứ iMAP muốn tránh.
+\vdm lưới đều lại tiêu tham số cho không khí, và tra nhiều mức thì chậm.
+
+\item \vd{Lưới đều tốn bộ nhớ; MLP đơn quên; cần một chỗ đứng giữa.}
+\gp ba lời giải song song --- Co-SLAM ghép mã hoá toạ độ với bảng băm thưa \cite{f32coslam2023}; ESLAM thay lưới ba chiều bằng ba mặt phẳng đặc trưng và dùng TSDF thay mật độ \cite{f32eslam2023}; Point-SLAM neo đặc trưng lên chính các điểm đã quan sát, dày thưa theo độ chi tiết ảnh \cite{f32pointslam2023}.
+\gd bề mặt chiếm phần rất nhỏ thể tích, nên cấu trúc thưa là đúng bản chất bài toán.
+\gia thêm siêu tham số cấp phát, và mỗi lời giải mạnh trên một loại cảnh khác nhau.
+\vdm cả ba vẫn không có tính nhất quán toàn cục: không đóng vòng, không hiệu chỉnh chùm tia toàn phần.
+
+\item \vd{Đi một vòng lớn rồi quay lại thì bản đồ lệch, và không có cơ chế nào kéo nó về.}
+\gp GO-SLAM ghép một bộ bám vết dày kiểu DROID với bản đồ neural, thêm đóng vòng và tối ưu toàn cục, rồi biến dạng bản đồ theo tư thế đã sửa \cite{f32goslam2023}.
+\gd bản đồ neo được vào các khung hình chốt, nên sửa tư thế thì kéo được bản đồ theo.
+\gia chi phí tăng thêm một bộ bám vết nặng, và toàn hệ cần bộ nhớ GPU lớn.
+\hq đây là mốc đầu tiên trong dòng này trả lời được nỗi đau đóng vòng --- và nó trả lời bằng cách mượn lại kiến trúc của SLAM cổ điển, không phải bằng bản thân trường neural.
+\end{mach}
+
+Hình~\ref{fig:nerf-slam-timeline} vẽ lại chính mạch đó trên một trục, để bạn nhìn thấy mỗi mốc gỡ nút nào.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  st/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,
+             font=\scriptsize,text width=2.5cm,minimum height=1.6cm},
+  ar/.style={-{Stealth[length=5pt]},steel,very thick},
+  nt/.style={font=\scriptsize,color=reddark,align=center,text width=2.9cm}]
+\node[st] (a) {\textbf{iMAP} (2021)\\ một MLP là toàn bộ bản đồ};
+\node[st,right=1.45cm of a] (b) {\textbf{NICE-SLAM} (2022)\\ lưới đặc trưng nhiều mức};
+\node[st,right=1.45cm of b] (c) {\textbf{Co-SLAM · ESLAM · Point-SLAM} (2023)\\ ba cách cấp phát thưa};
+\node[st,right=1.45cm of c] (d) {\textbf{GO-SLAM} (2023)\\ đóng vòng \(+\) tối ưu toàn cục};
+\foreach \x/\y in {a/b,b/c,c/d} \draw[ar] (\x) -- (\y);
+\node[nt,below=0.3cm of a] {nút: quên thảm khốc, chỉ hợp một phòng};
+\node[nt,below=0.3cm of b] {gỡ bằng: cập nhật cục bộ \ra bộ nhớ theo thể tích};
+\node[nt,below=0.3cm of c] {gỡ bằng: dồn tham số vào nơi có bề mặt};
+\node[nt,below=0.3cm of d] {gỡ bằng: mượn backend cổ điển, không phải trường neural};
+\node[font=\scriptsize,violetdark,align=center,text width=6.2cm,anchor=north] at ($(b.south)!0.5!(c.south)+(0,-1.95)$)
+  {\textbf{BARF} (2021) đứng ngoài trục này: nó hỏi ``nếu tư thế cũng sai thì sao'', và câu trả lời của nó --- mã hoá tần số từ thô đến tinh --- là bài học dùng lại được cả ngoài NeRF};
+\end{tikzpicture}}
+\caption{Dòng NeRF làm bản đồ SLAM, đọc theo nút thắt chứ không theo năm. Mỗi mũi tên là một câu trả lời cho đúng một chỗ hỏng của mốc trước, và mốc cuối đáng chú ý nhất vì nó gỡ nút bằng cách gọi lại kiến trúc SLAM cổ điển. Nếu bài toán của bạn không có nút thắt tương ứng, mốc đó không mang lại gì cho bạn.}
+\label{fig:nerf-slam-timeline}
+\end{figure}
+
+\subsection{B. NICE-SLAM và ý nghĩa của tính cục bộ}
+NICE-SLAM chữa quên thảm khốc bằng một thay đổi nghe rất kỹ thuật nhưng thực ra là thay đổi khái niệm \cite{f32niceslam2022}. Thay vì để cảnh nằm trong trọng số, nó để cảnh nằm trong \vn{lưới đặc trưng nhiều mức}{multi-level feature grid}: mỗi ô lưới giữ một vectơ đặc trưng học được, còn các bộ giải mã nhỏ thì cố định. Muốn biết mật độ tại một điểm, ta nội suy đặc trưng từ các ô lân cận rồi cho qua bộ giải mã.
+
+Hệ quả quan trọng nằm ở \emph{giá đỡ của gradient}. Với MLP đơn, một tia ở phòng B sinh gradient chảy vào mọi trọng số, nên nó đổi hàm ở khắp nơi. Với lưới đặc trưng, tia đó chỉ chạm vài ô quanh nó. Cập nhật trở thành cục bộ, và quên thảm khốc biến mất gần hết. Hình~\ref{fig:global-vs-local} vẽ đúng khác biệt này.
+
+\begin{figure}[H]\centering
+\resizebox{0.95\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize]
+% --- MLP dung chung ---
+\begin{scope}
+\node[font=\scriptsize\bfseries,inkblue] at (2.6,2.9) {Một MLP dùng chung (iMAP)};
+\node[draw=steel,fill=bluebg,rounded corners=2pt,minimum width=1.5cm,minimum height=2.0cm,
+      align=center,font=\scriptsize] (mlp) at (2.6,1.1) {trọng số\\ MLP};
+\draw[-{Stealth[length=4pt]},reddark,thick] (0.15,1.8) -- node[above,font=\scriptsize,reddark,pos=0.42]{tia ở phòng B} (mlp.west);
+\foreach \y in {0.35,0.75,1.15,1.55,1.95}
+  \draw[-{Stealth[length=3pt]},reddark,opacity=0.75] (mlp.east) -- ++(0.85,{(\y-1.15)*0.55});
+\node[font=\scriptsize,reddark,anchor=west,align=left,text width=2.0cm] at (4.35,1.1) {gradient chạm \emph{mọi} tham số};
+\node[font=\scriptsize,tiercol,align=center,text width=4.6cm] at (2.4,-0.45)
+  {phòng A mờ đi sau khi quét phòng B, nên phải phát lại tia cũ};
+\end{scope}
+% --- luoi dac trung ---
+\begin{scope}[xshift=9.2cm]
+\node[font=\scriptsize\bfseries,inkblue] at (2.4,2.9) {Lưới đặc trưng (NICE-SLAM)};
+\foreach \i in {0,...,7} \foreach \j in {0,...,4}
+  \draw[tiercol!55,very thin] (\i*0.6,\j*0.5) rectangle (\i*0.6+0.6,\j*0.5+0.5);
+\foreach \i/\j in {4/2,5/2,4/1,5/1,4/3}
+  \fill[reddark,opacity=0.35] (\i*0.6,\j*0.5) rectangle (\i*0.6+0.6,\j*0.5+0.5);
+\draw[-{Stealth[length=4pt]},reddark,thick] (0.1,1.35) -- node[above,font=\scriptsize,reddark,pos=0.4]{cùng tia đó} (2.35,1.35);
+\node[font=\scriptsize,tiercol,align=center,text width=4.6cm] at (2.4,-0.45)
+  {chỉ vài ô quanh tia đổi giá trị, nên phòng A không suy suyển};
+\end{scope}
+\end{tikzpicture}}
+\caption{Vì sao đổi từ trọng số sang lưới lại chữa được quên thảm khốc. Câu trả lời nằm ở giá đỡ của gradient: bên trái, một quan sát mới chạm tới toàn bộ tham số, nên nó bắt buộc phải đổi cả những vùng cảnh không liên quan; bên phải, quan sát chỉ chạm các ô lân cận. Đây là cùng một nguyên lý với việc chia bản đồ thành nhiều bản đồ con trong SLAM cổ điển: giới hạn phạm vi ảnh hưởng của một quan sát chính là cách mua lấy tính ổn định.}
+\label{fig:global-vs-local}
+\end{figure}
+
+Cái giá thì đúng bằng thứ iMAP muốn tránh: bộ nhớ quay lại phụ thuộc thể tích cảnh, và bạn phải biết trước biên của cảnh để cấp phát. Ba công trình năm 2023 đi tìm chỗ đứng giữa hai cực đó, mỗi cái theo một hướng khác. Co-SLAM ghép một mã hoá toạ độ trơn với một bảng băm thưa, để có cả tính lấp khe của hàm liên tục lẫn tốc độ của bảng tra \cite{f32coslam2023}. ESLAM bỏ lưới ba chiều, thay bằng ba mặt phẳng đặc trưng vuông góc nhau, nên bộ nhớ tăng theo bình phương chứ không theo luỹ thừa ba của độ phân giải; nó cũng đổi mật độ lấy TSDF, tức là kéo bề mặt về lại chỗ có định nghĩa sạch \cite{f32eslam2023}. Point-SLAM đi xa nhất theo hướng ``chỉ cấp phát nơi có vật'': đặc trưng neo trên chính đám mây điểm đã quan sát, và mật độ điểm được điều chỉnh theo độ biến thiên của ảnh, tức là dồn sức chứa vào chỗ nhiều chi tiết \cite{f32pointslam2023}.
+
+Ba lời giải này đáng nhớ không phải vì tên của chúng mà vì chúng là ba câu trả lời cho cùng một câu hỏi: \emph{đặt tham số ở đâu}. Đó cũng đúng là câu hỏi bạn sẽ phải trả lời nếu tự dựng một bản đồ dày cho hệ của mình.
+
+\subsection{C. BARF: khi tư thế cũng là ẩn số, và bài học từ thô đến tinh}
+Cả nhóm trên giả định tư thế camera đã có, hoặc ít nhất có một ước lượng ban đầu tốt. BARF hỏi câu ngược lại: nếu tối ưu tư thế \emph{cùng lúc} với trường thì sao \cite{f32barf2021}. Về mặt hình thức, đây chính là \vn{hiệu chỉnh chùm tia}{bundle adjustment}, chỉ khác là điểm 3D được thay bằng một trường liên tục và phần dư được đo trên chính điểm ảnh.
+
+Phát hiện quan trọng của BARF không phải kết quả mà là \emph{nguyên nhân của thất bại}. \vn{Mã hoá vị trí}{positional encoding} bằng chuỗi sin và cos nhiều tần số là thứ cho NeRF độ sắc nét. Nhưng chính nó phá hỏng gradient theo tư thế. Lý do là đạo hàm của một thành phần tần số \(k\) có biên độ tỉ lệ với \(k\). Các thành phần tần số cao vì thế tạo ra một mặt phẳng mất mát lởm chởm với vô số cực tiểu địa phương cách nhau rất gần. Hạ gradient trên tư thế rơi vào cái hố gần nhất và đứng lại đó.
+
+Lời giải của BARF là che dần: bật các tần số từ thấp lên cao theo tiến trình tối ưu. Giai đoạn đầu, mặt phẳng mất mát trơn và có một bồn hút rộng, nên tư thế đi đúng hướng. Giai đoạn sau, tần số cao mở ra và chi tiết trở lại. Hình~\ref{fig:barf-coarse-fine} vẽ minh hoạ mặt cắt một chiều của hai mặt phẳng mất mát đó.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=12cm,height=5.0cm,domain=-3:3,samples=400,
+  xlabel={độ lệch tư thế theo một trục (đơn vị tuỳ ý)},
+  ylabel={mất mát ảnh}, ylabel style={font=\small}, xlabel style={font=\small},
+  tick label style={font=\footnotesize},
+  legend style={font=\footnotesize,draw=none,fill=none,at={(0.5,1.22)},anchor=north,legend columns=2},
+  axis lines=left, ymin=0, ymax=2.6, enlarge x limits=false]
+\addplot[thick,steel] {0.24*x^2};
+\addlegendentry{chỉ bật tần số thấp (giai đoạn thô)}
+\addplot[thick,reddark] {0.24*x^2 + 0.16*(1-cos(deg(9*x)))};
+\addlegendentry{bật hết tần số ngay từ đầu}
+\draw[reddark,densely dashed] (axis cs:-2.1,0.0) -- (axis cs:-2.1,1.55);
+\node[font=\scriptsize,reddark,anchor=north west,align=left,text width=3.4cm] at (axis cs:-2.95,2.45)
+  {đường đỏ: kẹt ở cực tiểu địa phương, cách nghiệm đúng hai đơn vị};
+\draw[violetdark,-{Stealth[length=4pt]},thick] (axis cs:1.7,1.45) -- (axis cs:0.4,0.16);
+\node[font=\scriptsize,violetdark,anchor=north east,align=right,text width=3.3cm] at (axis cs:2.95,2.45)
+  {đường xanh: một bồn hút duy nhất, trượt thẳng về đáy};
+\end{axis}
+\end{tikzpicture}
+\caption{Mặt cắt một chiều của mặt phẳng mất mát theo tư thế, hình \emph{minh hoạ} chứ không phải số đo. Đường đỏ là điều xảy ra khi mọi tần số của mã hoá vị trí đều bật: biên độ đạo hàm của thành phần tần số \(k\) tỉ lệ với \(k\), nên các gợn tần số cao sinh ra hàng loạt cực tiểu địa phương gần nhau. Đường xanh là cùng bài toán khi chỉ bật tần số thấp: một bồn hút duy nhất, đủ rộng để hạ gradient tìm về đáy. BARF bật dần từ đường xanh sang đường đỏ trong quá trình tối ưu.}
+\label{fig:barf-coarse-fine}
+\end{figure}
+
+Bài học ở đây quan trọng hơn bản thân BARF, và nó nói bằng đúng ngôn ngữ bạn đã quen. Mọi phương pháp căn chỉnh theo cường độ ảnh đều cần một lịch làm trơn. Các hệ trực tiếp cổ điển gọi nó là kim tự tháp ảnh: căn chỉnh ở mức thô trước, rồi mới xuống mức tinh. BARF phát hiện lại đúng nguyên lý đó trong không gian tần số của mã hoá vị trí. Nếu một ngày bạn ghép một hàm mất mát quang trắc vào hệ của mình --- dù là để tinh chỉnh tư thế, để căn chỉnh với bản đồ, hay để hiệu chỉnh trực tuyến --- thì câu hỏi đầu tiên phải hỏi là: lịch làm trơn của tôi ở đâu.
+
+\subsection{D. Bốn nhánh còn lại, mỗi nhánh một câu hỏi khác}
+Bốn công trình còn lại trong danh sách không nằm trên cùng một trục với nhóm trên, vì mỗi cái hỏi một câu riêng.
+
+\begin{itemize}
+\item \textbf{NeRF-SLAM --- bỏ độ sâu cảm biến đi thì sao?} Nó ghép một bộ bám vết dày đơn ảnh với một bản đồ kiểu Instant-NGP, và điểm thiết kế đáng học là dùng \emph{độ bất định} của độ sâu ước lượng làm trọng số cho hàm mất mát dựng bản đồ \cite{f32nerfslam2022}. Đây chính là tư duy ma trận thông tin của đồ thị nhân tử, mang sang phía bản đồ. Nếu bạn chỉ đọc một ý từ cả nhóm này, hãy đọc ý đó.
+\item \textbf{NICER-SLAM --- chỉ có RGB thì lấy hình học ở đâu?} Nó thay độ sâu cảm biến bằng các tín hiệu học được: độ sâu đơn ảnh, pháp tuyến bề mặt, và ràng buộc căn chỉnh giữa các khung hình \cite{f32nicerslam2024}. Nói cách khác, khi mất một ràng buộc vật lý thì phải mượn một tiên nghiệm học được để thay --- và mọi giới hạn của tiên nghiệm đó, đặc biệt là vấn đề tỉ lệ, đi theo vào hệ. Chỗ này nối thẳng sang \ptr{F/30}.
+\item \textbf{vMAP --- vì sao cả cảnh phải nằm chung một trường?} Nó cấp cho mỗi vật thể một mạng nhỏ riêng, rồi hợp thành cảnh lúc dựng ảnh \cite{f32vmap2023}. Cái được rất đáng chú ý: vật thể quan sát được một phần vẫn ra hình dạng kín, vì mỗi mạng chỉ phải học một vật chứ không phải cả căn phòng. Đây là bước bắc cầu sang bản đồ mức đối tượng ở \ptr{F/33}.
+\item \textbf{GO-SLAM --- ai kéo bản đồ về khi đóng vòng?} Nó thêm phát hiện vòng lặp và tối ưu toàn cục, rồi biến dạng bản đồ neural theo tư thế đã sửa \cite{f32goslam2023}. Đáng chú ý là cách nó làm được: bản đồ được neo vào các khung hình chốt, nên sửa tư thế thì kéo được bản đồ theo. Bài học chung sẽ trở lại ở mục sau: \emph{biểu diễn nào neo được vào tư thế thì sửa được sau khi đóng vòng}.
+\end{itemize}
+
+\subsection{E. Giải phẫu hàm mất mát, để đọc bài nhanh hơn}
+Mọi hệ trong dòng này tối ưu một tổng của vài số hạng, và bốn số hạng dưới đây gần như luôn có mặt. Nhận ra chúng giúp bạn đọc một bài mới trong mười phút thay vì một giờ, vì phần khác biệt giữa các bài thường chỉ là trọng số và một số hạng phụ.
+
+\begin{itemize}
+\item \textbf{Số hạng màu} --- sai lệch giữa ảnh dựng và ảnh thật, trên các tia lấy mẫu. Đây là số hạng duy nhất bắt buộc, và cũng là số hạng \emph{không} ràng buộc hình học, đúng như phép tính ở mục sau cho thấy.
+\item \textbf{Số hạng độ sâu} --- sai lệch giữa độ sâu dựng ra và độ sâu cảm biến. Đây mới là số hạng thực sự dựng hình học, và nó biến mất trong các hệ chỉ có RGB. Bỏ nó đi thì phải mượn tiên nghiệm học được để thay.
+\item \textbf{Số hạng không gian trống} --- ép mật độ về không dọc phần tia trước điểm chạm. Nghe phụ nhưng rất quan trọng: nếu thiếu, mô hình thoải mái để lại vật chất giả lơ lửng, vì không có gì phạt nó.
+\item \textbf{Số hạng chính quy hoá} --- ép bề mặt trơn, ép Gaussian dẹt và bám mặt, ép pháp tuyến nhất quán. Đây là chỗ người ta \emph{trả lại} phần ràng buộc hình học đã cố tình bỏ đi lúc đầu.
+\end{itemize}
+
+Một quy tắc đọc rút ra: xem tỉ lệ giữa số hạng độ sâu và số hạng màu. Tỉ lệ nghiêng về màu thì bài đó đang tối ưu cho ảnh đẹp; nghiêng về độ sâu thì đang tối ưu cho hình học đúng. Rất ít bài nói thẳng điều này, nhưng bảng siêu tham số luôn nói.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Dòng NeRF làm bản đồ SLAM. Cột cuối là cột đáng đọc nhất: nó cho biết bạn sẽ gặp gì khi mang hệ đó ra khỏi điều kiện mà nó được công bố.}
+\label{tab:f32-nerf-line}
+\begin{tabularx}{\linewidth}{@{}L{2.15cm}YL{2.5cm}L{3.5cm}@{}}
+\toprule
+\textbf{Hệ} & \textbf{Cơ chế cốt lõi} & \textbf{Giả định} & \textbf{Hỏng khi nào}\\
+\midrule
+iMAP & Một MLP là toàn bộ bản đồ; bám vết và dựng bản đồ đều bằng hạ gradient & RGB-D, một phòng, GPU để bàn & Cảnh lớn dần: quên thảm khốc, chi phí phát lại tăng theo diện tích\\
+NICE-SLAM & Lưới đặc trưng nhiều mức, bộ giải mã cố định, cập nhật cục bộ & Biên cảnh biết trước để cấp phát lưới & Cảnh lớn hoặc mở: bộ nhớ theo thể tích; không có đóng vòng\\
+Co-SLAM & Mã hoá toạ độ trơn ghép bảng băm thưa & Bề mặt trơn từng mảnh & Va chạm băm ở vùng chi tiết dày\\
+ESLAM & Ba mặt phẳng đặc trưng thay lưới 3D; TSDF thay mật độ & Cảnh không quá nhiều lớp chồng theo mỗi trục & Cảnh phức tạp làm ba mặt phẳng chồng lấn thông tin\\
+Point-SLAM & Đặc trưng neo trên điểm đã quan sát, dày theo chi tiết ảnh & Độ sâu đủ tốt để đặt điểm đúng chỗ & Độ sâu nhiễu đặt điểm sai; vùng chưa quan sát để trống\\
+NeRF-SLAM & Bám vết dày đơn ảnh \(+\) bản đồ băm, trọng số theo bất định độ sâu & Bộ bám vết đủ tốt và chạy được thời gian thực & Bộ bám vết trôi thì bản đồ nhận sai; nặng GPU\\
+NICER-SLAM & Chỉ RGB, mượn độ sâu và pháp tuyến học được làm ràng buộc & Tiên nghiệm đơn ảnh đúng cho loại cảnh này & Ra ngoài phân phối huấn luyện; tỉ lệ trôi\\
+vMAP & Mỗi vật một mạng nhỏ, hợp lúc dựng ảnh & Có bộ tách vật thể đủ ổn định & Tách nhầm vật; cảnh không phân được thành vật\\
+GO-SLAM & Bám vết dày \(+\) đóng vòng \(+\) tối ưu toàn cục, bản đồ biến dạng theo & Bản đồ neo được vào khung hình chốt & Ngân sách GPU lớn; độ trễ khi biến dạng bản đồ lớn\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Dòng 3D Gaussian Splatting: vì sao rasteri hoá đổi cuộc chơi}
+\ptrtarget{F/32/03}
+Từ 2023 trở đi gần như cả lĩnh vực chuyển sang 3D Gaussian splatting. Chuyện này thường được kể như ``nhanh hơn nên tốt hơn'', và cách kể đó bỏ mất phần đáng học. Khoản chênh tốc độ đến từ một thay đổi thuật toán duy nhất, và chính thay đổi ấy kéo theo ba hệ quả rất hợp với SLAM.
+
+\subsection{A. Khác biệt cơ chế, nói gọn trong một đoạn}
+NeRF phải \emph{đi tìm} vật chất: với mỗi điểm ảnh, nó lấy hàng chục mẫu dọc tia và chạy mạng ở từng mẫu, vì nó không biết trước mặt nằm ở đâu. 3DGS đã lưu sẵn vật chất thành các nguyên thể tường minh, nên nó chỉ cần \en{rasterize}: chiếu chúng xuống mặt ảnh, sắp theo độ sâu rồi trộn --- đúng việc mà phần cứng đồ hoạ sinh ra để làm \cite{kerbl20233dgs}. Chi phí mỗi điểm ảnh vì thế đổi từ ``số mẫu dọc tia'' thành ``số nguyên thể phủ lên điểm ảnh đó'', và con số thứ hai nhỏ hơn hẳn. Cơ chế đầy đủ nằm ở \ptr{C/16/03-nerf-3dgs-va-hop-nhat}; ở đây ta chỉ cần ba hệ quả của nó.
+
+Chênh lệch nằm ở đâu thì viết ra được mà không cần một con số nào. Chi phí một khung hình của NeRF là (số điểm ảnh) \(\times\) (số mẫu dọc mỗi tia) \(\times\) (chi phí \emph{một lần chạy mạng}). Của 3DGS là (số điểm ảnh) \(\times\) (số nguyên thể phủ lên điểm ảnh đó) \(\times\) (chi phí \emph{một phép trộn}). Hai công thức có chung thừa số đầu và khác hẳn ở hai thừa số còn lại: số nguyên thể phủ lên một điểm ảnh nhỏ hơn số mẫu dọc một tia, và một phép trộn số học rẻ hơn một lần chạy mạng rất nhiều. Hai thừa số cùng nhỏ đi, nhân với nhau, là lý do khoảng cách lên tới nhiều bậc độ lớn --- và đó là chênh lệch về \emph{bản chất thuật toán}, không phải về cài đặt khéo hay vụng.
+
+\begin{itemize}
+\item \textbf{Cập nhật bản đồ trở thành sửa chữa cục bộ.} Thêm quan sát mới nghĩa là thêm vài nghìn Gaussian ở vùng vừa thấy và tinh chỉnh các Gaussian lân cận. Không có tham số dùng chung toàn cục nào bị chạm. Quên thảm hoạ, nút thắt lớn nhất của iMAP, biến mất theo kiến trúc chứ không nhờ mẹo huấn luyện.
+\item \textbf{Bản đồ dịch chuyển được sau khi đóng vòng.} Mỗi Gaussian có một vị trí tường minh. Gắn nó vào khung hình chốt đã sinh ra nó, rồi khi tối ưu toàn cục sửa tư thế khung hình đó, ta dịch chuyển cứng cả cụm Gaussian theo. Với một MLP đơn, phép tương đương không tồn tại: không có cách nào ``dịch một phần của trọng số''.
+\item \textbf{Đạo hàm theo tư thế có dạng giải tích.} Phép chiếu Gaussian là một chuỗi phép biến đổi trơn, nên gradient của sai số ảnh theo sáu bậc tự do của camera viết ra được, không cần đi qua mạng. Đây là điều làm bám vết theo mô hình chạy được ở tốc độ dùng được \cite{f32monogs2024}.
+\end{itemize}
+
+Hệ quả thứ hai đáng dừng lại một nhịp, vì nó chạm đúng một trong bốn nỗi đau của bạn. Trong hệ hiện tại, đóng vòng sửa tư thế rồi kéo các điểm bản đồ theo, và toàn bộ việc đó rẻ vì bản đồ là một tập điểm rời rạc gắn với khung hình chốt. Một bản đồ Gaussian giữ nguyên tính chất đó. Một bản đồ MLP thì không. Nếu bạn phải chọn một biểu diễn dày cho một hệ \emph{có} đóng vòng, tiêu chí ``sửa được sau khi đóng vòng'' quan trọng hơn hẳn tiêu chí PSNR.
+
+\begin{mach}[Mạch 2 --- dòng Gaussian làm bản đồ SLAM]
+\item \vd{Dòng NeRF chậm ngay cả trên GPU để bàn --- chậm tới mức khâu dựng bản đồ không theo kịp khâu bám vết --- và lại quên chỗ cũ khi đi sang chỗ mới.}
+\gp thay trường ẩn bằng tập Gaussian tường minh, dựng ảnh bằng rasteri hoá thay vì lấy mẫu dọc tia \cite{kerbl20233dgs}.
+\gd bề mặt xấp xỉ được bằng các hạt mờ dị hướng, và số hạt phủ lên mỗi điểm ảnh không quá lớn.
+\gia dung lượng bản đồ lớn hơn hẳn một MLP, và từ đây bộ nhớ chứ không phải tốc độ mới là ràng buộc quyết định.
+\hq cập nhật thành cục bộ, nên quên thảm khốc biến mất theo kiến trúc.
+
+\item \vd{Bám vết cần đạo hàm của sai số ảnh theo tư thế, và đi qua một mạng thì vừa chậm vừa ồn.}
+\gp MonoGS viết thẳng Jacobian giải tích của phép chiếu Gaussian theo tư thế trên nhóm Lie \cite{f32monogs2024}.
+\gd chuyển động giữa hai khung hình đủ nhỏ để nghiệm nằm trong bồn hút quang trắc.
+\gia vẫn là bám vết theo mô hình, nên lỗi bản đồ chảy thẳng vào quỹ đạo.
+\vdm chuyển động nhanh và ảnh mờ đẩy nghiệm ra ngoài bồn hút, và không có gì kéo nó về.
+
+\item \vd{Vòng lặp dựng ảnh nằm trên đường ước lượng tư thế nên vừa chậm vừa rủi ro.}
+\gp GS-ICP tách hẳn hai việc: tư thế do ICP tổng quát trên tâm Gaussian, dựng ảnh chỉ là sản phẩm \cite{f32gsicp2024}. Photo-SLAM đi xa hơn, giữ nguyên đặc trưng và hiệu chỉnh chùm tia cổ điển \cite{f32photoslam2024}.
+\gd đã có một nguồn tư thế đủ tốt --- và với bạn thì điều này đúng.
+\gia bản đồ không còn đóng góp gì cho quỹ đạo; nó chỉ là bên tiêu thụ.
+\hq đây chính là mẫu ghép lỏng, và là cách vào rẻ nhất cho một hệ đang chạy sản phẩm.
+
+\item \vd{Một triệu Gaussian không vừa ngân sách bộ nhớ và băng thông của máy nhúng.}
+\gp RTG-SLAM ép mỗi Gaussian hoặc đục hẳn hoặc trong hẳn, để một bề mặt cần ít hạt hơn nhiều \cite{f32rtgslam2024}.
+\gd bề mặt trong cảnh phần lớn là đục, không bán trong suốt.
+\gia mất khả năng biểu diễn khói, kính, và vật phản chiếu.
+\vdm số hạt vẫn tăng theo diện tích đã đi qua, nên vấn đề chỉ được đẩy lùi chứ chưa được giải.
+\end{mach}
+
+\subsection{B. Sáu hệ, và điểm thiết kế đáng học của mỗi hệ}
+\begin{itemize}
+\item \textbf{SplaTAM} --- hệ RGB-D thuần Gaussian: bám vết bằng cách dựng ảnh từ bản đồ rồi tối ưu tư thế, dựng bản đồ bằng cách thêm Gaussian ở vùng chưa được phủ \cite{f32splatam2024}. Điểm thiết kế đáng học là \vn{mặt nạ hiển thị}{visibility mask}: hệ chỉ tính mất mát ở các điểm ảnh mà bản đồ hiện có thật sự phủ tới. Nói theo ngôn ngữ của bạn, đó là một cổng loại bỏ phần dư không có cơ sở --- cùng vai trò với việc bỏ các điểm không quan sát được trước khi tính phần dư trong hiệu chỉnh chùm tia.
+\item \textbf{MonoGS} --- đưa 3DGS về đơn ảnh, và viết ra đạo hàm giải tích của sai số ảnh theo tư thế camera trong nhóm Lie \cite{f32monogs2024}. Đây là bài trong nhóm gần với gu của một người làm tối ưu trên đa tạp nhất; nếu bạn định đọc mã nguồn một hệ 3DGS SLAM, hãy đọc hệ này.
+\item \textbf{GS-ICP SLAM} --- tách hẳn bám vết khỏi dựng ảnh: tư thế do một biến thể ICP tổng quát tính trên chính tâm của các Gaussian, còn dựng ảnh chỉ là sản phẩm \cite{f32gsicp2024}. Đây là bằng chứng trực tiếp cho luận điểm trung tâm của chương: khi bỏ vòng lặp dựng ảnh ra khỏi đường ước lượng tư thế, hệ nhanh hơn hẳn, và chất lượng quỹ đạo không xấu đi.
+\item \textbf{Photo-SLAM} --- giữ nguyên xương sống đặc trưng và hiệu chỉnh chùm tia cổ điển cho tư thế, gắn thêm một bản đồ Gaussian chỉ để dựng ảnh \cite{f32photoslam2024}. Đây là mẫu kiến trúc mà tôi cho là đáng bắt chước nhất cho một hệ đang chạy sản phẩm, vì nó không đặt tư thế vào tay bộ dựng ảnh.
+\item \textbf{RTG-SLAM} --- tấn công thẳng vào số lượng Gaussian: ép mỗi Gaussian hoặc đục hẳn hoặc trong hẳn, để một bề mặt cần ít hạt hơn nhiều \cite{f32rtgslam2024}. Nó cho thấy số Gaussian là một biến thiết kế chứ không phải hằng số của bài toán --- điều rất quan trọng khi bạn có ngân sách bộ nhớ cố định.
+\item \textbf{OpenGS-SLAM} --- dòng ghép ngữ nghĩa mở vào bản đồ Gaussian, để truy vấn bản đồ bằng ngôn ngữ. Tôi \emph{không} chắc về chi tiết và kết quả của công trình này, nên chỉ nhắc tên và ý tưởng; phần ngữ nghĩa mở được bàn kỹ ở \ptr{F/33}.
+\end{itemize}
+
+Sáu hệ trên chia thành hai kiểu ghép nối, và phân biệt được hai kiểu đó quan trọng hơn nhớ tên từng hệ. Hình~\ref{fig:gs-coupling} vẽ cả hai.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  b/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\scriptsize,text width=2.35cm,minimum height=0.95cm},
+  m/.style={b,draw=violetdark,fill=violetbg},
+  o/.style={b,draw=reddark,fill=redbg},
+  ar/.style={-{Stealth[length=4pt]},steel,thick},
+  arb/.style={-{Stealth[length=4pt]},reddark,thick,densely dashed}]
+% --- ghep chat ---
+\begin{scope}
+\node[font=\scriptsize\bfseries,inkblue] at (3.0,2.35) {Ghép chặt: tư thế đến từ bộ dựng ảnh};
+\node[b] (img) at (0,1.2) {khung hình mới};
+\node[m] (ren) at (3.0,1.2) {dựng ảnh từ bản đồ Gaussian};
+\node[o] (pose) at (6.0,1.2) {tối ưu tư thế theo sai số ảnh};
+\node[m] (map) at (3.0,-0.35) {cập nhật bản đồ};
+\draw[ar] (img) -- (ren); \draw[ar] (ren) -- (pose);
+\draw[ar] (pose) -- (map); \draw[arb] (map) -- (ren);
+\node[font=\scriptsize,reddark,align=center,text width=6.2cm] at (3.0,-1.5)
+  {bản đồ sai \ra tư thế sai \ra bản đồ sai hơn.\\ SplaTAM, MonoGS nằm ở đây};
+\end{scope}
+% --- ghep long ---
+\begin{scope}[xshift=9.4cm]
+\node[font=\scriptsize\bfseries,inkblue] at (3.0,2.35) {Ghép lỏng: bản đồ là sản phẩm};
+\node[b] (img2) at (0,1.2) {khung hình mới};
+\node[o] (tr2) at (3.0,1.2) {bám vết cổ điển: đặc trưng, IMU, hiệu chỉnh chùm tia};
+\node[m] (map2) at (6.0,1.2) {bản đồ Gaussian};
+\node[b] (out2) at (6.0,-0.35) {ảnh dựng, bề mặt, mô phỏng};
+\draw[ar] (img2) -- (tr2); \draw[ar] (tr2) -- (map2); \draw[ar] (map2) -- (out2);
+\node[font=\scriptsize,reddark,align=center,text width=6.2cm] at (3.0,-1.5)
+  {không có mũi tên nào quay ngược về tư thế.\\ Photo-SLAM, GS-ICP nghiêng về phía này};
+\end{scope}
+\end{tikzpicture}}
+\caption{Hai kiểu ghép nối, và đây là phân biệt quan trọng nhất của cả chương. Bên trái, tư thế được ước lượng bằng cách so ảnh dựng với ảnh thật, nên mọi lỗi bản đồ chảy thẳng vào quỹ đạo; mũi tên đứt là vòng phản hồi đó. Bên phải, tư thế vẫn do đường cổ điển tính, còn bản đồ neural chỉ tiêu thụ tư thế; nó không thể làm quỹ đạo xấu đi, và cũng không thể làm quỹ đạo tốt lên. Chọn kiểu nào là quyết định kiến trúc, không phải chi tiết cài đặt.}
+\label{fig:gs-coupling}
+\end{figure}
+
+\begin{table}[H]\centering\footnotesize
+\caption{Dòng 3D Gaussian splatting làm bản đồ SLAM. Cột ``tư thế đến từ đâu'' quyết định hệ đó có thể làm hỏng quỹ đạo của bạn hay không.}
+\label{tab:f32-gs-line}
+\begin{tabularx}{\linewidth}{@{}L{2.05cm}L{2.6cm}YL{3.5cm}@{}}
+\toprule
+\textbf{Hệ} & \textbf{Tư thế đến từ đâu} & \textbf{Điểm thiết kế đáng học} & \textbf{Hỏng khi nào}\\
+\midrule
+SplaTAM & Dựng ảnh khác biệt được, RGB-D & Mặt nạ hiển thị: chỉ tính mất mát ở điểm ảnh bản đồ thật sự phủ & Độ sâu thiếu hoặc nhiễu; chuyển động lớn giữa hai khung hình\\
+MonoGS & Dựng ảnh, đơn ảnh, đạo hàm giải tích trên nhóm Lie & Viết thẳng Jacobian theo tư thế thay vì vi phân tự động & Tỉ lệ đơn ảnh; cảnh ít vân; chuyển động nhanh\\
+GS-ICP SLAM & ICP tổng quát trên tâm Gaussian & Tách bám vết khỏi dựng ảnh, và hệ nhanh lên rõ rệt & Hình học nghèo nàn làm ICP trượt; vẫn cần độ sâu\\
+Photo-SLAM & Đặc trưng \(+\) hiệu chỉnh chùm tia cổ điển & Bản đồ neural là bên tiêu thụ tư thế, không phải bên tạo ra nó & Bản đồ ảnh xấu ở nơi bám vết thưa khung hình chốt\\
+RTG-SLAM & Bám vết dày, RGB-D & Ép Gaussian đục hoặc trong để giảm mạnh số hạt & Bề mặt bán trong suốt và vật phản chiếu\\
+OpenGS-SLAM & \emph{chưa kiểm chứng} & Ghép ngữ nghĩa mở vào bản đồ Gaussian & \emph{chưa kiểm chứng}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{C. Chỗ nối rẻ nhất vào hệ bạn đang có}
+Nếu bạn muốn thử dòng này mà không đụng vào đường ước lượng tư thế, có một chỗ nối rất tự nhiên, và ít bài báo nói ra vì với họ nó hiển nhiên.
+
+Bản 3DGS gốc khởi tạo các Gaussian từ đám mây điểm thưa của một pipeline dựng cảnh cổ điển. Hệ của bạn \emph{đã} sinh ra đúng loại đám mây đó, mỗi khung hình chốt, kèm tư thế đã được hiệu chỉnh chùm tia. Nghĩa là bạn có sẵn đầu vào tốt nhất mà một hệ 3DGS có thể mơ tới: điểm 3D đã lọc ngoại lai, tư thế đã tối ưu toàn cục, và quan hệ đồng quan sát giữa các khung hình chốt.
+
+Từ đó ra một kiến trúc ghép lỏng rất gọn, và nó không thêm rủi ro nào cho quỹ đạo:
+
+\begin{itemize}
+\item \textbf{Gieo hạt.} Mỗi điểm bản đồ thành một Gaussian, tỉ lệ khởi tạo theo khoảng cách tới các điểm lân cận.
+\item \textbf{Neo vào khung hình chốt.} Mỗi Gaussian ghi nhớ khung hình chốt đã sinh ra nó. Khi đóng vòng sửa tư thế khung hình đó, cả cụm Gaussian dịch theo bằng một phép biến đổi cứng.
+\item \textbf{Chia bản đồ con.} Dùng chính đồ thị đồng quan sát để cắt cảnh thành các bản đồ con, rồi chỉ tối ưu bản đồ con đang hoạt động. Đây là cách duy nhất giữ ngân sách bộ nhớ hữu hạn khi robot đi mãi.
+\item \textbf{Chạy lệch nhịp.} Khâu Gaussian chạy ở tần số thấp, trên một luồng riêng, và được phép rớt khung hình. Nó là bên tiêu thụ, nên rớt khung chỉ làm ảnh xấu đi chứ không làm hỏng quỹ đạo.
+\end{itemize}
+
+Đây không phải một phương pháp mới; nó là mẫu Photo-SLAM viết lại bằng các khối bạn đã có. Giá trị của nó nằm ở chỗ rủi ro gần bằng không: nếu bỏ hẳn khâu Gaussian đi, hệ quay về đúng trạng thái hiện tại, không mất gì.
+
+\subsection{D. Ba chỗ dòng này vẫn chưa chạm tới}
+Đọc xong bảng trên dễ có cảm giác vấn đề đã xong. Chưa. Ba chỗ vẫn để ngỏ, và cả ba đều nằm đúng chỗ hệ của bạn đau.
+
+\begin{itemize}
+\item \textbf{Chuyển động nhanh.} Bám vết bằng dựng ảnh là một bài toán tối ưu quang trắc, nên nó có bồn hút hữu hạn. Chuyển động lớn giữa hai khung hình đẩy nghiệm ra ngoài bồn, và cách chữa duy nhất trong khuôn khổ đó là một dự đoán ban đầu tốt --- tức là quay lại cần IMU hoặc cần ghép đặc trưng. Đây chính là bài học của BARF nói lại lần nữa.
+\item \textbf{Ảnh mờ do chuyển động.} Một khung hình mờ không phải quan sát nhiễu của cảnh tĩnh. Nó là tích phân của cảnh dọc một quãng chuyển động. Hàm mất mát quang trắc không có chỗ nào biểu diễn điều đó, nên tối ưu sẽ giải thích vệt mờ bằng cách nhét thêm hình học sai. Các dòng khử mờ có ý thức về chuyển động, như BAD-NeRF và BAD-Gaussians, đưa mô hình phơi sáng vào bộ dựng ảnh; chúng được bàn ở \ptr{F/34}.
+\item \textbf{Phơi sáng và cân bằng trắng tự động.} Cùng một cơ chế: mô hình buộc phải giải thích thay đổi độ sáng bằng hình học. Các hệ trong chương này thường chạy trên chuỗi có phơi sáng cố định, và điều đó ít khi được ghi rõ.
+\end{itemize}
+
+\subsection{E. Điều cả hai dòng đều thiếu: một bài toán tối ưu chung}
+Có một khoảng trống chung cho toàn bộ chương, và nó là khoảng trống mà một người quen đồ thị nhân tử sẽ thấy ngay.
+
+Hiệu chỉnh chùm tia tối ưu tư thế và cấu trúc \emph{cùng lúc}, trong một bài toán bình phương tối thiểu duy nhất. Nó cho ba thứ đi kèm: nghiệm hội tụ bậc hai gần cực tiểu, một \vn{ma trận thông tin}{information matrix} để biết mình chắc chắn tới đâu, và một chỗ tự nhiên để cắm thêm nhân tử --- tiền tích phân IMU, ràng buộc đóng vòng, tiên nghiệm hiệu chỉnh.
+
+Gần như mọi hệ trong chương này làm khác hẳn. Chúng \emph{luân phiên}: cố định bản đồ rồi tối ưu tư thế vài bước, cố định tư thế rồi tối ưu bản đồ vài bước. Đây là \vn{hạ theo khối toạ độ}{block coordinate descent}, và nó kém hơn ở đúng ba chỗ vừa kể.
+
+\begin{itemize}
+\item \textbf{Hội tụ chậm và phụ thuộc lịch trình.} Số bước mỗi phía trở thành siêu tham số, và nó tương tác với ràng buộc thời gian thực. Chạy trên máy chậm hơn nghĩa là chạy ít bước hơn, tức là một hệ \emph{khác}. Đây là lý do sâu xa vì sao kết quả trên Orin không suy ra được từ kết quả trên máy để bàn.
+\item \textbf{Không có ma trận thông tin.} Không có hiệp phương sai của tư thế, nên không có gì để cắm vào một bộ lọc, không có gì để so bằng kiểm định chi bình phương, và không có cách nào phát hiện hệ đang không chắc chắn.
+\item \textbf{Không có chỗ cho IMU.} Đây là chỗ thiếu nghiêm trọng nhất với hệ của bạn. Trong khuôn khổ luân phiên, không có chỗ tự nhiên nào để đặt một nhân tử tiền tích phân IMU với trọng số đúng. Vài công trình gần đây có ghép IMU vào, thường bằng cách dùng nó làm dự đoán ban đầu; tôi \emph{không} nắm chắc kết quả của chúng và không mô tả số liệu.
+\end{itemize}
+
+Nói ngắn gọn: dòng này mạnh về biểu diễn và yếu về ước lượng. Hệ của bạn thì ngược lại. Đó chính là lý do mẫu ghép lỏng không phải một thoả hiệp tạm bợ, mà là cách ghép đúng thế mạnh của hai bên.
+
+\section{Hai trục đánh giá, và vì sao chúng bị trộn lẫn}
+\ptrtarget{F/32/04}\label{sec:f32-danhgia}
+Đây là mục quan trọng nhất của chương. Nếu bạn chỉ đọc một mục, đọc mục này.
+
+\subsection{A. Hai câu hỏi hoàn toàn khác nhau}
+Một hệ trong chương này báo cáo hai nhóm con số. Nhóm thứ nhất là chất lượng ảnh dựng lại: PSNR, SSIM, LPIPS \cite{wang2004ssim,zhang2018lpips}. Nhóm thứ hai là độ chính xác quỹ đạo: \vn{sai số quỹ đạo tuyệt đối}{absolute trajectory error}, viết tắt ATE, đôi khi kèm RPE. Hai nhóm này trả lời hai câu hỏi khác nhau và \emph{có thể tách rời hoàn toàn}.
+
+Lý do tách rời đã được nêu ở \ptr{C/16/03-nerf-3dgs-va-hop-nhat} và đáng nhắc lại một câu: hàm mất mát chỉ ràng buộc ảnh dựng ra, không ràng buộc hình học. Màu phụ thuộc góc nhìn cho mô hình thêm một đường thoát: nó có thể ``vẽ'' thứ đáng lẽ phải ``dựng''. Vì thế PSNR cao chứng minh mô hình khớp được các ảnh đã thấy, không chứng minh bản đồ đúng, và càng không chứng minh tư thế đúng.
+
+Chiều ngược lại cũng đúng và ít được nói tới. Một hệ có ATE rất tốt vẫn có thể cho ảnh dựng xấu, đơn giản vì nó dành ít tài nguyên cho bản đồ. Photo-SLAM là ví dụ có chủ ý theo hướng ngược lại: quỹ đạo do đường cổ điển bảo đảm, còn ảnh đẹp là phần thêm.
+
+Hình~\ref{fig:quality-vs-ate} bày cả hai trục lên một mặt phẳng. Đây là hình bạn nên vẽ lại cho chính hệ của mình.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[font=\footnotesize]
+% truc
+\draw[-{Stealth[length=4pt]},tiercol,thick] (0,0) -- (11.2,0)
+  node[right,font=\scriptsize,tiercol,align=left] {ảnh dựng\\ đẹp hơn};
+\draw[-{Stealth[length=4pt]},tiercol,thick] (0,0) -- (0,6.1)
+  node[above,font=\scriptsize,tiercol,align=center] {quỹ đạo\\ chính xác hơn};
+\node[font=\scriptsize,tiercol,anchor=north] at (5.6,-0.35) {PSNR / SSIM / LPIPS trên các góc nhìn giữ lại};
+\node[font=\scriptsize,tiercol,rotate=90,anchor=south] at (-0.5,3.0) {ATE nhỏ dần};
+% chia phan tu
+\draw[rulecol,densely dashed] (5.6,0) -- (5.6,6.0);
+\draw[rulecol,densely dashed] (0,3.0) -- (11.1,3.0);
+% nen 4 goc
+\fill[bluebg,opacity=0.55] (0.05,3.05) rectangle (5.55,5.95);
+\fill[violetbg,opacity=0.55] (5.65,3.05) rectangle (11.05,5.95);
+\fill[redbg,opacity=0.55] (0.05,0.05) rectangle (5.55,2.95);
+\fill[amberbg,opacity=0.75] (5.65,0.05) rectangle (11.05,2.95);
+% nhan goc
+\node[font=\scriptsize,align=center,text width=4.9cm,inkblue] at (2.8,4.5)
+  {\textbf{Góc của hệ cổ điển}\\ quỹ đạo tốt, không dựng được ảnh.\\ ORB-SLAM3 nằm ngoài trục ngang: nó \emph{không} dựng ảnh};
+\node[font=\scriptsize,align=center,text width=4.9cm,violetdark] at (8.35,4.5)
+  {\textbf{Góc thật sự đáng giá}\\ vừa đúng tư thế vừa đẹp ảnh.\\ Mẫu ghép lỏng nhắm vào đây};
+\node[font=\scriptsize,align=center,text width=4.9cm,reddark] at (2.8,1.5)
+  {\textbf{Góc vô dụng}\\ không ai công bố ở đây};
+\node[font=\scriptsize,align=center,text width=4.9cm,accent] at (8.35,1.5)
+  {\textbf{Góc dễ nhầm nhất}\\ ảnh rất đẹp, quỹ đạo tệ hơn hệ bạn đang có.\\ Đọc bảng chỉ có PSNR thì không phân biệt được góc này với góc trên};
+% diem minh hoa
+\fill[inkblue] (0.75,3.45) circle (2.6pt);
+\node[font=\scriptsize,inkblue,anchor=west] at (0.92,3.45) {hệ đặc trưng cổ điển};
+\end{tikzpicture}
+\caption{Hai trục đánh giá trên một mặt phẳng; các nhãn là \emph{góc phần tư khái niệm}, không phải vị trí đo được của hệ cụ thể nào. Bảng kết quả chỉ có cột PSNR không phân biệt được góc trên bên phải với góc dưới bên phải, và đó chính là chỗ người đọc bị dẫn sai. Quy tắc thực dụng: trước khi tin một hệ, hãy hỏi nó nằm ở đâu theo trục \emph{dọc}, đo bằng đúng giao thức mà bạn dùng cho hệ hiện tại.}
+\label{fig:quality-vs-ate}
+\end{figure}
+
+\begin{table}[H]\centering\footnotesize
+\caption{Ba nhóm thước đo cho cùng một hệ. Cột cuối là cột hay bị bỏ qua nhất, và nó là lý do một hệ có thể đứng đầu bảng ở cột đầu mà vẫn không dùng được cho robot.}
+\label{tab:f32-metrics}
+\begin{tabularx}{\linewidth}{@{}L{2.5cm}L{3.0cm}YL{3.9cm}@{}}
+\toprule
+\textbf{Nhóm} & \textbf{Đo cái gì} & \textbf{Trả lời được câu hỏi nào} & \textbf{Không chứng minh được gì}\\
+\midrule
+PSNR, SSIM, LPIPS & Ảnh dựng gần ảnh thật tới đâu & Bản đồ có dùng được để xem, để mô phỏng cảm biến không & Không nói gì về hình học, và không nói gì về tư thế\\
+ATE, RPE & Quỹ đạo lệch chân trị bao nhiêu & Hệ có định vị được không --- câu hỏi quyết định của SLAM & Không nói bản đồ có dày, có kín, có dùng để tránh vật cản được không\\
+Sai số hình học: độ sâu L1, độ chính xác và độ phủ, F-score với lưới chân trị & Bề mặt dựng ra lệch bề mặt thật bao nhiêu & Bản đồ có dùng để lập kế hoạch, để đo đạc được không & Không nói ảnh có đẹp không, và cần chân trị hình học nên hiếm khi có ngoài đời\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{B. Ví dụ tính tay: vì sao một sai lệch hình học lớn chỉ tốn một điểm ảnh}
+Câu ``PSNR không chứng minh hình học'' nghe như một lời cảnh báo chung chung. Nó không phải vậy. Nó là một bất đẳng thức số học, và tính ra được trong ba dòng.
+
+Trước khi tính, nói rõ một điều: \textbf{ví dụ dưới đây là một bài toán giả định hoàn toàn}. Mọi con số trong đó đều do mình đặt ra để thay vào công thức, không con số nào đến từ một phép đo trên thiết bị, cũng không con số nào trích từ một bài báo. Thứ đáng mang đi là \emph{hình dạng} của quan hệ --- \(\Delta u\) tỉ lệ thuận với khoảng dịch camera và tỉ lệ nghịch với bình phương độ sâu --- chứ không phải con số ở vế phải.
+
+Xét một bức tường phẳng cách camera \(Z = 3\) m. Giả sử bản đồ đặt sai một mảng vật chất, lệch \(\Delta Z = 10\) cm về phía trước tường. Với robot, sai số này rất nghiêm trọng: nó là chênh lệch giữa dừng đúng và va vào tường. Bây giờ hỏi xem nó lộ ra bao nhiêu trong ảnh.
+
+Một điểm ở độ sâu \(Z\), nhìn từ một camera dịch ngang một đoạn \(b\), có vị trí ảnh dịch đi một lượng tỉ lệ với \(f b / Z\). Sai một lượng \(\Delta Z\) làm vị trí ảnh lệch đi
+
+\[
+\Delta u \;\approx\; \frac{f\,b\,\Delta Z}{Z^{2}}
+\;=\; \frac{500 \times 0{,}2 \times 0{,}1}{3^{2}}
+\;\approx\; 1{,}1 \text{ điểm ảnh},
+\]
+
+với tiêu cự \(f = 500\) điểm ảnh và khoảng dịch camera \(b = 20\) cm. \emph{Một điểm ảnh.} Trên một ảnh mà mô hình còn được phép chỉnh màu theo góc nhìn, một điểm ảnh chìm hoàn toàn trong nhiễu cảm biến và trong sai số nội suy. PSNR gần như không đổi. Bản đồ thì sai 10 cm.
+
+Hình~\ref{fig:parallax} vẽ đúng hình học của phép tính đó.
+
+\begin{figure}[H]\centering
+\resizebox{0.9\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize]
+% tuong that
+\draw[steel,very thick] (7.0,-1.7) -- (7.0,1.9);
+\node[font=\scriptsize,steel,anchor=west,align=left] at (7.15,1.55) {tường thật\\ \(Z=3\) m};
+% mang sai
+\draw[reddark,very thick,densely dashed] (6.6,-1.5) -- (6.6,1.6);
+\node[font=\scriptsize,reddark,anchor=east,align=right,text width=2.6cm] at (6.45,-1.35)
+  {mảng vật chất sai,\\ lệch \(\Delta Z=10\) cm};
+% camera 1
+\draw[inkblue,thick] (0,0.9) -- (0.55,0.6) -- (0,0.3) -- cycle;
+\node[font=\scriptsize,inkblue,anchor=east,align=right,text width=2.7cm] at (-0.15,0.6) {góc nhìn dựng bản đồ};
+\draw[inkblue] (0.55,0.6) -- (7.0,1.0);
+% camera 2
+\draw[violetdark,thick] (0,-0.4) -- (0.55,-0.7) -- (0,-1.0) -- cycle;
+\node[font=\scriptsize,violetdark,anchor=east,align=right,text width=2.7cm] at (-0.15,-0.7) {góc nhìn giữ lại,\\ cách 20 cm};
+\draw[violetdark] (0.55,-0.7) -- (7.0,0.62);
+\draw[violetdark,densely dotted] (0.55,-0.7) -- (6.6,0.52);
+% khoang cach camera
+\draw[decorate,decoration={brace,amplitude=4pt},tiercol] (0.15,0.55) -- (0.15,-0.65);
+\node[font=\scriptsize,tiercol,anchor=north,align=center] at (0.75,-1.15) {\(b=20\) cm};
+% ket qua
+\node[font=\scriptsize,reddark,anchor=west,align=left,text width=4.0cm] at (7.35,0.15)
+  {chênh lệch trên ảnh:\\ \(\Delta u = f\,b\,\Delta Z / Z^{2} \approx 1{,}1\) điểm ảnh};
+\node[font=\scriptsize,tiercol,align=center,text width=12.0cm] at (5.0,-2.55)
+  {muốn 10 cm lộ thành 10 điểm ảnh, cần khoảng dịch camera bậc 2 m --- tức là những góc nhìn mà chuỗi đánh giá thường không có};
+\end{tikzpicture}}
+\caption{Vì sao sai số hình học trốn được khỏi PSNR; các con số trên hình là \emph{giả định} của ví dụ, không phải số đo. Với những giá trị giả định đó, sai 10 cm ở tầm 3 m chỉ dời điểm ảnh khoảng một điểm ảnh khi góc nhìn kiểm tra chỉ cách góc nhìn dựng bản đồ 20 cm. Độ nhạy tỉ lệ thuận với khoảng dịch camera và tỉ lệ nghịch với bình phương độ sâu. Hệ quả thực hành: chỉ khi tập góc nhìn giữ lại \emph{cách xa} quỹ đạo chụp thì chất lượng ảnh mới bắt đầu nói được điều gì về hình học --- và đó đúng là loại tập đánh giá mà các bài trong chương này hiếm khi dựng.}
+\label{fig:parallax}
+\end{figure}
+
+Ba hệ quả rút ra ngay, và cả ba đều dùng được khi bạn đọc bảng của người khác.
+
+\begin{itemize}
+\item \textbf{Độ nhạy tỉ lệ nghịch với bình phương độ sâu.} Vật xa hoàn toàn không bị ràng buộc bởi ảnh. Đây là lý do các bản đồ neural dựng ngoài trời hay có ``sương mù'' vật chất giả ở nền xa.
+\item \textbf{Độ nhạy tỉ lệ thuận với khoảng dịch camera.} Một tập góc nhìn giữ lại nằm sát quỹ đạo chụp gần như không kiểm tra được hình học. Muốn kiểm tra thật, phải giữ lại những góc nhìn \emph{lệch hẳn} khỏi quỹ đạo.
+\item \textbf{Muốn ràng buộc hình học thì phải đo hình học.} Không có cách nào lách: nếu đầu ra sẽ được dùng để tránh vật cản, thước đo phải là sai số bề mặt so với một quét chân trị, không phải PSNR.
+\end{itemize}
+
+\subsection{C. Bảy câu hỏi phải hỏi trước khi tin một bảng kết quả}
+Phần lớn kết quả trong chương này được công bố trong một điều kiện rất hẹp, và điều kiện đó thường nằm rải rác trong phần thí nghiệm chứ không nằm ở bảng. Bảy câu hỏi dưới đây lọc được gần hết.
+
+\begin{enumerate}
+\item \textbf{Ảnh dựng được đo trên góc nhìn nào?} Rất nhiều bảng báo cáo PSNR trên chính các khung hình đầu vào hoặc các khung hình chốt. Con số đó đo \emph{độ khớp}, không đo khả năng tổng quát sang góc nhìn mới. Hai đại lượng này khác nhau rất xa với một mô hình có hàng triệu tham số cho một cảnh.
+\item \textbf{Tư thế lúc dựng bản đồ là tư thế ước lượng hay chân trị?} Một số thí nghiệm chạy ở chế độ ``chỉ dựng bản đồ'' với tư thế chân trị. Kết quả đó hợp lệ, nhưng nó nói về bản đồ chứ không nói về hệ SLAM.
+\item \textbf{Độ sâu đến từ đâu?} Replica cho độ sâu tổng hợp hoàn hảo \cite{f32replica2019}. Cảm biến thật cho độ sâu có nhiễu, có lỗ, và có giới hạn tầm. Một hệ dựa nặng vào độ sâu sẽ tụt hạng rất nhiều giữa hai điều kiện này.
+\item \textbf{Chuỗi dài bao nhiêu và có vòng không?} Phần lớn chuỗi trong Replica và TUM RGB-D chỉ dài vài chục giây tới vài phút, đi bộ trong một phòng \cite{sturm2012benchmark,f32scannet2017}. Trôi tích luỹ và đóng vòng gần như không được kiểm tra.
+\item \textbf{ATE được căn chỉnh thế nào?} Với hệ đơn ảnh, ATE thường tính sau khi căn chỉnh có cả tỉ lệ. Phép căn chỉnh đó \emph{hấp thụ} sai lệch tỉ lệ, tức là giấu đúng chế độ hỏng nguy hiểm nhất của hệ đơn ảnh. Nếu bạn so với hệ stereo-inertial của mình, hai con số không cùng đơn vị nghĩa.
+\item \textbf{Phần cứng nào và tốc độ nào?} Con số fps trong bài gần như luôn là GPU để bàn. Và ``thời gian thực'' trong nhiều bài nghĩa là xử lý kịp tốc độ phát lại đã giảm, không phải kịp tốc độ cảm biến.
+\item \textbf{Baseline cổ điển có được tinh chỉnh tử tế không?} Đây là câu hỏi của \ptr{E/24} áp vào đây. Một bảng so bản đồ neural với ORB-SLAM3 chạy cấu hình mặc định trên chuỗi mà cấu hình đó không hợp là một so sánh không có nghĩa.
+\end{enumerate}
+
+\begin{cambay}
+Cái bẫy hay gặp nhất không phải số liệu sai mà là \emph{ghép hai kết luận đúng thành một kết luận sai}. Bài báo nói ``PSNR của chúng tôi cao nhất bảng'' --- đúng. Bài báo nói ``ATE của chúng tôi tốt hơn NICE-SLAM'' --- cũng đúng. Người đọc ghép lại thành ``hệ này tốt hơn hệ tôi đang chạy'' --- sai, vì cả hai hệ được so đều thuộc dòng neural, và cả hai đều có thể tệ hơn một hệ đặc trưng cổ điển đã tinh chỉnh trên cùng chuỗi. Cách kiểm tra rẻ nhất là tìm trong bài xem có dòng nào so với một hệ cổ điển \emph{trên cùng giao thức căn chỉnh} hay không. Nếu không có, bạn chưa biết gì về vị trí của nó theo trục dọc trong Hình~\ref{fig:quality-vs-ate}.
+\end{cambay}
+
+\begin{table}[H]\centering\footnotesize
+\caption{Điều kiện ẩn sau bốn tập dữ liệu hay gặp. Bảng này giải thích vì sao thứ hạng trên hai dòng đầu gần như không dự đoán được hành vi trên dòng cuối --- tập dữ liệu của chính bạn.}
+\label{tab:f32-datasets}
+\begin{tabularx}{\linewidth}{@{}L{2.2cm}L{2.5cm}L{2.2cm}Y@{}}
+\toprule
+\textbf{Tập} & \textbf{Độ sâu} & \textbf{Độ dài, vòng} & \textbf{Điều kiện dễ bị bỏ qua}\\
+\midrule
+Replica & Tổng hợp, hoàn hảo, không lỗ & Ngắn, quỹ đạo dựng sẵn & Không nhiễu ảnh, không mờ, phơi sáng cố định; đây là điều kiện dễ nhất có thể\\
+TUM RGB-D & Cảm biến kết cấu ánh sáng, có nhiễu và lỗ & Vài chục giây, ít vòng lớn & Trong nhà, đi bộ, một phòng; chuyển động vẫn khá êm\\
+ScanNet & Cảm biến, quét tay & Dài hơn, có quay lại chỗ cũ & Ảnh mờ và phơi sáng tự động xuất hiện thật; chân trị tư thế cũng từ một hệ dựng lại\\
+EuRoC, chuỗi của bạn & Stereo, không có độ sâu trực tiếp & Vài phút, chuyển động mạnh & Bay trong không gian rộng, chuyển động nhanh, ảnh mờ, thay đổi sáng --- gần như mọi giả định của chương đều bị vi phạm\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{D. Ba thí nghiệm bạn phải tự chạy}
+Đọc bảng của người khác chỉ để loại bớt ứng viên. Muốn biết một hệ có giúp được mình không, có ba thí nghiệm, và chúng đi theo đúng thứ tự kinh tế: rẻ trước, đắt sau.
+
+\begin{itemize}
+\item \textbf{Thí nghiệm oracle tư thế.} Cấp tư thế chân trị cho hệ và chỉ để nó dựng bản đồ. Con số thu được là \emph{trần} chất lượng bản đồ khi khâu tư thế hoàn hảo. Nếu trần đó đã không đủ cho việc hạ nguồn của bạn, mọi công sức về sau đều bị chặn trên. Đây đúng là công cụ ở \ptr{E/24}, áp vào đây.
+\item \textbf{Thí nghiệm tách ghép nối.} Chạy cùng hệ ở hai chế độ: tư thế do bộ dựng ảnh tính, và tư thế do đường cổ điển của bạn tính. Hiệu số ATE giữa hai chế độ trả lời thẳng câu hỏi ``bản đồ neural có làm quỹ đạo tốt lên không''. Kinh nghiệm đọc các bảng đã công bố cho thấy câu trả lời thường là không; nhưng đó là kết luận rút từ bảng của người khác, không phải phép đo của tôi.
+\item \textbf{Thí nghiệm ngoài phân phối.} Chạy trên chính chuỗi khó của bạn: chuyển động nhanh, ảnh mờ, phơi sáng tự động, ngoài trời. Đây là chỗ khoảng cách giữa bảng công bố và thực tế lộ ra nhiều nhất, và cũng là chỗ rẻ nhất để phát hiện sớm.
+\end{itemize}
+
+Và một nhắc nhở về kỷ luật đo, vì nó đã cắn bạn ở chỗ khác: mọi con số trên đây phải chạy nhiều lần. Các hệ này có thêm hai nguồn tản mát mà hệ cổ điển không có --- khởi tạo ngẫu nhiên của bản đồ và số bước tối ưu thực sự chạy được dưới ràng buộc thời gian thực. Sàn nhiễu vì thế thường rộng hơn bạn quen.
+
+\subsection{E. Dựng tập góc nhìn giữ lại cho đúng}
+Hai mục trên gộp lại thành một yêu cầu rất cụ thể, và nó đáng viết riêng vì hầu như không ai làm đúng.
+
+Cách làm mặc định là giữ lại mỗi khung hình thứ tám của chính chuỗi đầu vào. Cách này rẻ và gần như vô dụng. Lý do đã tính ở mục~B: khung hình thứ tám chỉ cách khung hình lân cận vài centimét, mà \(\Delta u \approx f b \Delta Z / Z^{2}\) tỉ lệ thuận với khoảng dịch \(b\). Thu \(b\) từ hàng chục centimét xuống vài centimét thì độ nhạy tụt theo đúng tỉ lệ ấy, và với các giá trị giả định của mục~B thì sai lệch hình học lộ ra ở mức nhỏ hơn một phần mười điểm ảnh --- tức là chìm hẳn dưới nhiễu. Bạn đang đo khả năng nội suy giữa hai ảnh liền kề, không đo bản đồ.
+
+Ba cách dựng tập giữ lại có nghĩa, xếp theo công sức tăng dần:
+
+\begin{itemize}
+\item \textbf{Giữ lại theo đoạn, không theo khung hình.} Cắt bỏ nguyên một đoạn quỹ đạo dài vài giây khỏi dữ liệu dựng bản đồ, rồi đánh giá trên đoạn đó. Khoảng dịch camera khi ấy tính bằng mét chứ không bằng centimét.
+\item \textbf{Quay hai lượt.} Đi qua cùng một chỗ hai lần theo hai đường khác nhau, dựng bản đồ bằng lượt một, đánh giá bằng lượt hai. Đây là cách rẻ nhất cho dữ liệu tự thu, và nó cũng cho bạn luôn một phép thử đóng vòng.
+\item \textbf{Đo thẳng hình học.} Nếu có một quét chân trị --- máy quét laser, hoặc một mô hình đã dựng kỹ ngoại tuyến --- thì bỏ hẳn ảnh đi và đo sai số bề mặt. Đây là câu trả lời đúng khi đầu ra sẽ được dùng để tránh vật cản.
+\end{itemize}
+
+Nếu bạn chỉ đọc bảng của người khác, câu hỏi rút gọn thành một dòng: tập giữ lại của họ cách quỹ đạo chụp bao xa? Bài nào không trả lời được câu đó thì cột PSNR của nó chỉ nói về nội suy.
+
+\section{Ngân sách trên Jetson Orin, và câu hỏi có đáng cho robot chưa}
+\ptrtarget{F/32/05}\label{sec:f32-orin}
+Mọi thứ ở trên đều giả định có một GPU để bàn. Mục này hỏi chi phí ấy có \emph{hình dạng} gì trên phần cứng bạn thật sự triển khai. Mục này cố tình \textbf{không đưa ra con số nào}: mình không có phép đo trên Orin cho bất kỳ hệ nào trong chương, và một ước lượng tự tính trên giấy rất dễ bị đọc lại thành một số đo. Cái đáng học ở đây không phải độ lớn, mà là \emph{thừa số nào nhân với thừa số nào} --- vì chính cấu trúc đó nói cho bạn biết nên cắt ở chỗ nào, và nó đúng bất kể con số cụ thể là bao nhiêu.
+
+\subsection{A. Bộ nhớ: đếm bằng công thức, không quy ra con số}
+Một Gaussian lưu 3 số vị trí, 3 số tỉ lệ, 4 số quaternion, 1 số độ đục và 48 hệ số màu bậc ba --- gần sáu chục số thực cho \emph{một} hạt. Đã là bội số lớn so với một điểm bản đồ thưa, vốn chỉ cần ba số toạ độ cộng một bộ mô tả ngắn. Và một cảnh cỡ căn phòng dựng cho tử tế cần bậc một triệu hạt như thế.
+
+Nhưng bộ nhớ tham số chưa phải khoản phải trả. Trong SLAM, bản đồ \emph{đang được tối ưu} chứ không nằm yên. Mỗi tham số cần thêm một ô gradient và hai ô trạng thái của bộ tối ưu kiểu Adam, nên bộ nhớ thực tế là bốn lần bộ nhớ tham số:
+\[
+\text{bộ nhớ bản đồ} \;\propto\; \underbrace{4}_{\text{tham số, gradient, hai ô Adam}} \times \underbrace{59}_{\text{số thực mỗi hạt}} \times \underbrace{N}_{\text{số Gaussian}} .
+\]
+Thừa số duy nhất bạn điều khiển được là \(N\); hai thừa số kia là hằng số của biểu diễn. Đó là lý do mọi công trình muốn đưa 3DGS lên máy nhúng đều tấn công vào \(N\) chứ không vào chỗ nào khác.
+
+Hướng của kết luận thì rõ, và nó không cần một con số nào: \textbf{bản đồ Gaussian tốn bộ nhớ hơn đám mây điểm thưa vài bậc độ lớn cho cùng một căn phòng, và bộ nhớ mới là ràng buộc quyết định của cả dòng này chứ không phải tốc độ dựng ảnh}. Muốn biết bao nhiêu megabyte trên cảnh của bạn thì phải đo trên cảnh của bạn: số hạt mà một cảnh cần phụ thuộc vào chính cảnh đó, nên không có hằng số nào chuyển thẳng được từ bài báo sang.
+
+Dung lượng nghe thì vẫn có vẻ vừa một Orin. Nhưng bộ nhớ trên Orin là bộ nhớ \emph{dùng chung} giữa CPU và GPU, và nó đang phải chứa cả hệ SLAM, cả các mạng nhận thức khác, cả ROS. Quan trọng hơn, dung lượng không phải ràng buộc cắn trước.
+
+\subsection{B. Băng thông mới là ràng buộc cắn trước}
+Mỗi vòng tối ưu phải đọc \emph{toàn bộ} tham số cùng gradient và trạng thái bộ tối ưu, rồi ghi lại chúng. Viết lưu lượng ấy thành công thức là đủ thấy vấn đề:
+\[
+\text{lưu lượng mỗi giây} \;\propto\;
+\underbrace{N}_{\text{số hạt}} \times
+\underbrace{4}_{\text{tham số}+\text{gradient}+\text{Adam}} \times
+\underbrace{2}_{\text{đọc rồi ghi}} \times
+\underbrace{n_{\text{vòng}}}_{\text{vòng tối ưu mỗi khung}} \times
+\underbrace{f}_{\text{khung mỗi giây}} .
+\]
+Năm thừa số, và bốn trong năm là hằng số của kiến trúc chứ không phải của cài đặt. Kết luận định tính rút ra: với một bản đồ cỡ căn phòng, riêng việc \emph{di chuyển} tham số qua lại đã ăn phần lớn băng thông bộ nhớ của một máy nhúng, trước khi thực hiện một phép nhân nào. Đây là lý do cơ học --- không phải lý do kỹ thuật cài đặt --- khiến một hệ 3DGS SLAM đầy đủ chưa chạy được ở tốc độ cảm biến trên phần cứng nhúng. Mình không có phép đo để nói nó hụt bao nhiêu lần; công thức chỉ nói nó hụt theo hướng nào, và cắt thừa số nào thì đỡ. Ba hướng thoát đều tồn tại và đều phải trả giá: giảm số Gaussian như RTG-SLAM, giảm số vòng tối ưu mỗi khung, hoặc chạy khâu bản đồ ở tần số thấp hơn hẳn khâu bám vết.
+
+Hình~\ref{fig:f32-bang-thong} nói vì sao khoản này khác hẳn mọi khoản học sâu khác bạn từng đưa lên Orin.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize,
+  b/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4pt,align=center,font=\scriptsize,text width=2.5cm,minimum height=1.0cm},
+  m/.style={b,draw=violetdark,fill=violetbg},
+  o/.style={b,draw=reddark,fill=redbg},
+  ar/.style={-{Stealth[length=4pt]},steel,thick},
+  arb/.style={-{Stealth[length=4pt]},reddark,thick},
+  lb/.style={font=\scriptsize,color=tiercol,align=center}]
+% --- suy luan ---
+\begin{scope}
+\node[font=\scriptsize\bfseries,inkblue] at (3.1,2.55) {Suy luận một mạng đã huấn luyện};
+\node[m] (w) at (0,1.2) {trọng số\\(nạp một lần)};
+\node[b] (k) at (3.1,1.2) {nhân ma trận};
+\node[b] (y) at (6.2,1.2) {kết quả};
+\draw[ar] (w)--(k); \draw[ar] (k)--(y);
+\node[lb,text width=6.6cm] at (3.1,-0.25)
+  {trọng số nằm yên, mọi khung hình dùng lại cùng bộ đó:\\ rất nhiều phép tính trên mỗi byte đã nạp};
+\node[font=\scriptsize,color=violetdark,align=center,text width=6.6cm] at (3.1,-1.55)
+  {\textbf{chặn bởi phép tính}\\ lượng tử hoá và TensorRT giúp được};
+\end{scope}
+% --- toi uu tai cho ---
+\begin{scope}[xshift=9.2cm]
+\node[font=\scriptsize\bfseries,inkblue] at (3.1,2.55) {Tối ưu bản đồ tại chỗ};
+\node[o] (p) at (0,1.2) {tham số bản đồ\\ \(+\) gradient \(+\) Adam};
+\node[b] (g) at (3.1,1.2) {một bước\\ hạ gradient};
+\node[o] (p2) at (6.2,1.2) {ghi đè lại\\ toàn bộ};
+\draw[ar] (p)--(g); \draw[ar] (g)--(p2);
+\draw[arb] (6.2,0.7) -- (6.2,0.05) -- node[lb,below,pos=0.5]{lặp lại mỗi vòng, mỗi khung} (0,0.05) -- (0,0.7);
+\node[font=\scriptsize,color=reddark,align=center,text width=6.6cm] at (3.1,-1.55)
+  {\textbf{chặn bởi băng thông}\\ không mẹo tăng tốc suy luận nào cứu được};
+\end{scope}
+\end{tikzpicture}}
+\caption{Vì sao khoản chi phí ở chương này không giống bất kỳ khoản học sâu nào khác trong Phần F. Bên trái là thứ bạn đã quen triển khai: trọng số nạp một lần rồi nằm yên, nên mỗi byte đã nạp được dùng cho rất nhiều phép tính và nút thắt nằm ở phép tính. Bên phải là thứ đang chạy trong một hệ SLAM neural: chính tham số bản đồ là biến đang bị sửa, nên mỗi vòng phải đọc rồi ghi lại toàn bộ, và số phép tính trên mỗi byte rất thấp. Mũi tên đỏ quay ngược là toàn bộ khác biệt --- nó biến bài toán từ ``chặn bởi phép tính'' thành ``chặn bởi băng thông'', và đó là lý do lượng tử hoá cùng TensorRT gần như không giúp gì.}
+\label{fig:f32-bang-thong}
+\end{figure}
+
+Còn một ràng buộc nữa mà bảng thông số không nói: nhiệt và điện. Orin chạy ở nhiều mức công suất, và mức thấp cắt cả xung nhịp GPU lẫn băng thông. Một khối chiếm gần trọn băng thông trong nhiều phút sẽ kéo cả hệ vào vùng giảm xung, nên các khối khác --- phát hiện vật thể, lập kế hoạch --- chậm theo. Đây là dạng ghép nối không xuất hiện trong bất kỳ phép đo đơn lẻ nào, và chỉ lộ ra khi chạy cả hệ trong thời gian dài.
+
+Với dòng NeRF, chỗ nghẽn dời từ băng thông sang phép tính, và công thức đổi theo. Chi phí một vòng tỉ lệ với (số tia lấy mẫu) \(\times\) (số mẫu dọc mỗi tia) \(\times\) (chi phí một lần chạy MLP), rồi vẫn phải nhân tiếp với số vòng mỗi khung và số khung mỗi giây. Ba thừa số đầu đều là hằng số kiến trúc, và tích của chúng lớn vì mỗi tia phải \emph{dò} chứ không \emph{chiếu} --- đúng cơ chế đã nói ở mục 3. Hướng kết luận giống hệt dòng Gaussian: một khối duy nhất ăn phần lớn ngân sách của máy, trong khi máy còn phải chạy cả phần nhận thức lẫn phần điều khiển. Lần nữa, đây là hình dạng của bài toán chứ không phải một phép đo; con số thật chỉ có nếu bạn chạy trên chính thiết bị của mình.
+
+\noindent\textbf{Một phản xạ không dùng được ở đây.} Khi thấy một mô hình quá chậm trên Orin, phản xạ quen thuộc là lượng tử hoá và biên dịch bằng TensorRT. Ở đây phản xạ đó gần như không giúp gì, và lý do đáng nhớ: cái đang chạy không phải \emph{suy luận} mà là một \emph{vòng lặp tối ưu} trên chính tham số bản đồ. Lượng tử hoá làm hỏng gradient; đồ thị tính toán thay đổi liên tục vì Gaussian được thêm và bị cắt; và phần lớn thời gian nằm ở lưu lượng bộ nhớ chứ không ở phép nhân. Đây là chỗ khác biệt căn bản giữa chương này và mọi chương khác của Phần F, nơi ta triển khai một mạng đã huấn luyện xong.
+
+\subsection{C. Vì sao gần như mọi kết quả đều là trong nhà và chuỗi ngắn}
+Ba ràng buộc trên giải thích luôn một điều mà người đọc thường coi là ngẫu nhiên: vì sao gần như toàn bộ kết quả trong chương này đến từ cảnh trong nhà, chuỗi vài chục giây tới vài phút, có độ sâu RGB-D, chạy trên GPU để bàn.
+
+\begin{itemize}
+\item \textbf{Trong nhà} vì cảnh có biên, nên lưới hoặc tập Gaussian cấp phát được. Ngoài trời không có biên, và bộ nhớ tăng theo diện tích đã đi qua.
+\item \textbf{Chuỗi ngắn} vì bản đồ chỉ lớn thêm chứ không bao giờ nhỏ đi, và vì chuỗi ngắn thì trôi tích luỹ chưa kịp thành vấn đề.
+\item \textbf{RGB-D} vì độ sâu cho hình học gần như miễn phí. Bỏ độ sâu đi thì phải mượn tiên nghiệm học được, và kéo theo mọi giới hạn của tiên nghiệm đó.
+\item \textbf{GPU để bàn} vì ở đó cả dung lượng lẫn băng thông bộ nhớ đều dư ra rất nhiều so với một máy nhúng, và lại không phải chia cho phần còn lại của robot.
+\item \textbf{Camera đi chậm và đều} vì bám vết quang trắc có bồn hút hữu hạn, và vì ảnh mờ phá thẳng vào hàm mất mát.
+\end{itemize}
+
+Không điều nào ở trên là lỗi của các tác giả. Đó là những điều kiện cần để bài toán giải được ở trạng thái hiện tại của lĩnh vực. Nhưng chúng \emph{là} khoảng cách giữa bảng kết quả và chiếc robot của bạn, và đó là khoảng cách bạn phải tự trả.
+
+\subsection{D. Điền số vào bốn cổng}
+Khung bốn cổng ở \ptr{F/27} có ích nhất khi nó được điền số thật thay vì cảm giác. Bảng~\ref{tab:f32-gates} điền cho chương này, với ba nhu cầu hạ nguồn khác nhau. Chú ý là cùng một công nghệ cho ba kết luận khác nhau, và khác biệt nằm ở nhu cầu chứ không ở công nghệ.
+
+\begin{table}[H]\centering\footnotesize
+\caption{Bốn cổng của \ptr{F/27} điền cho bản đồ neural, tách theo nhu cầu hạ nguồn. Cùng một công nghệ, ba kết luận khác nhau --- và đó là lý do câu hỏi ``bản đồ neural có đáng không'' không có câu trả lời chung.}
+\label{tab:f32-gates}
+\begin{tabularx}{\linewidth}{@{}L{2.6cm}YYY@{}}
+\toprule
+\textbf{Cổng} & \textbf{Để định vị} & \textbf{Để tránh vật cản} & \textbf{Để dựng lại và xem}\\
+\midrule
+Bài toán có thật không & Không: hệ hiện tại đã định vị tốt & Có, nhưng TSDF và lưới chiếm dụng đã giải & Có, và không có lời giải cổ điển nào thay được\\
+Đo được không & Có: ATE, cùng giao thức căn chỉnh & Có, nhưng cần chân trị hình học, thứ khó có ngoài đời & Có: PSNR, SSIM, LPIPS trên góc nhìn giữ lại thật sự\\
+Vừa ngân sách Orin không & Không: riêng lưu lượng đọc-ghi tham số mỗi vòng đã ăn phần lớn băng thông & Không ở tốc độ cảm biến; có nếu chạy khâu bản đồ ở tần số thấp & Có, nếu chạy ngoại tuyến trên máy trạm\\
+Hỏng ra sao & Im lặng, qua vòng phản hồi dương, không có chỉ báo & Vật chất giả lơ lửng bị coi là vật cản, hoặc ngược lại & Ảnh xấu đi, thấy ngay bằng mắt --- chế độ hỏng lành nhất\\
+\midrule
+\textbf{Kết luận} & \textbf{Chưa đáng} & \textbf{Dùng TSDF trước} & \textbf{Đáng, và nên làm ngoại tuyến}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Hàng cuối là chỗ đáng nhớ. Cùng một đống mã nguồn, cùng một bài báo, mà kết luận đảo hẳn theo việc bạn định dùng đầu ra vào việc gì. Ai hỏi ``bản đồ neural có đáng không'' mà không nói rõ dùng để làm gì thì đang hỏi một câu không có đáp án.
+
+\subsection{E. Kết luận thẳng thắn: có đáng chưa}
+Trả lời tách theo mục đích, vì gộp chung là chỗ mọi tranh luận đi vào ngõ cụt.
+
+\begin{itemize}
+\item \textbf{Thay bản đồ định vị bằng bản đồ neural: chưa đáng.} Không có bằng chứng nào cho thấy nó cải thiện ATE của một hệ stereo-inertial đã tinh chỉnh kỹ, trên chuỗi thật, ở ngân sách của Orin. Đổi lại bạn mất tính chẩn đoán được, mất tính lặp lại, và tiêu gần hết ngân sách tính toán. Đây là kết luận đọc từ điều kiện thí nghiệm của các bài đã công bố, không phải từ một phép đo của tôi --- nhưng nó là kết luận mà chính các điều kiện đó bắt buộc.
+\item \textbf{Bản đồ neural như một sản phẩm phụ, chạy ở tần số thấp: đáng thử, nếu có nhu cầu thật.} Nếu bài toán hạ nguồn cần ảnh --- xem lại từ xa, mô phỏng cảm biến, sinh dữ liệu huấn luyện, kiểm tra công trình --- thì mẫu ghép lỏng của Photo-SLAM là cách vào rẻ và không rủi ro. Tư thế vẫn do đường cổ điển bảo đảm, nên xấu nhất là bạn mất một luồng GPU.
+\item \textbf{Bản đồ dày để tránh vật cản: chọn TSDF hoặc lưới chiếm dụng trước.} Chúng rẻ hơn nhiều bậc, có mô hình xác suất, có bề mặt định nghĩa sạch, và đã được kiểm chứng lâu năm. Chỉ chuyển sang biểu diễn neural khi bạn chỉ ra được một việc cụ thể mà chúng không làm nổi.
+\item \textbf{Dựng lại chất lượng cao ngoại tuyến: đáng, và đây là chỗ dòng này thật sự thắng.} Bỏ ràng buộc thời gian thực đi thì mọi phép tính ở trên đổi hẳn. Ghi bag trên robot, chạy dựng bản đồ trên máy trạm, đó là cách dùng đúng sức của công nghệ này hôm nay.
+\end{itemize}
+
+\subsection{F. Bốn bài học thiết kế đáng giữ kể cả khi không dùng}
+Đây là phần trả lời câu hỏi thứ tư của khung đọc: nếu không lấy nguyên phương pháp thì lấy được gì.
+
+\begin{itemize}
+\item \textbf{Chọn biểu diễn theo tiêu chí ``sửa được sau khi đóng vòng''.} Đây là tiêu chí phân loại mạnh nhất trong cả chương, và nó tách dòng Gaussian khỏi dòng MLP đơn rõ hơn mọi bảng PSNR. Nó cũng đúng cho mọi thứ khác bạn gắn vào bản đồ: bản đồ ngữ nghĩa, bản đồ chiếm dụng, bộ nhớ đóng vòng.
+\item \textbf{Mọi hàm mất mát quang trắc cần một lịch làm trơn.} Bài học của BARF, và nó là bản sao của kim tự tháp ảnh trong các hệ trực tiếp cổ điển. Nếu bạn thêm một số hạng quang trắc vào hệ mình mà không có lịch làm trơn, nó sẽ mắc kẹt và bạn sẽ đổ lỗi nhầm cho khởi tạo.
+\item \textbf{Chốt khung hình theo lượng thông tin mới, đo được.} iMAP đo bằng sai số dựng ảnh dưới bản đồ hiện tại. Ý tưởng đó chuyển được sang hệ cổ điển: thay ngưỡng ``số điểm khớp dưới 90\%'' bằng một đại lượng có nghĩa thống kê. Bạn đã biết chính sách chốt khung hình là chỗ nhạy cảm bậc nhất của hệ mình.
+\item \textbf{Trọng số của phần dư phải đến từ bất định, không đến từ hằng số.} NeRF-SLAM cân hàm mất mát dựng bản đồ bằng bất định của độ sâu. Đây đúng là tư duy ma trận thông tin, và nó là sợi dây nối chương này với \ptr{F/34}.
+\end{itemize}
+
+\begin{cannho}
+Hai câu hỏi phải luôn tách rời: \emph{bản đồ này trông có đẹp không} và \emph{quỹ đạo này có đúng không}. Chúng được tối ưu bởi hai hàm mất mát khác nhau, đo bằng hai bộ thước đo khác nhau, và một hệ hoàn toàn có thể thắng ở câu thứ nhất trong khi thua ở câu thứ hai. Quy tắc kiến trúc rút ra: đừng để bộ dựng ảnh là nguồn của tư thế, trừ khi bạn đã tự đo và thấy nó tốt hơn đường cổ điển của mình trên chính chuỗi khó của mình. \T{3}
+\end{cannho}
+
+\section{Giới hạn và trường hợp hỏng}
+\ptrtarget{F/32/06}
+Giới hạn nặng nhất đã nói ở trên và đáng nhắc lại theo cách khác: các hệ này tối ưu \emph{riêng cho từng cảnh}. Chi phí vì thế là chi phí lặp lại, không phải chi phí một lần như huấn luyện một mạng rồi triển khai. Mọi kỹ thuật tăng tốc suy luận mà bạn quen đều không áp được. Các dòng mô hình tiến thẳng, dự đoán thẳng tập Gaussian từ vài ảnh, đang xoá dần ranh giới này; tại thời điểm viết, chất lượng của chúng vẫn dưới bản tối ưu riêng từng cảnh, và đây là quan sát xu hướng chứ chưa phải kết quả đã ổn định.
+
+Chế độ hỏng thứ hai là hỏng \emph{im lặng} và nó đáng sợ nhất. Khi tư thế sai vài phần mười độ, tối ưu không báo lỗi. Nó bù bằng cách sinh ra vật chất giả lơ lửng, và ảnh dựng ra vẫn đẹp. Với một hệ ghép chặt, vật chất giả đó lại quay lại làm sai tư thế của khung hình sau. Bạn có một vòng phản hồi dương mà không có chỉ báo nào bật lên. Ở hệ cổ điển, cùng tình huống ấy làm số điểm khớp tụt và làm phần dư tăng --- tức là bạn \emph{nhìn thấy} nó. Mất tính chẩn đoán được là khoản mất ít được nhắc nhất và đắt nhất khi triển khai.
+
+Chế độ hỏng thứ ba nằm ở giả định về quá trình tạo ảnh. Cảnh phải tĩnh, phơi sáng phải nhất quán, ảnh không được mờ. Ba giả định này bị vi phạm liên tục trên một robot thật, và chúng bị vi phạm \emph{cùng lúc} đúng vào những đoạn khó: robot quay nhanh trong hành lang thiếu sáng, camera tự tăng thời gian phơi, ảnh mờ đi, người đi qua khung hình. Mỗi vi phạm đều được mô hình giải thích bằng cách thêm hình học sai, vì đó là biến duy nhất nó có.
+
+Cuối cùng, một giới hạn về kiến thức chứ không về công nghệ: tôi không có phép đo riêng nào cho các hệ trong chương này trên phần cứng Orin, và cũng không kiểm chứng được các con số hiệu năng mà các bài báo đưa ra. Vì thế mục~\ref{sec:f32-orin} cố tình chỉ nói về \emph{cấu trúc} của chi phí --- thừa số nào nhân với thừa số nào --- chứ không đưa ra con số nào. Cấu trúc đó đủ để nói ``khoản này bị chặn bởi băng thông chứ không bởi phép tính'' và ``thừa số duy nhất cắt được là số hạt''. Nó không đủ để nói hệ nào nhanh hơn hệ nào, cũng không đủ để nói hụt bao nhiêu lần. Nếu bạn cần một con số, chỉ có một cách lấy nó, là chạy trên chính thiết bị của mình.
+
+\section{Thực hành}
+\ptrtarget{F/32/07}
+\begin{description}
+\item[Repo và tài nguyên.] Mã nguồn của các hệ trong chương đều mở: \repo{cvg/nice-slam}, \repo{HengyiWang/Co-SLAM}, \repo{idiap/ESLAM}, \repo{eriksandstroem/Point-SLAM}, \repo{youmi-zym/GO-SLAM} cho dòng NeRF; \repo{spla-tam/SplaTAM}, \repo{muskie82/MonoGS}, \code{Lab-of-AI-and-Robotics/GS\_ICP\_SLAM}, \repo{HuajianUP/Photo-SLAM} cho dòng Gaussian. Bản 3DGS gốc là \repo{graphdeco-inria/gaussian-splatting}. Để đo, dùng lại chính \repo{evo} mà bạn đã quen cho ATE, và một script nhỏ tính PSNR cùng LPIPS trên tập góc nhìn giữ lại. Tập dữ liệu vào cửa nhanh nhất là TUM RGB-D vì nó nhỏ và mọi hệ đều báo cáo trên đó. Danh sách tên hệ ở đây chốt tại tháng 9/2026 và sẽ cũ trong sáu tới mười hai tháng; các hạ tầng bền hơn nhiều là bộ rasterize gốc, \repo{evo}, và \repo{opencv}.
+\item[Câu hỏi kiểm tra hiểu.] Vì sao lưới đặc trưng chữa được quên thảm khốc trong khi tăng số tham số của một MLP đơn thì không? Một bài báo cáo PSNR đứng đầu bảng trên Replica và ATE nhỏ hơn mọi hệ neural khác được so: hai kết quả đó nói gì và không nói gì về việc hệ chạy được trên chuỗi EuRoC của bạn? Nếu chỉ được chạy một thí nghiệm để quyết định có theo đuổi hướng này không, bạn chạy thí nghiệm nào, và nó chặn trên cái gì?
+\item[Mini project.] Xem khối \emph{Mini project SLAM} bên dưới; nó chính là thí nghiệm rẻ nhất trả lời được câu hỏi trung tâm của chương.
+\end{description}
+
+\begin{onbai}
+\ar[3]{Bản đồ điểm thưa}{Vài chục tới vài trăm nghìn điểm 3D kèm bộ mô tả. Đủ để trả lời ``tôi ở đâu'', không trả lời được ``chỗ kia có trống không'' vì nó chưa bao giờ mô hình hoá khoảng không giữa các điểm.}
+\ar[3]{TSDF}{Lưới lưu khoảng cách có dấu tới bề mặt gần nhất. Bề mặt là tập mức 0 nên có định nghĩa sạch, và đây là đối thủ thật sự của bản đồ neural chứ không phải bản đồ thưa.}
+\ar[2]{iMAP}{Hệ SLAM RGB-D dùng một MLP làm toàn bộ bản đồ. Gọn tới mức một phòng chỉ cần vài trăm nghìn tham số, nhưng trọng số dùng chung nên học chỗ mới làm mờ chỗ cũ.}
+\ar[3]{Quên thảm hoạ}{Học dữ liệu mới làm mất khả năng tái tạo dữ liệu cũ, vì cùng bộ tham số gánh cả hai. Triệu chứng trong bản đồ neural: sang phòng bên rồi quay lại thì phòng cũ mờ đi.}
+\ar[3]{Vì sao lưới đặc trưng chữa được quên thảm khốc?}{Vì nó thu hẹp giá đỡ của gradient. Một tia chỉ chạm vài ô lưới quanh nó thay vì chạm mọi trọng số, nên cập nhật trở thành cục bộ. Cái giá là bộ nhớ quay lại phụ thuộc thể tích cảnh.}
+\ar[2]{Ba cách cấp phát thưa}{Co-SLAM ghép mã hoá toạ độ với bảng băm; ESLAM dùng ba mặt phẳng đặc trưng nên bộ nhớ theo bình phương chứ không theo luỹ thừa ba; Point-SLAM neo đặc trưng lên chính điểm đã quan sát.}
+\ar[3]{BARF}{Tối ưu tư thế cùng lúc với trường bức xạ. Phát hiện chính: mã hoá vị trí tần số cao làm mặt phẳng mất mát lởm chởm, nên phải bật tần số từ thô tới tinh.}
+\ar[3]{Vì sao tần số cao phá gradient theo tư thế?}{Vì đạo hàm của thành phần tần số \(k\) có biên độ tỉ lệ với \(k\). Các gợn tần số cao sinh ra vô số cực tiểu địa phương gần nhau, và hạ gradient rơi vào cái hố gần nhất.}
+\ar[2]{GO-SLAM}{Hệ đầu tiên trong dòng NeRF có đóng vòng và tối ưu toàn cục thật sự. Nó làm được vì bản đồ neo vào khung hình chốt, nên sửa tư thế thì kéo bản đồ theo.}
+\ar[1]{vMAP}{Mỗi vật thể một mạng nhỏ riêng, hợp lại lúc dựng ảnh. Vật quan sát được một phần vẫn ra hình dạng kín, vì mỗi mạng chỉ phải học một vật.}
+\ar[3]{Vì sao 3DGS nhanh hơn NeRF về bản chất?}{NeRF phải đi tìm vật chất bằng cách lấy hàng chục mẫu dọc mỗi tia. 3DGS đã lưu vật chất thành nguyên thể tường minh nên chỉ chiếu, sắp theo độ sâu rồi trộn. Chi phí mỗi điểm ảnh đổi từ số mẫu sang số nguyên thể phủ lên nó.}
+\ar[3]{Ba hệ quả của việc chuyển sang nguyên thể tường minh}{Cập nhật bản đồ thành sửa chữa cục bộ; bản đồ dịch chuyển được sau khi đóng vòng; đạo hàm theo tư thế có dạng giải tích.}
+\ar[3]{Ghép chặt và ghép lỏng}{Ghép chặt lấy tư thế từ chính bộ dựng ảnh, nên lỗi bản đồ chảy vào quỹ đạo. Ghép lỏng để tư thế cho đường cổ điển và coi bản đồ là sản phẩm; nó không thể làm quỹ đạo xấu đi.}
+\ar[2]{Photo-SLAM}{Giữ xương sống đặc trưng và hiệu chỉnh chùm tia cho tư thế, gắn thêm bản đồ Gaussian chỉ để dựng ảnh. Đây là mẫu ghép lỏng điển hình và là cách vào rẻ nhất cho một hệ đang chạy sản phẩm.}
+\ar[3]{PSNR cao nhưng ATE tệ --- giải thích thế nào?}{Hàm mất mát chỉ ràng buộc ảnh dựng, không ràng buộc hình học, và màu phụ thuộc góc nhìn cho mô hình chỗ để ``vẽ'' thay vì ``dựng''. Hai đại lượng đó tách rời được hoàn toàn.}
+\ar[3]{PSNR đo trên khung hình đầu vào}{Dấu hiệu cảnh báo quan trọng nhất khi đọc bảng: con số đó đo độ khớp chứ không đo khả năng tổng quát sang góc nhìn mới. Phải tìm xem bài có tập góc nhìn giữ lại không.}
+\ar[3]{ATE có căn chỉnh tỉ lệ}{Với hệ đơn ảnh, ATE thường tính sau khi căn chỉnh cả tỉ lệ. Phép căn chỉnh đó hấp thụ sai lệch tỉ lệ, tức là giấu đúng chế độ hỏng nguy hiểm nhất, nên không so trực tiếp được với hệ stereo-inertial.}
+\ar[2]{Thí nghiệm oracle tư thế}{Cấp tư thế chân trị và chỉ để hệ dựng bản đồ, để lấy trần chất lượng bản đồ khi khâu tư thế hoàn hảo. Trần đó không đủ thì mọi công sức về sau bị chặn trên.}
+\ar[3]{Ngân sách của một bản đồ Gaussian}{Gần sáu chục số thực cho mỗi hạt, nhân bốn khi đang tối ưu vì còn gradient và hai ô Adam. Lưu lượng mỗi giây tỉ lệ với số hạt nhân số vòng tối ưu mỗi khung nhân số khung mỗi giây --- nên băng thông cắn trước dung lượng, và thừa số duy nhất bạn điều khiển được là số hạt.}
+\ar[2]{Vì sao TensorRT không cứu được?}{Vì cái chạy trên Orin không phải suy luận mà là vòng lặp tối ưu trên chính tham số bản đồ. Lượng tử hoá phá gradient, đồ thị đổi liên tục, và nút thắt nằm ở băng thông chứ không ở phép nhân.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{\repo[https://github.com/graphdeco-inria/gaussian-splatting]{gaussian-splatting}}{Bộ rasterize Gaussian khác biệt được --- hạ tầng mà toàn bộ dòng SLAM Gaussian trong chương dựng lên trên đó}{Hạ tầng; bền hơn tên từng hệ SLAM}
+\ud{Photo-SLAM \cite{f32photoslam2024}}{Mẫu ghép lỏng: tư thế do đặc trưng và hiệu chỉnh chùm tia cổ điển, bản đồ Gaussian chỉ tiêu thụ tư thế}{Kiến trúc đáng bắt chước nhất cho hệ đang chạy sản phẩm}
+\ud{GO-SLAM \cite{f32goslam2023}}{Neo bản đồ neural vào khung hình chốt để biến dạng được sau khi đóng vòng}{Bằng chứng cho tiêu chí ``sửa được sau khi đóng vòng''}
+\ud{NeRF-SLAM \cite{f32nerfslam2022}}{Dùng bất định của độ sâu làm trọng số cho hàm mất mát dựng bản đồ}{Tư duy ma trận thông tin mang sang phía bản đồ}
+\ud{Công cụ số hoá công trình và quét nội thất}{Dựng lại chất lượng cao \emph{ngoại tuyến} từ video quay tay --- đúng chỗ dòng này thắng rõ}{Được cho là đã dùng trong sản phẩm thương mại; tôi không kiểm chứng chi tiết}
+\end{ungdung}
+
+\begin{duan}{Đặt một hệ bản đồ neural lên đúng hai trục đánh giá}{1--2 ngày}
+\dmt trả lời bằng số cho câu hỏi trung tâm của chương: một hệ SLAM Gaussian đứng ở góc phần tư nào của Hình~\ref{fig:quality-vs-ate} khi đo bằng \emph{giao thức của bạn}, chứ không phải giao thức của bài báo.
+\ddl một chuỗi TUM RGB-D dễ để hệ chạy được, cộng đúng một chuỗi EuRoC khó mà bạn đã có sàn nhiễu từ dự án chương 24 --- ví dụ V2\_03. Baseline là hệ ORB-SLAM3 của chính bạn ở cấu hình mặc định đã tinh chỉnh.
+\dbc cài một hệ ghép chặt và chạy nó ba lần trên mỗi chuỗi; ghi ATE bằng \repo{evo} với \emph{cùng một} phép căn chỉnh cho cả hai hệ, và ghi rõ có căn chỉnh tỉ lệ hay không; ghi PSNR trên các khung hình giữ lại, không phải trên khung hình đầu vào; chạy thêm chế độ oracle với tư thế chân trị để lấy trần chất lượng bản đồ; đo đỉnh bộ nhớ GPU và thời gian mỗi khung hình, trên máy để bàn trước, rồi trên Orin nếu nó chạy nổi.
+\dxk bạn vẽ được một điểm cho mỗi hệ trên mặt phẳng (chất lượng ảnh, ATE) kèm thanh sai số ba lần chạy, và phát biểu được một trong hai câu: ``hệ neural nằm cùng góc với ORB-SLAM3 theo trục dọc'' hoặc ``nó tệ hơn X cm, tức là ngoài sàn nhiễu đã đo''. Kiểm tra chéo bắt buộc: nếu bỏ căn chỉnh tỉ lệ mà ATE của hệ đơn ảnh nhảy vọt, bạn vừa nhìn thấy chỗ mà bảng công bố đã giấu.
+\dnv \ptr{E/24} cho sàn nhiễu và cho thí nghiệm oracle; \ptr{F/27} cho khung bốn cổng để kết luận đi tiếp hay dừng; \ptr{F/34} nếu chuỗi khó của bạn hỏng vì ảnh mờ chứ không vì bản đồ.
+\end{duan}
+
+\begin{traloi}
+\tl{Bản đồ dày cho bạn ba thứ mà bản đồ thưa không có: biết chỗ nào trống để tránh vật cản, biết hình dạng bề mặt để thao tác hoặc kiểm tra, và dựng được ảnh ở góc nhìn mới. Cả ba đều là câu hỏi về \emph{khoảng không giữa các điểm}, thứ mà bản đồ thưa chưa bao giờ mô hình hoá.}
+\tl{Không có lý do mặc định nào cả --- và đó chính là cổng đầu tiên. Bản đồ neural chỉ hơn TSDF ở ba chỗ: nội suy vùng chưa quan sát, dựng được ảnh có màu phụ thuộc góc nhìn, và dồn tham số theo nội dung. Nếu nhu cầu của bạn không nằm trong ba chỗ đó thì TSDF hoặc lưới chiếm dụng vẫn là câu trả lời đúng.}
+\tl{Vì hàm mất mát chỉ ràng buộc ảnh dựng ra. Hai cấu hình hình học rất khác nhau có thể sinh ra cùng một bộ ảnh, nhất là khi màu được phép phụ thuộc hướng nhìn. Muốn biết quỹ đạo, phải đo ATE bằng đúng giao thức căn chỉnh mà bạn dùng cho hệ hiện tại.}
+\tl{Thay đổi duy nhất là bỏ việc đi dò dọc tia, thay bằng chiếu các nguyên thể tường minh rồi trộn. Nó mở ra đóng vòng vì nguyên thể có vị trí tường minh: gắn chúng vào khung hình chốt thì sửa tư thế sẽ kéo được cả cụm theo, còn với một MLP đơn thì không có phép nào tương đương.}
+\tl{Băng thông cắn trước dung lượng, và lý do nằm ở công thức chứ không ở một con số: mỗi vòng tối ưu đọc rồi ghi lại \emph{toàn bộ} tham số cùng gradient và hai ô trạng thái Adam, và lưu lượng đó còn phải nhân với số vòng mỗi khung rồi nhân với số khung mỗi giây. Với một bản đồ cỡ căn phòng, riêng việc di chuyển tham số đã ăn phần lớn băng thông của một máy nhúng trước khi tính một phép nhân nào. Muốn biết hụt bao nhiêu lần thì phải đo trên chính thiết bị của mình.}
+\end{traloi}
+
+\begin{dongian}
+Hãy nghĩ về hai cách ghi lại một căn phòng. Cách thứ nhất là đóng vài chục cái đinh lên tường ở những chỗ dễ nhận ra, rồi ghi lại khoảng cách giữa chúng. Cách thứ hai là thuê một hoạ sĩ vẽ căn phòng đó thật giống, giống tới mức nhìn bức tranh cứ tưởng đang nhìn phòng thật.
+
+Cái đinh giúp bạn biết mình đang đứng ở đâu, chính xác tới từng centimét. Nhưng nhìn bản đồ đinh thì không biết cái ghế có chắn lối đi hay không. Bức tranh thì ngược lại: nhìn rất rõ căn phòng, mà đo tường từ bức tranh lại sai, vì hoạ sĩ chỉ cần vẽ cho \emph{trông} giống chứ không cần vẽ cho \emph{đo} đúng. Anh ta được phép vẽ một cái bóng thay cho một cái hốc tường, và người xem không phát hiện ra.
+
+Toàn bộ chương này là chuyện có nên đổi đinh lấy tranh hay không. Câu trả lời hôm nay là: đừng đổi, hãy giữ đinh để định vị và treo thêm bức tranh nếu bạn thật sự cần nhìn. Vì bức tranh rất đắt --- vẽ một căn phòng ngốn gần hết sức của cái máy tính nhỏ gắn trên robot --- và vì độ giống của bức tranh không hề chứng minh nó đo đúng.
+
+\chuadongian{chỗ bức tranh \emph{có thể} đo đúng. Khi được vẽ từ rất nhiều góc nhìn phủ kín, hoạ sĩ hết chỗ để gian lận, và bức tranh dần trở thành phép đo thật. Không có ranh giới gọn nào nói bao nhiêu góc nhìn là đủ, và mọi cách nói đơn giản về ranh giới đó đều bỏ sót một phản ví dụ.}
+\motcau{Đinh để biết mình ở đâu, tranh để biết chỗ đó trông thế nào --- và tranh đẹp không có nghĩa là tường được đo đúng.}
+\end{dongian}
+
+\section{Kết nối}
+\ptrtarget{F/32/08}
+\ptr{C/16/03-nerf-3dgs-va-hop-nhat} là tiền đề trực tiếp: cơ chế dựng ảnh thể tích, phép rasterize Gaussian, và lập luận vì sao PSNR không chứng minh hình học đều nằm ở đó, còn chương này chỉ hỏi chuyện dùng chúng làm bản đồ. \ptr{F/27} là bộ lọc: khung bốn cổng ở đó chính là thứ dẫn tới kết luận ``chưa đáng'' của mục~\ref{sec:f32-orin}, và bạn nên chạy lại khung đó với số liệu của riêng mình. \ptr{F/31} giải thích các bộ bám vết dày mà NeRF-SLAM và GO-SLAM mượn lại, nên đọc nó trước nếu bạn muốn hiểu vì sao hai hệ đó chính xác hơn phần còn lại của dòng. \ptr{F/30} là nguồn của mọi tiên nghiệm độ sâu và pháp tuyến mà NICER-SLAM dùng để thay cảm biến, kèm theo vấn đề tỉ lệ đi cùng. \ptr{F/33} tiếp nhận ý tưởng bản đồ mức đối tượng của vMAP và đẩy nó lên đồ thị cảnh. \ptr{F/34} nhận lại hai chỗ chương này bỏ ngỏ: ảnh mờ do chuyển động, và việc lấy trọng số phần dư từ bất định thay vì từ hằng số. Còn \ptr{E/24} là bộ công cụ để chạy ba thí nghiệm ở mục~\ref{sec:f32-danhgia} một cách có kỷ luật --- đặc biệt là thí nghiệm oracle, thứ trả lời được nhiều nhất với chi phí ít nhất.
+
+\begin{tukiem}
+\item Vì sao khoản chênh tốc độ giữa NeRF và 3DGS lại kéo theo khả năng sửa bản đồ sau khi đóng vòng, trong khi hai chuyện đó nghe không liên quan gì tới nhau?
+\item Một hệ báo PSNR cao nhất bảng và ATE tốt hơn mọi hệ neural khác. Vì sao điều đó vẫn chưa nói gì về việc nó có thay được hệ của bạn không, và bạn tìm dòng nào trong bài để biết?
+\item Giả sử bạn buộc phải dùng bản đồ neural cho tránh vật cản. Đại lượng nào của TSDF hoặc lưới chiếm dụng bị mất, và bạn dựng lại nó bằng cách nào?
+\item Bài học từ thô đến tinh của BARF tương đương với kỹ thuật cổ điển nào, và điều gì xảy ra nếu bạn thêm một số hạng quang trắc vào hệ mình mà quên nó?
+\item Vì sao lượng tử hoá và TensorRT gần như vô dụng ở chương này, trong khi chúng là công cụ chính ở mọi chương khác của Phần F?
+\item Một hệ ghép chặt bị lệch tư thế nhẹ ở khung hình thứ 200. Chuỗi sự kiện nào dẫn tới hỏng, và vì sao không có chỉ báo nào bật lên như ở hệ cổ điển?
+\item Trong bốn bài học thiết kế ở cuối chương, bài nào áp được vào hệ của bạn ngay tuần này mà không cần thêm một dòng học sâu nào?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

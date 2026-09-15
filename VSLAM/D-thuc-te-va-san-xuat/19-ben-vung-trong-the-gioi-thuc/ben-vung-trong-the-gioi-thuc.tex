@@ -1,0 +1,297 @@
+% ---------------------------------------------------------------------------
+% Chương 19 — Bền vững trong thế giới thực
+% Tạo: 2026-09-13 | Phụ thuộc: A/01 (giả thiết cảnh tĩnh), A/02 (quang trắc), B/07, C/13
+% Mức độ: XƯƠNG SỐNG. Danh mục các chế độ hỏng — dùng làm danh mục kiểm khi THIẾT KẾ.
+% Kiểm chứng:
+%   (1) RANSAC chọn vật động làm inlier khi nó chiếm đa số — cửa (a) từ định nghĩa
+%       "tập nhất quán lớn nhất" ở B/07 mục 5B.
+%   (2) Direct nhạy với vật động hơn indirect — cửa (a): một vật động làm hỏng cường độ
+%       cả một vùng liên thông, trong khi indirect chỉ mất vài điểm rời rạc.
+%   (3) Kính/gương gây hỏng IM LẶNG (khớp thành công nhưng với ảnh phản chiếu) — cửa (a).
+%   (4) Phát hiện thất bại > phục hồi sau thất bại — cửa (a) lập luận chi phí.
+% Ghi chú trung thực: KHÔNG có số liệu tỉ lệ hỏng thật (tôi không có fleet data).
+%   Mọi ưu tiên xếp hạng là phán đoán của tôi, ghi rõ.
+% ---------------------------------------------------------------------------
+\documentclass[../../vslam.tex]{subfiles}
+\begin{document}
+\chapter{Bền vững trong thế giới thực (Robustness in the Real World)}
+\ptrtarget{D/19}\ptrtarget{D/19-ben-vung-trong-the-gioi-thuc}
+\dependency{\ptr{A/01-hinh-hoc-da-thi} (giả thiết cảnh tĩnh --- chương này là chỗ trả nợ cho nó); \ptr{A/02-mo-hinh-camera} (mô hình quang trắc, rolling shutter); \ptr{B/07-dac-trung-va-data-association} (giới hạn của RANSAC); \ptr{B/08-mo-hinh-phan-du} (indirect và direct hỏng khác nhau); \ptr{C/13-quan-ly-ban-do} (thế giới thay đổi theo thời gian).}
+
+\begin{tomtat}
+Ba phần trước dựng một hệ thống chạy tốt trên EuRoC. Chương này liệt kê những gì thế giới thật ném vào nó, và mỗi mục trong danh sách là một giả thiết của Phần~A bị vi phạm. Nội dung tổ chức theo bốn nhóm chứ không theo danh sách phẳng, vì mỗi nhóm đòi một loại xử lý khác nhau. Nhóm một --- \emph{cảnh không tĩnh}: vật động, và một trường hợp đặc biệt tệ là khi vật động chiếm đa số khung hình. Nhóm hai --- \emph{thông tin không đủ}: nghèo vân, tối, mờ do chuyển động. Nhóm ba --- \emph{thông tin sai lệch}: kính, gương, bề mặt phản chiếu, vân lặp lại; đây là nhóm nguy hiểm nhất vì nó hỏng \emph{im lặng}. Nhóm bốn --- \emph{cảm biến suy giảm}: bụi ống kính, lệch tiêu cự, hỏng pixel, và trôi hiệu chuẩn. Mục cuối cùng, và là mục quan trọng nhất, bàn về thứ quyết định một hệ có dùng được trong sản phẩm hay không: \emph{phát hiện thất bại và suy giảm có kiểm soát}. Nếu chỉ nhớ một điều: \emph{biết mình đang sai quan trọng hơn không bao giờ sai} --- và đó không phải một câu an ủi mà là một nguyên tắc thiết kế có hệ quả cụ thể ở mọi module.
+\end{tomtat}
+
+\begin{nentang}
+\kn{vật động (dynamic object)}{vật thể di chuyển trong cảnh --- người, xe, cửa mở. Nó vi phạm giả thiết cảnh tĩnh mà toàn bộ \ptr{A/01} dựa vào.}
+\kn{masking}{loại bỏ các vùng ảnh khỏi việc xử lý, thường dựa trên phân đoạn ngữ nghĩa (``đây là người'') hoặc trên kiểm tra hình học (``vùng này không nhất quán'').}
+\kn{motion blur}{nhoè do vật hoặc camera di chuyển trong thời gian phơi sáng. Nó làm gradient giảm, nên cả detector lẫn direct method đều suy giảm.}
+\kn{suy giảm có kiểm soát (graceful degradation)}{hành vi của hệ thống khi điều kiện xấu: thay vì hỏng hoàn toàn, nó chuyển sang chế độ kém chính xác hơn nhưng vẫn hoạt động, và \emph{báo} rằng nó đang ở chế độ đó.}
+\kn{phát hiện thất bại (failure detection)}{cơ chế để hệ thống tự nhận ra ước lượng của nó không còn đáng tin. Khác với phục hồi ở chỗ nó chạy \emph{trước} và quyết định có cần phục hồi không.}
+\kn{hỏng im lặng (silent failure)}{chế độ hỏng mà hệ thống tiếp tục cho ra kết quả trông hợp lý nhưng sai, không có dấu hiệu nào. Nguy hiểm hơn hỏng ồn ào nhiều bậc.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Một chiếc xe tải đi ngang chiếm \(70\%\) khung hình. RANSAC báo \(85\%\) inlier. Nêu chính xác cái gì vừa được ước lượng, và vì sao kết quả sai mà vẫn nhất quán.}
+\h{Direct method và indirect method đều suy giảm khi có vật động. Nêu vì sao direct suy giảm \emph{nặng hơn}, và nói điều đó ảnh hưởng tới lựa chọn kiến trúc thế nào.}
+\h{Trong bốn nhóm vấn đề ở chương này, nhóm nào nguy hiểm nhất và vì sao? Câu trả lời không phải nhóm làm hệ thống hỏng nhiều nhất.}
+\h{Camera của bạn bị mờ một góc vì bụi bám sau sáu tháng. Nêu ba dấu hiệu đo được, và nói vì sao ATE không phải một trong ba dấu hiệu ấy.}
+\h{Bạn có ngân sách cho \emph{một} tính năng: cải thiện độ chính xác \(20\%\), hoặc thêm một cơ chế phát hiện thất bại. Chọn cái nào và biện minh bằng chi phí vận hành.}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+\ptrtarget{D/19/01}
+
+\ptr{A/01} mục~7 liệt kê bốn giả thiết của hình học đa thị và nói rằng ba trong bốn sẽ được trả nợ ở các chương sau. Chương này là chỗ trả nợ, và nó trả nợ cho nhiều hơn thế --- gần như mọi giả thiết tiện lợi của ba phần trước đều bị vi phạm ở đây.
+
+Bài toán gốc phát biểu bằng một quan sát thực nghiệm mà ai triển khai đều gặp: \emph{một hệ SLAM chạy tốt trên bộ dữ liệu chuẩn thường thất bại ở môi trường thật, và nó thất bại vì những lý do không có trong bộ dữ liệu chuẩn}.
+
+Lý do cấu trúc, và đáng nói rõ vì nó giải thích cả sự thiếu tài liệu. Bộ dữ liệu chuẩn được thu để \emph{đánh giá thuật toán}, nên chúng cố ý loại bỏ nhiễu loạn: EuRoC quay trong một phòng có motion capture, không có người đi lại; KITTI quay trên đường, nhưng người ta chọn các đoạn mà hệ thống chạy được. Điều đó \emph{đúng} về mặt phương pháp --- để so hai thuật toán, cần một môi trường kiểm soát --- nhưng nó nghĩa là điểm số trên chúng không dự đoán được hành vi ngoài đời.
+
+Ai gặp bài toán này? Chỉ những người triển khai. Đây là lý do một kỹ sư có sáu tháng kinh nghiệm triển khai thường biết nhiều hơn về chủ đề này so với một người đọc trăm bài báo --- và là lý do chương này viết ở mức danh mục kiểm chứ không ở mức công thức.
+
+Cách tổ chức của chương đáng giải thích. Tôi \emph{không} liệt kê phẳng các vấn đề mà chia thành bốn nhóm theo \emph{bản chất của cái sai}, vì mỗi nhóm đòi một loại xử lý khác nhau và nhầm nhóm là nhầm cách chữa:
+
+\emph{Nhóm một --- cảnh không tĩnh}: dữ liệu đúng nhưng mô hình sai (mô hình giả định thế giới đứng yên).
+
+\emph{Nhóm hai --- thông tin không đủ}: mô hình đúng nhưng dữ liệu nghèo. Cách chữa là thêm nguồn thông tin.
+
+\emph{Nhóm ba --- thông tin sai lệch}: dữ liệu \emph{trông} đúng nhưng không phải. Nguy hiểm nhất vì mọi cơ chế phát hiện dựa trên tính nhất quán đều thất bại.
+
+\emph{Nhóm bốn --- cảm biến suy giảm}: mô hình đo không còn mô tả cảm biến. Đây là nhóm phát triển \emph{chậm} theo thời gian, nên nó không xuất hiện trong bất kỳ thí nghiệm ngắn nào.
+
+\begin{trucgiac}
+Hình dung bạn đang đi trong một toà nhà và ghi nhớ đường đi bằng cách nhìn các mốc.
+
+\emph{Nhóm một}: có người đi ngang. Bạn ghi nhớ ``có một người mặc áo đỏ ở đây'', rồi lát sau quay lại và người đó đã đi mất. Tệ hơn: nếu bạn đi cùng chiều với người đó một đoạn dài, bạn sẽ nghĩ mình đứng yên trong khi thực ra cả hai đang đi --- vì so với người ấy thì bạn không nhúc nhích.
+
+\emph{Nhóm hai}: đèn tắt, hoặc bạn đi vào một hành lang trắng trơn không có gì để nhớ. Bạn \emph{biết} mình không có thông tin, và bạn đi chậm lại, quờ tay tìm tường. Đây là loại vấn đề dễ chịu nhất, vì bạn biết mình đang gặp nó.
+
+\emph{Nhóm ba}: có một tấm gương lớn. Bạn nhìn thấy một hành lang tiếp tục ở phía trước và đi thẳng vào đó. Mọi thứ bạn thấy đều hợp lý, nhất quán, rõ ràng --- cho tới khi bạn đâm vào gương. Đây là loại tệ nhất, vì \emph{không có gì báo trước}.
+
+\emph{Nhóm bốn}: mắt bạn mờ dần theo năm tháng. Mỗi ngày nó chỉ tệ hơn hôm qua một chút, nên không ngày nào bạn nhận ra. Sau vài năm bạn nhìn nhầm nhiều thứ, và bạn vẫn tin vào mắt mình như cũ.
+
+Bốn loại, bốn cách xử lý. Loại hai chữa bằng cách thêm nguồn thông tin khác --- sờ tường, đếm bước. Loại một và bốn chữa bằng cách nhận ra và điều chỉnh. Loại ba thì \emph{không chữa được bằng cách nhìn kỹ hơn} --- cách duy nhất là biết trước rằng gương tồn tại, và nghi ngờ khi thấy một hành lang quá hoàn hảo.
+
+Và có một điều chung cho cả bốn, quan trọng hơn mọi cách chữa: \emph{một người biết mình đang không chắc thì đi chậm lại và sờ tường; một người không biết thì đi bình thường và ngã}.
+\end{trucgiac}
+
+\section{Nhóm một: cảnh không tĩnh}
+\ptrtarget{D/19/02}
+
+\subsection{A. Vì sao RANSAC không đủ}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ nhất.
+
+RANSAC tìm \emph{tập nhất quán lớn nhất} (\ptr{B/07} mục~5B). Khi vật động chiếm thiểu số, tập nhất quán lớn nhất là cảnh tĩnh, và RANSAC làm đúng việc của nó.
+
+Khi vật động chiếm \emph{đa số} --- một xe tải đi ngang, một đám đông, một bức tường của kho hàng đang được xe nâng dịch chuyển --- tập nhất quán lớn nhất là \emph{vật động}. RANSAC trung thành chọn nó làm inlier và cảnh tĩnh làm outlier.
+
+Cái vừa được ước lượng là \emph{tư thế tương đối của camera so với chiếc xe tải}. Kết quả sai so với thế giới, nhưng nó hoàn toàn nhất quán: mọi điểm trên xe tải khớp hoàn hảo với mô hình, phần dư nhỏ, số inlier cao. Không có gì trong đầu ra báo hiệu.
+
+Đây là một ví dụ nữa của nguyên tắc ở \ptr{A/05}: số inlier đo mức nhất quán của dữ liệu với mô hình, không đo mức đúng đắn của mô hình.
+
+\subsection{B. Ba tầng xử lý}
+
+\emph{Tầng một --- kiểm tra hình học.} Với các điểm có lịch sử quan sát đủ dài, kiểm xem chúng có nhất quán với một điểm \(3\)D tĩnh không. Một điểm trên vật động sẽ có phần dư tăng dần khi vật di chuyển. Rẻ, không cần mô hình ngữ nghĩa, và nó bắt được mọi loại vật động --- kể cả những loại mà một bộ phân đoạn không biết. Giới hạn: cần thời gian, nên nó không bắt được vật động ngay lập tức.
+
+\emph{Tầng hai --- masking ngữ nghĩa.} Dùng một mạng phân đoạn để loại các vùng thuộc các lớp \emph{có thể} di chuyển --- người, xe, động vật. DynaSLAM \cite{bescos2018dynaslam} làm điều này. Nhanh và chủ động, nhưng nó có hai giới hạn đáng nêu: nó chỉ biết các lớp đã huấn luyện, và nó loại cả những vật \emph{đang đứng yên} thuộc lớp đó --- một chiếc xe đỗ là một mốc tĩnh rất tốt mà masking ngữ nghĩa sẽ vứt đi.
+
+Cách kết hợp đúng: dùng ngữ nghĩa để \emph{hạ trọng số}, không để loại cứng; rồi để kiểm tra hình học quyết định. Một chiếc xe đỗ sẽ chứng minh mình tĩnh qua vài khung và lấy lại trọng số.
+
+\emph{Tầng ba --- nhận ra khi vật động chiếm đa số.} Đây là tầng hay bị bỏ và là tầng quan trọng nhất. Khi tầng một và hai cùng báo rằng phần lớn khung hình là động, hành vi đúng \emph{không} phải cố ước lượng từ phần còn lại --- đó là \emph{từ chối} và dựa vào cảm biến khác (\ptr{C/15}) cho tới khi tình hình qua đi. Đây là nguyên tắc ``biết từ chối'' của \ptr{B/10} áp dụng ở một chỗ khác.
+
+\subsection{C. Direct suy giảm nặng hơn indirect}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ hai.
+
+Với indirect, một vật động làm mất vài chục điểm rời rạc --- các điểm trên vật đó trở thành outlier và bị M-estimator hạ trọng số. Hệ thống mất một phần thông tin.
+
+Với direct, một vật động làm hỏng cường độ của \emph{cả một vùng liên thông}. Vì phần dư quang trắc được tính trên mọi pixel có gradient, và vì các pixel trong vùng ấy \emph{tương quan mạnh} với nhau (chúng cùng sai theo cùng một cách), nên đóng góp của vùng ấy vào hàm mục tiêu lớn hơn nhiều so với tỉ lệ diện tích của nó. M-estimator xử lý outlier độc lập tốt hơn nhiều so với outlier tương quan thành khối.
+
+Hệ quả kiến trúc: trong môi trường có nhiều vật động --- nhà xưởng có người, đường phố --- indirect có lợi thế thật. Đây là một trong những tiêu chí cụ thể để chọn giữa hai họ ở \ptr{B/08}, và nó không xuất hiện trong các so sánh trên bộ dữ liệu tĩnh.
+
+\section{Nhóm hai: thông tin không đủ}
+\ptrtarget{D/19/03}
+
+Nhóm này dễ chịu nhất vì hệ thống \emph{biết} nó đang gặp vấn đề --- số đặc trưng giảm, phần dư tăng, hiệp phương sai nở ra.
+
+\emph{Nghèo vân}: hành lang trắng, tường trơn, sương mù. Cách xử lý theo thứ tự: chuyển sang đặc trưng đường thẳng và mặt phẳng (\ptr{B/08} mục~4B), vốn tồn tại ngay cả khi không có góc; hoặc chuyển sang direct, vốn khai thác được gradient yếu; hoặc dựa vào cảm biến khác cho tới khi qua.
+
+\emph{Ánh sáng thay đổi}: đèn bật tắt, đi từ trong nhà ra ngoài trời, auto-exposure phản ứng. Với indirect, descriptor bền một phần. Với direct, đây là vấn đề nghiêm trọng và cách chữa là mô hình quang trắc (\ptr{A/02} mục~5B) cộng hai tham số affine mỗi khung.
+
+\emph{Motion blur}: gradient giảm nên cả hai họ đều suy giảm. Cách chữa đúng thuộc về phần cứng --- giảm thời gian phơi sáng, tăng gain, dùng cảm biến nhạy hơn --- và đó là một quyết định ở \ptr{D/21}. Cách chữa phần mềm là dùng IMU để dự đoán và thu hẹp vùng tìm kiếm (\ptr{B/07} mục~5C), vốn giúp nhưng không giải quyết được việc thông tin đã mất.
+
+Điểm chung của cả ba, và là lý do nhóm này dễ hơn: \emph{có tín hiệu cảnh báo}. Số đặc trưng, độ tương phản trung bình, và mức gradient đều đo được rẻ, và chúng giảm \emph{trước} khi hệ thống hỏng. Một hệ có giám sát các đại lượng này sẽ biết trước vài trăm mili giây --- đủ để chuyển chế độ hoặc để báo.
+
+\section{Nhóm ba: thông tin sai lệch}
+\ptrtarget{D/19/04}
+
+Đây là câu trả lời cho câu hỏi mở đầu thứ ba: nhóm này nguy hiểm nhất, và không phải vì nó làm hệ thống hỏng nhiều nhất mà vì nó hỏng \emph{im lặng}.
+
+\subsection{A. Kính, gương, bề mặt phản chiếu}
+
+Trong nhóm một và hai, hệ thống hoặc thấy phần dư lớn hoặc thấy ít dữ liệu --- có tín hiệu. Ở đây, mọi thứ \emph{trông hoàn hảo}: các đặc trưng trong gương ổn định, khớp tốt qua nhiều khung, triangulate ra các điểm \(3\)D nhất quán. Chúng chỉ ở sai chỗ --- ở phía sau mặt gương, tại vị trí ảnh phản chiếu.
+
+Với cửa kính còn tệ hơn: hệ thống thấy cả cảnh phía sau kính (đúng về mặt hình học, vì ánh sáng đi thẳng qua) lẫn ảnh phản chiếu trên mặt kính (sai), trộn vào nhau.
+
+Vì sao khó chữa: mọi cơ chế phát hiện trong cây này dựa trên \emph{tính nhất quán} --- phần dư, số inlier, kiểm chéo giữa các nguồn. Ảnh phản chiếu nhất quán với chính nó qua nhiều khung, nên không cơ chế nào bắt được. Đây là giới hạn cấu trúc chứ không phải thiếu sót cài đặt.
+
+Ba hướng giảm thiểu, không cái nào đầy đủ. \emph{Ngữ nghĩa}: một bộ phân đoạn có lớp ``kính'' và ``gương'' --- hoạt động khi được huấn luyện đúng, và các bề mặt ấy khó phân đoạn chính vì chúng trong suốt. \emph{Nhất quán đa cảm biến}: LiDAR cũng bị lừa bởi gương nhưng theo cách khác, nên bất đồng giữa hai cảm biến là một tín hiệu. \emph{Suy luận hình học cấp cao}: ảnh phản chiếu có cấu trúc hình học đặc biệt --- nó là phản xạ của cảnh thật qua một mặt phẳng --- và về nguyên tắc một hệ có thể nhận ra điều đó qua nhiều góc nhìn. Tôi không biết một hệ SLAM thực dụng nào làm điều này, và nó là một hướng chưa được khai thác \emph{(tôi suy ra từ lập luận hình học, chưa đối chiếu nguồn)}.
+
+\subsection{B. Vân lặp lại}
+
+Đã bàn ở \ptr{B/07} mục~3B và \ptr{B/11} mục~5B, và nó thuộc nhóm này vì cùng lý do: một khớp sai giữa hai cánh cửa giống nhau \emph{nhất quán} với chính nó.
+
+Điều đáng nhắc ở đây là một biểu hiện đặc biệt trong sản phẩm: các môi trường lặp lại có hệ thống --- kho hàng, bãi đỗ xe, hành lang chung cư --- là đúng những môi trường mà robot thương mại hoạt động. Nên đây không phải một trường hợp biên mà là môi trường mặc định của một phần lớn thị trường.
+
+\subsection{C. Vì sao nhóm này quyết định thiết kế}
+
+Ba nhóm kia có thể xử lý bằng cách cải thiện thuật toán. Nhóm này thì không --- nó đòi \emph{thay đổi kiến trúc hệ thống}, theo hai hướng.
+
+\emph{Một --- đa dạng hoá cảm biến}. Không phải để chính xác hơn mà để có \emph{bất đồng}. Hai cảm biến bị lừa theo hai cách khác nhau sẽ bất đồng, và bất đồng là tín hiệu duy nhất có sẵn trong nhóm này. Đây là một lập luận cho hợp nhất cảm biến khác với lập luận ở \ptr{C/15}, và có lẽ mạnh hơn.
+
+\emph{Hai --- giới hạn hậu quả}. Nếu không phát hiện được, hãy đảm bảo hậu quả bị chặn: đừng để một loop closure đơn lẻ phá bản đồ (\ptr{B/11} mục~5), đừng để một relocalization đơn lẻ được tin ngay (\ptr{B/12} mục~4B), và giữ khả năng quay lại một trạng thái trước đó.
+
+\section{Nhóm bốn: cảm biến suy giảm}
+\ptrtarget{D/19/05}
+
+Đây là nhóm mà không thí nghiệm ngắn nào phát hiện được, vì nó phát triển theo tháng và năm. Đây là câu trả lời cho câu hỏi mở đầu thứ tư.
+
+\emph{Bụi và vết bẩn trên ống kính.} Một vùng ảnh mất tương phản. Ba dấu hiệu đo được: mật độ đặc trưng theo \emph{vùng} giảm không đều (một góc ảnh sụt trong khi các góc khác bình thường); độ tương phản cục bộ giảm ở cùng vùng đó; và phân bố inlier lệch khỏi vùng ấy. Cả ba đo được mà không cần chân trị, và cả ba nên là một phần của giám sát sức khoẻ ở \ptr{D/21}.
+
+Vì sao ATE \emph{không} phải một dấu hiệu: một vùng ảnh mất đặc trưng không làm hệ thống sai ngay --- các đặc trưng còn lại vẫn đủ, và ATE có thể không đổi trong nhiều tháng. Nó chỉ tệ đi khi kết hợp với một điều kiện khó khác, và lúc đó bạn không biết nguyên nhân là bụi. Đây là một ví dụ chung của nguyên tắc: \emph{đo nguyên nhân, không chỉ đo hậu quả}.
+
+\emph{Lệch tiêu cự và trôi cơ khí.} Ống kính xoay dần do rung; keo lão hoá; khung stereo biến dạng theo nhiệt. Biểu hiện: phần dư có cấu trúc không gian (\ptr{A/02} mục~4A) hoặc tham số hiệu chuẩn trực tuyến trôi đơn điệu (\ptr{C/14} mục~4B).
+
+\emph{Hỏng pixel và suy giảm cảm biến.} Pixel chết tạo ra các đặc trưng giả \emph{đứng yên trong ảnh}. Đây là một chế độ hỏng tinh vi: các đặc trưng ấy ổn định tuyệt đối qua mọi khung, nên chúng trông rất đáng tin --- và chúng nói rằng camera không di chuyển. Phát hiện: một đặc trưng có cùng toạ độ pixel qua hàng nghìn khung trong khi hệ thống đang di chuyển là một pixel hỏng, không phải một landmark.
+
+\begin{cannho}
+\textbf{Đo nguyên nhân, không chỉ đo hậu quả.} Đây là nguyên tắc nối chương này với \ptr{D/21}.
+
+ATE là hậu quả. Nó tổng hợp mọi nguyên nhân thành một con số, và khi nó xấu đi bạn không biết vì sao. Tệ hơn, nó có thể \emph{không} xấu đi trong nhiều tháng trong khi hệ thống đang suy giảm dần --- vì các cơ chế bù trừ vẫn còn dư địa.
+
+Các đại lượng đo nguyên nhân thì rẻ và nhiều thông tin hơn. Danh sách tối thiểu nên giám sát liên tục trong sản phẩm:
+
+\emph{Nhóm một}: tỉ lệ điểm bị loại vì không nhất quán hình học; diện tích vùng bị mask.
+
+\emph{Nhóm hai}: số đặc trưng, độ tương phản trung bình, mức gradient trung bình, thời gian phơi sáng.
+
+\emph{Nhóm ba}: bất đồng giữa các cảm biến; số loop closure bị từ chối ở từng tầng.
+
+\emph{Nhóm bốn}: mật độ đặc trưng \emph{theo vùng ảnh} (không phải tổng); xu hướng dài hạn của tham số hiệu chuẩn trực tuyến; số đặc trưng có toạ độ pixel không đổi.
+
+Mỗi đại lượng tốn vài byte mỗi khung và có thể tổng hợp thành thống kê hàng ngày. Chúng là thứ biến một báo cáo lỗi ``robot bị lạc'' thành một chẩn đoán ``camera trái bẩn từ ba tuần trước''.
+\end{cannho}
+
+\section{Phát hiện thất bại và suy giảm có kiểm soát}
+\ptrtarget{D/19/06}
+
+Đây là mục quan trọng nhất của chương, và là câu trả lời cho câu hỏi mở đầu thứ năm.
+
+\subsection{A. Lập luận chi phí}
+
+So sánh hai hệ thống trong một đội hình một nghìn robot.
+
+\emph{Hệ A}: tỉ lệ lỗi \(1\%\) số ca, và khi lỗi nó im lặng --- tiếp tục báo tư thế sai. Mười ca mỗi ngày, mỗi ca robot đi sai chỗ, có thể va chạm, và cần người tới xử lý. Chi phí: mười lần can thiệp, cộng rủi ro an toàn, cộng việc khách hàng mất niềm tin.
+
+\emph{Hệ B}: tỉ lệ lỗi \(2\%\), nhưng nó phát hiện được \(90\%\) số ca. Hai mươi ca mỗi ngày, trong đó mười tám ca robot \emph{dừng lại và báo}, và hai ca im lặng. Chi phí: mười tám lần gián đoạn ngắn (robot dừng, tự phục hồi hoặc chờ) cộng hai lần can thiệp.
+
+Hệ B tốt hơn rõ rệt dù tỉ lệ lỗi gấp đôi, vì \emph{một lỗi được phát hiện rẻ hơn một lỗi im lặng nhiều bậc}. Đây là lập luận cho việc chọn phát hiện thất bại thay vì cải thiện độ chính xác khi chỉ có ngân sách cho một cái.
+
+Có một lập luận thứ hai, và nó mạnh hơn về dài hạn: \emph{một lỗi được phát hiện là một lỗi được ghi lại}. Hệ B tạo ra dữ liệu --- mười tám bản ghi mỗi ngày về việc nó thất bại ở đâu và trong điều kiện nào. Sau một tháng đó là năm trăm mẫu để phân tích. Hệ A tạo ra các báo cáo mơ hồ từ khách hàng. Đây là vòng lặp cải tiến ở \ptr{D/21}, và nó chỉ khởi động được nếu hệ thống biết mình sai.
+
+\subsection{B. Bốn tầng phát hiện}
+
+\emph{Tầng một --- các đại lượng tức thời}, mỗi khung: số inlier, tỉ lệ tracking, phần dư trung bình. Rẻ nhất, phát hiện sớm nhất, nhiều báo động giả nhất.
+
+\emph{Tầng hai --- các đại lượng thống kê}, trên một cửa sổ: xu hướng của phần dư, phân bố không gian của inlier, số điều kiện của \(\Lambda\). Bắt được các suy giảm chậm mà tầng một bỏ qua.
+
+\emph{Tầng ba --- nhất quán chéo giữa các nguồn}: bất đồng giữa thị giác và IMU, giữa thị giác và odometry. Đây là tầng duy nhất có cơ hội bắt được nhóm ba, và nó chỉ tồn tại nếu có nhiều cảm biến.
+
+\emph{Tầng bốn --- kiểm tính hợp lý vật lý}: robot có thể đi nhanh thế này không? Tư thế có nhảy một quãng không thể trong một khung không? Rẻ, và nó bắt được các thất bại thảm hoạ mà ba tầng kia có thể bỏ qua vì chúng dựa trên các đại lượng nội tại vốn cũng bị ảnh hưởng.
+
+\subsection{C. Suy giảm có kiểm soát}
+
+Phát hiện xong thì làm gì. Nguyên tắc: \emph{chuyển sang chế độ kém chính xác hơn nhưng vẫn hoạt động, và báo rằng mình đang ở chế độ đó}.
+
+Một thang chế độ hợp lý, từ tốt tới xấu: SLAM đầy đủ với bản đồ; SLAM không đóng vòng (khi loop closure không đáng tin); odometry thị giác-quán tính không bản đồ; odometry quán tính-bánh xe (khi thị giác chết); và cuối cùng là dừng và báo.
+
+Hai yêu cầu về kiến trúc, và cả hai phải được thiết kế từ đầu. \emph{Một --- chuyển chế độ phải mượt}, không có bước nhảy trong đầu ra, vì bộ điều khiển phía trên không chịu được. \emph{Hai --- chế độ hiện tại phải là một phần của đầu ra}, cùng với tư thế và hiệp phương sai. Một module phía trên nhận ``tư thế, hiệp phương sai, chế độ'' hành xử khác hẳn một module chỉ nhận tư thế --- nó biết khi nào nên thận trọng.
+
+Yêu cầu thứ hai nghe hiển nhiên và nó bị bỏ sót thường xuyên, vì trong nghiên cứu đầu ra của SLAM là một quỹ đạo để so với chân trị, không phải một tín hiệu cho một hệ thống khác dùng.
+
+\begin{ungdung}
+\ud{DynaSLAM \cite{bescos2018dynaslam}}{Masking ngữ nghĩa \(+\) kiểm tra hình học cho vật động}{Mục 2B; chú ý giới hạn của masking cứng}
+\ud{DSO \cite{engel2018dso}}{Mô hình quang trắc \(+\) hai tham số affine mỗi khung}{Mục 3 --- xử lý thay đổi ánh sáng cho direct}
+\ud{ORB-SLAM3 \cite{campos2021orbslam3}}{Atlas cho phục hồi mềm khi mất bám}{Mục 6C --- một dạng suy giảm có kiểm soát}
+\ud{OpenLORIS \cite{shi2020openloris}}{Bộ dữ liệu có người đi lại, ánh sáng đổi, nhiều phiên}{Một trong ít bộ dữ liệu chạm vào nội dung chương này}
+\ud{Kimera \cite{rosinol2020kimera}}{Ngữ nghĩa trong đồ thị; hạ trọng số theo lớp đối tượng}{Hướng đúng cho mục 2B --- hạ trọng số thay vì loại cứng}
+\end{ungdung}
+
+\begin{duan}{Dựng một bộ thử nghiệm nghịch cảnh, rồi đo tỉ lệ phát hiện thất bại}{4 ngày}
+\dmt chuyển từ ``hệ của tôi chạy tốt'' sang ``hệ của tôi thất bại trong \(X\%\) các tình huống này, và nó \emph{biết} trong \(Y\%\) số lần thất bại''.
+\ddl tự thu, và đây là phần chính của bài: dựng một bộ mười chuỗi nghịch cảnh, mỗi chuỗi nhắm vào một mục trong bốn nhóm --- người đi ngang chiếm phần lớn khung hình, hành lang trắng, đèn tắt đột ngột, chuyển động nhanh gây mờ, một tấm gương lớn, một hành lang có các cửa giống nhau, một ống kính bị che một phần bằng băng dính mờ (mô phỏng bụi), và ba chuỗi tổ hợp.
+\dbc chạy hệ thống trên cả mười chuỗi; với mỗi chuỗi ghi lại: có thất bại không (so với chân trị thô hoặc quan sát bằng mắt), và hệ thống có \emph{báo} rằng nó đang gặp vấn đề không; cài bốn tầng phát hiện ở mục 6B và đo tỉ lệ phát hiện cùng tỉ lệ báo động giả của từng tầng; cuối cùng cài một thang chế độ theo mục 6C và đo xem hệ thống có chuyển chế độ đúng lúc không.
+\dxk bạn có hai con số cho hệ thống của mình: \emph{tỉ lệ thất bại} trên bộ nghịch cảnh, và \emph{tỉ lệ phát hiện} trong số các lần thất bại. Con số thứ hai là con số mà gần như không ai công bố và nó quan trọng hơn con số thứ nhất. Bạn cũng có một bảng bốn tầng phát hiện với chi phí và hiệu quả của từng tầng --- dùng nó để quyết định tầng nào đáng cài trước.
+\dnv \ptr{D/20-toi-uu-hieu-nang-va-he-thong} cho chi phí tính toán của các tầng giám sát; \ptr{D/21-tu-prototype-len-mass-production} biến bộ nghịch cảnh này thành regression test và biến các đại lượng giám sát thành fleet analytics.
+\end{duan}
+
+\begin{traloi}
+\tl{Cái vừa được ước lượng là \emph{tư thế tương đối của camera so với chiếc xe tải}, không phải so với thế giới. RANSAC tìm tập nhất quán \emph{lớn nhất}, và khi vật động chiếm đa số thì tập ấy là vật động --- nó trung thành chọn xe tải làm inlier và cảnh tĩnh làm outlier. Kết quả sai nhưng \emph{hoàn toàn nhất quán}: mọi điểm trên xe khớp hoàn hảo với mô hình, phần dư nhỏ, số inlier cao, không có gì trong đầu ra báo hiệu. Đây lại là nguyên tắc ở \ptr{A/05}: số inlier đo mức nhất quán của dữ liệu với mô hình, không đo mức đúng đắn của mô hình.}
+\tl{Vì một vật động làm hỏng cường độ của \emph{cả một vùng liên thông}, và các pixel trong vùng ấy \emph{tương quan mạnh} --- chúng cùng sai theo cùng một cách. M-estimator xử lý outlier độc lập tốt hơn nhiều so với outlier tương quan thành khối, nên đóng góp sai của vùng ấy vào hàm mục tiêu lớn hơn tỉ lệ diện tích của nó. Với indirect, vật động chỉ làm mất vài chục điểm rời rạc và chúng bị hạ trọng số độc lập. Hệ quả kiến trúc: trong môi trường nhiều vật động --- nhà xưởng có người, đường phố --- indirect có lợi thế thật, và đây là một tiêu chí chọn giữa hai họ ở \ptr{B/08} không xuất hiện trong các so sánh trên bộ dữ liệu tĩnh.}
+\tl{\emph{Nhóm ba --- thông tin sai lệch} (kính, gương, vân lặp lại). Không phải vì nó làm hỏng nhiều nhất mà vì nó hỏng \emph{im lặng}: mọi cơ chế phát hiện trong cây này dựa trên tính nhất quán, và ảnh phản chiếu nhất quán với chính nó qua nhiều khung nên không cơ chế nào bắt được. Đây là giới hạn cấu trúc chứ không phải thiếu sót cài đặt. Hệ quả: ba nhóm kia xử lý bằng cách cải thiện thuật toán, nhóm này đòi \emph{thay đổi kiến trúc} --- đa dạng hoá cảm biến để có \emph{bất đồng} (tín hiệu duy nhất có sẵn), và giới hạn hậu quả của một lần sai đơn lẻ.}
+\tl{Ba dấu hiệu: (1) \emph{mật độ đặc trưng theo vùng ảnh} giảm không đều --- một góc sụt trong khi các góc khác bình thường; (2) \emph{độ tương phản cục bộ} giảm ở cùng vùng đó; (3) \emph{phân bố inlier lệch khỏi} vùng ấy. Cả ba đo được không cần chân trị. ATE không phải dấu hiệu vì một vùng mất đặc trưng không làm hệ sai ngay --- các đặc trưng còn lại vẫn đủ, và ATE có thể không đổi trong nhiều tháng; nó chỉ tệ đi khi kết hợp với một điều kiện khó khác, và lúc đó bạn không biết nguyên nhân là bụi. Nguyên tắc chung: \emph{đo nguyên nhân, không chỉ đo hậu quả}.}
+\tl{Chọn \emph{phát hiện thất bại}. Lập luận chi phí trên một nghìn robot: hệ A lỗi \(1\%\) và im lặng cho mười ca mỗi ngày, mỗi ca cần người tới xử lý cộng rủi ro an toàn; hệ B lỗi \(2\%\) nhưng phát hiện \(90\%\) cho mười tám lần gián đoạn ngắn (robot dừng và báo) cộng chỉ hai lần can thiệp. Hệ B tốt hơn rõ rệt dù tỉ lệ lỗi gấp đôi. Có một lập luận thứ hai mạnh hơn về dài hạn: \emph{một lỗi được phát hiện là một lỗi được ghi lại} --- hệ B tạo ra năm trăm mẫu mỗi tháng để phân tích, hệ A tạo ra các báo cáo mơ hồ từ khách hàng. Vòng lặp cải tiến ở \ptr{D/21} chỉ khởi động được nếu hệ thống biết mình sai.}
+\end{traloi}
+
+\begin{dongian}
+Bạn đi trong một toà nhà lạ và nhớ đường bằng cách nhìn các mốc. Có bốn kiểu chuyện có thể xảy ra, và chúng khác nhau về bản chất chứ không chỉ về mức độ.
+
+\emph{Kiểu một}: có người đi ngang. Bạn ghi nhớ ``có anh áo đỏ đứng đây'' rồi lát sau quay lại, anh ta đã đi mất. Tệ hơn: nếu bạn đi cùng chiều với anh ta một đoạn dài, bạn sẽ tưởng mình đứng yên --- vì so với anh ta thì bạn không nhúc nhích.
+
+\emph{Kiểu hai}: đèn tắt, hoặc bạn vào một hành lang trắng trơn không có gì để nhớ. Chuyện này khó chịu nhưng dễ chịu nhất trong bốn kiểu, vì \emph{bạn biết} mình đang không có thông tin. Bạn tự khắc đi chậm lại và quờ tay tìm tường.
+
+\emph{Kiểu ba}: có một tấm gương lớn ở cuối hành lang. Bạn thấy hành lang tiếp tục ở phía trước và đi thẳng vào. Mọi thứ bạn thấy đều hợp lý, rõ ràng, nhất quán --- cho tới khi bạn đâm vào gương. Đây là kiểu tệ nhất, vì không có gì báo trước và vì \emph{nhìn kỹ hơn cũng không giúp gì}.
+
+\emph{Kiểu bốn}: mắt bạn mờ dần theo năm tháng. Mỗi ngày chỉ tệ hơn hôm qua một chút nên không ngày nào bạn nhận ra. Sau vài năm bạn nhìn nhầm nhiều thứ, và bạn vẫn tin vào mắt mình y như cũ.
+
+Bốn kiểu, bốn cách xử lý. Kiểu hai chữa bằng cách dùng giác quan khác --- sờ tường, đếm bước. Kiểu một và bốn chữa bằng cách để ý và điều chỉnh. Kiểu ba thì chỉ có một cách: \emph{biết trước rằng gương tồn tại}, và thấy nghi khi một hành lang trông quá hoàn hảo.
+
+Nhưng điều quan trọng nhất thì chung cho cả bốn, và nó không phải một mẹo kỹ thuật. Người biết mình đang không chắc thì đi chậm lại và sờ tường; người không biết thì đi bình thường và ngã. Hai người ấy có thể có cùng thị lực --- nhưng một người về được nhà.
+
+\chuadongian{chỗ không rút gọn được là tấm gương. Mọi cách nhận ra sai sót trong chương này đều dựa trên việc ``có gì đó không khớp''. Ảnh trong gương khớp hoàn hảo với chính nó, khớp qua nhiều lần nhìn, khớp từ nhiều góc. Không có gì không khớp cả. Cách duy nhất là dùng một giác quan khác --- hoặc biết trước.}
+\motcau{Biết mình đang sai quan trọng hơn không bao giờ sai --- vì cái thứ nhất đo được và sửa được, cái thứ hai thì không tồn tại.}
+\end{dongian}
+
+\section{Điều gì chứng minh cách hiểu này sai}
+\ptrtarget{D/19/07}
+
+Mệnh đề chính --- \emph{phát hiện thất bại có giá trị cao hơn cải thiện độ chính xác} --- dựa trên một lập luận chi phí với các con số \emph{tôi tự đặt} để minh hoạ. Nó bị bác bỏ nếu trong một triển khai thật, chi phí của một lần gián đoạn được phát hiện xấp xỉ chi phí của một lần lỗi im lặng --- điều có thể đúng nếu việc robot dừng lại cũng đòi hỏi can thiệp của con người. Với robot có khả năng tự phục hồi thì mệnh đề vững; với robot mà mọi lần dừng đều cần người thì nó yếu đi nhiều. Đây là chỗ tôi phát biểu dựa trên cấu trúc chứ không dựa trên số liệu fleet \emph{(tôi suy ra, chưa đối chiếu nguồn)}.
+
+Mệnh đề thứ hai --- \emph{nhóm ba nguy hiểm nhất} --- là một xếp hạng theo mức khó phát hiện chứ không theo tần suất. Nó bị bác bỏ nếu trong thống kê thật, các thất bại do kính và gương hiếm tới mức không đáng kể so với các thất bại do nghèo vân. Điều đó \emph{có thể} đúng tuỳ môi trường --- một nhà kho không có gương, một văn phòng hiện đại thì đầy kính. Cách kiểm là thu thống kê nguyên nhân từ fleet, tức đúng việc mà \ptr{D/21} đề nghị.
+
+Mệnh đề thứ ba --- \emph{direct suy giảm nặng hơn indirect với vật động} --- suy từ lập luận về tương quan của outlier (cửa a). Nó kiểm được bằng thí nghiệm: chạy cả hai họ trên cùng chuỗi có vật động chiếm các tỉ lệ diện tích khác nhau, và xem đường cong suy giảm. Tôi \emph{chưa} chạy thí nghiệm đó, và nó là một mục trong \code{99-chua-biet.md}.
+
+Mệnh đề thứ tư --- \emph{suy luận hình học cấp cao có thể phát hiện gương} --- là một phỏng đoán của tôi dựa trên việc ảnh phản chiếu có cấu trúc đặc biệt. Tôi không biết một hệ thực dụng nào làm điều này, và tôi cũng chưa khảo sát xem có ai đã thử và thất bại hay không. Đây là chỗ có rủi ro sai cao nhất trong chương.
+
+\section{Kết nối}
+\ptrtarget{D/19/08}
+
+Nối lên trên. \ptr{A/01-hinh-hoc-da-thi} mục~7 nêu bốn giả thiết ngầm; chương này là chỗ trả nợ cho giả thiết cảnh tĩnh. \ptr{A/05-observability-gauge-va-suy-bien} cho nguyên tắc chung mà mục~2A là một ứng dụng: số inlier không đo mức đúng đắn của mô hình. \ptr{A/06-bat-dinh-va-lan-truyen-sai-so} cho khái niệm hỏng im lặng, mà nhóm ba là biểu hiện cực đoan nhất. \ptr{B/08-mo-hinh-phan-du} là chỗ mục~2C cho thêm một tiêu chí chọn giữa indirect và direct.
+
+Nối ngang. \ptr{C/13-quan-ly-ban-do} mục~4C bàn một dạng khác của cùng vấn đề: thế giới thay đổi theo tháng thay vì theo giây. \ptr{C/14-hieu-chuan-nhu-mot-nhanh-cua-slam} mục~4B cho cơ chế phát hiện trôi hiệu chuẩn, tức nhóm bốn. \ptr{C/15-hop-nhat-da-cam-bien} cho một lập luận về đa cảm biến; mục~4C ở đây cho một lập luận khác và có lẽ mạnh hơn --- đa dạng hoá để có bất đồng. \ptr{C/17-hoc-may-trong-slam} cho công cụ ngữ nghĩa dùng ở mục~2B.
+
+Nối xuống dưới. \ptr{D/20-toi-uu-hieu-nang-va-he-thong} cho ngân sách tính toán của các tầng giám sát ở mục~6B --- chúng không miễn phí. \ptr{D/21-tu-prototype-len-mass-production} là chỗ chương này trở thành quy trình: bộ nghịch cảnh thành regression test, các đại lượng giám sát thành fleet analytics, và tỉ lệ phát hiện thất bại thành một chỉ tiêu nghiệm thu. \ptr{D/22-huong-nghien-cuu-con-trong} lấy \emph{dự đoán thất bại} --- dự đoán trước khi mất bám thay vì phục hồi sau --- làm hướng số bốn, và mục~6 của chương này là lập luận vì sao nó đáng giá.
+
+\begin{tukiem}
+\item Vì sao RANSAC chọn vật động khi nó chiếm đa số, và cái gì thực sự được ước lượng lúc đó?
+\item Nêu ba tầng xử lý vật động, và nói vì sao masking ngữ nghĩa nên hạ trọng số thay vì loại cứng.
+\item Vì sao direct suy giảm nặng hơn indirect khi có vật động? Trả lời bằng ngôn ngữ tương quan của outlier.
+\item Nhóm nào trong bốn nhóm nguy hiểm nhất và vì sao? Nêu hai hướng thay đổi kiến trúc mà nó đòi hỏi.
+\item Nêu ba dấu hiệu của bụi ống kính, và nói vì sao ATE không phải một trong ba.
+\item Nêu bốn tầng phát hiện thất bại, và nói tầng nào là tầng duy nhất có cơ hội bắt được nhóm ba.
+\item Trình bày lập luận chi phí cho việc ưu tiên phát hiện thất bại hơn độ chính xác, và nêu điều kiện mà lập luận đó yếu đi.
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

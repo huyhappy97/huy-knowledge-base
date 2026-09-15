@@ -1,0 +1,17 @@
+\documentclass[../marker.tex]{subfiles}
+\begin{document}
+\part{NGÂN SÁCH SAI SỐ}
+\begin{tomtat}
+Phần C là chỗ cả cây hội tụ, và nó chỉ có hai chương vì nó chỉ làm hai việc. Chương~15 lập ngân sách: lấy các quan hệ tỉ lệ từ chương~5, gắn số thật của một cấu hình cụ thể, rồi ra một bảng nói từng khâu ăn bao nhiêu milimét --- và bảng ấy nói ngay bố trí nào có cơ hội đạt 5\,mm / 0,5\(^\circ\) và bố trí nào thì không. Chương~16 kiểm ngân sách ấy bằng hai cách: mô phỏng Monte Carlo (rẻ, làm được ngay, có script chạy được trong \code{code/}) và nghiệm thu thật (đắt, cần ground truth). Nếu chỉ nhớ một điều: \emph{làm Phần~C trước khi viết dòng code nào và trước khi đặt gia công bất cứ thứ gì} --- đó là toàn bộ lý do nó tồn tại như một phần riêng chứ không phải một mục cuối Phần~B.
+\end{tomtat}
+
+Phần này ngắn nhưng nó là phần tôi khuyên đọc đầu tiên nếu thời gian có hạn, và lý do nằm ở kinh tế của dự án chứ không ở nội dung. Mọi chương khác trong cây mô tả những việc tốn \emph{thời gian}: đọc, cài, thử, chỉnh. Phần~C mô tả những quyết định tốn \emph{tiền} và không đảo ngược được: kích thước tấm marker, khoảng cách giữa các tag, có nghiêng tag hay không, chọn tiêu cự nào, có làm côn dẫn hướng hay không. Một sai lầm trong nhóm quyết định thứ hai không sửa được bằng cách làm việc chăm chỉ hơn ở nhóm thứ nhất.
+
+Có một lý do thứ hai, tinh tế hơn, để tách Phần~C ra. Ngân sách sai số là chỗ duy nhất trong cây mà các chương khác được đặt cạnh nhau trên cùng một thước đo. Trong Phần~B, mỗi chương nói về một kỹ thuật và tự nhiên nghe như thể kỹ thuật ấy đáng làm. Chỉ khi tất cả cùng quy về milimét thì mới lộ ra rằng một số kỹ thuật đóng góp hai chữ số phần trăm ngân sách còn một số khác đóng góp phần nghìn --- và rằng thứ tự ấy không trùng với thứ tự mức độ thú vị về mặt kỹ thuật. Đây là chức năng quan trọng nhất của một ngân sách sai số: nó là công cụ chống lại xu hướng tự nhiên là làm việc thú vị thay vì việc có tác dụng.
+
+Chương~16 có một điểm khác biệt về thể loại so với mọi chương còn lại: nó đi kèm mã nguồn chạy được. Script Monte Carlo trong \code{16-danh-gia-va-nghiem-thu/code/} là hiện thân của cửa kiểm chứng (b) trong \code{learning-rules.md} mục~5, và nó phục vụ cả cây chứ không riêng chương~16 --- các công thức ở chương~5 chỉ thật sự qua cửa (b) khi script ấy được chạy và kết quả khớp với dự đoán giải tích. Cho tới lúc đó, chúng mới chỉ qua cửa (a).
+\subfile{00-map}
+\subfile{15-ngan-sach-sai-so/ngan-sach-sai-so}
+\subfile{16-danh-gia-va-nghiem-thu/danh-gia-va-nghiem-thu}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

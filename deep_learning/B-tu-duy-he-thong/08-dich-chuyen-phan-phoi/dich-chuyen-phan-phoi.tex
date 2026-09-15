@@ -1,0 +1,286 @@
+% Tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: —
+% Dependency: B/04 (giả định IID), B/05 (selection bias), B/07 (giao thức đánh giá)
+% Mức độ: cốt lõi
+\documentclass[../../deep_learning.tex]{subfiles}
+\begin{document}
+\chapter{Phân phối, dịch chuyển và ngoài phân phối (Distribution Shift and OOD)}
+\ptrtarget{B/08}\ptrtarget{B/08-dich-chuyen-phan-phoi}
+\dependency{\ptr{B/04-nen-tang-hoc-tu-du-lieu} (giả định IID và vì sao mọi bảo đảm học máy đứng trên nó); \ptr{B/05-thiet-ke-bai-toan} (\vn{thiên lệch chọn mẫu}{selection bias}, khung lấy mẫu); \ptr{B/07-chia-du-lieu-va-danh-gia} (chương này gỡ bỏ đúng giả định mà giao thức ở đó dựa vào).}
+
+\begin{tomtat}
+Chương này nói về chuyện xảy ra khi dữ liệu thật không còn cùng phân phối với dữ liệu huấn luyện --- tức là gần như luôn luôn. Đọc xong bạn thay được câu ``bị domain shift'' bằng một chẩn đoán cụ thể chỉ ra nên gán nhãn lại, nên chỉnh đầu ra, hay nên thu thập thêm; bạn dựng được một quy trình giám sát trôi phân phối; và bạn biết vì sao mô hình lại mong manh đến vậy. Nếu chỉ nhớ một điều: ba loại dịch chuyển --- \(p(x)\) đổi, \(p(y)\) đổi, \(p(y\mid x)\) đổi --- cho cùng một triệu chứng nhưng đòi ba cách chữa loại trừ nhau, và chỉ loại thứ ba mới bắt buộc phải gán nhãn lại.
+\end{tomtat}
+
+\begin{nentang}
+\kn{phân phối xác suất và ký hiệu \(p(\cdot)\)}{\(p(x)\) mô tả những ảnh nào hay xuất hiện và những ảnh nào hiếm; \(p(y)\) mô tả tỉ lệ các lớp; \(p(y\mid x)\) là ``cho trước ảnh này, nhãn đúng của nó có khả năng là gì''; \(p(x\mid y)\) là ``ảnh của lớp này trông thế nào''. Toàn bộ chương xoay quanh đúng một câu hỏi: trong bốn thứ đó, thứ nào đã thay đổi.}
+\kn{giả định IID}{giả định rằng mỗi mẫu được rút ra một cách độc lập từ cùng một phân phối, cho cả dữ liệu huấn luyện lẫn dữ liệu tương lai. Mọi bảo đảm lý thuyết của học máy đứng trên giả định này, và chương này nói về chuyện xảy ra khi nó vỡ.}
+\kn{ba loại dịch chuyển phân phối}{\emph{covariate shift} --- \(p(x)\) đổi (camera mới, ánh sáng khác) nhưng quan hệ ảnh--nhãn \(p(y\mid x)\) vẫn đúng. \emph{Label shift} --- tỉ lệ các lớp \(p(y)\) đổi trong khi ảnh của mỗi lớp vẫn y hệt. \emph{Concept drift} --- chính \(p(y\mid x)\) đổi, tức cùng một ảnh nay phải gán nhãn khác. Ba loại cho cùng một triệu chứng nhưng đòi ba cách chữa loại trừ nhau.}
+\kn{mô hình, huấn luyện và tối thiểu hoá rủi ro thực nghiệm (empirical risk minimization, ERM)}{mô hình là hàm có tham số biến ảnh thành dự đoán; huấn luyện là tìm tham số làm trung bình mất mát trên tập huấn luyện nhỏ nhất --- đúng cái nguyên tắc gọn ấy có tên là ERM. Nó là \en{baseline} mà mọi phương pháp phức tạp hơn trong chương này phải vượt qua.}
+\kn{tiên nghiệm (prior) và tỉ số cược (odds)}{tiên nghiệm là xác suất của một lớp \emph{trước khi} nhìn ảnh, tức tỉ lệ lớp đó trong dữ liệu; tỉ số cược của một xác suất \(p\) là \(p/(1-p)\), một cách viết khác của cùng thông tin nhưng nhân chia được. Cần biết vì phép chữa rẻ nhất trong cả chương chỉ là nhân tỉ số cược với tỉ lệ giữa hai tiên nghiệm.}
+\kn{đuôi dài (long-tail) --- phân biệt với mất cân bằng lớp}{mất cân bằng lớp là vài lớp có ít mẫu hơn hẳn các lớp khác. Đuôi dài là tình huống có \emph{rất nhiều} lớp mà mỗi lớp chỉ có dăm bảy mẫu, nên vấn đề không còn là tỉ lệ mà là không đủ dữ liệu để học được lớp đó là gì. Phân biệt này quan trọng vì cách chữa của trường hợp đầu không dùng được cho trường hợp sau.}
+\kn{ngoài phân phối (OOD), softmax, độ tin cậy và hiệu chuẩn (calibration)}{softmax biến các điểm số thô ở đầu ra thành một bộ số dương cộng lại bằng 1, đọc như xác suất; giá trị lớn nhất trong đó gọi là độ tin cậy của mô hình. Hiệu chuẩn tốt nghĩa là khi mô hình nói 0{,}8 thì nó đúng khoảng 80\%
+số lần. Một đầu vào \emph{ngoài phân phối} là đầu vào khác hẳn mọi thứ mô hình từng thấy lúc huấn luyện, và ``phát hiện OOD'' là cố nhận ra nó để hệ thống nói ``tôi không chắc'' thay vì trả lời bừa.}
+\kn{embedding, augmentation và corruption}{embedding là vectơ vài trăm chiều biểu diễn một ảnh, ảnh giống nhau cho vectơ gần nhau --- dùng ở đây để so hai tập dữ liệu mà không cần nhãn. Augmentation là cố ý biến dạng ảnh \emph{huấn luyện} (lật, đổi màu, thêm nhiễu, làm mờ) để mô hình bớt phụ thuộc chi tiết không quan trọng; corruption là cùng loại biến dạng đó nhưng áp lên tập \emph{kiểm tra} để đo độ bền. Cùng một phép biến đổi, hai mục đích ngược nhau.}
+\end{nentang}
+
+\begin{khoigoi}
+\h{Mô hình đạt 95\%
+ trên tập test và 60\%
+ở khách hàng đầu tiên. Ba câu hỏi nào tách được nguyên nhân, và câu nào cho phép chữa mà không cần huấn luyện lại một tham số nào?}
+\h{Vì sao một mạng có thể phân biệt bò với lạc đà rất giỏi mà thực ra chưa bao giờ nhìn con vật?}
+\h{Nếu hàng trăm phương pháp tổng quát hoá miền đều tốt hơn ERM trong bài báo của chính chúng, vì sao khi tune công bằng thì không cái nào thắng?}
+\h{Vì sao độ tin cậy của mô hình lại là tín hiệu cảnh báo tệ nhất, đúng vào lúc bạn cần nó nhất?}
+\end{khoigoi}
+
+\section{Đặt vấn đề}
+Mọi kết quả lý thuyết ở \ptr{B/04} --- từ chặn tổng quát hoá tới chính khái niệm ``sai số kỳ vọng'' --- đứng trên một giả định duy nhất: dữ liệu huấn luyện và dữ liệu tương lai được rút độc lập từ cùng một phân phối. Trong thị giác máy tính, giả định đó gần như luôn sai. Camera được thay sau mười tám tháng, firmware ISP cập nhật, mùa đổi, khách hàng mới ở một thành phố khác, một loại xe mới xuất hiện trên đường.
+
+Sai lầm đắt nhất của người mới ở đây không phải chọn sai phương pháp thích nghi, mà là chẩn đoán quá thô. Hệ thống tụt tám điểm sau khi triển khai, và kết luận duy nhất được đưa ra là ``bị domain shift'' --- một câu vừa đúng vừa vô dụng, vì nó không dẫn tới hành động nào. Ba nguyên nhân hoàn toàn khác nhau đều cho ra cùng triệu chứng ấy, và chúng đòi ba cách chữa loại trừ lẫn nhau: một cái cần gán nhãn lại, một cái chỉ cần vài phép nhân ở đầu ra, một cái cần thu thập thêm dữ liệu miền mới.
+
+Có một trực giác từ robotics giúp đóng khung cả chương. Một hệ định vị được điều chỉnh cho một mô hình nhiễu cụ thể chạy tuyệt vời trong đúng điều kiện nó được điều chỉnh; đổi cảm biến hay đổi bề mặt sàn thì nó không báo lỗi, nó chỉ \emph{sai một cách tự tin}. Mạng nơ-ron còn tệ hơn ở chỗ nó không có \vn{phần dư}{residual} để bạn nhìn vào, nên nó không có cách nào tự nói rằng mình đang ở ngoài vùng hợp lệ. Phần lớn chương này là các cách xây dựng nhân tạo cái phần dư ấy.
+\lk{B/04}{hệ quả của}{giả định IID là nền của mọi bảo đảm tổng quát hoá; gỡ nó ra thì các bảo đảm đó mất hiệu lực, chứ không phải yếu đi.}
+
+\begin{trucgiac}
+Hãy hình dung một robot định vị bằng cách đếm số bước từ cửa phòng thay vì đọc bản đồ. Trong toà nhà nó được hiệu chỉnh, kết quả chính xác tuyệt đối và không có cách nào phân biệt nó với một hệ định vị thật. Sang toà nhà khác --- cùng loại hành lang, cùng loại cửa, chỉ khác chiều dài --- nó sai hoàn toàn ngay bước đầu tiên. Nó không hỏng; nó đã học đúng thứ tương quan mạnh nhất với đáp án trong dữ liệu nó thấy. Đây chính là cơ chế của \en{shortcut learning}, và nó giải thích vì sao độ chính xác cao trên tập test không hề bảo đảm hệ thống hiểu bài toán.
+\end{trucgiac}
+
+\section{Ba loại dịch chuyển (Covariate, Label and Concept Shift)}
+Muốn thay ``bị shift'' bằng một chẩn đoán dùng được, phải tách bài toán theo cấu trúc của phân phối chung \(p(x, y)\). Nói gọn thì có ba cách phân rã nó, và mỗi cách cho một loại dịch chuyển với một cách chữa riêng.
+
+\subsection{A. Phân biệt bằng cấu trúc của \(p(x,y)\)}
+\begin{table}[H]\centering\footnotesize
+\caption{Ba loại dịch chuyển. Cột cuối là lý do phải phân biệt: cách chữa của loại này vô dụng với loại kia.}
+\label{tab:ba-loai-shift}
+\begin{tabularx}{\linewidth}{@{}L{2.3cm}L{3.0cm}YL{4.0cm}@{}}
+\toprule
+\textbf{Loại} & \textbf{Cái gì đổi} & \textbf{Dấu hiệu} & \textbf{Cách xử lý}\\
+\midrule
+\vn{dịch chuyển hiệp biến}{covariate shift} & \(p(x)\) đổi, \(p(y\mid x)\) giữ nguyên & Ảnh trông khác đi nhưng quan hệ ảnh--nhãn vẫn đúng & Reweighting theo mật độ, augmentation, domain adaptation\\
+\vn{dịch chuyển nhãn}{label shift} & \(p(y)\) đổi, \(p(x\mid y)\) giữ nguyên & Tỉ lệ lớp đổi; ảnh của mỗi lớp vẫn y hệt & Hiệu chỉnh tiên nghiệm ngay ở đầu ra, không cần train lại\\
+\vn{trôi khái niệm}{concept drift} & \(p(y\mid x)\) đổi & Cùng một ảnh nay phải gán nhãn khác & Gán nhãn lại và huấn luyện lại; không có đường tắt\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Hình~\ref{fig:ba-loai-shift} vẽ ba loại đó trên một trục đặc trưng duy nhất, và điểm đáng nhìn là chúng làm biến dạng những bộ phận khác nhau của cùng một bức tranh: hai loại đầu di chuyển \emph{dữ liệu} quanh một biên quyết định đứng yên, còn loại thứ ba di chuyển \emph{chính biên quyết định}. Đó là lý do hai loại đầu chữa được bằng số học trong khi loại thứ ba đòi nhãn mới.
+
+\begin{figure}[H]\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[x=1cm,y=1cm,thick]
+\foreach \dx/\lab in {0/{Covariate shift}, 5.2/{Label shift}, 10.4/{Concept drift}}{
+  \begin{scope}[xshift=\dx cm]
+    \draw[->,steel] (-0.15,0) -- (4.3,0) node[right,font=\scriptsize,black] {\(x\)};
+    \node[font=\scriptsize,black,align=center] at (2.05,-0.72) {\lab};
+  \end{scope}}
+\begin{scope}
+  \draw[inkblue,smooth,samples=70,domain=0:4.2] plot (\x,{1.15*exp(-(\x-1.15)^2/0.32)});
+  \draw[reddark,dashed,smooth,samples=70,domain=0:4.2] plot (\x,{1.15*exp(-(\x-2.95)^2/0.32)});
+  \draw[violetdark,dotted,very thick] (2.05,0) -- (2.05,1.75);
+\end{scope}
+\begin{scope}[xshift=5.2cm]
+  \draw[inkblue,smooth,samples=70,domain=0:4.2] plot (\x,{1.35*exp(-(\x-1.15)^2/0.32)});
+  \draw[inkblue,smooth,samples=70,domain=0:4.2] plot (\x,{0.45*exp(-(\x-2.95)^2/0.32)});
+  \draw[reddark,dashed,smooth,samples=70,domain=0:4.2] plot (\x,{0.45*exp(-(\x-1.15)^2/0.32)});
+  \draw[reddark,dashed,smooth,samples=70,domain=0:4.2] plot (\x,{1.35*exp(-(\x-2.95)^2/0.32)});
+  \draw[violetdark,dotted,very thick] (2.05,0) -- (2.05,1.75);
+\end{scope}
+\begin{scope}[xshift=10.4cm]
+  \draw[inkblue,smooth,samples=70,domain=0:4.2] plot (\x,{1.15*exp(-(\x-2.05)^2/0.55)});
+  \draw[violetdark,dotted,very thick] (1.35,0) -- (1.35,1.75);
+  \draw[violetdark,dotted,very thick] (2.95,0) -- (2.95,1.75);
+  \draw[->,violetdark,thin] (1.45,1.55) -- (2.85,1.55);
+\end{scope}
+\end{tikzpicture}}
+\caption{Ba loại dịch chuyển trên một trục đặc trưng. Nét liền xanh là phân phối lúc huấn luyện, nét đứt đỏ là lúc triển khai, nét chấm tím là biên quyết định. Hai panel đầu: dữ liệu dịch chuyển, biên đứng yên. Panel cuối: dữ liệu y nguyên, biên dịch chuyển --- và đó là lý do duy nhất trong ba trường hợp mà nhãn cũ trở thành nhãn sai.}
+\label{fig:ba-loai-shift}
+\end{figure}
+
+\subsection{B. Ví dụ tính tay: hiệu chỉnh tiên nghiệm khi có label shift}
+Label shift đáng có một ví dụ số vì nó là trường hợp duy nhất chữa được gần như miễn phí, và cũng là trường hợp hay bị bỏ qua nhất. Giả sử bạn huấn luyện một bộ phân loại nhị phân trên tập cân bằng (tỉ lệ dương 50\%), còn khi triển khai tỉ lệ dương thật chỉ là 5\%
+. Mô hình trả về \(p = 0{,}60\) cho một mẫu.
+\begin{enumerate}
+\item Đổi sang \vn{tỉ số cược}{odds}: \(0{,}60/0{,}40 = 1{,}50\).
+\item Vì \(p(x \mid y)\) không đổi, \vn{tỉ số độ hợp lý}{likelihood ratio} giữ nguyên và chỉ phần tiên nghiệm cần sửa. Nhân với \(\dfrac{0{,}05/0{,}95}{0{,}50/0{,}50} \approx 0{,}0526\), được \(0{,}079\).
+\item Đổi ngược về xác suất: \(p \approx 0{,}079/1{,}079 \approx 0{,}073\).
+\end{enumerate}
+Phép tính này nói điều gì? Rằng một dự đoán ``khá chắc là dương'' thật ra là ``7\%
+khả năng dương'', và toàn bộ sự chênh lệch đến từ việc mô hình mang theo tiên nghiệm của tập huấn luyện chứ không phải của thế giới. Không train lại một tham số nào; chỉ cần biết tỉ lệ lớp mới. Ngược lại, nếu vấn đề thật là concept drift thì phép nhân này không những vô ích mà còn làm sai lệch thêm, vì giả định \(p(x\mid y)\) bất biến đã vỡ ngay từ đầu.
+\lk{E/25}{tiền đề}{hiệu chỉnh tiên nghiệm là một thao tác vận hành: nó sửa đầu ra theo tỉ lệ lớp thật, và chỉ dùng được khi đầu ra đã hiệu chuẩn.}
+
+\section{Biết là đã trôi, chưa biết có hại (Shift Detection)}
+Trước khi chữa phải phát hiện, và phát hiện rẻ hơn nhiều so với người ta tưởng. Hai công cụ thực dụng, cộng một giới hạn phải luôn nhớ:
+\begin{itemize}
+\item \textbf{Khoảng cách trên không gian \en{embedding}} --- so phân phối đặc trưng của dữ liệu huấn luyện với dữ liệu đang chạy. Rẻ, chạy liên tục được, nhưng con số khoảng cách tự nó khó diễn giải.
+\item \textbf{Bộ phân loại phân biệt miền} --- huấn luyện một bộ phân loại nhị phân để tách ``mẫu train'' khỏi ``mẫu production''. Đây là dụng cụ đo tốt hơn vì kết quả đọc được ngay:
+  \begin{itemize}
+  \item \textbf{AUC \(\approx 0{,}5\)} --- hai tập không phân biệt được, chưa có dịch chuyển đáng kể.
+  \item \textbf{AUC \(\approx 0{,}95\)} --- chỉ cần nhìn ảnh cũng biết nó đến từ đâu.
+  \item \textbf{Lợi ích kèm theo} --- các đặc trưng mà bộ phân biệt dựa vào chính là mô tả cụ thể của dịch chuyển, nên nó vừa báo động vừa chẩn đoán.
+  \end{itemize}
+\item \textbf{Giới hạn chung của cả hai} --- chúng trả lời ``phân phối có đổi không'', không phải ``việc đó có làm hỏng hệ thống không''. Hai điều đó tách rời theo cả hai chiều: đổi tông màu toàn cục là thay đổi lớn về thống kê nhưng vô hại nếu mô hình không dùng màu; ngược lại một thay đổi bé xíu đúng vào đặc trưng mô hình dựa vào lại đủ làm sập nó.
+\end{itemize}
+Hệ quả thực hành: tín hiệu dịch chuyển phải luôn được đối chiếu với một metric thật trên một tập nhỏ có nhãn thu ở miền đích. Giám sát dịch chuyển mà không có mẫu có nhãn nào ở miền đích là giám sát mù. Vì thế ngân sách nên đổ vào việc lấy vài trăm nhãn mỗi tháng từ production, trước khi đổ vào thuật toán thích nghi.
+
+\section{Thích nghi hay tổng quát hoá (Domain Adaptation vs Generalization)}
+Đến khi phải hành động, có một phân đôi quyết định toàn bộ chiến lược, và nó phụ thuộc vào đúng một câu hỏi: \emph{bạn có mẫu từ miền đích hay không?}
+
+\begin{mach}[Mạch 1 --- từ thích nghi tới tổng quát hoá]
+\item \vd{có mẫu miền đích (dù không nhãn), và chỉ cần chạy tốt ở đúng miền đó.} \gp \vn{thích nghi miền}{domain adaptation}: căn chỉnh phân phối đặc trưng giữa hai miền, hoặc tự huấn luyện bằng nhãn giả trên miền đích. \gd hai miền chia sẻ cùng quan hệ \(p(y \mid x)\), tức đây là covariate shift chứ không phải concept drift. \gia mô hình bị chuyên biệt hoá cho một phân phối cụ thể; miền thứ ba xuất hiện thì làm lại từ đầu.
+\item \vd{chưa từng thấy miền đích và không biết nó sẽ là gì.} \gp \vn{tổng quát hoá miền}{domain generalization}: học biểu diễn bất biến qua nhiều miền huấn luyện, với hy vọng cái bất biến đó cũng đúng ở miền chưa thấy \cite{arjovsky2019irm}. \gia phải hy sinh hiệu năng trung bình để lấy độ bền --- một biểu diễn chỉ giữ phần bất biến thì bỏ đi thông tin có ích ở miền hiện tại. \gd tồn tại một cơ chế nhân quả bất biến và bạn có đủ miền huấn luyện đa dạng để nhận ra nó.
+\item \vdm giả định đó có được thoả trên dữ liệu thật không? \hq đây là chỗ cần trung thực: một khảo sát có kiểm soát cho thấy khi mọi phương pháp tổng quát hoá miền được tune công bằng với cùng ngân sách, không phương pháp nào vượt được ERM thuần một cách nhất quán \cite{gulrajani2021search}. Kết quả này không nói ``đừng làm DG''; nó nói rằng phần lớn cải tiến báo cáo được đến từ quy trình chọn mô hình, không từ thuật toán. Đây đúng là \en{adaptive overfitting} ở \ptr{B/07}, lần này xuất hiện ở cấp độ cả một dòng nghiên cứu.
+\item \vd{cái ta thật sự quan tâm là nhóm tệ nhất, không phải trung bình.} \gp tối ưu trực tiếp cho nhóm tệ nhất thay vì cho trung bình \cite{sagawa2020groupdro}. \gd bạn biết trước các nhóm là gì --- nghĩa là quay lại đúng vấn đề metadata ở \ptr{B/07}: không có nhãn nhóm thì không có phương pháp nhóm nào dùng được.
+\end{mach}
+
+Đằng sau cả bốn bước là một nguyên nhân chung đã nêu ở hộp trực giác: \en{shortcut learning} \cite{geirhos2020shortcut}. Mô hình không cố hiểu bài toán; nó tìm đặc trưng dễ nhất tương quan đủ mạnh với nhãn trong tập huấn luyện. Nếu ảnh của lớp ``bò'' toàn chụp trên đồng cỏ thì cỏ là đặc trưng rẻ hơn hình dạng con bò rất nhiều; nếu ảnh bệnh lý đến từ một máy chụp và ảnh bình thường từ máy khác, thì dấu hiệu của máy là đặc trưng rẻ nhất trong toàn bộ ảnh. Đây là lời giải thích thống nhất cho hiện tượng ``chính xác trên test, ngu ngốc ngoài đời'', và nó nối ngược về \ptr{B/05}: shortcut hầu như luôn bắt nguồn từ một thiên lệch chọn mẫu ở khâu thu thập, nên nó không phải lỗi của mô hình mà là lỗi được cài vào từ trước khi mô hình tồn tại.
+\lk{B/05}{hệ quả của}{thiên lệch sinh ở khâu thu thập thì không hàm mất mát nào sửa được ở khâu cuối --- shortcut chỉ là cách nó lộ ra.}
+
+\section{Đo độ bền và quyền nói ``tôi không biết'' (Robustness and OOD Detection)}
+
+\subsection{A. Benchmark corruption, và đường thẳng làm chuẩn nghiêm khắc}
+Nếu độ bền quan trọng thì nó phải được đo, không phải được hy vọng. Cách rẻ nhất là các bộ benchmark corruption tổng hợp: làm nhiễu, mờ, nén, đổi thời tiết ở nhiều mức nghiêm trọng rồi đọc metric theo từng loại và từng mức \cite{hendrycks2019benchmarking}. Giá trị thật của chúng nằm ở \emph{cấu trúc} chứ không ở con số tổng --- loại corruption làm sập mạnh nhất chính là loại phá huỷ đặc trưng mô hình đang dùng. Nếu mờ chuyển động làm sập trong khi đổi màu không ảnh hưởng, mô hình đang sống nhờ cấu trúc tần số cao, và đó là thông tin hành động được.
+
+Giới hạn thì cũng rõ: corruption tổng hợp không thay thế được dịch chuyển thật. Vì thế các tập dữ liệu như WILDS được xây từ dịch chuyển xảy ra tự nhiên trong ứng dụng: bệnh viện khác, năm khác, vùng địa lý khác \cite{koh2021wilds}. Và có một quan sát thực nghiệm hữu ích, hơi bất ngờ, được vẽ ở Hình~\ref{fig:acc-on-line}: trên nhiều họ dịch chuyển tự nhiên, độ chính xác ngoài phân phối gần như là hàm tuyến tính của độ chính xác trong phân phối \cite{taori2020measuring,recht2019imagenet}.
+
+\begin{figure}[H]\centering
+\resizebox{0.56\linewidth}{!}{%
+\begin{tikzpicture}[thick]
+\draw[steel] (0,0) rectangle (5.2,4.0);
+\draw[inkblue,thin] (0.5,0.45) -- (4.9,3.15);
+\node[font=\scriptsize,color=inkblue,rotate=31,anchor=south] at (3.1,1.95) {đường thực nghiệm};
+\foreach \x/\y in {0.8/0.62, 1.3/0.95, 1.75/1.2, 2.2/1.45, 2.5/1.72, 3.0/1.95, 3.4/2.2, 3.9/2.5, 4.3/2.78, 4.7/3.0, 1.0/0.6, 2.8/1.9, 3.6/2.45}{
+  \fill[tiercol] (\x,\y) circle (1.9pt);}
+\fill[reddark] (3.4,3.35) circle (2.6pt);
+\node[font=\scriptsize,color=reddark,anchor=west,align=left] at (2.15,3.72) {thật sự bền hơn};
+\draw[reddark,thin,-{Latex[length=1.6mm]}] (3.05,3.62) -- (3.35,3.45);
+\node[font=\scriptsize,below] at (2.6,-0.15) {Độ chính xác trong phân phối};
+\node[font=\scriptsize,rotate=90,anchor=south] at (-0.2,2.0) {Độ chính xác ngoài phân phối};
+\end{tikzpicture}}
+\caption{``Accuracy on the line'' (sơ đồ minh hoạ theo mô tả trong \cite{taori2020measuring}, không phải số đo lại). Hầu hết mô hình và hầu hết ``phương pháp tăng độ bền'' chỉ trượt dọc theo một đường thẳng: cải thiện ngoài phân phối đến hoàn toàn từ cải thiện trong phân phối. Chỉ điểm đỏ --- nằm \emph{trên} đường --- mới xứng đáng gọi là tăng độ bền. Đường thẳng này vì thế là một \en{baseline} nghiêm khắc mà mọi tuyên bố về độ bền phải vượt qua.}
+\label{fig:acc-on-line}
+\end{figure}
+
+\subsection{B. Cho mô hình quyền nói ``tôi không biết''}
+\lk{E/24}{ràng buộc bởi}{đường thẳng đó là chuẩn so sánh: một ablation về độ bền chỉ có nghĩa khi nó tách được điểm ra khỏi đường.}
+
+Hướng bổ sung, không thay thế: \vn{phát hiện ngoài phân phối}{out-of-distribution detection} nhằm nhận ra đầu vào nằm ngoài phân phối huấn luyện để hệ thống chuyển sang chế độ an toàn thay vì trả lời bừa. Ba điều cần biết, theo thứ tự quan trọng:
+\begin{itemize}
+\item \textbf{Đường cơ sở đơn giản đến bất ngờ} --- dùng chính giá trị softmax cực đại làm điểm số \cite{hendrycks2017baseline}. Đây vừa là tin tốt (rẻ, không cần train lại) vừa là cảnh báo: nó cho thấy phần lớn công trình sau đó chỉ cải thiện tiệm tiến trên một tín hiệu vốn yếu.
+\item \textbf{Giới hạn thực nghiệm} --- độ tin cậy của mạng sâu vốn đã kém hiệu chuẩn ngay trong phân phối, và nó xuống cấp thêm đúng dưới dịch chuyển, tức đúng lúc ta cần nó nhất \cite{ovadia2019can}.
+\item \textbf{Giới hạn nguyên tắc} --- không thể có bộ phát hiện OOD phổ quát: ``ngoài phân phối'' chỉ có nghĩa khi đã cố định một phân phối tham chiếu, nên mọi bộ phát hiện đều là bộ phát hiện của \emph{một loại} bất thường mà bạn đã ngầm chọn.
+\end{itemize}
+
+\section{Đuôi dài và vòng phản hồi (Long-Tail and Feedback Loops)}
+Hai hiện tượng cuối không phải dịch chuyển theo nghĩa thời gian, nhưng chúng phá cùng một giả định.
+
+\begin{itemize}
+\item \textbf{\en{Long-tail} khác mất cân bằng lớp ở cơ chế, không chỉ ở mức độ.}
+  \begin{itemize}
+  \item \textbf{Mất cân bằng lớp} --- vài lớp có ít mẫu hơn hẳn; tăng trọng số hay lấy mẫu lại giúp được, vì vấn đề nằm ở hàm mất mát.
+  \item \textbf{Đuôi dài} --- \emph{rất nhiều} lớp, mỗi lớp cực hiếm; vấn đề không còn là trọng số mà là không đủ mẫu để học biểu diễn. Tăng trọng số cho một lớp có bốn mẫu chỉ làm mô hình thuộc lòng bốn mẫu đó nhanh hơn.
+  \item \textbf{Hướng đi có cơ sở} --- tách hai việc vốn bị gộp: học biểu diễn trên toàn bộ dữ liệu (phần đầu phân phối cung cấp tín hiệu), rồi học riêng bộ phân loại với dữ liệu cân bằng lại; hoặc đổi hẳn bài toán sang truy hồi theo độ tương đồng, nơi thêm một lớp mới chỉ là thêm một mẫu tham chiếu.
+  \end{itemize}
+\item \textbf{\vn{vòng phản hồi}{feedback loop} là thứ nguy hiểm nhất chương, vì nó vô hình với mọi phép đo ngoại tuyến.}
+  \begin{itemize}
+  \item \textbf{Cơ chế} --- hệ thống quyết định cái gì được nhìn thấy: ảnh nào tới tay người kiểm duyệt, vùng nào được quét kỹ, mẫu nào được gửi đi gán nhãn. Dữ liệu thu về sau đó đã bị chính mô hình lọc.
+  \item \textbf{Vì sao không đo được} --- mô hình tiếp theo học trên dữ liệu ấy sẽ củng cố đúng thiên lệch của mô hình trước. Mọi metric ngoại tuyến vẫn xác nhận nó tốt lên, vì tập đánh giá cũng đi qua cùng cái phễu. Đây là một dạng cụ thể của khoản nợ kỹ thuật ẩn trong hệ thống học máy \cite{sculley2015hidden}.
+  \item \textbf{Cách phá vòng} --- cố tình giữ một luồng dữ liệu không bị mô hình lọc: một tỉ lệ nhỏ mẫu chọn ngẫu nhiên, thu thập bất kể mô hình nói gì.
+  \end{itemize}
+\end{itemize}
+
+Từ đó suy ra hành động chủ động cuối cùng, và cũng là hành động rẻ nhất trong cả chương: \emph{tự xây một bộ test đối kháng}. Không phải đối kháng theo nghĩa nhiễu tối ưu hoá. Ý ở đây là vài trăm ảnh được chọn có chủ ý để lộ đúng shortcut bạn nghi ngờ: cùng vật thể trên nền khác, cùng cảnh chụp bằng camera khác, đúng lớp hiếm ở điều kiện xấu. Vài trăm ảnh như vậy thường nói nhiều hơn cả một bộ benchmark corruption, vì chúng nhắm vào giả thuyết cụ thể của bạn thay vì rải đều.
+\lk{B/07}{đối lập với}{tập test chuẩn được thiết kế để \emph{đại diện}; bộ test đối kháng được thiết kế để \emph{phá}, nên hai thứ trả lời hai câu hỏi khác nhau.}
+
+\section{Giới hạn và trường hợp hỏng}
+Cách phân loại ba dịch chuyển ở đầu chương gọn gàng hơn thực tế: dịch chuyển thật hầu như luôn là hỗn hợp của cả ba, và không có phép kiểm định nào tách chúng ra sạch sẽ khi bạn không có nhãn ở miền đích. Thứ tự chẩn đoán thực dụng là bắt đầu bằng cái rẻ nhất --- kiểm tra tiên nghiệm lớp có đổi không, vì nếu có thì hiệu chỉnh gần như miễn phí --- rồi mới tới các giả thuyết đắt hơn.
+
+Hiệu chỉnh theo tiên nghiệm giả định \(p(x \mid y)\) bất biến, một giả định thường bị vi phạm âm thầm: khi tỉ lệ lớp đổi vì camera mới, thì ảnh của mỗi lớp cũng đã đổi cùng lúc, và bạn có cả label shift lẫn covariate shift chồng lên nhau. Reweighting theo tỉ số mật độ chỉ hoạt động khi vùng mà phân phối nguồn thật sự có mẫu của phân phối đích nằm trong giá đỡ của phân phối nguồn; với miền thật sự mới, tỉ số mật độ tiến ra vô cực ở đúng vùng bạn quan tâm và phương sai của ước lượng nổ tung.
+
+\begin{cambay}
+Cạm bẫy hay gặp nhất là dùng chính độ tin cậy của mô hình làm cảnh báo dịch chuyển. Nghe hợp lý --- mô hình gặp thứ lạ thì phải kém tự tin --- nhưng đó chính là điều mạng sâu \emph{không} làm: dưới dịch chuyển, nó thường vẫn tự tin và tự tin sai \cite{ovadia2019can}. Một hệ thống giám sát chỉ báo động khi confidence tụt sẽ im lặng đúng trong những kịch bản hỏng nguy hiểm nhất.
+\end{cambay}
+
+\begin{cannho}
+``Bị domain shift'' không phải một chẩn đoán. Chẩn đoán là trả lời được \(p(x)\) đổi, \(p(y)\) đổi, hay \(p(y \mid x)\) đổi. Ba câu trả lời đó dẫn tới ba hành động loại trừ nhau, và chỉ cái cuối cùng bắt buộc phải gán nhãn lại. Muốn chẩn đoán được thì phải có một dòng nhỏ dữ liệu \emph{có nhãn} từ miền đích; không có nó thì mọi thuật toán thích nghi đều là đoán mò. \T{2}
+\end{cannho}
+
+\section{Thực hành}
+\begin{description}
+\item[Repo và tài nguyên.] \repo{bethgelab/imagecorruptions} cùng ImageNet-C và ImageNet-R cho corruption tổng hợp; \repo{RobustBench/robustbench} để so với các \en{baseline} đã được đo lại cẩn thận; \repo{p-lambda/wilds} cho dịch chuyển thật thay vì nhân tạo; \repo{Jingkang50/OpenOOD} và \repo{kkirchheim/pytorch-ood} cho OOD detection; \repo{evidentlyai/evidently} và \repo{SeldonIO/alibi-detect} để giám sát trôi phân phối trong production. Danh sách chốt tại tháng 9/2026 và tên phương pháp dẫn đầu sẽ cũ trong 6--12 tháng; các tập dữ liệu (WILDS, ImageNet-C) và hạ tầng giám sát bền hơn nhiều so với bảng xếp hạng.
+\item[Câu hỏi kiểm tra hiểu.] Accuracy trên production tụt 8\%: ba phép đo nào phân biệt được covariate shift với concept drift, và phép nào rẻ nhất nên làm trước? Vì sao tăng trọng số cho lớp hiếm không giải quyết được đuôi dài? Vì sao một bộ phát hiện OOD ``phổ quát'' là khái niệm không nhất quán?
+\item[Bài tập phụ.] Đo accuracy trên 15 loại corruption ở 5 mức nghiêm trọng, vẽ bản đồ nhiệt, tìm loại làm sập mạnh nhất, rồi giải thích nó bằng ngôn ngữ của chuỗi tạo ảnh ở \ptr{A/02-vat-ly-tao-anh}: corruption đó phá huỷ đặc trưng nào, và điều đó nói gì về thứ mô hình đang thật sự dùng?
+\end{description}
+
+\begin{onbai}
+\ar[3]{Giả định IID}{Mỗi mẫu được rút độc lập từ cùng một phân phối, cho cả dữ liệu huấn luyện lẫn dữ liệu tương lai. Mọi bảo đảm lý thuyết của học máy đứng trên nó, nên khi nó vỡ thì các bảo đảm mất hiệu lực chứ không chỉ yếu đi.}
+\ar[3]{Covariate shift}{\(p(x)\) đổi nhưng quan hệ ảnh--nhãn giữ nguyên: ảnh trông khác, quy luật vẫn đúng. Chữa bằng thích nghi miền, augmentation, hoặc đánh trọng số lại theo mật độ.}
+\ar[3]{Label shift}{Tỉ lệ các lớp đổi trong khi ảnh của mỗi lớp vẫn y hệt. Đây là trường hợp duy nhất chữa được gần như miễn phí, bằng cách chỉnh lại tiên nghiệm ở đầu ra.}
+\ar[3]{Concept drift}{Chính \(p(y \mid x)\) đổi: cùng một ảnh nay phải gán nhãn khác. Không có đường tắt --- phải gán nhãn lại rồi huấn luyện lại.}
+\ar[2]{Vì sao label shift chữa được mà không cần huấn luyện lại?}{Vì \(p(x \mid y)\) không đổi nên tỉ số độ hợp lý giữ nguyên, chỉ phần tiên nghiệm sai. Nhân tỉ số cược của đầu ra với tỉ lệ giữa hai tiên nghiệm là xong.}
+\ar[2]{Mô hình cho 0{,}60 nhưng tỉ lệ dương thật chỉ 5\% --- xác suất đúng?}{Khoảng 0{,}073. Tỉ số cược 1{,}5 nhân với 0{,}0526 ra 0{,}079, đổi ngược về xác suất là 7{,}3\%. Một dự đoán ``khá chắc'' hoá ra chỉ là 7\%.}
+\ar[3]{Bộ phân biệt miền}{Một bộ phân loại nhị phân tách ``mẫu train'' khỏi ``mẫu production''. AUC quanh 0{,}5 nghĩa là chưa có dịch chuyển đáng kể; AUC 0{,}95 nghĩa là nhìn ảnh cũng biết nó đến từ đâu.}
+\ar[3]{Vì sao phát hiện được dịch chuyển vẫn chưa đủ?}{Vì nó trả lời ``có đổi không'', không trả lời ``có hại không''. Đổi tông màu toàn cục là thay đổi lớn mà vô hại; một thay đổi bé đúng vào đặc trưng mô hình dựa vào lại đủ làm sập nó.}
+\ar[2]{Thích nghi miền}{Căn chỉnh phân phối đặc trưng, hoặc tự huấn luyện bằng nhãn giả, khi bạn đã có mẫu từ miền đích. Nó chuyên biệt hoá mô hình cho một phân phối, nên miền thứ ba xuất hiện thì phải làm lại.}
+\ar[2]{Tổng quát hoá miền}{Học biểu diễn bất biến qua nhiều miền huấn luyện, dùng khi chưa từng thấy miền đích. Giá phải trả là hy sinh hiệu năng trung bình để lấy độ bền.}
+\ar[2]{Vì sao tổng quát hoá miền không thắng nổi ERM?}{Vì phần lớn cải tiến báo cáo được đến từ quy trình chọn mô hình, không từ thuật toán. Cho mọi phương pháp cùng ngân sách tune và cùng thủ tục chọn thì lợi thế biến mất.}
+\ar[3]{Shortcut learning}{Mô hình học đặc trưng dễ nhất mà tương quan đủ mạnh với nhãn: cỏ thay cho hình dạng con bò, dấu hiệu máy chụp thay cho bệnh lý. Đây là lời giải thích thống nhất cho ``chính xác trên test, ngu ngốc ngoài đời''.}
+\ar[2]{Accuracy on the line}{Quan sát rằng trên nhiều dịch chuyển tự nhiên, độ chính xác ngoài phân phối gần như tuyến tính theo độ chính xác trong phân phối. Dùng nó làm chuẩn: chỉ điểm nằm trên đường mới đáng gọi là tăng độ bền.}
+\ar[2]{Benchmark corruption}{Đo lại metric qua nhiều loại nhiễu, mờ, nén, thời tiết ở nhiều mức. Giá trị nằm ở bản đồ nhiệt theo từng loại, vì loại làm sập mạnh nhất chính là loại phá đặc trưng mô hình đang dùng.}
+\ar[3]{OOD detection}{Nhận ra đầu vào nằm ngoài phân phối huấn luyện để hệ thống nói ``tôi không chắc''. Không thể có bộ phát hiện phổ quát, vì ``ngoài phân phối'' chỉ có nghĩa khi đã cố định một phân phối tham chiếu.}
+\ar[3]{Vì sao độ tin cậy của mô hình là cảnh báo tệ?}{Vì mạng sâu vốn đã quá tự tin ngay trong phân phối, và xuống cấp thêm đúng dưới dịch chuyển. Hệ giám sát chỉ báo động khi độ tin cậy tụt sẽ im lặng đúng lúc nguy hiểm nhất.}
+\ar[3]{Đuôi dài}{Rất nhiều lớp mà mỗi lớp chỉ có dăm bảy mẫu. Khác mất cân bằng lớp ở chỗ nút thắt là thiếu dữ liệu để học biểu diễn, nên tăng trọng số chỉ làm mô hình thuộc lòng vài mẫu đó nhanh hơn.}
+\ar[2]{Vòng phản hồi}{Mô hình quyết định cái gì được nhìn thấy, nên dữ liệu thu về sau đó đã bị chính nó lọc. Phá vòng bằng cách giữ một tỉ lệ nhỏ mẫu chọn ngẫu nhiên, thu bất kể mô hình nói gì.}
+\ar[2]{Accuracy production tụt 8\% --- ba phép đo nào, làm cái nào trước?}{Đo tỉ lệ lớp, đo AUC của bộ phân loại phân biệt miền, và gán tay vài chục mẫu để xem nhãn cũ còn đúng không. Làm phép đầu trước vì nếu là label shift thì chữa gần như miễn phí.}
+\ar[2]{Mọi metric ngoại tuyến đều tốt lên mà người dùng vẫn phàn nàn --- vì sao?}{Vòng phản hồi: tập đánh giá đi qua đúng cái phễu mà mô hình đã lọc. Phân biệt bằng một tập giữ riêng thu ngẫu nhiên, không qua mô hình; nếu con số ở đó không nhích thì vòng lặp đã khoá.}
+\end{onbai}
+
+\begin{ungdung}
+\ud{WILDS (\repo{p-lambda/wilds})}{Đóng gói dịch chuyển tự nhiên theo bệnh viện, theo năm, theo vùng, và yêu cầu báo cáo hiệu năng nhóm tệ nhất thay vì trung bình}{Bằng chứng rằng phân biệt các loại dịch chuyển đã thành chuẩn thiết kế benchmark}
+\ud{ImageNet-C, ImageNet-R, \repo{RobustBench}}{Đo độ bền theo từng loại corruption và từng mức, đúng ý ``cấu trúc quan trọng hơn con số tổng''}{Hạ tầng đánh giá; RobustBench tồn tại vì các báo cáo tự đo không tái lập được}
+\ud{\repo{OpenOOD}}{So các phương pháp phát hiện ngoài phân phối trên cùng giao thức, kể cả \en{baseline} softmax cực đại}{Cho thấy khoảng cách giữa baseline đơn giản và phương pháp mới hẹp hơn ấn tượng từ từng bài báo}
+\ud{\repo{evidentlyai/evidently}, \repo{SeldonIO/alibi-detect}}{Giám sát production bằng đúng hai công cụ của chương: khoảng cách phân phối trên embedding và bộ phân loại phân biệt miền}{Hạ tầng vận hành, ít phụ thuộc mô hình cụ thể}
+\ud{Mô hình nền tảng huấn luyện trên dữ liệu web quy mô lớn (dòng CLIP, DINOv2/v3)}{Được cho là nhấc hẳn đường ``accuracy on the line'' nhờ đa dạng dữ liệu, chứ không nhờ một thuật toán bền hơn}{Đây là cách đọc phổ biến tính tới 9/2026, không phải một kết luận đã khép lại}
+\end{ungdung}
+
+\begin{duan}{Chẩn đoán loại dịch chuyển khi đổi tập dữ liệu}{1--2 ngày}
+\dmt lấy đúng bộ phân loại ``cùng chỗ'' đã dựng ở chương trước, chạy nó trên một tập dữ liệu khác, rồi trả lời bằng bằng chứng số: mức sụt là covariate shift, label shift, hay concept drift.
+\ddl EuRoC làm miền nguồn; TUM-VI (chuỗi \code{room} hoặc \code{corridor}) hoặc OpenLORIS làm miền đích. Sinh nhãn cùng chỗ ở miền đích theo \emph{đúng} quy tắc hình học đã dùng ở \ptr{B/07-chia-du-lieu-va-danh-gia}, không đổi ngưỡng.
+\dbc bốn phép đo, theo thứ tự từ rẻ tới đắt. (1) Đo metric ở cả hai miền, ghi mức sụt. (2) Huấn luyện một bộ phân loại phân biệt miền trên embedding của hai tập và ghi AUC của nó. (3) Đo tỉ lệ cặp dương ở hai miền, áp hiệu chỉnh tiên nghiệm, ghi phần hiệu năng lấy lại được. (4) Gán tay 50 cặp ở miền đích và đếm tỉ lệ bất đồng giữa nhãn hình học và nhãn tay.
+\dxk bạn kết luận được một loại dịch chuyển kèm ba con số chống lưng: AUC của bộ phân biệt miền, phần trăm hiệu năng lấy lại nhờ hiệu chỉnh tiên nghiệm, và tỉ lệ bất đồng ở bước (4). Tỉ lệ bất đồng cao chính là bằng chứng của concept drift, vì định nghĩa ``cùng chỗ'' đã đổi theo cấu trúc cảnh.
+\dnv \ptr{B/07-chia-du-lieu-va-danh-gia} cho bộ đo và cách chia; \ptr{E/25-do-tin-cay-va-van-hanh} vì nếu kết luận là concept drift thì bước kế tiếp là thiết kế chế độ hỏng an toàn chứ không phải tinh chỉnh thêm.
+\end{duan}
+
+\begin{traloi}
+\tl{Ba câu hỏi: tỉ lệ lớp có đổi không; ảnh có trông khác không; cùng một ảnh nay có phải gán nhãn khác không. Câu đầu --- label shift --- chữa được gần như miễn phí bằng hiệu chỉnh tiên nghiệm ở đầu ra, nên phải kiểm tra trước tiên vì nó rẻ nhất.}
+\tl{Vì nó học nền chứ không học con vật: bò gần như luôn đứng trên cỏ, lạc đà trên cát. Đặc trưng nền rẻ hơn hình dạng rất nhiều và tương quan đủ mạnh với nhãn trong tập huấn luyện, nên ERM chọn đúng nó.}
+\tl{Vì phần lớn cải tiến báo cáo được đến từ quy trình chọn mô hình --- mỗi bài chọn siêu tham số theo cách thuận lợi cho phương pháp của mình. Cho mọi phương pháp cùng ngân sách tune và cùng thủ tục chọn thì lợi thế đó biến mất \cite{gulrajani2021search}.}
+\tl{Vì mạng sâu vốn đã quá tự tin ngay trong phân phối, và độ tin cậy xuống cấp thêm đúng dưới dịch chuyển. Một hệ giám sát chỉ báo động khi confidence tụt sẽ im lặng đúng trong những kịch bản hỏng nguy hiểm nhất.}
+\end{traloi}
+
+\begin{dongian}
+Bạn bán hàng ở khu phố A suốt ba năm, quen tới mức nhìn khách bước vào là đoán được họ sẽ mua gì. Rồi bạn chuyển sang khu phố B và tỉ lệ đoán đúng tụt hẳn. Chỉ có đúng ba lý do, và ba cách chữa khác hẳn nhau.
+
+Một, khách trông khác đi --- ăn mặc khác, đến vào giờ khác --- nhưng quy luật cũ vẫn đúng: ai vội thì mua nhanh. Cái này chỉ cần thời gian làm quen với kiểu khách mới. Hai, tỉ lệ khách đổi: khu cũ toàn dân văn phòng, khu mới toàn sinh viên. Quy luật không sai một chút nào, chỉ là bạn đang kỳ vọng sai tỉ lệ, nên chỉnh lại kỳ vọng là xong và gần như không tốn gì. Ba, nghĩa của dấu hiệu đã đổi: ở khu cũ, khách đứng lâu trước quầy nghĩa là sắp mua; ở khu mới, đứng lâu nghĩa là đang đợi bạn. Chỉ trường hợp thứ ba mới bắt bạn quan sát lại từ đầu.
+
+Mẹo là đừng gộp ba thứ đó thành một câu than ``khu này khó bán''. Hỏi lần lượt: khách có khác không, tỉ lệ có khác không, dấu hiệu có còn nghĩa cũ không --- và hỏi cái rẻ nhất trước, vì cái rẻ nhất cũng là cái chữa nhanh nhất.
+
+Cái giá là bạn cần vài chục đơn hàng thật ở khu mới mới trả lời được ba câu hỏi ấy. Không có chúng thì bạn chỉ đang đoán, và đoán một cách rất tự tin.
+
+\chuadongian{vì sao máy lại bám vào một dấu hiệu ăn may thay vì dấu hiệu đúng thì không có cách nói gọn nào không gây hiểu lầm. Nói ``máy lười'' là sai: nó chọn đúng thứ gắn chặt nhất với đáp án trong đống dữ liệu nó được xem, và nếu chỉ nhìn đống đó thì không ai --- kể cả người --- phân biệt được đâu là dấu hiệu thật.}
+\motcau{Sụt hiệu năng không phải một chẩn đoán; chẩn đoán là nói được cái gì đã đổi, vì mỗi thứ đổi có đúng một cách chữa.}
+\end{dongian}
+
+\section{Kết nối}
+Chương này đóng lại Phần B ở phía dữ liệu bằng cách gỡ bỏ giả định mà \ptr{B/04-nen-tang-hoc-tu-du-lieu} phải giả sử và \ptr{B/07-chia-du-lieu-va-danh-gia} phải dựa vào. Nó nối ngược về \ptr{B/05-thiet-ke-bai-toan} qua khái niệm shortcut, vốn chỉ là thiên lệch chọn mẫu nhìn từ phía mô hình, và về \ptr{B/06-chat-luong-du-lieu} theo quan hệ đối lập: ở đó nhãn sai vì con người, ở đây nhãn đúng nhưng thế giới đã đổi. Nó là tiền đề của \ptr{B/09-thiet-ke-ham-mat-mat}, nơi một số dịch chuyển được xử lý ngay trong hàm mất mát, và của \ptr{E/25-do-tin-cay-va-van-hanh}, nơi OOD detection và calibration trở thành một phần của thiết kế chế độ hỏng an toàn.
+
+\begin{tukiem}
+\item Vì sao một hệ thống có thể có dịch chuyển phân phối rất lớn theo phép đo mà hiệu năng không giảm chút nào, và ngược lại?
+\item Bạn đo được tỉ lệ lớp dương đã đổi từ 50\%
+ xuống 5\%. Vì sao đây là tin tốt, và phép sửa cụ thể gồm mấy bước?
+\item Tổng quát hoá miền phải hy sinh cái gì để lấy độ bền, và kết quả của \cite{gulrajani2021search} buộc bạn nghi ngờ điều gì trong chính thí nghiệm của mình?
+\item Trong Hình~\ref{fig:acc-on-line}, vì sao một điểm nằm \emph{trên} đường thẳng mới đáng gọi là tăng độ bền, còn một điểm nằm xa về bên phải thì không?
+\item Vì sao dùng confidence của mô hình làm cảnh báo dịch chuyển lại im lặng đúng lúc nguy hiểm nhất?
+\item Đuôi dài và mất cân bằng lớp khác nhau ở cơ chế nào, và vì sao sự khác nhau đó khiến reweighting thất bại?
+\item Một vòng phản hồi làm mọi metric ngoại tuyến tốt lên trong khi hệ thống tệ đi. Cơ chế nào cho phép điều đó, và biện pháp rẻ nhất để phá vòng là gì?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

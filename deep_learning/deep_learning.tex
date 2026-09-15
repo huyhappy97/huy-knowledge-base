@@ -1,0 +1,82 @@
+% ============================================================================
+%  HỌC AI CHO COMPUTER VISION — master gộp toàn cây thành một PDF liền mạch.
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Nguồn: roadmap_dl.md (v5). Dependency: không (gốc cây). Mức độ: cốt lõi.
+%  Build: ./build.sh            (chỉ master)
+%         ./build.sh all        (thêm PDF riêng cho từng phần/chương/mục)
+% ============================================================================
+\documentclass[11pt,a4paper,oneside]{report}
+\usepackage{subfiles}
+\input{\subfix{preamble/common}}
+\addbibresource{\subfix{refs.bib}}
+\addbibresource{\subfix{refs-b07.bib}}
+\addbibresource{\subfix{refs-f27.bib}}
+\addbibresource{\subfix{refs-f28.bib}}
+\addbibresource{\subfix{refs-f29.bib}}
+\addbibresource{\subfix{refs-f30.bib}}
+\addbibresource{\subfix{refs-f31.bib}}
+\addbibresource{\subfix{refs-f32.bib}}
+\addbibresource{\subfix{refs-f33.bib}}
+\addbibresource{\subfix{refs-f34.bib}}
+\hypersetup{pdftitle={Học AI cho Computer Vision — cây tri thức},
+            pdfsubject={Deep learning for computer vision, trình bày theo mạch vấn đề đến giải pháp}}
+\begin{document}
+
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture, overlay]
+  % dải màu dọc bên trái
+  \fill[inkblue] (current page.north west) rectangle ++(1.5cm,-\paperheight);
+  \fill[accent]  ($(current page.north west)+(1.5cm,0)$) rectangle ++(0.22cm,-\paperheight);
+  % chữ số mờ trang trí
+  \node[anchor=north east, inner sep=0pt]
+    at ($(current page.north east)+(-1.6cm,-2.3cm)$)
+    {\fontsize{190}{190}\selectfont\sffamily\bfseries\color{inkblue!7}CV};
+\end{tikzpicture}
+
+\vspace*{4.2cm}
+\begin{flushleft}
+{\sffamily\bfseries\color{accent}\large HỌC SÂU CHO THỊ GIÁC MÁY TÍNH\par}
+\vspace{0.5cm}
+{\sffamily\bfseries\color{inkblue}\fontsize{40}{45}\selectfont
+CÂY TRI THỨC\\[0.12em] COMPUTER VISION\par}
+\vspace{0.9cm}
+{\color{accent}\rule{7cm}{2.4pt}}\par
+\vspace{0.9cm}
+{\large\color{inkblue!85}
+Trình bày theo mạch\\[0.25em]
+\textbf{vấn đề} \(\rightarrow\) \textbf{giải pháp} \(\rightarrow\) \textbf{giả định} \(\rightarrow\) \textbf{giá phải trả}\par}
+\end{flushleft}
+
+\vfill
+\begin{flushleft}
+{\itshape\color{tiercol}``Độ khó không biến mất, nó chỉ bị đẩy đi chỗ khác.''\par}
+{\footnotesize\sffamily\color{tiercol}nguyên lý đọc hệ thống, Chương 3\par}
+\vspace{1.1cm}
+{\footnotesize\sffamily\color{inkblue}\textbf{Năm phần}\quad
+A · Nền tảng có giới hạn \quad B · Tư duy hệ thống \quad C · Thuật toán và mô hình\\[0.25em]
+\phantom{\textbf{Năm phần}}\quad D · Kỹ thuật, tối ưu và triển khai \quad E · Đánh giá, độ tin cậy và dự án\par}
+\vspace{0.5em}
+{\footnotesize\sffamily\color{tiercol}Bản gộp toàn cây --- \today\par}
+\end{flushleft}
+\end{titlepage}
+
+\pagenumbering{roman}
+\subfile{00-map}
+\cleardoublepage
+\tableofcontents
+\cleardoublepage
+\pagenumbering{arabic}
+
+\subfile{A-nen-tang-co-gioi-han/nen-tang-co-gioi-han}
+\subfile{B-tu-duy-he-thong/tu-duy-he-thong}
+\subfile{C-thuat-toan-va-mo-hinh/thuat-toan-va-mo-hinh}
+\subfile{D-ky-thuat-va-trien-khai/ky-thuat-va-trien-khai}
+\subfile{E-danh-gia-va-du-an/danh-gia-va-du-an}
+\subfile{F-hoc-sau-cho-visual-slam/hoc-sau-cho-visual-slam}
+
+\subfile{98-thuat-ngu}
+\subfile{99-ket-luan}
+
+\printbibliography[title={Nguồn}]
+\end{document}

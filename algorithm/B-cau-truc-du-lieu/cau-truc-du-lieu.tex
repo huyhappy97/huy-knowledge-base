@@ -1,0 +1,24 @@
+% ============================================================================
+%  B — file phần: Cấu trúc dữ liệu
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../algorithm.tex]{subfiles}
+\begin{document}
+\part{CẤU TRÚC DỮ LIỆU}
+\begin{tomtat}
+Phần B đi qua bảy nhóm cấu trúc dữ liệu, nhưng chia theo \emph{thao tác được làm rẻ đi} chứ không theo hình dạng. Mảng và hai con trỏ làm rẻ việc quét có cửa sổ; ngăn xếp, hàng đợi và heap làm rẻ việc lấy phần tử ``đúng lúc''; bảng băm làm rẻ tra cứu theo khoá; cây tìm kiếm làm rẻ tra cứu theo thứ tự; cây chỉ số làm rẻ truy vấn trên đoạn kèm cập nhật; DSU làm rẻ việc hợp nhất; trie và các cấu trúc chuỗi làm rẻ việc so khớp. Đọc xong phần này, khi nhìn một đề bài bạn sẽ hỏi ``thao tác nào lặp lại nhiều nhất'' thay vì ``bài này dùng cây gì''. Nếu chỉ nhớ một điều: cấu trúc dữ liệu là một cách trả trước chi phí --- bạn bỏ công sắp đặt trước để mỗi truy vấn sau rẻ đi, và mọi cấu trúc đều có một thao tác mà nó làm \emph{tệ hơn} mảng thường.
+\end{tomtat}
+
+Có một cách nhìn thống nhất cho cả phần này, và nó đáng nói ngay từ đầu. Mọi cấu trúc dữ liệu đều là một sự đánh đổi giữa \emph{trật tự bạn duy trì} và \emph{giá bạn trả để duy trì nó}. Mảng thô không duy trì trật tự nào nên chèn rẻ mà tìm đắt. Cây tìm kiếm duy trì trật tự toàn phần nên tìm rẻ mà mỗi lần chèn phải trả tiền giữ cân bằng. Heap duy trì một trật tự yếu hơn --- chỉ cần biết ai nhỏ nhất --- nên rẻ hơn cây, đổi lại không trả lời được câu ``phần tử thứ \(k\) là ai''. Khi bạn đọc mỗi chương, hãy tự hỏi cấu trúc đó duy trì \emph{đúng bao nhiêu} trật tự, vì đó là thứ quyết định nó nhanh ở đâu và mù ở đâu.
+
+Thứ tự bảy chương không phải ngẫu nhiên. Chương 6 và 7 là những cấu trúc mà bạn dùng gần như mọi ngày, và chúng cũng là nơi các kỹ thuật ``ngây thơ nhưng đúng'' như hai con trỏ hay ngăn xếp đơn điệu biến \Ob{n^2} thành \Ob{n}. Chương 8 và 9 là hai cách tra cứu đối lập --- băm cho tra cứu chính xác, cây cho tra cứu theo thứ tự --- và ranh giới giữa chúng là câu hỏi ``bài có cần thứ tự không''. Chương 10 và 11 là hai cấu trúc mà người luyện thi đấu dùng nhiều nhất vì tỉ lệ sức mạnh trên độ dài code rất cao. Chương 12 khép lại bằng chuỗi, miền mà cấu trúc dữ liệu chuyên biệt tạo ra khác biệt lớn nhất.
+\subfile{00-map}
+\subfile{06-mang-chuoi-hai-con-tro/mang-chuoi-hai-con-tro}
+\subfile{07-ngan-xep-hang-doi-heap/ngan-xep-hang-doi-heap}
+\subfile{08-bam-va-tap-hop/bam-va-tap-hop}
+\subfile{09-cay-tim-kiem/cay-tim-kiem}
+\subfile{10-cay-chi-so-va-truy-van-doan/cay-chi-so-va-truy-van-doan}
+\subfile{11-hop-nhat-tap-hop/hop-nhat-tap-hop}
+\subfile{12-chuoi-va-so-khop/chuoi-va-so-khop}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

@@ -1,0 +1,162 @@
+% ============================================================================
+%  A/01-toan-toi-thieu/02-vi-phan-va-toi-uu
+%  Ngày tạo: 2026-09-03 | Sửa gần nhất: 2026-09-03 | Ôn gần nhất: chưa
+%  Dependency: A/01/01-dai-so-tuyen-tinh. Mức độ: cốt lõi.
+% ============================================================================
+\documentclass[../../../deep_learning.tex]{subfiles}
+\begin{document}
+\section{Vi phân nhiều biến và tối ưu hoá (Matrix Calculus and Optimization)}
+\ptrtarget{A/01-toan-toi-thieu/02}\ptrtarget{A/01-toan-toi-thieu/02-vi-phan-va-toi-uu}\ptrtarget{A/01/02}\ptrtarget{A/01/02-vi-phan-va-toi-uu}
+\dependency{\ptr{A/01-toan-toi-thieu/01-dai-so-tuyen-tinh} (phổ trị riêng, số điều kiện --- toàn bộ phần ``hình dạng landscape'' dưới đây là cách đọc lại phổ ấy).}
+
+\begin{tomtat}
+Mục này giải thích cấu trúc của phép lấy đạo hàm trên đồ thị tính toán và hình dạng của bài toán tối ưu mà huấn luyện thực sự giải. Đọc xong bạn tự derive được backward của một tầng bất kỳ mà không nhầm chiều. Bạn biết vì sao \vn{lan truyền ngược}{backpropagation} đắt về bộ nhớ chứ không đắt về phép tính. Và bạn chẩn đoán được ``huấn luyện chậm'' thuộc loại nào trong ba loại: điều hoà tệ, learning rate sai, hay tín hiệu giám sát yếu. Nếu chỉ nhớ một điều: \emph{khớp shape trước, dấu và hệ số sau} --- và trước khi đổ lỗi cho tính không lồi, hãy kiểm tra số điều kiện, vì phần lớn ``bài toán khó tối ưu'' hoá ra chỉ là bài toán bị điều hoà tệ.
+\end{tomtat}
+
+\begin{nentang}
+\kn{mô hình và tham số}{mô hình là một hàm có tham số nhận đầu vào và trả về dự đoán; tham số là các con số bên trong hàm đó mà quá trình huấn luyện được phép thay đổi.}
+\kn{hàm mất mát (loss function)}{một con số đo mức sai của dự đoán so với nhãn. Huấn luyện là quá trình đi tìm bộ tham số làm con số này nhỏ nhất.}
+\kn{gradient}{vector các đạo hàm riêng của hàm mất mát theo từng tham số; nó chỉ hướng làm loss tăng nhanh nhất, nên ta cập nhật theo hướng ngược lại.}
+\kn{learning rate}{độ dài bước mà thuật toán tối ưu đi theo hướng ngược gradient ở mỗi lần cập nhật. Quá lớn thì nghiệm bật ra ngoài và phân kỳ; quá nhỏ thì hội tụ chậm tới mức vô dụng.}
+\kn{mini-batch và epoch}{mini-batch là một nhóm nhỏ mẫu dùng để ước lượng gradient cho \emph{một} lần cập nhật; một epoch là một lượt đi hết toàn bộ tập huấn luyện.}
+\kn{tập validation}{phần dữ liệu tách riêng, không dùng để cập nhật tham số, chỉ dùng để đo xem mô hình đang tốt lên hay xấu đi. Nó tồn tại vì loss trên tập huấn luyện luôn giảm kể cả khi mô hình đang học vẹt.}
+\kn{hàm lồi (convex)}{hàm mà đoạn thẳng nối hai điểm bất kỳ trên đồ thị luôn nằm trên đồ thị --- hình dạng ``lòng chảo''. Với hàm lồi, mọi cực tiểu địa phương đều là cực tiểu toàn cục; mạng nơ-ron thì không lồi.}
+\kn{Jacobian và Hessian}{Jacobian là ma trận đạo hàm bậc nhất của một hàm nhiều đầu vào nhiều đầu ra --- nó là bản tuyến tính hoá tốt nhất tại một điểm. Hessian là ma trận đạo hàm bậc hai, đo độ cong.}
+\end{nentang}
+
+\subsection{A. Đặt vấn đề}
+Bạn đã viết \vn{ma trận Jacobian}{Jacobian} bằng tay cho một hàm chi phí \vn{sai số tái chiếu}{reprojection error} và đã từng mất một buổi chiều vì nhầm dấu hoặc nhầm thứ tự nhân. Trong deep learning, \en{autograd} làm hộ việc đó, nên câu hỏi đổi hình. Không còn là ``đạo hàm bằng bao nhiêu'', mà là ``vì sao \en{gradient} chết ở tầng thứ ba'', ``vì sao đổi thứ tự hai phép toán làm bộ nhớ tăng gấp đôi'', và ``vì sao \vn{hàm mất mát}{loss function} giảm nhưng mô hình không học được gì''. Trả lời những câu đó cần hiểu \emph{cấu trúc} của phép lấy đạo hàm, không cần kỹ năng đạo hàm tay.
+
+\textbf{Học xong mục này thì làm được gì mà trước đó không làm được?} Ba việc: viết và kiểm chứng một \vn{lượt ngược}{backward pass} tự cài trong mười lăm phút thay vì nửa ngày; đọc một đường cong huấn luyện và đặt tên đúng cho nguyên nhân trước khi thử ngẫu nhiên các siêu tham số; và hiểu vì sao mọi optimizer hiện đại đều là biến thể của cùng một ý tưởng, nên không cần học thuộc từng cái.
+
+\subsection{B. Bộ máy vi phân: khớp shape trước}
+\begin{trucgiac}
+Quy tắc chuỗi ở dạng ma trận là một bài toán \emph{lắp ống dẫn}. Mỗi tầng là một cái ống có đường kính vào và đường kính ra; Jacobian của tầng là tấm chuyển tiếp kích thước (đường kính ra) \(\times\) (đường kính vào). Backprop là ghép các tấm chuyển tiếp từ cuối về đầu, và cách duy nhất để ghép sai là ghép hai tấm không khớp đường kính. Vì thế: khớp shape trước, lo dấu và hệ số sau --- nếu shape khớp thì công thức chỉ còn sai được ở một hằng số hoặc một dấu trừ, và cả hai lộ ra ngay trong một lần \vn{kiểm tra gradient}{gradient check}.
+\end{trucgiac}
+
+Với hàm \(f:\mathbb{R}^n\to\mathbb{R}^m\), Jacobian \(J\in\mathbb{R}^{m\times n}\) là bản tuyến tính hoá tốt nhất tại một điểm:
+\[
+f(x+\delta)\;\approx\; f(x)+J\delta .
+\]
+Nói bằng lời: \emph{trong một lân cận đủ nhỏ, mọi hàm trơn đều là một phép nhân ma trận} --- và đó là toàn bộ lý do vi phân hữu ích. \vn{Quy tắc chuỗi}{chain rule} nói Jacobian của hàm hợp là tích các Jacobian theo đúng thứ tự hợp, \(J_{g\circ f} = J_g J_f\).
+
+Toàn bộ lan truyền ngược \cite{rumelhart1986} chỉ là một nhận xét về \emph{thứ tự nhân}. Đầu ra cuối là một số vô hướng, tức \(m=1\) ở tầng hàm mất mát. Khi đó nhân tích ấy từ trái sang phải rẻ hơn từ phải sang trái rất nhiều. Lý do: mỗi bước ta nhân một vector hàng với một ma trận, thay vì nhân hai ma trận. Đó là lý do nó tên là \en{reverse-mode automatic differentiation}, tức là đi ngược từ đầu ra vô hướng về từng tham số; cần phân biệt \emph{lan truyền ngược} là thuật toán còn \vn{lượt ngược}{backward pass} là một lần chạy nó. Đây cũng là lý do nó tốn bộ nhớ: muốn nhân ngược thì phải giữ lại giá trị trung gian của lượt xuôi. Đánh đổi bộ nhớ lấy tính toán ấy quay lại nguyên vẹn ở \code{D} dưới cái tên \en{gradient checkpointing} \cite{chen2016training}.
+\lk{D}{ràng buộc bởi}{bộ nhớ kích hoạt do lượt xuôi để lại mới là thứ chặn batch size trên một GPU, không phải số trọng số}
+
+
+\textbf{Phiên bản đơn giản hoá của mẹo khớp shape.} Nếu \(Y = XW\) với \(X\in\mathbb{R}^{B\times d_{\text{in}}}\), \(W\in\mathbb{R}^{d_{\text{in}}\times d_{\text{out}}}\), thì gradient của một đại lượng phải có đúng shape của chính đại lượng đó. Vậy \(\partial L/\partial W\) phải là \(d_{\text{in}}\times d_{\text{out}}\); hai thứ có sẵn để ghép ra kích thước đó là \(X^\top\) (\(d_{\text{in}}\times B\)) và \(\partial L/\partial Y\) (\(B\times d_{\text{out}}\)); chỉ có một cách ghép hợp lệ, nên
+\[
+\frac{\partial L}{\partial W} = X^\top \frac{\partial L}{\partial Y},
+\qquad
+\frac{\partial L}{\partial X} = \frac{\partial L}{\partial Y}\,W^\top .
+\]
+Không cần nhớ gì, chỉ cần đếm chiều. Quy tắc này giải quyết khoảng chín phần mười trường hợp thực tế; phần còn lại --- chuẩn hoá, \en{softmax}, phép toán chia sẻ trọng số --- thì kiểm bằng \code{torch.autograd.gradcheck} trên đầu vào kiểu double, và nếu sai thì gần như luôn sai ở một chỗ tổng-hợp-theo-\en{batch} bị bỏ quên.
+
+\vn{Ma trận Hessian}{Hessian} gần như không bao giờ được lập tường minh, vì kích thước của nó là bình phương số tham số. Nhưng \emph{tích Hessian với một vector} tính được với chi phí cỡ một lượt ngược, và thế là đủ để đo độ cong theo một hướng. Vai trò của Hessian ở đây không phải để làm bước Newton mà để \emph{đọc bài toán}: trị riêng lớn nhất chặn \en{learning rate} ổn định, phổ trị riêng cho biết landscape dẹt hay nhọn, trị riêng âm cho biết ta đang ở \vn{điểm yên ngựa}{saddle point} chứ không phải cực tiểu.
+
+\subsection{C. Vì sao optimizer có hình dạng như hiện nay}
+Hình~\ref{fig:tien-hoa-opt} đọc theo trục thời gian: mỗi bước sinh ra vì bước trước để lại một nút thắt cụ thể, không phải vì ai đó muốn thêm một siêu tham số.
+
+\begin{figure}[H]\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.5cm and 0.75cm,
+  blk/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=5pt,align=center,font=\small,text width=2.35cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.3cm}]
+\node[blk] (gd) {\textbf{GD}\\toàn tập dữ liệu};
+\node[blk,right=of gd] (sgd) {\textbf{SGD}\\mini-batch};
+\node[blk,right=of sgd] (mom) {\textbf{+ momentum}\\trung bình trượt};
+\node[blk,right=of mom] (ada) {\textbf{Adam}\\thang đo mỗi toạ độ};
+\node[blk,right=of ada] (adw) {\textbf{AdamW}\\tách weight decay};
+\draw[ar] (gd) -- node[lb,below=1pt] {mỗi bước quá đắt} (sgd);
+\draw[ar] (sgd) -- node[lb,below=1pt] {dao động ngang thung lũng} (mom);
+\draw[ar] (mom) -- node[lb,below=1pt] {độ cong lệch nhau theo chiều} (ada);
+\draw[ar] (ada) -- node[lb,below=1pt] {phạt \(L_2\) bị chia lệch} (adw);
+\end{tikzpicture}}
+\caption{Dòng tiến hoá của optimizer. Nhãn dưới mỗi mũi tên là \emph{nút thắt} mà bước kế tiếp gỡ; đọc theo chiều này thì không cần học thuộc từng thuật toán, chỉ cần nhớ nó sinh ra để chữa cái gì.}
+\label{fig:tien-hoa-opt}
+\end{figure}
+
+\begin{mach}[Mạch 2 --- cùng dòng tiến hoá, kèm giá phải trả]
+\item \vd{hàm mất mát nhiều chiều, không có nghiệm đóng.} \gp đi ngược hướng gradient từng bước nhỏ. \gd hàm khả vi và trơn đủ để tuyến tính hoá còn đúng trong lân cận cỡ learning rate. \gia phải chọn learning rate; chọn sai thì hoặc phân kỳ hoặc bò.
+\item \vd{tính gradient trên toàn tập dữ liệu quá đắt.} \gp ước lượng trên một mini-batch. \hq mỗi bước rẻ đi hàng nghìn lần nên ta đi được nhiều bước hơn với cùng ngân sách. \vdm gradient thành biến ngẫu nhiên, với nhiễu tỉ lệ nghịch với căn của \vn{kích thước batch}{batch size}. Tăng batch gấp bốn chỉ giảm nhiễu một nửa. Quan hệ lợi ích giảm dần đó quyết định phần lớn cách chọn batch size \cite{smith2018dont}.
+\item \vd{các hướng có độ cong rất khác nhau nên một learning rate chung không vừa cho hướng nào.} \gp co giãn từng toạ độ theo lịch sử độ lớn gradient, tức họ Adam \cite{kingma2015adam}. \gd độ cong xấp xỉ tách rời được theo từng toạ độ. \gia mất đảm bảo hội tụ của SGD trong vài trường hợp, và sinh tương tác lạ với \en{weight decay} --- chính chỗ đó đẻ ra AdamW \cite{loshchilov2019adamw}.
+\item \vd{nhiễu mini-batch làm quỹ đạo dao động ở cuối quá trình.} \gp giảm learning rate theo lịch trình. \hq bước cuối đủ nhỏ để trung bình hoá nhiễu. \vdm lịch trình thành một siêu tham số nhạy, tương tác với cả batch size lẫn số epoch --- nên chép kiến trúc mà không chép lịch trình thì không tái lập được kết quả.
+\end{mach}
+
+\begin{table}[H]\centering\small
+\caption{Bốn optimizer thường gặp trên cùng tiêu chí. Cột cuối quan trọng nhất.}
+\label{tab:optimizer}
+\begin{tabularx}{\linewidth}{@{}L{2.0cm}L{3.2cm}YL{3.6cm}@{}}
+\toprule
+\textbf{Thuật toán} & \textbf{Cơ chế} & \textbf{Mạnh khi nào} & \textbf{Hỏng khi nào}\\
+\midrule
+SGD & Bước theo gradient mini-batch & Bài toán điều hoà tốt sau chuẩn hoá; hay tổng quát hoá tốt hơn trên thị giác & Landscape lệch thang đo mạnh; cần rất nhiều công tune learning rate\\
+SGD + momentum & Trung bình trượt gradient & Thung lũng hẹp dài --- triệt tiêu dao động ngang & Momentum quá lớn gây vọt lố ở giai đoạn cuối\\
+Adam & Chia mỗi toạ độ cho ước lượng độ lớn riêng & Gradient thưa hoặc lệch thang đo mạnh, ví dụ \en{transformer} & Đầu quá trình khi ước lượng phương sai chưa ổn (cần \en{warmup}); tổng quát hoá đôi khi kém hơn SGD\\
+AdamW & Như Adam, tách weight decay khỏi bước thích nghi & Mặc định hợp lý cho hầu hết mô hình lớn hiện nay & Vẫn cần warmup và lịch trình; không cứu được bài toán mà tín hiệu giám sát sai\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{D. Lồi hay không lồi, và hình dạng thật của landscape}
+Câu nói phổ thông ``deep learning khó vì hàm mất mát không lồi'' đúng về chữ nhưng dẫn tới trực giác sai. Với bài toán \vn{lồi}{convex}, mọi cực tiểu địa phương là cực tiểu toàn cục và ta có chứng nhận dừng. Với bài toán không lồi cả hai thứ đó mất. Nhưng thực nghiệm trên mạng lớn cho thấy thủ phạm làm chậm không phải các cực tiểu địa phương tồi: trong không gian rất nhiều chiều, một điểm dừng ngẫu nhiên gần như chắc chắn là điểm yên ngựa, vì để là cực tiểu thì hàng triệu trị riêng phải dương \emph{cùng lúc}. Cái làm chậm là vùng phẳng quanh yên ngựa và vùng có số điều kiện tệ --- tức đúng hiện tượng ở mục trước.
+
+\textbf{Ví dụ nhỏ nhất tính tay được, và nó đủ giải thích cả hiện tượng.} Với \(L(x)=\tfrac12(x_1^2+\varepsilon x_2^2)\), hạ gradient bước \(\eta\) nhân thành phần thứ nhất với \((1-\eta)\) và thành phần thứ hai với \((1-\eta\varepsilon)\) mỗi vòng. Ổn định buộc \(\eta<2\). Lấy \(\eta = 1{,}8\) và \(\varepsilon = 0{,}05\). Hướng thứ nhất dao động đổi dấu mỗi bước với hệ số \(-0{,}8\); hướng thứ hai mỗi vòng chỉ co \(9\%\). Tỉ số \(1/\varepsilon = 20\) chính là số điều kiện. Hình~\ref{fig:zigzag} vẽ đúng quỹ đạo đó: chi phí không nằm ở chỗ ``đi xuống'', nó nằm ở chỗ đi ngang thung lũng.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.9\linewidth,height=5.0cm,
+  xlabel={\(x_1\) --- hướng dốc},ylabel={\(x_2\) --- hướng phẳng},
+  xmin=-1.4,xmax=1.4,ymin=-1.2,ymax=5.0,axis lines=middle,
+  xlabel style={font=\footnotesize,at={(1,0)},anchor=north east},
+  ylabel style={font=\footnotesize,at={(0,1)},anchor=south west},
+  tick label style={font=\scriptsize}]
+\addplot[rulecol,thin,domain=0:360,samples=120] ({0.632*cos(x)},{2.83*sin(x)});
+\addplot[rulecol,thin,domain=0:360,samples=120] ({1.0*cos(x)},{4.47*sin(x)});
+\addplot[inkblue,thick,mark=*,mark size=1.1pt] coordinates {
+ (1,4) (-0.8,3.64) (0.64,3.312) (-0.512,3.014) (0.4096,2.743)
+ (-0.3277,2.496) (0.2621,2.271) (-0.2097,2.067) (0.1678,1.881)};
+\end{axis}
+\end{tikzpicture}
+\caption{Hạ gradient trên hàm toàn phương có số điều kiện 20: quỹ đạo nảy qua nảy lại theo hướng dốc trong khi bò rất chậm theo hướng phẳng. Chuẩn hoá đầu vào và các optimizer thích nghi đều nhắm vào việc làm hai trục của ellipse gần bằng nhau, tức là làm hình này tròn lại.}
+\label{fig:zigzag}
+\end{figure}
+
+Khác biệt thứ hai, thực dụng hơn: khi không lồi, \emph{cực tiểu nào} ta rơi vào là một phần của kết quả. Có bằng chứng thực nghiệm rằng nghiệm ở vùng dẹt tổng quát hoá tốt hơn nghiệm ở vùng nhọn, và batch lớn có xu hướng rơi vào vùng nhọn nếu không hiệu chỉnh gì \cite{keskar2017large}. Đây là quan sát đo được và tái lập nhiều lần, nhưng cách giải thích vẫn còn tranh cãi và định nghĩa ``dẹt'' phụ thuộc cách tham số hoá --- hãy nhớ ở mức hiện tượng, đừng nhớ ở mức định lý.
+
+\subsection{E. Điều kiện dừng nào có nghĩa}
+Trong tối ưu cổ điển ta dừng khi chuẩn gradient nhỏ. Trong huấn luyện mạng, tiêu chí đó gần như vô dụng: gradient mini-batch không bao giờ nhỏ vì nhiễu lấy mẫu, và ngay cả gradient toàn phần nhỏ cũng không nói gì về chất lượng mô hình. Thứ thực sự được dùng là dừng theo chỉ số trên tập \en{validation} --- tức dừng khi mục tiêu ta \emph{quan tâm}, không phải mục tiêu ta \emph{tối ưu}, ngừng cải thiện. 
+\lk{A/01}{tiền đề}{câu hỏi ``validation đã cải thiện chưa'' là câu hỏi thống kê về sai số lấy mẫu, được trả lời ở mục xác suất kế tiếp}
+Chuyển từ ``điều kiện dừng của thuật toán'' sang ``điều kiện dừng của phép ước lượng ngoài mẫu'' là một dịch chuyển tư duy lớn. Nó cũng là cầu nối sang \ptr{A/01/03}. Câu hỏi ``validation đã ngừng cải thiện chưa'' là câu hỏi thống kê, không phải câu hỏi giải tích.
+
+\subsection{F. Giới hạn và trường hợp hỏng}
+\begin{itemize}
+\item \textbf{Giả định khả vi bị vi phạm thường xuyên hơn ta tưởng.} \en{ReLU} không khả vi tại không (vô hại, tập điểm có độ đo không), nhưng các phép toán rời rạc thật thì không cứu được: bước lọc bỏ các hộp trùng nhau và chỉ giữ hộp điểm cao nhất (\en{non-maximum suppression}) dùng argmax, phép lấy mẫu cứng, chỉ số nguyên trong \vn{lượng tử hoá}{quantization} đều làm gradient bằng không ở mọi nơi. Cả một mảng kỹ thuật ở \code{C} và \code{D} --- \en{surrogate loss}, \en{straight-through estimator}, \en{Gumbel-softmax} --- tồn tại chỉ để vá chỗ này, và mỗi cách vá đưa vào một thiên lệch riêng.
+\lk{C}{hệ quả của}{mọi cách vá chỗ không khả vi đều sinh ra từ đúng một sự thật: gradient bằng không ở mọi nơi trên một phép toán rời rạc}
+
+\item \textbf{Autograd không cứu được sai số số học.} Gradient có thể đúng công thức nhưng vẫn tràn hoặc mất chính xác ở \en{half precision}. Triệu chứng là loss thành NaN sau vài trăm bước. Đó là lý do tồn tại của \en{loss scaling} trong huấn luyện hỗn hợp độ chính xác \cite{micikevicius2018mixed}. Ở chiều ngược lại, gradient check với float32 hay báo sai giả; phải kiểm ở double.
+\item \textbf{Đừng suy từ bài toán lồi sang mạng sâu.} Trực giác ``quỹ đạo trơn tru đi xuống lòng chảo'' mô tả sai cái đang xảy ra: quỹ đạo thật đi qua vùng có độ cong đổi dấu, và learning rate lớn ở giai đoạn đầu đóng vai trò \vn{chính quy hoá}{regularization} chứ không chỉ là ``đi nhanh'' --- giảm nó quá sớm làm mất tác dụng đó.
+\end{itemize}
+
+\begin{cambay}
+Loss giảm không có nghĩa mô hình đang học thứ bạn muốn. Ba trường hợp hay gặp và cách phân biệt: loss giảm vì mô hình học thiên lệch của nhãn (kiểm bằng cách so với \en{baseline} đoán lớp phổ biến nhất); loss train giảm mà validation đi ngang vì \vn{rò rỉ dữ liệu}{data leakage} làm hai tập không độc lập (kiểm bằng cách chia theo nhóm nguồn); loss giảm đều nhưng chỉ số nghiệp vụ đứng yên vì hàm mất mát không đại diện tốt cho chỉ số đó (kiểm bằng cách vẽ tương quan giữa hai đại lượng). Luôn xem loss như một \en{proxy} có sai lệch; \ptr{B/09} mổ xẻ sai lệch ấy.
+\end{cambay}
+
+\begin{cannho}
+Khớp shape trước, dấu và hệ số sau. Trước khi đổ lỗi cho tính không lồi, hãy kiểm tra số điều kiện. Và đừng bao giờ dừng huấn luyện theo chuẩn gradient --- dừng theo chỉ số trên tập validation, vì đó mới là đại lượng bạn thật sự quan tâm. \T{1}
+\end{cannho}
+
+\subsection{G. Kết nối}
+Mục này nhận trực tiếp từ \ptr{A/01/01-dai-so-tuyen-tinh} (Hessian và phổ của nó) và chuyển tiếp sang \ptr{A/01/03-xac-suat-va-thong-tin}, nơi câu hỏi ``validation ngừng cải thiện chưa'' được trả lời bằng công cụ thống kê thay vì bằng mắt. Theo chiều ngang, đây là tiền đề của hai chỗ. Thứ nhất là toàn bộ chương optimizer và lịch trình learning rate ở \code{D}. Thứ hai là phần thiết kế hàm mất mát ở \ptr{B/09}, nơi ta thấy nhiều lựa chọn loss thật ra là lựa chọn về \emph{hình dạng gradient} chứ không về ý nghĩa thống kê.
+
+\begin{tukiem}
+\item Vì sao chế độ ngược tốn bộ nhớ còn chế độ xuôi thì không, và điều đó dẫn tới kỹ thuật gì khi mô hình quá lớn?
+\item Bạn derive được \(\partial L/\partial W\) mà không cần nhớ công thức. Lập luận đó dựa trên tính chất nào, và khi nào nó không đủ để xác định duy nhất đáp án?
+\item Trong không gian nhiều triệu chiều, vì sao điểm dừng gần như chắc chắn là yên ngựa chứ không phải cực tiểu địa phương?
+\item Vì sao ``chuẩn gradient nhỏ'' là điều kiện dừng vô nghĩa khi huấn luyện với mini-batch?
+\item Tăng batch size gấp bốn thì nhiễu gradient giảm bao nhiêu, và vì sao quan hệ đó khiến batch rất lớn kém hiệu quả về chi phí?
+\item Loss giảm ổn định suốt 50 epoch nhưng mô hình vô dụng khi triển khai --- ba nguyên nhân nào giải thích được chuyện đó, và mỗi nguyên nhân phân biệt bằng phép kiểm nào?
+\end{tukiem}
+\ifSubfilesClassLoaded{\printbibliography[title={Nguồn}]}{}
+\end{document}

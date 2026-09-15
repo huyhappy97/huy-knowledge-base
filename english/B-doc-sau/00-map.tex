@@ -1,0 +1,59 @@
+% ============================================================================
+%  B/00-map.tex — bản đồ phần B
+%  Ngày tạo: 2026-09-06 | Sửa gần nhất: 2026-09-06 | Ôn gần nhất: chưa
+% ============================================================================
+\documentclass[../english.tex]{subfiles}
+\begin{document}
+\section*{Bản đồ phần B --- Đọc sâu}
+
+\begin{tomtat}
+Sáu chương, và chúng trả lời sáu câu hỏi rất khác nhau. Chuỗi phụ thuộc: 5 \(\rightarrow\) 6 \(\rightarrow\) 8 là mạch chính; chương 7 và 9 là hai ứng dụng cụ thể; chương 10 chạy song song suốt và nên bắt đầu ngay từ tuần đầu. Nếu chỉ có thời gian cho hai chương, hãy đọc 6 và 8.
+\end{tomtat}
+
+\subsection*{A. Bảng tra ngược: bạn đang cần gì \(\rightarrow\) đọc chương nào}
+\begin{center}\footnotesize
+\begin{tabularx}{\linewidth}{@{}L{5.6cm}L{2.0cm}Y@{}}
+\toprule
+\textbf{Tình huống} & \textbf{Chương} & \textbf{Công cụ chính}\\
+\midrule
+Có 30 bài, không biết bài nào đáng đọc kỹ & 5 & Đọc thăm dò và tiêu chí loại bài\\
+Đọc xong không tóm tắt được lập luận & 6 & Bản đồ lập luận, từ nối, mô hình Toulmin\\
+Cần đọc một bài báo hiệu quả & 7 & Ba lượt đọc, IMRAD, mẫu ghi chú\\
+Không chắc tác giả khẳng định mạnh tới đâu & 8 & Thang cam kết, hedging, hàm ý\\
+Xem khoá học mà không đọng lại & 9 & Xem trước, nghe theo tín hiệu cấu trúc, ghi chú\\
+Thuật ngữ ngành làm đứt mạch đọc & 10 & Bảng thuật ngữ cá nhân, đọc định nghĩa\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection*{B. Vì sao chia như vậy}
+Cách chia thông thường của sách dạy đọc là theo \emph{kỹ thuật} --- đọc lướt, đọc quét, đoán từ, tóm tắt. Cách đó khiến người học coi đọc là một kỹ năng đồng nhất. Sáu chương ở đây chia theo \emph{loại thông tin cần lấy ra}: nội dung mệnh đề, bộ khung lập luận, và thái độ cùng mức cam kết. Ba loại này nằm ở ba chỗ khác nhau trong văn bản và đòi ba cách đọc khác nhau --- đó là lý do chia như vậy, và cũng là lý do người đọc chỉ luyện ``đọc hiểu'' chung chung thường bỏ sót hẳn hai loại sau.
+
+\subsection*{C. Phụ thuộc và thứ tự đọc}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=0.58cm and 0.95cm,
+  m/.style={draw=steel,fill=bluebg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=2.7cm},
+  o/.style={draw=accent,fill=amberbg,rounded corners=2pt,inner sep=4.5pt,align=center,font=\small,text width=2.7cm},
+  ar/.style={-{Latex[length=2.2mm]},draw=steel,thick},
+  ard/.style={-{Latex[length=2.2mm]},draw=tiercol,thick,dashed},
+  lb/.style={font=\scriptsize\itshape,color=reddark,align=center,text width=2.3cm}]
+\node[m] (c5) {\textbf{5.} Ba tầng đọc};
+\node[m,right=of c5] (c6) {\textbf{6.} Cấu trúc lập luận};
+\node[o,right=of c6] (c8) {\textbf{8.} Đọc giữa các dòng};
+\node[m,below=1.0cm of c5] (c7) {\textbf{7.} Bài báo khoa học};
+\node[m,below=1.0cm of c6] (c9) {\textbf{9.} Nghe giảng};
+\node[o,below=1.0cm of c8] (c10) {\textbf{10.} Từ vựng ngành};
+\draw[ar] (c5) -- node[lb,above=0pt] {khung để đọc kỹ} (c6);
+\draw[ar] (c6) -- node[lb,above=0pt] {thái độ và cam kết} (c8);
+\draw[ar] (c5) -- (c7);
+\draw[ard] (c6) -- (c9);
+\draw[ard] (c8) -- (c10);
+\draw[ard] (c7.east) -- (c9.west);
+\end{tikzpicture}
+\caption{Phụ thuộc giữa sáu chương. Mạch trên là mạch kỹ năng chung; hàng dưới là ba ứng dụng. Hai chương tô hổ phách quan trọng nhất cho mục tiêu ``hiểu đúng ý người nói'': chương 8 dạy đọc ra ngụ ý, chương 10 xoá dần rào cản thuật ngữ.}
+\label{fig:map-B-en}
+\end{figure}
+
+\subsection*{D. Cốt lõi hay tham khảo}
+\textbf{Cốt lõi:} tiêu chí chọn tầng đọc ở chương 5; bảng từ nối và mô hình lập luận ở chương 6; ba lượt đọc ở chương 7; toàn bộ chương 8; và quy trình xây bảng thuật ngữ ở chương 10. \textbf{Tham khảo:} phần lý thuyết siêu diễn ngôn ở chương 6 và phần kỹ thuật ghi chú chi tiết ở chương 9 --- đọc một lần để biết cách làm, rồi tự chọn hệ thống hợp với mình.
+\end{document}

@@ -1,0 +1,80 @@
+Cấu hình: f = 600 px, sigma = 0.2 px, 3000 lần thử mỗi cấu hình
+CẢNH BÁO: mọi số mặc định là VÍ DỤ SỐ HỌC, không phải số đo.
+
+=== PHẦN 1: bốn quan hệ tỉ lệ của A/05 ===
+Dự đoán: dx ~ Z.sigma/f ; dZ ~ Z.sigma/w ; dtheta ~ Z.sigma/(f.B)
+
+-- quét Z (một tag 100 mm, camera nhìn chếch 20 độ) --
+   Công thức A/05 KHÔNG có hệ số 1/sqrt(N) (xem A/05 mục 3A: cố ý bỏ
+   cho thận trọng). Với 4 góc độc lập, mô phỏng cho dx nhỏ hơn dự đoán
+   khoảng sqrt(4) = 2 lần — nên cột cuối là dự đoán ĐÃ chia cho 2.
+
+  Z (m)   dx (mm)   dZ (mm)   dZ/dx     Z/W  dx dự đoán/2  dZ dự đoán
+   0.30     0.056     0.254    4.56    3.00         0.050       0.300
+   0.50     0.087     0.786    9.05    5.00         0.083       0.833
+   1.00     0.169     3.279   19.41   10.00         0.167       3.333
+   2.00     0.370    12.999   35.11   20.00         0.333      13.333
+  Kiểm 1: cột dx phải xấp xỉ cột 'dx dự đoán/2'  -> dx ~ Z.sigma/f.
+  Kiểm 2: cột dZ phải xấp xỉ cột 'dZ dự đoán'    -> dZ ~ Z.sigma/w.
+  Kiểm 3: cột dZ/dx phải TĂNG TUYẾN TÍNH theo Z (cùng dốc với Z/W).
+
+-- quét baseline B NGANG (hai tag 100 mm, Z = 0,5 m) --
+   Baseline CÓ HƯỚNG (B/09 mục 3): trải rộng theo x cải thiện YAW,
+   không cải thiện PITCH. Vì vậy phải nhìn từng trục, không nhìn
+   một con số góc vô hướng — nó bị trục tệ nhất chi phối.
+
+  B (m)     pitch       yaw      roll  yaw dự đoán   tỉ số
+   0.10    0.1891    0.1237    0.0405       0.0955    1.30
+   0.20    0.1752    0.0969    0.0280       0.0477    2.03
+   0.40    0.1296    0.0598    0.0161       0.0239    2.50
+   0.80    0.0772    0.0366    0.0084       0.0119    3.06
+  Kiểm 1: cột YAW phải giảm gần TUYẾN TÍNH theo B (A/05 mục 6),
+          nên cột 'tỉ số' phải gần như KHÔNG ĐỔI theo B.
+  Kiểm 2: cột PITCH giảm CHẬM hơn nhiều — vì baseline đứng không đổi.
+          Đây chính là luận điểm 'baseline có hướng' của B/09 mục 3,
+          và nó là lý do không nên bỏ hẳn baseline theo chiều đứng.
+
+=== PHẦN 2: ambiguity của target phẳng (A/04) ===
+Dự đoán: rho -> 1 khi góc nghiêng -> 0, và sai số góc nổ tung ở đó.
+
+ nghiêng (deg)  rho trung vị  sai số góc (deg)
+             0         1.348             1.383
+             2         1.822             1.329
+             5         5.044             1.165
+            10        13.661             0.855
+            20        33.026             0.510
+            40        65.085             0.273
+  Kiểm: cột rho phải tăng theo góc nghiêng; ở 0 độ nó phải gần 1,
+        và sai số góc ở 0 độ phải lớn hơn hẳn (A/04 mục 4).
+
+-- KHỬ bằng tính không đồng phẳng --
+                    cấu hình     pitch       yaw      roll      tổng
+            4 tag đồng phẳng    0.1538    0.1127    0.0181    0.1916
+         4 tag nghiêng 20 độ    0.1241    0.0896    0.0187    0.1542
+  Cải thiện: 1.24 lần (B/09 mục 4).
+
+=== PHẦN 3: PnP hợp nhất so với trung bình pose (A/03 mục 5) ===
+Dự đoán: hợp nhất thắng rõ về sai số GÓC, và khoảng cách thắng
+         tăng theo baseline (B/09 mục 2).
+
+  B (m)   hợp nhất (deg)   trung bình (deg)   tỉ số
+   0.10           0.3019             0.4266    1.41
+   0.22           0.2462             0.3301    1.34
+   0.45           0.1689             0.2545    1.51
+  Kiểm: cột tỉ số phải LỚN HƠN 1 và tăng theo B.
+        Nếu nó bằng 1 thì mệnh đề A/03 mục 5 bị bác bỏ — hãy ghi lại.
+
+=== PHẦN 4: bốn phương án bố trí constellation (B/09) ===
+
+                     phương án  dx (mm)  dZ (mm)    pitch      yaw     roll
+             A. một tag 150 mm    0.118    0.399   0.4232   0.4244   0.0451
+   B. 4 tag đồng phẳng, B=0,22    0.056    0.160   0.1586   0.1114   0.0179
+        C. 4 tag nghiêng 20 độ    0.050    0.163   0.1236   0.0879   0.0181
+       D. C + tag nhô ra 60 mm    0.038    0.162   0.0642   0.0492   0.0184
+
+  Ngân sách của cây: 5 mm và 0,5 độ (C/15).
+  Kiểm: phương án B phải tệ hơn C rõ rệt ở cột GÓC dù cùng baseline —
+        đó là toàn bộ luận điểm của A/04 và B/09 mục 4.
+
+Xong. Đối chiếu kết quả với dự đoán giải tích ở A/05, A/04, A/03.
+Chỗ nào lệch thì GHI LẠI — đó là một mục cho 99-chua-biet.md.
