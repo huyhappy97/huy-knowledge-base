@@ -33,8 +33,8 @@ def pages(key):
         n = len(list(PDFPage.get_pages(open(pdf, "rb"))))
         with open(c, "w") as fh:
             for i in range(n):
-                fh.write(f"\f=== {i+1} ===\n" + extract_text(pdf, page_numbers=[i]))
-    raw = open(c).read().split("\f")[1:]
+                fh.write(f"\x00=== {i+1} ===\n" + extract_text(pdf, page_numbers=[i]))
+    raw = open(c).read().split("\x00")[1:]
     return [norm(p.split("\n", 1)[1]) for p in raw]
 
 
