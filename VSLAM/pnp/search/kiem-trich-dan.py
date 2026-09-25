@@ -63,6 +63,6 @@ def check(key):
 
 if __name__ == "__main__":
     keys = sys.argv[1:] or sorted(os.path.basename(p)[:-3] for p in glob.glob(os.path.join(ROOT, "notes", "*.md"))
-                                  if not os.path.basename(p).startswith("00-"))
+                                  if not os.path.basename(p).startswith("00-") and os.path.basename(p) != "README.md")
     res = [check(k) for k in keys]
     sys.exit(0 if all(res) else 1)

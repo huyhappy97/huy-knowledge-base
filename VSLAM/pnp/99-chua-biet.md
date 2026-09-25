@@ -5,11 +5,15 @@ Cùng cơ chế với `../99-chua-biet.md`: mỗi mục là một câu hỏi c�
 
 Ngày lập: 2026-09-25.
 
-## 0. Nợ đọc (ưu tiên cao nhất)
+## 0. Nợ đọc và nợ ký (ưu tiên cao nhất)
 
-Toàn bộ `refs.bib` đã kiểm **siêu dữ liệu** nhưng **chưa có bài nào được đọc tới lượt hai**.
-Mười bài trong "Lộ trình đọc gợi ý" của `danh-muc.md` là mười ghi chú `notes/<bibkey>.md` đầu tiên
-phải viết. Trước khi xong, mọi câu "vì sao đọc" trong danh mục chỉ là gợi ý, không phải hiểu biết.
+*Cập nhật 2026-09-25:* mười bài của lộ trình (11 ghi chú, vì mục 9 có hai bài) đã được **agent** đọc
+toàn văn tới lượt 2–3 và có `notes/<bibkey>.md` kèm script kiểm chứng số trong `code/`. Mọi trích đoạn
+nguyên văn đã được kiểm máy (`search/kiem-trich-dan.py`), mọi script đã được chạy lại độc lập.
+
+**Nợ còn lại:** (1) Huy chưa đọc lại để ký ghi chú nào — theo `research-rules.md` mục 8, các bài nền
+tảng (EPnP, SQPnP, Ding, Lu–Hager, Haralick) phải chính Huy đọc tới lượt ba; (2) ~110 bài còn lại trong
+`refs.bib` vẫn chỉ kiểm siêu dữ liệu; (3) chưa có `matrix.md` và bài học LaTeX.
 
 ## 1. Câu hỏi nội dung
 
@@ -21,8 +25,13 @@ phải viết. Trước khi xong, mọi câu "vì sao đọc" trong danh mục c
    sao tối đa bốn" vẫn chưa có chứng minh trong các bài đã đọc — `haralick1994review` chỉ khẳng định.
 2. EPnP cực tiểu hoá một sai số **đại số**. Trên dữ liệu có nhiễu pixel đẳng hướng, sai số đó
    lệch khỏi sai số tái chiếu bao nhiêu, và sau một bước LM thì chênh lệch còn lại có đáng kể không?
+   *Tiến triển 2026-09-25:* EPnP+GN kém LM trên sai số tái chiếu 10–25 % về sai số pose; bước MᵀM ngầm
+   trọng số theo z²; trên target phẳng nhìn thẳng, bước GN của bài còn làm tệ đi. (`notes/lepetit2009epnp.md`)
 3. SQPnP tuyên bố "tối ưu toàn cục" — tối ưu theo hàm nào (sai số trong không gian vật?), và hàm
    đó trùng với nghiệm hợp lý cực đại dưới nhiễu pixel Gauss khi nào?
+   *Tiến triển 2026-09-25:* hàm được tối ưu là Σ zᵢ²‖mᵢ − π(X_c,i)‖² — sai số tái chiếu trọng số độ sâu
+   bình phương (kiểm tới 1e-16). LM trên sai số tái chiếu thuần từ nghiệm SQPnP hạ RMSE 2–11 %, và ở n = 4,
+   20 px có lúc xoay 27–48° sang lưu vực khác. Câu "trùng ML khi nào" vẫn mở. (`notes/terzakis2020sqpnp.md`)
 4. CPnP tuyên bố nhất quán (consistent) khi n → ∞. EPnP và SQPnP có **không** nhất quán không,
    và độ chệch của chúng lớn cỡ nào ở n = 50 — điều đó có quan trọng cho relocalization không?
 5. Với target phẳng, vì sao hàm mục tiêu có đúng hai cực tiểu mà không phải nhiều hơn? (Trỏ sang
@@ -58,6 +67,9 @@ Mỗi câu trỏ về ghi chú sinh ra nó; chi tiết và số liệu nằm ở
 - EPnP phẳng với ba vector nhân: một vòng tái tuyến tính hoá chỉ có hạng 6/9 — bài (hay mã MATLAB gốc) thực sự giải ca này thế nào? (`lepetit2009epnp`)
 - Bước MᵀM của EPnP ngầm trọng số sai số pixel theo z²; với dải độ sâu lớn, chuẩn hoá lại theo độ sâu (như CEPnP, MLPnP) lợi bao nhiêu? (`lepetit2009epnp`)
 - `cv2.SOLVEPNP_EPNP` hỏng trên dữ liệu phẳng không nhiễu (nghiệm lật): có phải do `cv::invert(DECOMP_SVD)` cắt mất trục độ dài ≈ 0? OpenCV đã ghi nhận chưa? (`lepetit2009epnp`)
+
+- Chứng minh Mệnh đề 5–6 của SQPnP (supplementary, chưa có) dùng "descending" theo dòng gradient hay theo bước SQP rời rạc? Mệnh đề 3 sai nếu hiểu là lồi trắc địa. (`terzakis2020sqpnp`)
+- Có cấp được chứng nhận tối ưu rẻ (Shor relaxation của QCQP (8)) cho mỗi nghiệm SQPnP để biến "toàn cục thực nghiệm" thành "có chứng nhận"? (`terzakis2020sqpnp`, nối `garciasalguero2024certpnp`)
 
 **RANSAC**
 - Khi N nhỏ và lấy mẫu không hoàn lại, k = log(1−p)/log(1−wⁿ) đánh giá thấp số vòng (N = 20: đạt 0,96 thay vì 0,99). OpenCV, PoseLib, USAC có hiệu chỉnh hypergeometric không? (`fischler1981ransac`)

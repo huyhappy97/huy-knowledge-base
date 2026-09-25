@@ -26,7 +26,7 @@ Nếu chỉ có thời gian cho khoảng mười bài, đi theo thứ tự này.
 2. **haralick1994review** — P3P là gì, tối đa bốn nghiệm, sáu lời giải từ Grunert 1841 quy về một khung, và vì sao thứ tự thế biến đổi quyết định độ chính xác số.
 3. **lepetit2009epnp** — bộ giải n điểm được dùng nhiều nhất; ý tưởng bốn điểm điều khiển.
 4. **lu2000orthogonal** — cách nghĩ ngược lại: lặp để cực tiểu sai số trong không gian vật.
-5. **terzakis2020sqpnp** — PnP tối ưu toàn cục hiện đại, đang là cờ mặc định nên dùng trong OpenCV.
+5. **terzakis2020sqpnp** — PnP "tối ưu toàn cục" hiện đại, cờ nên dùng trong OpenCV (cờ *mặc định* của `solvePnP` vẫn là `ITERATIVE`). Lưu ý: hàm được tối ưu là sai số tái chiếu **có trọng số độ sâu²**, và tính toàn cục là thực nghiệm, không được chứng minh cho thuật toán thực chạy.
 6. **collins2014ippe** — target phẳng và vì sao nó có hai nghiệm; nối sang cây `marker/`.
 7. **fischler1981ransac** — RANSAC ra đời chính để giải bài toán định vị kiểu P3P có ngoại lai.
 8. **ding2023p3p** — P3P hiện hành của cả OpenCV lẫn PoseLib.
@@ -84,7 +84,7 @@ với chi phí O(n)". Các bộ giải khác nhau chủ yếu ở **hàm mục t
 - **ASPnP: An Accurate and Scalable Solution to the PnP Problem** — Zheng, Sugimoto, Okutomi — *IEICE Trans. Inf. & Syst.*, 2013 `[B]`. [zheng2013aspnp]
 - ★ **UPnP: An Optimal O(n) Solution to the Absolute Pose Problem with Universal Applicability** — Kneip, Li, Seo — *ECCV*, 2014 `[A]`. Một bộ giải cho cả camera trung tâm và camera tổng quát. [kneip2014upnp]
 - **Globally Optimal DLS Method for PnP Problem with Cayley Parameterization** — Nakano — *BMVC*, 2015 `[B]`. Sửa điểm kỳ dị của tham số hoá Cayley trong DLS. [nakano2015dls]
-- ★ **A Consistently Fast and Globally Optimal Solution to the Perspective-n-Point Problem** (SQPnP) — Terzakis, Lourakis — *ECCV*, 2020 `[A]`. SQP trên các vùng mỗi vùng chứa một cực tiểu; `SOLVEPNP_SQPNP` trong OpenCV. [terzakis2020sqpnp]
+- ★ **A Consistently Fast and Globally Optimal Solution to the Perspective-n-Point Problem** (SQPnP) — Terzakis, Lourakis — *ECCV*, 2020 `[A]`. SQP khởi đầu từ các vector riêng của Ω; `SOLVEPNP_SQPNP` trong OpenCV. Cực tiểu toàn cục của Σ zᵢ²‖mᵢ − π‖² (không phải sai số tái chiếu thuần); ghi chú đo được 6/2320 ca trượt cực tiểu toàn cục (target phẳng n = 4, n = 3), bản OpenCV trượt 23/2320 vì chỉ dùng một seed mỗi vector riêng. [terzakis2020sqpnp]
 - **CPnP: Consistent Pose Estimator for PnP Problem with Bias Elimination** — Zeng, Chen, Mu, Shi, Wu — *ICRA*, 2023 `[B]`. Trừ độ chệch tiệm cận để ước lượng nhất quán khi n → ∞. [zeng2023cpnp]
 - **A Novel Iterative Solution to the PnP Problem via Cost Function Approximation** — Zhou, Wei, Wang — *IEEE T-RO*, 2025 `[B]`. Tuyên bố các bộ giải hiện có lệch khỏi Gold Standard khi dải độ sâu lớn — đáng kiểm. [zhou2025iterative]
 
@@ -278,9 +278,12 @@ Bổ sung sau khi đọc bài và chạy thử trên **OpenCV 5.0.0** (2026-09-2
   nhánh phẳng. Trên dữ liệu **không nhiễu** nó trượt (> 0,01°) ở 24/50 cảnh tổng quát khi n = 4, 50/50
   cảnh phẳng khi n = 4 và 8–16 % cảnh phẳng khi n ≥ 6 — tôi tự đo lại, khớp với ghi chú. Với target
   phẳng hãy dùng `SOLVEPNP_IPPE` hoặc `SQPNP`. (`lepetit2009epnp`)
+- `SOLVEPNP_SQPNP` lấy **một** điểm khởi đầu cho mỗi vector riêng thay vì hai (±e, eq. 13 của bài), nên
+  trượt cực tiểu toàn cục nhiều hơn bản theo bài (23 so với 8 trên 2320 cảnh có kiểm độ sâu dương);
+  với n = 4 kết quả có thể lật giữa đúng và sai khi chỉ đổi thứ tự điểm. (`terzakis2020sqpnp`)
 - `SOLVEPNP_IPPE` tính translation bằng bình phương tối thiểu (eq. 36 của bài), nên hai nghiệm không
   chung tâm như công thức đóng eq. 28; `reprojectionError` trả về là RMSE chia √2. (`collins2014ippe`)
-- Công thức in trong một số bài nền **sai** và không được chép nguyên văn: IPPE eq. (14), (22);
+- Công thức in trong một số bài nền **sai** và không được chép nguyên văn: IPPE eq. (14), (22); SQPnP eq. (14) (lệch chỉ số) và Mệnh đề 3;
   Lu–Hager eq. (16); Haralick eq. (51) và hệ số Finsterwalder; Ding eq. (21) (vô hại); Marchand thiếu
   bước khử thang của DLT và chiều cập nhật exp. Mỗi ghi chú mục 8 nói cách sửa.
 

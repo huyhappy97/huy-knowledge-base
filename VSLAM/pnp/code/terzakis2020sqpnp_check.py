@@ -1,19 +1,22 @@
 """Kiểm chứng số cho terzakis2020sqpnp (SQPnP, ECCV 2020) — cửa (b), learning-rules.md mục 5.
 
-Chạy:  python3 VSLAM/pnp/code/terzakis2020sqpnp_check.py      (< 3 phút, seed cố định)
+Chạy:  python3 VSLAM/pnp/code/terzakis2020sqpnp_check.py          (~85 s, seed cố định)
+       python3 VSLAM/pnp/code/terzakis2020sqpnp_check.py --full   (~6 phút, 40 cảnh/cấu hình ở [4], 150 ở [5b])
 
 Nội dung:
   [1] Dựng A_i, Q_i, P, Omega theo eq. (3)-(7); kiểm E^2(R, t=P r) = r^T Omega r, t=P r là nghiệm
       bình phương tối thiểu theo t, và đồng nhất thức (tôi suy ra) E^2 = sum z_i^2 ||m_i - pi(X_c,i)||^2.
   [2] Hạng của Omega: 2n-3 (n nhỏ), null 3 chiều cho điểm đồng phẳng.
   [3] Mệnh đề 3 (lồi trong vùng 90 độ) và Mệnh đề 4 (góc < 71 độ) — kiểm bằng số.
-  [4] Cài SQPnP (Alg. 1 + Alg. 2) bằng numpy, ba biến thể:
-        'fixed'   : bắt đầu từ e9 (vector riêng trị riêng nhỏ nhất), dừng khi min E^2 < 3*s_next (như §2.1 viết)
-        'literal' : chỉ số nu của eq. (14)/Alg. 1 chép nguyên văn, điều kiện while so với s (không nhân 3)
-        'e9only'  : chỉ hai lần SQP từ +-sqrt(3) e9 (hoặc từ không gian null), không vòng while
+  [4] Cài SQPnP (Alg. 1 + Alg. 2) bằng numpy, các biến thể:
+        'fixed'    : chỉ số đã sửa (bắt đầu từ ±sqrt3 e9 / cơ sở null), dừng khi min E^2 < 3*s_next (§2.1)
+        'literal'  : chỉ số nu của eq. (14)/Alg. 1 chép nguyên văn, điều kiện while so với s (không nhân 3)
+        'e9only'   : không có vòng while
+        'onesided' : 1 seed / vector riêng (mô phỏng FOAM của OpenCV trả cùng rotation cho +e và -e)
       So với cv2.solvePnP(flags=SOLVEPNP_SQPNP).
-  [5] Tối ưu toàn cục thực nghiệm: so E^2 của SQPnP với cực tiểu của cùng hàm r^T Omega r trên SO(3)
-      tìm bằng LM đa khởi tạo dày (256 điểm khởi tạo ngẫu nhiên đều trên SO(3)).
+  [5] Tối ưu toàn cục thực nghiệm: so E^2 với cực tiểu của cùng hàm r^T Omega r trên SO(3) tìm bằng LM
+      đa khởi tạo (96 / 128 điểm ngẫu nhiên đều + nghiệm của các bộ giải), có và không có ràng buộc độ sâu.
+  [5b] Độ nhạy với cơ sở tuỳ ý của null(Omega): 2 seed (eq. 13) vs 1 seed.
   [6] Hàm (2) khác hàm (1): sai số tái chiếu của nghiệm SQPnP so với sau khi tinh chỉnh LM theo (1).
   [7] Thời gian theo n.
 """
@@ -119,14 +122,15 @@ def sqpnp(Om, variant='fixed', null_tol=1e-10, eps=1e-8, T=15, cheiral=None, nul
     if null_rot is not None and k > 1:           # đổi cơ sở (tuỳ ý) của không gian null — bài không cố định cơ sở
         e = e.copy()
         e[:, 9 - k:] = e[:, 9 - k:] @ null_rot(k)
-    calls = []                       # (E2, r, số bước, hội tụ?, góc seed->kết quả (độ), hợp lệ độ sâu?)
+    calls = []                       # (E2, r, số bước, hội tụ?, góc R^9 giữa ±sqrt3 e và nghiệm (độ), hợp lệ độ sâu?)
     ok = cheiral if cheiral is not None else (lambda r: True)
 
     def run(x0):
         r0 = nearest_rot_vec(x0)
         r, it, conv = solve_sqp(r0, Om, eps, T)
         r = nearest_rot_vec(r)       # làm tròn về SO(3)
-        calls.append((float(r @ Om @ r), r, it, conv, rot_err_deg(r.reshape(3, 3), r0.reshape(3, 3)), ok(r)))
+        phi = np.degrees(np.arccos(np.clip(r @ x0 / (np.linalg.norm(r) * np.linalg.norm(x0)), -1, 1)))
+        calls.append((float(r @ Om @ r), r, it, conv, phi, ok(r)))   # phi: góc trong R^9 giữa nghiệm và ±sqrt3 e
 
     def best():
         c = [z[0] for z in calls if z[5]]
@@ -393,7 +397,8 @@ def main():
     cs = np.array(call_steps); cc = np.array(call_conv); sa = np.array(seed_ang)
     print(f"  Alg.2 (eps=1e-8, T=15), {len(cs)} lời gọi: số bước median {int(np.median(cs))}, 90% {int(np.percentile(cs, 90))},"
           f" tỉ lệ chạm T mà chưa hội tụ {100 * np.mean(~cc):.1f}%")
-    print(f"  góc giữa điểm khởi tạo NOMP và nghiệm SQP: median {np.median(sa):.1f} độ, 90% {np.percentile(sa, 90):.1f}, max {sa.max():.1f}")
+    print(f"  góc trong R^9 giữa ±sqrt3 e (vector riêng sinh seed) và nghiệm SQP: median {np.median(sa):.1f} độ, "
+          f"90% {np.percentile(sa, 90):.1f}, max {sa.max():.1f}; tỉ lệ > 90 độ (ra khỏi 'vùng 90 độ'): {100 * np.mean(sa > 90):.1f}%")
     print(f"  số lời gọi SQP / cảnh (fixed): min {min(ncalls)}  median {int(np.median(ncalls))}  max {max(ncalls)}")
     cvd = np.array(cv_vs_mine)
     print(f"  góc R(cv2) vs R(numpy conv, có kiểm độ sâu): median {np.median(cvd):.1e} độ; > 1 độ ở {np.sum(cvd > 1)}/{len(cvd)} cảnh")

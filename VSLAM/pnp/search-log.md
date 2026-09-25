@@ -89,6 +89,23 @@ lượt ba chưa làm.
 - **Agent báo lệch:** số trang trên trang CVF thường lệch 1–5 trang so với số trang IEEE (DOI).
   `refs.bib` dùng số trang theo Crossref (IEEE).
 
+## Lượt 5 — Đọc toàn văn 10 bài của lộ trình (bước 3)
+
+- **Ngày:** 2026-09-25 (qua đêm, theo yêu cầu).
+- **Nguồn toàn văn:** 5 bài từ bản open-access (CVF, ECVA, Copernicus); 6 bài từ bản tác giả/viện tự
+  đăng — IRISA (Marchand), haralick.org, TU Graz (Lepetit), UCI (Lu), Univ. Clermont Auvergne (Collins),
+  SRI (Fischler). Các URL đã thêm vào `papers/fetch.sh`. Trang Springer của Haralick trả 403.
+- **Cách làm:** 11 agent song song, mỗi agent một bài, theo `notes/00-mau-ghi-chu.md`; bắt buộc trích
+  đoạn nguyên văn có số trang và một script kiểm chứng số. Sau đó tôi (phiên chính) kiểm: chạy
+  `search/kiem-trich-dan.py` (86/86 trích khớp đúng trang), chạy lại mọi script (kết quả trùng), và
+  kiểm tay vài tuyên bố then chốt (xem `notes/README.md`).
+- **Môi trường kiểm chứng:** Python 3.11, numpy 2.4.6, scipy 1.17.1, **OpenCV 5.0.0** (không phải 4.x như
+  header đọc ở lượt 2 — các nhận xét về hành vi OpenCV trong `notes/` là của bản 5.0.0).
+- **Phát hiện sửa ngược vào danh mục:** mô tả Haralick và Lu–Hager, ghi chú RANSAC/AP3P/IPPE/SQPnP trong
+  `refs.bib`, sáu cạm bẫy OpenCV mới, và "cờ mặc định" của SQPnP (mặc định thật của `solvePnP` là `ITERATIVE`).
+- **Còn treo:** số trang `ke2017p3p` (Crossref 4618–4626 so với footer CVF 7225–7233); `quan1999linear` số
+  (issue) 8 theo Crossref, EPnP trích là 7.
+
 ## Theo dõi — tiền ấn mức C, xét lại ở lần rà 3/2027
 
 - S. H. Lee, P. Vandewalle, J. Civera, *P3P Made Easy*, arXiv 2508.01312 — comment arXiv ghi nhận ở ECCV Workshop 2026.

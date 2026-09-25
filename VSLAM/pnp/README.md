@@ -4,9 +4,10 @@
 `../../research-rules.md`, đặt trong cây VSLAM vì PnP nằm dưới relocalization (ch 12), tracking
 theo bản đồ, loop closure và khởi tạo.
 
-**Trạng thái (2026-09-25): đã xong bước 0–2 (khung câu hỏi, săn nguồn, sàng lọc). Chưa làm
-bước 3–4 (đọc từng bài, viết bài học).** Tức là ở đây có một danh mục nguồn đáng tin, chưa có
-hiểu biết đã tổng hợp.
+**Trạng thái (2026-09-25):** xong bước 0–2 (khung câu hỏi, săn nguồn, sàng lọc). Bước 3 (đọc) đã làm
+cho **10 bài của lộ trình** — 11 ghi chú đọc toàn văn trong `notes/`, mỗi ghi chú kèm script kiểm chứng
+số trong `code/`; người đọc là agent, **Huy chưa ký**. Bước 4 (ma trận, bài học) chưa làm.
+**Sáng mai mở `notes/README.md` trước** — bảng tổng hợp và những gì thay đổi sau khi đọc.
 
 ## Đọc gì trước
 
@@ -26,10 +27,12 @@ refs.bib           122 entry, mỗi entry có DOI (đã kiểm) và mức tin; m
 search-log.md      nhật ký bốn lượt tìm, tái lập được; lý do loại từng nhóm bài
 search/            script kiểm Crossref, quét CVF/ECVA, và danh sách truy vấn nguyên văn
 papers/fetch.sh    tải 54 PDF open-access về papers/<bibkey>.pdf
-99-chua-biet.md    sổ những điều chưa biết
+99-chua-biet.md    sổ những điều chưa biết — có ~35 câu hỏi cụ thể phát sinh khi đọc
+notes/             11 ghi chú đọc + README.md (bảng tổng hợp) + 00-mau-ghi-chu.md
+code/              common.py + <bibkey>_check.py — kiểm chứng số, chạy từ gốc repo
 ```
 
-Chưa có (theo `research-rules.md` mục 1, sẽ thêm khi đọc): `notes/<bibkey>.md`, `matrix.md`,
+Chưa có (theo `research-rules.md` mục 1): `matrix.md`,
 `bai-hoc/` (bài học LaTeX dùng chung `../preamble/common.tex`).
 
 ## PDF
