@@ -1,0 +1,15 @@
+Scanline Homographies for Rolling-Shutter Plane Absolute Pose
+Learning To Solve Hard Minimal Problems Hruby
+Learning To Find Good Models in RANSAC Barath
+Object Pose Estimation With Statistical Guarantees: Conformal Keypoint Detection and Geometric Uncertainty Propagation
+Absolute Pose from One or Two Scaled and Oriented Features Ventura
+Camera Resection from Known Line Pencils and a Radially Distorted Scanline
+R-SCoRe: Revisiting Scene Coordinate Regression for Robust Large-Scale Visual Localization
+Generalized Differentiable RANSAC Wei Patel
+MinCD-PnP: Learning 2D-3D Correspondences with Approximate Blind PnP
+Minimal Rolling Shutter Absolute Pose with Unknown Focal Length and Radial Distortion
+Scene Coordinate Reconstruction: Posing of Image Collections via Incremental Learning of a Relocalizer
+Space-Partitioning RANSAC Barath
+ZebraPose: Coarse To Fine Surface Encoding for 6DoF Object Pose Estimation
+SurfEmb: Dense and Continuous Correspondence Distributions for Object Pose Estimation With Learnt Surface Embeddings
+Map-Free Visual Relocalization: Metric Pose Relative to a Single Image

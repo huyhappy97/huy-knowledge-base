@@ -45,6 +45,9 @@ B-front-end-va-back-end/     Phần B — front-end và back-end     (chương 7
 C-he-thong-slam-day-du/      Phần C — hệ thống SLAM đầy đủ      (chương 13–18)
 D-thuc-te-va-san-xuat/       Phần D — thực tế và sản xuất       (chương 19–22)
 E-framework-va-lo-trinh/     Phần E — framework và lộ trình     (chương 23–24)
+
+pnp/                         khảo sát PnP theo research-rules.md — danh mục nguồn đã kiểm,
+                             chưa phải chương; không nằm trong vslam.tex (xem pnp/README.md)
 ```
 
 Mỗi thư mục có `00-map.tex` (bản đồ nhánh) và đúng một tệp `.tex` cùng tên với thư mục.

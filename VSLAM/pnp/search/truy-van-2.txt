@@ -1,0 +1,31 @@
+Pose Estimation for Augmented Reality: A Hands-On Survey Marchand Uchiyama Spindler
+Monocular Model-Based 3D Tracking of Rigid Objects: A Survey Lepetit Fua
+A Versatile Approach for Solving PnP, PnPf, and PnPfr Problems Nakano
+SoftPOSIT Simultaneous Pose and Correspondence Determination David DeMenthon
+Global Optimization through Rotation Space Search Hartley Kahl
+Robust Optimal Pose Estimation Enqvist Kahl
+Pose Priors for Simultaneously Solving Alignment and Correspondence Moreno-Noguer
+The perspective view of three points Wolfe Mathis Sklair Magee
+Revisiting Radial Distortion Absolute Pose Larsson Sattler Kukelova Pollefeys
+Using multi-camera systems in robotics: Efficient solutions to the NPnP problem Kneip
+Efficient Computation of Absolute Pose for Gravity-Aware Augmented Reality Sweeney
+Minimal Solvers for Generalized Pose and Scale Estimation from Two Rays and One Point Camposeco
+Hybrid Camera Pose Estimation Camposeco Cohen Pollefeys Sattler
+Back to the Feature: Learning Robust Camera Localization from Pixels to Pose Sarlin
+BOP: Benchmark for 6D Object Pose Estimation Hodan Michel
+CPnP Consistent Pose Estimator for Perspective-n-Point Problem with Bias Elimination Zeng
+A complete, accurate and efficient solution for the perspective-n-line problem Zhou Koppel Kaess
+A simple, robust and fast method for the perspective-n-point Problem Wang Xu
+Efficient Intersection of Three Quadrics and Applications in Computer Vision Kukelova Heller Fitzgibbon
+Pose estimation from corresponding point data Haralick Joo Lee Zhuang
+Absolute pose for cameras under flat refractive interfaces Haner Astrom
+Expert Sample Consensus Applied to Camera Re-Localization
+Learning Less is More 6D Camera Localization via 3D Surface Regression Brachmann Rother
+Accelerated Coordinate Encoding Learning to Relocalize in Minutes Brachmann
+Why Having 10,000 Parameters in Your Camera Model Is Better Than Twelve Schops
+Globally Optimal Consensus Maximization for Relative Pose Estimation with Known Gravity Direction
+Perspective-n-Point pose uncertainty covariance propagation closed form
+An Efficient Solution to Absolute Orientation Horn closed-form quaternions
+Least-Squares Estimation of Transformation Parameters Between Two Point Patterns Umeyama
+A Stable Direct Solution of Perspective-Three-Point Problem Li Xu
+PnP-Net: A hybrid Perspective-n-Point Network Sheffer

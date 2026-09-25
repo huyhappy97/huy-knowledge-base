@@ -1,0 +1,6 @@
+Exhaustive Linearization for Robust Camera Pose and Focal Length Estimation Penate-Sanchez Andrade-Cetto Moreno-Noguer
+Hruby 2024 CVPR absolute pose points lines minimal solvers
+Josephson Byrod Kahl Astrom Image-based localization using hybrid feature correspondences 2007
+Sweeney 2014 3DV absolute pose upright points lines
+gDLS: A Scalable Solution to the Generalized Pose and Scale Problem Sweeney
+PoseLib minimal solvers camera pose Larsson

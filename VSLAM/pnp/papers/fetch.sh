@@ -69,6 +69,14 @@ declare -A URL=(
   [wang2024glace]="$CVF/content/CVPR2024/papers/Wang_GLACE_Global_Local_Accelerated_Coordinate_Encoding_CVPR_2024_paper.pdf"
   [brachmann2024ace0]="$ECVA/eccv_2024/papers_ECCV/papers/07356.pdf"
   [jiang2025rscore]="$CVF/content/CVPR2025/papers/Jiang_R-SCoRe_Revisiting_Scene_Coordinate_Regression_for_Robust_Large-Scale_Visual_Localization_CVPR_2025_paper.pdf"
+  # --- bổ sung từ lượt tìm 2021–2026 ---
+  [wu2025conic]="$CVF/content/WACV2025/papers/Wu_A_Conic_Transformation_Approach_for_Solving_the_Perspective-Three-Point_Problem_WACV_2025_paper.pdf"
+  [hahn2025orderone]="$CVF/content/CVPR2025/papers/Hahn_Order-One_Rolling_Shutter_Cameras_CVPR_2025_paper.pdf"
+  [liu2023lincov]="$CVF/content/ICCV2023/papers/Liu_Linear-Covariance_Loss_for_End-to-End_Learning_of_6D_Pose_Estimation_ICCV_2023_paper.pdf"
+  [brachmann2019ngransac]="$CVF/content_ICCV_2019/papers/Brachmann_Neural-Guided_RANSAC_Learning_Where_to_Sample_Model_Hypotheses_ICCV_2019_paper.pdf"
+  [sattler2018benchmarking]="$CVF/content_cvpr_2018/papers/Sattler_Benchmarking_6DOF_Outdoor_CVPR_2018_paper.pdf"
+  # --- tiền ấn arXiv (bản chính thức duy nhất) ---
+  [barath2025superansac]="https://arxiv.org/pdf/2506.04803"
 )
 keys=("$@"); [ ${#keys[@]} -eq 0 ] && keys=("${!URL[@]}")
 ok=0; skip=0; fail=0

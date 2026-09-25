@@ -1,0 +1,55 @@
+Review and Analysis of Solutions of the Three Point Perspective Pose Estimation Problem Haralick
+Complete Solution Classification for the Perspective-Three-Point Problem Gao
+Novel Parametrization of the Perspective-Three-Point Problem Direct Computation Absolute Camera Position Kneip
+An Efficient Algebraic Solution to the Perspective-Three-Point Problem Ke Roumeliotis
+Lambda Twist Accurate Fast Robust Perspective Three Point P3P Solver Persson Nordberg
+Revisiting the P3P Problem Ding Yang Persson
+EPnP Accurate O(n) Solution PnP Problem
+Fast and Globally Convergent Pose Estimation from Video Images Lu Hager
+Model-based object pose in 25 lines of code DeMenthon Davis
+A Robust O(n) Solution to the Perspective-n-Point Problem Li Xu Xie
+A Direct Least-Squares DLS Method for PnP Hesch Roumeliotis
+Revisiting the PnP Problem: A Fast, General and Optimal Solution Zheng
+ASPnP Accurate and Scalable Solution Perspective-n-Point Zheng
+UPnP Optimal O(n) Solution Absolute Pose Problem Universal Applicability Kneip
+MLPnP Real-Time Maximum Likelihood Solution Perspective-n-Point Urban
+A Consistently Fast and Globally Optimal Solution to the Perspective-n-Point Problem Terzakis
+Very Fast Solution to the PnP Problem with Algebraic Outlier Rejection Ferraz
+Leveraging Feature Uncertainty in the PnP Problem Ferraz
+Robust Pose Estimation from a Planar Target Schweighofer Pinz
+Infinitesimal Plane-Based Pose Estimation Collins Bartoli
+Globally Optimal O(n) Solution to the PnP Problem for General Camera Models Schweighofer
+Globally Optimal DLS Method for PnP Problem with Cayley parameterization Nakano
+Linear N-Point Camera Pose Determination Quan Lan
+PnP Problem Revisited Wu Hu Journal of Mathematical Imaging and Vision
+Iterative Pose Estimation Using Coplanar Feature Points Oberkampf
+Random Sample Consensus Paradigm Model Fitting Fischler Bolles
+Locally Optimized RANSAC Chum Matas Kittler
+USAC Universal Framework for Random Sample Consensus Raguram
+Graph-Cut RANSAC Barath Matas
+MAGSAC++ fast reliable accurate robust estimator
+Globally Optimal Inlier Set Maximisation for Simultaneous Camera Pose and Feature Correspondence Campbell
+Solving the Blind Perspective-n-Point Problem End-to-End with Robust Differentiable Geometric Optimization Campbell
+BPnP End-to-End Learning of Geometric Vision Tasks Chen Parra Chin
+EPro-PnP Generalized End-to-End Probabilistic Perspective-n-Points Monocular Object Pose
+DSAC Differentiable RANSAC for Camera Localization Brachmann
+PVNet Pixel-wise Voting Network 6DoF Pose Estimation
+GDR-Net Geometry-Guided Direct Regression Network Monocular 6D Object Pose
+Pose Estimation from Line Correspondences A Complete Analysis and a Series of Solutions Xu
+Globally optimal pose estimation from line correspondences Mirzaei Roumeliotis
+Accurate and Linear Time Pose Estimation from Points and Lines Vakhitov
+Uncertainty-Aware Camera Pose Estimation From Points and Lines Vakhitov
+A Minimal Solution to the Generalised 3-Point Pose Problem Nister Stewenius
+Closed-Form Solutions to Minimal Absolute Pose Problems with Known Vertical Direction Kukelova
+A General Solution to the P4P Problem for Camera with Unknown Focal Length Bujnak
+Making Minimal Solvers for Absolute Pose Estimation Compact and Robust Larsson
+Real-Time Solution to the Absolute Pose Problem with Unknown Radial Distortion and Focal Length Kukelova
+R6P Rolling Shutter Absolute Camera Pose Albl
+OpenGV A unified and generalized approach to real-time calibrated geometric vision Kneip Furgale
+Automatic Generator of Minimal Problem Solvers Kukelova Bujnak Pajdla
+Efficient Solvers for Minimal Problems by Syzygy-based Reduction Larsson
+BOP Benchmark for 6D Object Pose Estimation Hodan
+Globally optimal pose estimation from point to plane? Olsson Kahl branch and bound registration
+Certifiable Outlier-Robust Geometric Perception Exact Semidefinite Relaxations Yang Carlone
+A Certifiably Globally Optimal Solution to the Non-Minimal Relative Pose Problem Briales
+Revisiting the PnP problem with a GPS Schweighofer
