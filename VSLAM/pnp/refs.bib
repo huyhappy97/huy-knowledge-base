@@ -1,0 +1,265 @@
+% ===========================================================================
+%  refs.bib — khảo sát PnP (Perspective-n-Point / absolute camera pose).
+%
+%  TRẠNG THÁI KIỂM NGUỒN (khác với ../refs.bib):
+%  Mọi entry trong file này đã được đối chiếu tên bài + tác giả + venue + năm +
+%  DOI với bản ghi Crossref (api.crossref.org) ngày 2026-09-25 — xem
+%  search-log.md. Entry nào kiểm bằng đường khác (trang arXiv, trang CVF, trang
+%  dự án) thì ghi rõ trong `note`. KHÔNG có DOI nào được đoán.
+%
+%  Kiểm nguồn mới chỉ chứng minh bài có thật và nằm đúng venue. Nó KHÔNG chứng
+%  minh tôi đã đọc bài. Theo learning-rules.md mục 5, mọi entry dưới đây mặc
+%  định là `% chưa đọc kỹ` cho tới khi có notes/<bibkey>.md.
+%
+%  Mức tin (research-rules.md mục 4) — là phán đoán ban đầu, sửa khi đọc:
+%    A = phản biện ở venue đầu ngành VÀ đã được người ngoài nhóm tái lập / dùng
+%        làm chuẩn (vd có trong OpenCV, OpenGV, PoseLib, COLMAP)
+%    B = phản biện tốt, chưa rõ ai tái lập công khai
+%    C = tiền ấn, hoặc venue yếu nhưng là công trình duy nhất chạm tới vấn đề
+%
+%  Quy ước bibkey: <tác giả đầu><năm><từ khoá>. Nhóm theo trường phái, cùng thứ
+%  tự với danh-muc.md.
+% ===========================================================================
+
+% ---------------- 0. Tổng quan, sách, benchmark ----------------
+@article{marchand2016arsurvey, author={Marchand, Eric and Uchiyama, Hideaki and Spindler, Fabien}, title={Pose Estimation for Augmented Reality: A Hands-On Survey}, journal={IEEE Transactions on Visualization and Computer Graphics}, volume={22}, number={12}, pages={2633--2651}, year={2016}, doi={10.1109/TVCG.2015.2513408}, note={mức tin A; tổng quan có mã minh hoạ, đọc đầu tiên}}
+% chưa đọc kỹ
+@article{lepetit2005survey, author={Lepetit, Vincent and Fua, Pascal}, title={Monocular Model-Based 3D Tracking of Rigid Objects: A Survey}, journal={Foundations and Trends in Computer Graphics and Vision}, volume={1}, number={1}, pages={1--89}, year={2005}, doi={10.1561/0600000001}, note={mức tin A}}
+% chưa đọc kỹ
+@book{hartley2004, author={Hartley, Richard and Zisserman, Andrew}, title={Multiple View Geometry in Computer Vision}, edition={2}, publisher={Cambridge University Press}, year={2004}, note={mức tin A; sách chuẩn, chương về camera resectioning (DLT) và Gold Standard; không kiểm qua Crossref vì là sách}}
+@inproceedings{hodan2018bop, author={Hodaň, Tomáš and Michel, Frank and Brachmann, Eric and Kehl, Wadim and Buch, Anders Glent and Kraft, Dirk and Drost, Bertram and Vidal, Joel and Ihrke, Stephan and Zabulis, Xenophon and Sahin, Caner and Manhardt, Fabian and Tombari, Federico and Kim, Tae-Kyun and Matas, Jiří and Rother, Carsten}, title={{BOP}: Benchmark for 6D Object Pose Estimation}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, year={2018}, doi={10.1007/978-3-030-01249-6_2}, note={mức tin A; benchmark chuẩn của nhánh 6D object pose, nơi PnP học được so kết quả; danh sách tác giả chép từ trang CVF, chưa đối chiếu từng tên}}
+% chưa đọc kỹ
+
+% ---------------- 1. P3P — bài toán tối thiểu ----------------
+@article{haralick1994review, author={Haralick, Robert M. and Lee, Chung-Nan and Ottenberg, Karsten and Nölle, Michael}, title={Review and Analysis of Solutions of the Three Point Perspective Pose Estimation Problem}, journal={International Journal of Computer Vision}, volume={13}, number={3}, pages={331--356}, year={1994}, doi={10.1007/BF02028352}, note={mức tin A; tổng kết các lời giải P3P từ Grunert 1841; Crossref ghi sai tên đầu thành 'Bert', đã sửa theo tên thật}}
+% chưa đọc kỹ
+@article{wolfe1991perspective, author={Wolfe, William J. and Mathis, Donald and Sklair, Cheryl Weber and Magee, Michael}, title={The Perspective View of Three Points}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, volume={13}, number={1}, pages={66--73}, year={1991}, doi={10.1109/34.67632}, note={mức tin B; hình học của số nghiệm P3P}}
+% chưa đọc kỹ
+@article{gao2003p3p, author={Gao, Xiao-Shan and Hou, Xiao-Rong and Tang, Jianliang and Cheng, Hang-Fei}, title={Complete Solution Classification for the Perspective-Three-Point Problem}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, volume={25}, number={8}, pages={930--943}, year={2003}, doi={10.1109/TPAMI.2003.1217599}, note={mức tin A; phân loại đầy đủ số nghiệm thực; từng là SOLVEPNP_P3P của OpenCV, nay OpenCV 4.x trỏ cờ này sang ding2023p3p (kiểm calib3d.hpp ngày 2026-09-25)}}
+% chưa đọc kỹ
+@inproceedings{kneip2011p3p, author={Kneip, Laurent and Scaramuzza, Davide and Siegwart, Roland}, title={A Novel Parametrization of the Perspective-Three-Point Problem for a Direct Computation of Absolute Camera Position and Orientation}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={2969--2976}, year={2011}, doi={10.1109/CVPR.2011.5995464}, note={mức tin A; tính trực tiếp R, t không qua khoảng cách; có trong OpenGV}}
+% chưa đọc kỹ
+@inproceedings{ke2017p3p, author={Ke, Tong and Roumeliotis, Stergios I.}, title={An Efficient Algebraic Solution to the Perspective-Three-Point Problem}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={4618--4626}, year={2017}, doi={10.1109/CVPR.2017.491}, note={mức tin A; là SOLVEPNP_AP3P trong OpenCV}}
+% chưa đọc kỹ
+@inproceedings{persson2018lambdatwist, author={Persson, Mikael and Nordberg, Klas}, title={Lambda Twist: An Accurate Fast Robust Perspective Three Point ({P3P}) Solver}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, pages={334--349}, year={2018}, doi={10.1007/978-3-030-01225-0_20}, note={mức tin A; được dùng rộng rãi trong các pipeline định vị; PoseLib nay đã chuyển P3P sang ding2023p3p}}
+% chưa đọc kỹ
+@inproceedings{ding2023p3p, author={Ding, Yaqing and Yang, Jian and Larsson, Viktor and Olsson, Carl and Åström, Kalle}, title={Revisiting the {P3P} Problem}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={4872--4880}, year={2023}, doi={10.1109/CVPR52729.2023.00472}, note={mức tin A; là P3P mặc định của cả OpenCV 4.x (SOLVEPNP_P3P) lẫn PoseLib (p3p) — kiểm mã nguồn ngày 2026-09-25}}
+% chưa đọc kỹ
+
+% ---------------- 2. PnP dạng đóng / không lặp, n điểm ----------------
+@article{quan1999linear, author={Quan, Long and Lan, Zhongdan}, title={Linear N-Point Camera Pose Determination}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, volume={21}, number={8}, pages={774--780}, year={1999}, doi={10.1109/34.784291}, note={mức tin B}}
+% chưa đọc kỹ
+@article{wu2006pnp, author={Wu, Yihong and Hu, Zhanyi}, title={{PnP} Problem Revisited}, journal={Journal of Mathematical Imaging and Vision}, volume={24}, number={1}, pages={131--141}, year={2006}, doi={10.1007/s10851-005-3617-z}, note={mức tin B; phân tích số nghiệm của P4P, P5P}}
+% chưa đọc kỹ
+@article{lepetit2009epnp, author={Lepetit, Vincent and Moreno-Noguer, Francesc and Fua, Pascal}, title={{EPnP}: An Accurate O(n) Solution to the {PnP} Problem}, journal={International Journal of Computer Vision}, volume={81}, number={2}, pages={155--166}, year={2009}, doi={10.1007/s11263-008-0152-6}, note={mức tin A; bốn điểm điều khiển, O(n); bản hội nghị: ICCV 2007, doi 10.1109/ICCV.2007.4409116}}
+% chưa đọc kỹ
+@article{li2012rpnp, author={Li, Shiqi and Xu, Chi and Xie, Ming}, title={A Robust O(n) Solution to the Perspective-n-Point Problem}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, volume={34}, number={7}, pages={1444--1450}, year={2012}, doi={10.1109/TPAMI.2012.41}, note={mức tin A; RPnP, baseline chuẩn trong hầu hết benchmark PnP về sau}}
+% chưa đọc kỹ
+@inproceedings{hesch2011dls, author={Hesch, Joel A. and Roumeliotis, Stergios I.}, title={A Direct Least-Squares ({DLS}) Method for {PnP}}, booktitle={IEEE International Conference on Computer Vision (ICCV)}, pages={383--390}, year={2011}, doi={10.1109/ICCV.2011.6126266}, note={mức tin A; CẠM BẪY: cờ SOLVEPNP_DLS của OpenCV 4.x được ghi là 'broken implementation' và âm thầm chạy EPnP}}
+% chưa đọc kỹ
+@inproceedings{zheng2013opnp, author={Zheng, Yinqiang and Kuang, Yubin and Sugimoto, Shigeki and Åström, Kalle and Okutomi, Masatoshi}, title={Revisiting the {PnP} Problem: A Fast, General and Optimal Solution}, booktitle={IEEE International Conference on Computer Vision (ICCV)}, pages={2344--2351}, year={2013}, doi={10.1109/ICCV.2013.291}, note={mức tin B; OPnP}}
+% chưa đọc kỹ
+@article{zheng2013aspnp, author={Zheng, Yinqiang and Sugimoto, Shigeki and Okutomi, Masatoshi}, title={{ASPnP}: An Accurate and Scalable Solution to the Perspective-n-Point Problem}, journal={IEICE Transactions on Information and Systems}, volume={E96.D}, number={7}, pages={1525--1535}, year={2013}, doi={10.1587/transinf.E96.D.1525}, note={mức tin B; venue tầm trung}}
+% chưa đọc kỹ
+@inproceedings{kneip2014upnp, author={Kneip, Laurent and Li, Hongdong and Seo, Yongduek}, title={{UPnP}: An Optimal O(n) Solution to the Absolute Pose Problem with Universal Applicability}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, pages={127--142}, year={2014}, doi={10.1007/978-3-319-10590-1_9}, note={mức tin A; chạy cho cả camera trung tâm và camera tổng quát; có trong OpenGV. CẠM BẪY: cờ SOLVEPNP_UPNP của OpenCV KHÔNG phải bài này mà là penate2013exhaustive, và đang hỏng (fallback EPnP)}}
+% chưa đọc kỹ
+@inproceedings{nakano2015dls, author={Nakano, Gaku}, title={Globally Optimal {DLS} Method for {PnP} Problem with {Cayley} Parameterization}, booktitle={British Machine Vision Conference (BMVC)}, pages={78.1--78.11}, year={2015}, doi={10.5244/C.29.78}, note={mức tin B; sửa điểm kỳ dị của tham số hoá Cayley trong DLS}}
+% chưa đọc kỹ
+@article{urban2016mlpnp, author={Urban, Steffen and Leitloff, Jens and Hinz, Stefan}, title={{MLPnP} --- A Real-Time Maximum Likelihood Solution to the Perspective-n-Point Problem}, journal={ISPRS Annals of the Photogrammetry, Remote Sensing and Spatial Information Sciences}, volume={III-3}, pages={131--138}, year={2016}, doi={10.5194/isprs-annals-III-3-131-2016}, note={mức tin B; đưa covariance của tia chiếu vào PnP; có trong OpenGV}}
+% chưa đọc kỹ
+@inproceedings{terzakis2020sqpnp, author={Terzakis, George and Lourakis, Manolis}, title={A Consistently Fast and Globally Optimal Solution to the Perspective-n-Point Problem}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, pages={478--494}, year={2020}, doi={10.1007/978-3-030-58452-8_28}, note={mức tin A; SQPnP, có trong OpenCV (SOLVEPNP_SQPNP)}}
+% chưa đọc kỹ
+@inproceedings{zeng2023cpnp, author={Zeng, Guangyang and Chen, Shiyu and Mu, Biqiang and Shi, Guodong and Wu, Junfeng}, title={{CPnP}: Consistent Pose Estimator for Perspective-n-Point Problem with Bias Elimination}, booktitle={IEEE International Conference on Robotics and Automation (ICRA)}, pages={1940--1946}, year={2023}, doi={10.1109/ICRA48891.2023.10160942}, note={mức tin B; ước lượng nhất quán thống kê (consistent) khi n tăng}}
+% chưa đọc kỹ
+
+% ---------------- 3. PnP lặp / tinh chỉnh ----------------
+@article{haralick1989pose, author={Haralick, Robert M. and Joo, Hyonam and Lee, Chung-Nan and Zhuang, Xinhua and Vaidya, Vinay G. and Kim, Man Bae}, title={Pose Estimation from Corresponding Point Data}, journal={IEEE Transactions on Systems, Man, and Cybernetics}, volume={19}, number={6}, pages={1426--1446}, year={1989}, doi={10.1109/21.44063}, note={mức tin A; bài nền cho ước lượng pose lặp và robust}}
+% chưa đọc kỹ
+@article{dementhon1995posit, author={DeMenthon, Daniel F. and Davis, Larry S.}, title={Model-Based Object Pose in 25 Lines of Code}, journal={International Journal of Computer Vision}, volume={15}, number={1-2}, pages={123--141}, year={1995}, doi={10.1007/BF01450852}, note={mức tin A; POSIT}}
+% chưa đọc kỹ
+@article{oberkampf1996coplanar, author={Oberkampf, Denis and DeMenthon, Daniel F. and Davis, Larry S.}, title={Iterative Pose Estimation Using Coplanar Feature Points}, journal={Computer Vision and Image Understanding}, volume={63}, number={3}, pages={495--511}, year={1996}, doi={10.1006/cviu.1996.0037}, note={mức tin A; POSIT cho điểm đồng phẳng}}
+% chưa đọc kỹ
+@article{lu2000orthogonal, author={Lu, Chien-Ping and Hager, Gregory D. and Mjolsness, Eric}, title={Fast and Globally Convergent Pose Estimation from Video Images}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, volume={22}, number={6}, pages={610--622}, year={2000}, doi={10.1109/34.862199}, note={mức tin A; orthogonal iteration (LHM), cực tiểu sai số trong không gian vật}}
+% chưa đọc kỹ
+
+% ---------------- 4. Target phẳng và lưỡng nghĩa ----------------
+@inproceedings{sturm2000plane, author={Sturm, Peter}, title={Algorithms for Plane-Based Pose Estimation}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, volume={1}, pages={706--711}, year={2000}, doi={10.1109/CVPR.2000.855889}, note={mức tin B}}
+% chưa đọc kỹ
+@article{schweighofer2006planar, author={Schweighofer, Gerald and Pinz, Axel}, title={Robust Pose Estimation from a Planar Target}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, volume={28}, number={12}, pages={2024--2030}, year={2006}, doi={10.1109/TPAMI.2006.252}, note={mức tin A; chỉ ra hai cực tiểu địa phương với target phẳng}}
+% chưa đọc kỹ
+@article{collins2014ippe, author={Collins, Toby and Bartoli, Adrien}, title={Infinitesimal Plane-Based Pose Estimation}, journal={International Journal of Computer Vision}, volume={109}, number={3}, pages={252--286}, year={2014}, doi={10.1007/s11263-014-0725-5}, note={mức tin A; IPPE, trả cả hai nghiệm; có trong OpenCV (SOLVEPNP_IPPE)}}
+% chưa đọc kỹ
+
+% ---------------- 5. Tối ưu toàn cục và chứng nhận ----------------
+@inproceedings{olsson2006optimal, author={Olsson, Carl and Kahl, Fredrik and Oskarsson, Magnus}, title={Optimal Estimation of Perspective Camera Pose}, booktitle={International Conference on Pattern Recognition (ICPR)}, pages={5--8}, year={2006}, doi={10.1109/ICPR.2006.909}, note={mức tin B}}
+% chưa đọc kỹ
+@inproceedings{schweighofer2008sos, author={Schweighofer, Gerald and Pinz, Axel}, title={Globally Optimal O(n) Solution to the {PnP} Problem for General Camera Models}, booktitle={British Machine Vision Conference (BMVC)}, pages={55.1--55.10}, year={2008}, doi={10.5244/C.22.55}, note={mức tin B; SDP / sum-of-squares}}
+% chưa đọc kỹ
+@article{olsson2009bnb, author={Olsson, Carl and Kahl, Fredrik and Oskarsson, Magnus}, title={Branch-and-Bound Methods for {Euclidean} Registration Problems}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, volume={31}, number={5}, pages={783--794}, year={2009}, doi={10.1109/TPAMI.2008.131}, note={mức tin A}}
+% chưa đọc kỹ
+@article{hartley2009rotation, author={Hartley, Richard I. and Kahl, Fredrik}, title={Global Optimization through Rotation Space Search}, journal={International Journal of Computer Vision}, volume={82}, number={1}, pages={64--79}, year={2009}, doi={10.1007/s11263-008-0186-9}, note={mức tin A; branch-and-bound trên SO(3), áp cho cả pose tuyệt đối}}
+% chưa đọc kỹ
+@inproceedings{enqvist2008robust, author={Enqvist, Olof and Kahl, Fredrik}, title={Robust Optimal Pose Estimation}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, pages={141--153}, year={2008}, doi={10.1007/978-3-540-88682-2_12}, note={mức tin B; tối ưu toàn cục có ngoại lai}}
+% chưa đọc kỹ
+@article{yang2022certifiable, author={Yang, Heng and Carlone, Luca}, title={Certifiably Optimal Outlier-Robust Geometric Perception: Semidefinite Relaxations and Scalable Global Optimization}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, year={2022}, doi={10.1109/TPAMI.2022.3179463}, note={mức tin A; khung chứng nhận nghiệm toàn cục có ngoại lai; Crossref chưa ghi số tập, trang}}
+% chưa đọc kỹ
+
+% ---------------- 6. Camera không chuẩn: focal, méo, rolling shutter, tổng quát ----------------
+@inproceedings{nister2004gp3p, author={Nistér, David}, title={A Minimal Solution to the Generalised 3-Point Pose Problem}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, volume={1}, pages={560--567}, year={2004}, doi={10.1109/CVPR.2004.1315081}, note={mức tin A; gP3P cho camera tổng quát (nhiều tâm chiếu)}}
+% chưa đọc kỹ
+@inproceedings{kneip2013npnp, author={Kneip, Laurent and Furgale, Paul and Siegwart, Roland}, title={Using Multi-Camera Systems in Robotics: Efficient Solutions to the {NPnP} Problem}, booktitle={IEEE International Conference on Robotics and Automation (ICRA)}, pages={3770--3776}, year={2013}, doi={10.1109/ICRA.2013.6631107}, note={mức tin B}}
+% chưa đọc kỹ
+@inproceedings{bujnak2008p4pf, author={Bujnak, Martin and Kukelova, Zuzana and Pajdla, Tomas}, title={A General Solution to the {P4P} Problem for Camera with Unknown Focal Length}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={1--8}, year={2008}, doi={10.1109/CVPR.2008.4587793}, note={mức tin A; P4Pf}}
+% chưa đọc kỹ
+@inproceedings{kukelova2013p4pfr, author={Kukelova, Zuzana and Bujnak, Martin and Pajdla, Tomas}, title={Real-Time Solution to the Absolute Pose Problem with Unknown Radial Distortion and Focal Length}, booktitle={IEEE International Conference on Computer Vision (ICCV)}, pages={2816--2823}, year={2013}, doi={10.1109/ICCV.2013.350}, note={mức tin A; P4Pfr}}
+% chưa đọc kỹ
+@inproceedings{zheng2016dlsf, author={Zheng, Yinqiang and Kneip, Laurent}, title={A Direct Least-Squares Solution to the {PnP} Problem with Unknown Focal Length}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={1790--1798}, year={2016}, doi={10.1109/CVPR.2016.198}, note={mức tin B; PnPf}}
+% chưa đọc kỹ
+@inproceedings{nakano2016versatile, author={Nakano, Gaku}, title={A Versatile Approach for Solving {PnP}, {PnPf}, and {PnPfr} Problems}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, pages={338--352}, year={2016}, doi={10.1007/978-3-319-46487-9_21}, note={mức tin B}}
+% chưa đọc kỹ
+@inproceedings{larsson2017compact, author={Larsson, Viktor and Kukelova, Zuzana and Zheng, Yinqiang}, title={Making Minimal Solvers for Absolute Pose Estimation Compact and Robust}, booktitle={IEEE International Conference on Computer Vision (ICCV)}, pages={2335--2343}, year={2017}, doi={10.1109/ICCV.2017.254}, note={mức tin B; P4Pf, P4Pfr gọn và ổn định số}}
+% chưa đọc kỹ
+@inproceedings{larsson2019radial, author={Larsson, Viktor and Sattler, Torsten and Kukelova, Zuzana and Pollefeys, Marc}, title={Revisiting Radial Distortion Absolute Pose}, booktitle={IEEE/CVF International Conference on Computer Vision (ICCV)}, pages={1062--1071}, year={2019}, doi={10.1109/ICCV.2019.00115}, note={mức tin B; mô hình 1D radial camera, không cần biết méo}}
+% chưa đọc kỹ
+@inproceedings{albl2015r6p, author={Albl, Cenek and Kukelova, Zuzana and Pajdla, Tomas}, title={{R6P} --- Rolling Shutter Absolute Pose Problem}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={2292--2300}, year={2015}, doi={10.1109/CVPR.2015.7298842}, note={mức tin B}}
+% chưa đọc kỹ
+@article{albl2020rolling, author={Albl, Cenek and Kukelova, Zuzana and Larsson, Viktor and Pajdla, Tomas}, title={Rolling Shutter Camera Absolute Pose}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, volume={42}, number={6}, pages={1439--1452}, year={2020}, doi={10.1109/TPAMI.2019.2894395}, note={mức tin B; bản tạp chí tổng hợp nhánh rolling shutter}}
+% chưa đọc kỹ
+@inproceedings{albl2016rsvertical, author={Albl, Cenek and Kukelova, Zuzana and Pajdla, Tomas}, title={Rolling Shutter Absolute Pose Problem with Known Vertical Direction}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={3355--3363}, year={2016}, doi={10.1109/CVPR.2016.365}, note={mức tin B}}
+% chưa đọc kỹ
+@inproceedings{haner2015refractive, author={Haner, Sebastian and Åström, Kalle}, title={Absolute Pose for Cameras under Flat Refractive Interfaces}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={1428--1436}, year={2015}, doi={10.1109/CVPR.2015.7298749}, note={mức tin B; camera sau kính phẳng (dưới nước)}}
+% chưa đọc kỹ
+@inproceedings{camposeco2016pose, author={Camposeco, Federico and Sattler, Torsten and Pollefeys, Marc}, title={Minimal Solvers for Generalized Pose and Scale Estimation from Two Rays and One Point}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, pages={202--218}, year={2016}, doi={10.1007/978-3-319-46454-1_13}, note={mức tin B}}
+% chưa đọc kỹ
+@inproceedings{camposeco2018hybrid, author={Camposeco, Federico and Cohen, Andrea and Pollefeys, Marc and Sattler, Torsten}, title={Hybrid Camera Pose Estimation}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={136--144}, year={2018}, doi={10.1109/CVPR.2018.00022}, note={mức tin B; trộn tương ứng 2D-3D và 2D-2D trong cùng RANSAC}}
+% chưa đọc kỹ
+@inproceedings{ventura2023p1ac, author={Ventura, Jonathan and Kukelova, Zuzana and Sattler, Torsten and Baráth, Dániel}, title={{P1AC}: Revisiting Absolute Pose From a Single Affine Correspondence}, booktitle={IEEE/CVF International Conference on Computer Vision (ICCV)}, pages={19694--19704}, year={2023}, doi={10.1109/ICCV51070.2023.01809}, note={mức tin B; pose từ một tương ứng affine}}
+% chưa đọc kỹ
+
+% ---------------- 7. Biết hướng trọng lực (prior IMU) ----------------
+@inproceedings{kukelova2010vertical, author={Kukelova, Zuzana and Bujnak, Martin and Pajdla, Tomas}, title={Closed-Form Solutions to Minimal Absolute Pose Problems with Known Vertical Direction}, booktitle={Asian Conference on Computer Vision (ACCV 2010)}, series={LNCS}, pages={216--229}, year={2011}, doi={10.1007/978-3-642-19309-5_17}, note={mức tin A; P2P khi biết hướng thẳng đứng, là up2p trong PoseLib; kỷ yếu ACCV 2010 xuất bản 2011}}
+% chưa đọc kỹ
+@inproceedings{sweeney2015gravity, author={Sweeney, Chris and Flynn, John and Nuernberger, Benjamin and Turk, Matthew and Höllerer, Tobias}, title={Efficient Computation of Absolute Pose for Gravity-Aware Augmented Reality}, booktitle={IEEE International Symposium on Mixed and Augmented Reality (ISMAR)}, pages={19--24}, year={2015}, doi={10.1109/ISMAR.2015.20}, note={mức tin B}}
+% chưa đọc kỹ
+
+% ---------------- 8. Điểm + đường: PnL, PnPL ----------------
+@inproceedings{mirzaei2011pnl, author={Mirzaei, Faraz M. and Roumeliotis, Stergios I.}, title={Globally Optimal Pose Estimation from Line Correspondences}, booktitle={IEEE International Conference on Robotics and Automation (ICRA)}, pages={5581--5588}, year={2011}, doi={10.1109/ICRA.2011.5980272}, note={mức tin B}}
+% chưa đọc kỹ
+@article{xu2017pnl, author={Xu, Chi and Zhang, Lilian and Cheng, Li and Koch, Reinhard}, title={Pose Estimation from Line Correspondences: A Complete Analysis and a Series of Solutions}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, volume={39}, number={6}, pages={1209--1222}, year={2017}, doi={10.1109/TPAMI.2016.2582162}, note={mức tin A}}
+% chưa đọc kỹ
+@inproceedings{vakhitov2016pnpl, author={Vakhitov, Alexander and Funke, Jan and Moreno-Noguer, Francesc}, title={Accurate and Linear Time Pose Estimation from Points and Lines}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, pages={583--599}, year={2016}, doi={10.1007/978-3-319-46478-7_36}, note={mức tin B; EPnPL, OPnPL}}
+% chưa đọc kỹ
+@article{zhou2021pnl, author={Zhou, Lipu and Koppel, Daniel and Kaess, Michael}, title={A Complete, Accurate and Efficient Solution for the Perspective-N-Line Problem}, journal={IEEE Robotics and Automation Letters}, volume={6}, number={2}, pages={699--706}, year={2021}, doi={10.1109/LRA.2020.3047797}, note={mức tin B}}
+% chưa đọc kỹ
+@inproceedings{vakhitov2021uncertainty, author={Vakhitov, Alexander and Ferraz Colomina, Luis and Agudo, Antonio and Moreno-Noguer, Francesc}, title={Uncertainty-Aware Camera Pose Estimation from Points and Lines}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={4657--4666}, year={2021}, doi={10.1109/CVPR46437.2021.00463}, note={mức tin B; đưa bất định của điểm, đường vào PnP(L)}}
+% chưa đọc kỹ
+
+% ---------------- 9. Bất định và loại ngoại lai trong chính bộ giải ----------------
+@inproceedings{ferraz2014reppnp, author={Ferraz, Luis and Binefa, Xavier and Moreno-Noguer, Francesc}, title={Very Fast Solution to the {PnP} Problem with Algebraic Outlier Rejection}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={501--508}, year={2014}, doi={10.1109/CVPR.2014.71}, note={mức tin B; REPPnP, loại ngoại lai không qua RANSAC}}
+% chưa đọc kỹ
+@inproceedings{ferraz2014cepnp, author={Ferraz, Luis and Binefa, Xavier and Moreno-Noguer, Francesc}, title={Leveraging Feature Uncertainty in the {PnP} Problem}, booktitle={British Machine Vision Conference (BMVC)}, pages={83.1--83.13}, year={2014}, doi={10.5244/C.28.83}, note={mức tin B; CEPnP}}
+% chưa đọc kỹ
+
+% ---------------- 10. Ước lượng bền vững: họ RANSAC ----------------
+@article{fischler1981ransac, author={Fischler, Martin A. and Bolles, Robert C.}, title={Random Sample Consensus: A Paradigm for Model Fitting with Applications to Image Analysis and Automated Cartography}, journal={Communications of the ACM}, volume={24}, number={6}, pages={381--395}, year={1981}, doi={10.1145/358669.358692}, note={mức tin A; RANSAC ra đời chính để giải bài toán định vị kiểu P3P}}
+% chưa đọc kỹ
+@inproceedings{chum2003lo, author={Chum, Ondřej and Matas, Jiří and Kittler, Josef}, title={Locally Optimized {RANSAC}}, booktitle={Pattern Recognition (DAGM)}, series={LNCS}, pages={236--243}, year={2003}, doi={10.1007/978-3-540-45243-0_31}, note={mức tin A}}
+% chưa đọc kỹ
+@article{raguram2013usac, author={Raguram, Rahul and Chum, Ondřej and Pollefeys, Marc and Matas, Jiří and Frahm, Jan-Michael}, title={{USAC}: A Universal Framework for Random Sample Consensus}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, volume={35}, number={8}, pages={2022--2038}, year={2013}, doi={10.1109/TPAMI.2012.257}, note={mức tin A}}
+% chưa đọc kỹ
+@inproceedings{barath2018gcransac, author={Barath, Daniel and Matas, Jiří}, title={Graph-Cut {RANSAC}}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={6733--6741}, year={2018}, doi={10.1109/CVPR.2018.00704}, note={mức tin A; bản tạp chí T-PAMI 2021, doi 10.1109/TPAMI.2021.3071812}}
+% chưa đọc kỹ
+@inproceedings{barath2020magsacpp, author={Barath, Daniel and Noskova, Jana and Ivashechkin, Maksym and Matas, Jiří}, title={{MAGSAC++}, a Fast, Reliable and Accurate Robust Estimator}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={1301--1309}, year={2020}, doi={10.1109/CVPR42600.2020.00138}, note={mức tin A; có trong OpenCV USAC}}
+% chưa đọc kỹ
+@inproceedings{campbell2017bnb, author={Campbell, Dylan and Petersson, Lars and Kneip, Laurent and Li, Hongdong}, title={Globally-Optimal Inlier Set Maximisation for Simultaneous Camera Pose and Feature Correspondence}, booktitle={IEEE International Conference on Computer Vision (ICCV)}, pages={1--10}, year={2017}, doi={10.1109/ICCV.2017.10}, note={mức tin B; bản T-PAMI 2020 vol 42 no 2 pp 328-342, doi 10.1109/TPAMI.2018.2848650}}
+% chưa đọc kỹ
+
+% ---------------- 11. Không cần tương ứng biết trước ----------------
+@article{david2004softposit, author={David, Philip and DeMenthon, Daniel and Duraiswami, Ramani and Samet, Hanan}, title={{SoftPOSIT}: Simultaneous Pose and Correspondence Determination}, journal={International Journal of Computer Vision}, volume={59}, number={3}, pages={259--284}, year={2004}, doi={10.1023/B:VISI.0000025800.10423.1f}, note={mức tin A}}
+% chưa đọc kỹ
+@inproceedings{morenonoguer2008priors, author={Moreno-Noguer, Francesc and Lepetit, Vincent and Fua, Pascal}, title={Pose Priors for Simultaneously Solving Alignment and Correspondence}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, pages={405--418}, year={2008}, doi={10.1007/978-3-540-88688-4_30}, note={mức tin B}}
+% chưa đọc kỹ
+@inproceedings{campbell2020blindpnp, author={Campbell, Dylan and Liu, Liu and Gould, Stephen}, title={Solving the Blind Perspective-n-Point Problem End-to-End with Robust Differentiable Geometric Optimization}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, pages={244--261}, year={2020}, doi={10.1007/978-3-030-58536-5_15}, note={mức tin B}}
+% chưa đọc kỹ
+
+% ---------------- 12. PnP khả vi và PnP trong mạng học sâu ----------------
+@inproceedings{brachmann2017dsac, author={Brachmann, Eric and Krull, Alexander and Nowozin, Sebastian and Shotton, Jamie and Michel, Frank and Gumhold, Stefan and Rother, Carsten}, title={{DSAC} --- Differentiable {RANSAC} for Camera Localization}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={2492--2500}, year={2017}, doi={10.1109/CVPR.2017.267}, note={mức tin A}}
+% chưa đọc kỹ
+@inproceedings{brachmann2018dsacpp, author={Brachmann, Eric and Rother, Carsten}, title={Learning Less is More --- {6D} Camera Localization via {3D} Surface Regression}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={4654--4662}, year={2018}, doi={10.1109/CVPR.2018.00489}, note={mức tin A; DSAC++}}
+% chưa đọc kỹ
+@inproceedings{brachmann2019esac, author={Brachmann, Eric and Rother, Carsten}, title={Expert Sample Consensus Applied to Camera Re-Localization}, booktitle={IEEE/CVF International Conference on Computer Vision (ICCV)}, pages={7524--7533}, year={2019}, doi={10.1109/ICCV.2019.00762}, note={mức tin B}}
+% chưa đọc kỹ
+@article{brachmann2021dsacstar, author={Brachmann, Eric and Rother, Carsten}, title={Visual Camera Re-Localization from {RGB} and {RGB-D} Images Using {DSAC}}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, year={2021}, doi={10.1109/TPAMI.2021.3070754}, note={mức tin A; DSAC*; bản in cuối: vol 44 no 9 pp 5847-5865, 2022 (theo ../refs.bib, chưa kiểm lại số trang)}}
+% chưa đọc kỹ
+@inproceedings{peng2019pvnet, author={Peng, Sida and Liu, Yuan and Huang, Qixing and Zhou, Xiaowei and Bao, Hujun}, title={{PVNet}: Pixel-Wise Voting Network for {6DoF} Pose Estimation}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={4556--4565}, year={2019}, doi={10.1109/CVPR.2019.00469}, note={mức tin A; bản T-PAMI 2022 vol 44 no 6 pp 3212-3223, doi 10.1109/TPAMI.2020.3047388}}
+% chưa đọc kỹ
+@inproceedings{chen2020bpnp, author={Chen, Bo and Parra, Alvaro and Cao, Jiewei and Li, Nan and Chin, Tat-Jun}, title={End-to-End Learnable Geometric Vision by Backpropagating {PnP} Optimization}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={8097--8106}, year={2020}, doi={10.1109/CVPR42600.2020.00812}, note={mức tin B; BPnP, đạo hàm qua PnP bằng định lý hàm ẩn}}
+% chưa đọc kỹ
+@inproceedings{wang2021gdrnet, author={Wang, Gu and Manhardt, Fabian and Tombari, Federico and Ji, Xiangyang}, title={{GDR-Net}: Geometry-Guided Direct Regression Network for Monocular {6D} Object Pose Estimation}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={16606--16616}, year={2021}, doi={10.1109/CVPR46437.2021.01634}, note={mức tin B; thay PnP bằng mô-đun Patch-PnP học được}}
+% chưa đọc kỹ
+@inproceedings{chen2022epropnp, author={Chen, Hansheng and Wang, Pichao and Wang, Fan and Tian, Wei and Xiong, Lu and Li, Hao}, title={{EPro-PnP}: Generalized End-to-End Probabilistic Perspective-n-Points for Monocular Object Pose Estimation}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={2771--2780}, year={2022}, doi={10.1109/CVPR52688.2022.00280}, note={mức tin B; PnP xác suất, cho ra phân bố pose thay vì một điểm}}
+% chưa đọc kỹ
+@article{chen2025epropnp, author={Chen, Hansheng and Tian, Wei and Wang, Pichao and Wang, Fan and Xiong, Lu and Li, Hao}, title={{EPro-PnP}: Generalized End-to-End Probabilistic Perspective-n-Points for Monocular Object Pose Estimation}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, volume={47}, number={11}, pages={9413--9425}, year={2025}, doi={10.1109/TPAMI.2024.3354997}, note={mức tin B; bản tạp chí mở rộng của chen2022epropnp}}
+% chưa đọc kỹ
+
+% ---------------- 13. PnP trong định vị thị giác ----------------
+@inproceedings{sarlin2021pixloc, author={Sarlin, Paul-Edouard and Unagar, Ajaykumar and Larsson, Måns and Germain, Hugo and Toft, Carl and Larsson, Viktor and Pollefeys, Marc and Lepetit, Vincent and Hammarstrand, Lars and Kahl, Fredrik and Sattler, Torsten}, title={Back to the Feature: Learning Robust Camera Localization from Pixels to Pose}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={3246--3256}, year={2021}, doi={10.1109/CVPR46437.2021.00326}, note={mức tin B; PixLoc, tinh chỉnh pose bằng đặc trưng học thay cho sai số tái chiếu; tên tác giả thứ 9-11 chép từ trang CVF}}
+% chưa đọc kỹ
+@inproceedings{brachmann2023ace, author={Brachmann, Eric and Cavallari, Tommaso and Prisacariu, Victor Adrian}, title={Accelerated Coordinate Encoding: Learning to Relocalize in Minutes Using {RGB} and Poses}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={5044--5053}, year={2023}, doi={10.1109/CVPR52729.2023.00488}, note={mức tin B}}
+% chưa đọc kỹ
+@inproceedings{wang2024glace, author={Wang, Fangjinhua and Jiang, Xudong and Galliani, Silvano and Vogel, Christoph and Pollefeys, Marc}, title={{GLACE}: Global Local Accelerated Coordinate Encoding}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={5819--5828}, year={2024}, doi={10.1109/CVPR52733.2024.02037}, note={mức tin B}}
+% chưa đọc kỹ
+
+% ---------------- 14. Công cụ sinh bộ giải tối thiểu và thư viện ----------------
+@inproceedings{kukelova2008generator, author={Kukelova, Zuzana and Bujnak, Martin and Pajdla, Tomas}, title={Automatic Generator of Minimal Problem Solvers}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, pages={302--315}, year={2008}, doi={10.1007/978-3-540-88690-7_23}, note={mức tin A}}
+% chưa đọc kỹ
+@inproceedings{larsson2017syzygy, author={Larsson, Viktor and Åström, Kalle and Oskarsson, Magnus}, title={Efficient Solvers for Minimal Problems by Syzygy-Based Reduction}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={2383--2392}, year={2017}, doi={10.1109/CVPR.2017.256}, note={mức tin A}}
+% chưa đọc kỹ
+@inproceedings{kukelova2016quadrics, author={Kukelova, Zuzana and Heller, Jan and Fitzgibbon, Andrew}, title={Efficient Intersection of Three Quadrics and Applications in Computer Vision}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={1799--1808}, year={2016}, doi={10.1109/CVPR.2016.199}, note={mức tin A; bộ giải E3Q3 được PoseLib dùng cho gp3p, p4pf, p6lp, p3ll}}
+% chưa đọc kỹ
+@inproceedings{kneip2014opengv, author={Kneip, Laurent and Furgale, Paul}, title={{OpenGV}: A Unified and Generalized Approach to Real-Time Calibrated Geometric Vision}, booktitle={IEEE International Conference on Robotics and Automation (ICRA)}, pages={1--8}, year={2014}, doi={10.1109/ICRA.2014.6906582}, note={mức tin A; thư viện cài sẵn P3P, EPnP, UPnP, gP3P, NPnP}}
+% chưa đọc kỹ
+
+% ---------------- 15. Bổ sung sau khi đối chiếu mã nguồn OpenCV và PoseLib ----------------
+@article{penate2013exhaustive, author={Penate-Sanchez, Adrian and Andrade-Cetto, Juan and Moreno-Noguer, Francesc}, title={Exhaustive Linearization for Robust Camera Pose and Focal Length Estimation}, journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, volume={35}, number={10}, pages={2387--2400}, year={2013}, doi={10.1109/TPAMI.2013.36}, note={mức tin B; PnP + focal chưa biết; là thứ cờ SOLVEPNP_UPNP của OpenCV thực sự trỏ tới}}
+% chưa đọc kỹ
+@inproceedings{josephson2007hybrid, author={Josephson, Klas and Byröd, Martin and Kahl, Fredrik and Åström, Kalle}, title={Image-Based Localization Using Hybrid Feature Correspondences}, booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={1--8}, year={2007}, doi={10.1109/CVPR.2007.383353}, note={mức tin B; nguồn của bộ giải p2p2pl trong PoseLib}}
+% chưa đọc kỹ
+@inproceedings{hruby2024pointline, author={Hruby, Petr and Duff, Timothy and Pollefeys, Marc}, title={Efficient Solution of Point-Line Absolute Pose}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={21316--21325}, year={2024}, doi={10.1109/CVPR52733.2024.02014}, note={mức tin B; nguồn của p2p1ll, p1p2ll trong PoseLib}}
+% chưa đọc kỹ
+@inproceedings{sweeney2014gdls, author={Sweeney, Chris and Fragoso, Victor and Höllerer, Tobias and Turk, Matthew}, title={{gDLS}: A Scalable Solution to the Generalized Pose and Scale Problem}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, pages={16--31}, year={2014}, doi={10.1007/978-3-319-10593-2_2}, note={mức tin B; pose + scale cho camera tổng quát, dùng khi ghép bản đồ SLAM vào bản đồ SfM}}
+% chưa đọc kỹ
+@inproceedings{fragoso2020gdlsstar, author={Fragoso, Victor and DeGol, Joseph and Hua, Gang}, title={{gDLS*}: Generalized Pose-and-Scale Estimation Given Scale and Gravity Priors}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={2207--2216}, year={2020}, doi={10.1109/CVPR42600.2020.00228}, note={mức tin B}}
+% chưa đọc kỹ
+@misc{poselib, author={Larsson, Viktor and {contributors}}, title={{PoseLib} --- Minimal Solvers for Camera Pose Estimation}, howpublished={\url{https://github.com/PoseLib/PoseLib}}, year={2020}, note={mức tin B; phần mềm, không phải công trình phản biện; entry chép từ mục Citing trong README, bảng bộ giải kiểm ngày 2026-09-25}}
+@misc{opencvsolvepnp, author={{OpenCV team}}, title={{OpenCV} calib3d: solvePnP, solvePnPRansac, solvePnPRefineLM}, howpublished={\url{https://github.com/opencv/opencv/blob/4.x/modules/calib3d/include/opencv2/calib3d.hpp}}, year={2026}, note={mức tin B; phần mềm; danh sách cờ SOLVEPNP_* đọc trực tiếp từ header ngày 2026-09-25}}
+
+% ---------------- 16. Bổ sung 2020–2025 từ quét danh sách CVF (CVPR/ICCV 2021–2025) và ECVA (ECCV 2018–2024) ----------------
+@inproceedings{kukelova2020rsfr, author={Kukelova, Zuzana and Albl, Cenek and Sugimoto, Akihiro and Schindler, Konrad and Pajdla, Tomas}, title={Minimal Rolling Shutter Absolute Pose with Unknown Focal Length and Radial Distortion}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, pages={698--714}, year={2020}, doi={10.1007/978-3-030-58558-7_41}, note={mức tin B}}
+% chưa đọc kỹ
+@inproceedings{bai2022scanline, author={Bai, Fang and Sengupta, Agniva and Bartoli, Adrien}, title={Scanline Homographies for Rolling-Shutter Plane Absolute Pose}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={8983--8992}, year={2022}, doi={10.1109/CVPR52688.2022.00879}, note={mức tin B; rolling shutter + target phẳng}}
+% chưa đọc kỹ
+@inproceedings{hruby2022hard, author={Hruby, Petr and Duff, Timothy and Leykin, Anton and Pajdla, Tomas}, title={Learning to Solve Hard Minimal Problems}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={5522--5532}, year={2022}, doi={10.1109/CVPR52688.2022.00545}, note={mức tin B; hướng mới cho bộ giải tối thiểu nói chung: học để đi thẳng tới một nghiệm thay vì giải mọi nghiệm; chưa kiểm bài toán minh hoạ là gì}}
+% chưa đọc kỹ
+@inproceedings{barath2022learning, author={Barath, Daniel and Cavalli, Luca and Pollefeys, Marc}, title={Learning to Find Good Models in {RANSAC}}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={15723--15732}, year={2022}, doi={10.1109/CVPR52688.2022.01529}, note={mức tin B}}
+% chưa đọc kỹ
+@inproceedings{barath2022sprt, author={Barath, Daniel and Valasek, Gábor}, title={Space-Partitioning {RANSAC}}, booktitle={European Conference on Computer Vision (ECCV)}, series={LNCS}, pages={721--737}, year={2022}, doi={10.1007/978-3-031-19824-3_42}, note={mức tin B}}
+% chưa đọc kỹ
+@inproceedings{wei2023gdransac, author={Wei, Tong and Patel, Yash and Shekhovtsov, Alexander and Matas, Jiří and Barath, Daniel}, title={Generalized Differentiable {RANSAC}}, booktitle={IEEE/CVF International Conference on Computer Vision (ICCV)}, pages={17603--17614}, year={2023}, doi={10.1109/ICCV51070.2023.01618}, note={mức tin B}}
+% chưa đọc kỹ
+@inproceedings{yang2023conformal, author={Yang, Heng and Pavone, Marco}, title={Object Pose Estimation with Statistical Guarantees: Conformal Keypoint Detection and Geometric Uncertainty Propagation}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={8947--8958}, year={2023}, doi={10.1109/CVPR52729.2023.00864}, note={mức tin B; lan truyền vùng bất định của keypoint qua PnP thành vùng bất định của pose, có bảo đảm thống kê}}
+% chưa đọc kỹ
+@inproceedings{ventura2024scaled, author={Ventura, Jonathan and Kukelova, Zuzana and Sattler, Torsten and Baráth, Dániel}, title={Absolute Pose from One or Two Scaled and Oriented Features}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={20870--20880}, year={2024}, doi={10.1109/CVPR52733.2024.01972}, note={mức tin B; dùng scale + orientation của keypoint để giảm số tương ứng tối thiểu}}
+% chưa đọc kỹ
+@inproceedings{dibene2025pencils, author={Dibene, Juan C. and Dunn, Enrique}, title={Camera Resection from Known Line Pencils and a Radially Distorted Scanline}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={15843--15851}, year={2025}, doi={10.1109/CVPR52734.2025.01477}, note={mức tin C; rất mới, chưa có tái lập; bài toán hẹp}}
+% chưa đọc kỹ
+@inproceedings{an2025mincdpnp, author={An, Pei and Yang, Jiaqi and Peng, Muyao and Yang, You and Liu, Qiong and Wu, Xiaolin and Nan, Liangliang}, title={{MinCD-PnP}: Learning {2D-3D} Correspondences with Approximate Blind {PnP}}, booktitle={IEEE/CVF International Conference on Computer Vision (ICCV)}, pages={26519--26528}, year={2025}, doi={10.1109/ICCV51701.2025.02461}, note={mức tin C; rất mới, chưa có tái lập}}
+% chưa đọc kỹ
+@inproceedings{brachmann2024ace0, author={Brachmann, Eric and Wynn, Jamie and Chen, Shuai and Cavallari, Tommaso and Monszpart, Áron and Turmukhambetov, Daniyar and Prisacariu, Victor Adrian}, title={Scene Coordinate Reconstruction: Posing of Image Collections via Incremental Learning of a Relocalizer}, booktitle={European Conference on Computer Vision (ECCV 2024)}, series={LNCS}, pages={421--440}, year={2025}, doi={10.1007/978-3-031-72992-8_24}, note={mức tin B; ACE0 — dựng SfM chỉ bằng scene coordinate regression + PnP-RANSAC; kỷ yếu ECCV 2024 xuất bản 2025}}
+% chưa đọc kỹ
+@inproceedings{jiang2025rscore, author={Jiang, Xudong and Wang, Fangjinhua and Galliani, Silvano and Vogel, Christoph and Pollefeys, Marc}, title={{R-SCoRe}: Revisiting Scene Coordinate Regression for Robust Large-Scale Visual Localization}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, year={2025}, note={mức tin C; Crossref chưa có bản ghi ngày 2026-09-25 — kiểm tên bài và tác giả trên trang CVF open access, chưa có DOI; tác giả thứ 5 (Pollefeys) đọc từ id biểu mẫu trên trang CVF}}
+% chưa đọc kỹ
+@inproceedings{su2022zebrapose, author={Su, Yongzhi and Saleh, Mahdi and Fetzer, Torben and Rambach, Jason and Navab, Nassir and Busam, Benjamin and Stricker, Didier and Tombari, Federico}, title={{ZebraPose}: Coarse to Fine Surface Encoding for {6DoF} Object Pose Estimation}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={6728--6738}, year={2022}, doi={10.1109/CVPR52688.2022.00662}, note={mức tin B; tương ứng 2D-3D dày đặc rồi PnP-RANSAC — đại diện nhánh 'học tương ứng, giữ PnP cổ điển'}}
+% chưa đọc kỹ
+@inproceedings{haugaard2022surfemb, author={Haugaard, Rasmus Laurvig and Buch, Anders Glent}, title={{SurfEmb}: Dense and Continuous Correspondence Distributions for Object Pose Estimation with Learnt Surface Embeddings}, booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages={6739--6748}, year={2022}, doi={10.1109/CVPR52688.2022.00663}, note={mức tin B}}
+% chưa đọc kỹ
