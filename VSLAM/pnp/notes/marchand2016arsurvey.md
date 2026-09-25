@@ -171,7 +171,7 @@ Tổng: 21/21 PASS, thời gian 57.6s
 - `kneip2011p3p`: bài khuyên dùng trong RANSAC [tr. 3–4]; khớp mục 7 [5].
 - `fischler1981ransac`: nguồn của RANSAC và công thức số vòng [tr. 5]; bài nói RANSAC được đề xuất "để giải P3P" — khớp với ghi chú `notes/fischler1981ransac.md` (bài gốc giới thiệu RANSAC cùng bài toán định vị LDP/PnP).
 - `dementhon1995posit`, `oberkampf1996coplanar`: POSIT và bản cho điểm đồng phẳng [tr. 4].
-- `lu2000orthogonal`: được nhắc như cách lặp trên sai số đại số, nhanh nhưng còn cực tiểu địa phương [tr. 5]. Nhan đề bài gốc lại là "globally convergent" — hai cách nói này chưa khớp nhau; cần đọc `lu2000orthogonal` để phân xử.
+- `lu2000orthogonal`: được nhắc như cách lặp trên sai số đại số, nhanh nhưng còn cực tiểu địa phương [tr. 5]. Nhan đề bài gốc lại là "globally convergent" — hai cách nói này chưa khớp nhau; cần đọc `lu2000orthogonal` để phân xử. **Đã phân xử (2026-09-25, xem `notes/lu2000orthogonal.md`):** hàm mục tiêu của Lu et al. là khoảng cách hình học trong không gian vật (object-space collinearity), không phải sai số đại số như survey gọi; "globally convergent" nghĩa là hội tụ về một điểm bất động từ mọi khởi tạo (định lý Zangwill), không phải tới cực tiểu toàn cục — nên survey đúng ở ý "vẫn có cực tiểu địa phương" nhưng gọi sai tên hàm mục tiêu.
 - `olsson2009bnb`: tối ưu toàn cục bằng branch-and-bound, đắt [tr. 5].
 - `hartley2004` ([48] trong bài, bản 2001): nguồn của DLT, "gold standard" và tuyên bố tương đương hình học/đại số.
 - `collins2014ippe`: không được nhắc (bài ra trước khi IPPE phổ biến trong OpenCV); với target phẳng, bài chỉ trình bày cách đọc cột của H, còn IPPE giải trực tiếp và xử lý lưỡng nghĩa — thứ bài không nhắc tới [M].

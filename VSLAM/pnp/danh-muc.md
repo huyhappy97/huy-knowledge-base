@@ -23,7 +23,7 @@ Nếu chỉ có thời gian cho khoảng mười bài, đi theo thứ tự này.
 *bộ giải* rồi tới *hệ thống*, không theo năm công bố:
 
 1. **marchand2016arsurvey** — bức tranh toàn cảnh, có mã; đọc trước để có từ vựng.
-2. **haralick1994review** — P3P là gì, vì sao có tới bốn nghiệm, lịch sử từ Grunert 1841.
+2. **haralick1994review** — P3P là gì, tối đa bốn nghiệm, sáu lời giải từ Grunert 1841 quy về một khung, và vì sao thứ tự thế biến đổi quyết định độ chính xác số.
 3. **lepetit2009epnp** — bộ giải n điểm được dùng nhiều nhất; ý tưởng bốn điểm điều khiển.
 4. **lu2000orthogonal** — cách nghĩ ngược lại: lặp để cực tiểu sai số trong không gian vật.
 5. **terzakis2020sqpnp** — PnP tối ưu toàn cục hiện đại, đang là cờ mặc định nên dùng trong OpenCV.
@@ -59,7 +59,7 @@ Ba điểm là số tương ứng ít nhất xác định được pose (sáu �
 bài toán có tối đa bốn nghiệm thực. Lịch sử nhánh này là lịch sử của việc làm cho bộ giải
 **ổn định số hơn và nhanh hơn**, vì trong RANSAC nó chạy hàng nghìn lần mỗi ảnh.
 
-- ★ **Review and Analysis of Solutions of the Three Point Perspective Pose Estimation Problem** — Haralick, Lee, Ottenberg, Nölle — *IJCV*, 1994 `[A]`. So sánh các lời giải từ Grunert 1841 trở đi; nền lịch sử và số nghiệm. [haralick1994review]
+- ★ **Review and Analysis of Solutions of the Three Point Perspective Pose Estimation Problem** — Haralick, Lee, Ottenberg, Nölle — *IJCV*, 1994 `[A]`. Quy sáu lời giải từ Grunert 1841 về một khung ký hiệu và phân tích ổn định số; chỉ *khẳng định* tối đa bốn nghiệm, không chứng minh. Có bốn lỗi in trong công thức — xem ghi chú. [haralick1994review]
 - **The Perspective View of Three Points** — Wolfe, Mathis, Sklair, Magee — *IEEE T-PAMI*, 1991 `[B]`. Hình học của việc khi nào có nhiều nghiệm. [wolfe1991perspective]
 - **Complete Solution Classification for the Perspective-Three-Point Problem** — Gao, Hou, Tang, Cheng — *IEEE T-PAMI*, 2003 `[A]`. Phân loại đầy đủ số nghiệm thực theo cấu hình. [gao2003p3p]
 - ★ **A Novel Parametrization of the P3P Problem for a Direct Computation of Absolute Camera Position and Orientation** — Kneip, Scaramuzza, Siegwart — *CVPR*, 2011 `[A]`. Tính thẳng R, t, bỏ bước trung gian qua khoảng cách. [kneip2011p3p]
@@ -97,7 +97,7 @@ trên ảnh hay sai số trong không gian vật.
 - **Pose Estimation from Corresponding Point Data** — Haralick, Joo, Lee, Zhuang, Vaidya, Kim — *IEEE Trans. SMC*, 1989 `[A]`. [haralick1989pose]
 - ★ **Model-Based Object Pose in 25 Lines of Code** (POSIT) — DeMenthon, Davis — *IJCV*, 1995 `[A]`. Lặp từ xấp xỉ phối cảnh yếu. [dementhon1995posit]
 - **Iterative Pose Estimation Using Coplanar Feature Points** — Oberkampf, DeMenthon, Davis — *CVIU*, 1996 `[A]`. POSIT cho điểm đồng phẳng. [oberkampf1996coplanar]
-- ★ **Fast and Globally Convergent Pose Estimation from Video Images** (LHM / orthogonal iteration) — Lu, Hager, Mjolsness — *IEEE T-PAMI*, 2000 `[A]`. Cực tiểu sai số trong không gian vật; hội tụ toàn cục theo tuyên bố của tác giả. [lu2000orthogonal]
+- ★ **Fast and Globally Convergent Pose Estimation from Video Images** (LHM / orthogonal iteration) — Lu, Hager, Mjolsness — *IEEE T-PAMI*, 2000 `[A]`. Cực tiểu khoảng cách hình học trong không gian vật. "Hội tụ toàn cục" nghĩa là hội tụ về một điểm bất động từ mọi khởi tạo (Zangwill), **không** phải tới cực tiểu toàn cục — ghi chú đo được 4–46 % khởi tạo dừng ở nghiệm khác nghiệm tốt nhất. [lu2000orthogonal]
 
 ## 4. Target phẳng và lưỡng nghĩa
 
@@ -266,6 +266,23 @@ Nền hình học đại số mà `00-cau-hoi.md` liệt kê là "chưa có tron
   Code gọi hai cờ này sẽ không báo lỗi, chỉ ra kết quả của một thuật toán khác.
 - `SOLVEPNP_UPNP` trỏ tới Penate-Sanchez 2013, **không phải** UPnP của Kneip 2014 dù trùng tên.
 - `SOLVEPNP_P3P` / `SOLVEPNP_AP3P` đòi **đúng 4 điểm**: ba điểm để giải, điểm thứ tư để chọn nghiệm.
+
+Bổ sung sau khi đọc bài và chạy thử trên **OpenCV 5.0.0** (2026-09-25, chi tiết trong `notes/`):
+
+- `SOLVEPNP_P3P` của bản 5.0.0 cho kết quả trùng bộ giải Ding 2023 dựng lại từ bài (sai khác trung vị
+  3e-14) — nhưng khi ba điểm gần thẳng hàng sai số tăng ~1/ε², tệ hơn hẳn AP3P (~1/ε). (`ding2023p3p`)
+- Ở cấu hình nghiệm kép (ví dụ Fig. 5 của Fischler–Bolles), cả `P3P` lẫn `AP3P` trả về 2 trong 4 nghiệm
+  hợp lệ; hai nghiệm kia là NaN hoặc sai. (`fischler1981ransac`)
+- `AP3P` trả trung bình 2,35 nghiệm mỗi lần, 28 % sai hình học — cần lọc bằng điểm thứ tư. (`ding2023p3p`)
+- `SOLVEPNP_EPNP` **không phải** thuật toán EPnP của bài báo: không có bước tái tuyến tính hoá, không có
+  nhánh phẳng. Trên dữ liệu **không nhiễu** nó trượt (> 0,01°) ở 24/50 cảnh tổng quát khi n = 4, 50/50
+  cảnh phẳng khi n = 4 và 8–16 % cảnh phẳng khi n ≥ 6 — tôi tự đo lại, khớp với ghi chú. Với target
+  phẳng hãy dùng `SOLVEPNP_IPPE` hoặc `SQPNP`. (`lepetit2009epnp`)
+- `SOLVEPNP_IPPE` tính translation bằng bình phương tối thiểu (eq. 36 của bài), nên hai nghiệm không
+  chung tâm như công thức đóng eq. 28; `reprojectionError` trả về là RMSE chia √2. (`collins2014ippe`)
+- Công thức in trong một số bài nền **sai** và không được chép nguyên văn: IPPE eq. (14), (22);
+  Lu–Hager eq. (16); Haralick eq. (51) và hệ số Finsterwalder; Ding eq. (21) (vô hại); Marchand thiếu
+  bước khử thang của DLT và chiều cập nhật exp. Mỗi ghi chú mục 8 nói cách sửa.
 
 Cũng trong lúc kiểm: trang ECVA gắn DOI của SQPnP là `…-58452-8_27`, nhưng DOI đó thuộc một bài
 khác; DOI đúng (Crossref) là `…-58452-8_28`. Một ví dụ cụ thể cho quy tắc "không đoán DOI, không
