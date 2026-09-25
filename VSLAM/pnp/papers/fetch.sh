@@ -3,7 +3,8 @@
 # (research-rules.md mục 1: papers/<bibkey>.pdf). PDF KHÔNG được commit (xem .gitignore).
 #
 # Mỗi URL dưới đây đã được kiểm ngày 2026-09-25: trả HTTP 200, content-type application/pdf.
-# Chỉ có bản open-access chính thức (CVF open access, ECVA, Copernicus). Bài IEEE / Springer
+# Bản open-access chính thức (CVF open access, ECVA, Copernicus, arXiv) hoặc bản tác giả / viện
+# của tác giả tự đăng (nhóm cuối danh sách). Bài IEEE / Springer
 # / Elsevier không có bản mở thì không nằm ở đây — mở qua DOI trong refs.bib.
 #
 #   ./fetch.sh            tải mọi bài còn thiếu
@@ -77,6 +78,13 @@ declare -A URL=(
   [sattler2018benchmarking]="$CVF/content_cvpr_2018/papers/Sattler_Benchmarking_6DOF_Outdoor_CVPR_2018_paper.pdf"
   # --- tiền ấn arXiv (bản chính thức duy nhất) ---
   [barath2025superansac]="https://arxiv.org/pdf/2506.04803"
+  # --- bản tác giả / viện tự đăng (bài trong lộ trình đọc) ---
+  [marchand2016arsurvey]="http://rainbow-doc.irisa.fr/pdf/2016_ieeetvcg_marchand.pdf"
+  [haralick1994review]="https://haralick.org/journals/three_point_perspective.pdf"
+  [lepetit2009epnp]="https://www.tugraz.at/fileadmin/user_upload/Institute/ICG/Images/team_lepetit/publications/lepetit_ijcv08.pdf"
+  [lu2000orthogonal]="http://computableplant.ics.uci.edu/papers/2000/LuHagerMjolsness.pdf"
+  [collins2014ippe]="https://encov.ip.uca.fr/publications/pubfiles/2014_Collins_etal_IJCV_plane.pdf"
+  [fischler1981ransac]="https://www.sri.com/wp-content/uploads/2021/12/ransac-publication.pdf"
 )
 keys=("$@"); [ ${#keys[@]} -eq 0 ] && keys=("${!URL[@]}")
 ok=0; skip=0; fail=0
